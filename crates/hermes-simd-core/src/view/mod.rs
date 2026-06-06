@@ -19,7 +19,11 @@ pub mod tile;
 
 pub use tile::{TileView, TileMatrixMultiply};
 
+/// Module containing the generic SIMD vector register wrappers.
 pub mod vector_reg;
+/// Module containing operator overload implementations for SIMD vectors.
+pub mod vector_ops;
+/// Module containing the SIMD mask register wrappers.
 pub mod mask_reg;
 
 pub use vector_reg::Vector;

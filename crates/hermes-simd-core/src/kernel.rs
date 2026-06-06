@@ -42,7 +42,7 @@
 /// attribute on each `impl` block ensures the compiler emits the correct machine instruction;
 /// calling from a non-gated context requires wrapping in an `unsafe { ... }` block inside
 /// a function that is itself gated by `#[target_feature(enable = "...")]`.
-pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + Sync + 'static {
+pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + Sync + Sized + 'static {
     /// The underlying raw register/vector type for this architecture and element type.
     type Vector: Copy + Send + Sync + 'static;
 
@@ -271,13 +271,8 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     ///
     /// # Safety
     /// Processor must support the required target feature.
-    unsafe fn mask_from_bitmask(bm: u64) -> Self::Mask
-    {
-        let mut bools = [false; 64];
-        for i in 0..Self::LANE_COUNT {
-            bools[i] = (bm >> i) & 1 == 1;
-        }
-        Self::mask_from_bools(&bools[..Self::LANE_COUNT])
+    unsafe fn mask_from_bitmask(bm: u64) -> Self::Mask {
+        crate::kernel_helpers::generic_mask_from_bitmask::<T, Self>(bm)
     }
 
     /// Set all lanes to zero.
@@ -303,14 +298,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn div(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        let mut buf_a = [T::ZERO; 128];
-        let mut buf_b = [T::ZERO; 128];
-        Self::store_unaligned(buf_a.as_mut_ptr(), a);
-        Self::store_unaligned(buf_b.as_mut_ptr(), b);
-        for i in 0..Self::LANE_COUNT {
-            buf_a[i] = buf_a[i] / buf_b[i];
-        }
-        Self::load_unaligned(buf_a.as_ptr())
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| x / y)
     }
 
     /// Elementwise bitwise AND: `a & b`.
@@ -318,14 +306,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn bitand(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        let mut buf_a = [T::ZERO; 128];
-        let mut buf_b = [T::ZERO; 128];
-        Self::store_unaligned(buf_a.as_mut_ptr(), a);
-        Self::store_unaligned(buf_b.as_mut_ptr(), b);
-        for i in 0..Self::LANE_COUNT {
-            buf_a[i] = buf_a[i].bitand(buf_b[i]);
-        }
-        Self::load_unaligned(buf_a.as_ptr())
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| x.bitand(y))
     }
 
     /// Elementwise bitwise OR: `a | b`.
@@ -333,14 +314,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn bitor(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        let mut buf_a = [T::ZERO; 128];
-        let mut buf_b = [T::ZERO; 128];
-        Self::store_unaligned(buf_a.as_mut_ptr(), a);
-        Self::store_unaligned(buf_b.as_mut_ptr(), b);
-        for i in 0..Self::LANE_COUNT {
-            buf_a[i] = buf_a[i].bitor(buf_b[i]);
-        }
-        Self::load_unaligned(buf_a.as_ptr())
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| x.bitor(y))
     }
 
     /// Elementwise bitwise XOR: `a ^ b`.
@@ -348,14 +322,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn bitxor(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        let mut buf_a = [T::ZERO; 128];
-        let mut buf_b = [T::ZERO; 128];
-        Self::store_unaligned(buf_a.as_mut_ptr(), a);
-        Self::store_unaligned(buf_b.as_mut_ptr(), b);
-        for i in 0..Self::LANE_COUNT {
-            buf_a[i] = buf_a[i].bitxor(buf_b[i]);
-        }
-        Self::load_unaligned(buf_a.as_ptr())
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| x.bitxor(y))
     }
 
     /// Elementwise absolute value.
@@ -363,12 +330,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn abs(a: Self::Vector) -> Self::Vector {
-        let mut buf = [T::ZERO; 128];
-        Self::store_unaligned(buf.as_mut_ptr(), a);
-        for i in 0..Self::LANE_COUNT {
-            buf[i] = buf[i].abs();
-        }
-        Self::load_unaligned(buf.as_ptr())
+        crate::kernel_helpers::generic_unary_op::<T, Self, _>(a, |x| x.abs())
     }
 
     /// Elementwise minimum of `a` and `b`.
@@ -376,14 +338,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn min(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        let mut buf_a = [T::ZERO; 128];
-        let mut buf_b = [T::ZERO; 128];
-        Self::store_unaligned(buf_a.as_mut_ptr(), a);
-        Self::store_unaligned(buf_b.as_mut_ptr(), b);
-        for i in 0..Self::LANE_COUNT {
-            buf_a[i] = if buf_a[i] < buf_b[i] { buf_a[i] } else { buf_b[i] };
-        }
-        Self::load_unaligned(buf_a.as_ptr())
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| if x < y { x } else { y })
     }
 
     /// Elementwise maximum of `a` and `b`.
@@ -391,14 +346,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn max(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        let mut buf_a = [T::ZERO; 128];
-        let mut buf_b = [T::ZERO; 128];
-        Self::store_unaligned(buf_a.as_mut_ptr(), a);
-        Self::store_unaligned(buf_b.as_mut_ptr(), b);
-        for i in 0..Self::LANE_COUNT {
-            buf_a[i] = if buf_a[i] > buf_b[i] { buf_a[i] } else { buf_b[i] };
-        }
-        Self::load_unaligned(buf_a.as_ptr())
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| if x > y { x } else { y })
     }
 
     /// Elementwise square root.
@@ -406,12 +354,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn sqrt(a: Self::Vector) -> Self::Vector {
-        let mut buf = [T::ZERO; 128];
-        Self::store_unaligned(buf.as_mut_ptr(), a);
-        for i in 0..Self::LANE_COUNT {
-            buf[i] = buf[i].sqrt();
-        }
-        Self::load_unaligned(buf.as_ptr())
+        crate::kernel_helpers::generic_unary_op::<T, Self, _>(a, |x| x.sqrt())
     }
 
     /// Elementwise equal: `a == b`.
@@ -419,14 +362,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn cmp_eq(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        let mut buf_a = [T::ZERO; 128];
-        let mut buf_b = [T::ZERO; 128];
-        Self::store_unaligned(buf_a.as_mut_ptr(), a);
-        Self::store_unaligned(buf_b.as_mut_ptr(), b);
-        for i in 0..Self::LANE_COUNT {
-            buf_a[i] = if buf_a[i] == buf_b[i] { T::ALL_ONES } else { T::ZERO };
-        }
-        Self::load_unaligned(buf_a.as_ptr())
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| if x == y { T::ALL_ONES } else { T::ZERO })
     }
 
     /// Elementwise not equal: `a != b`.
@@ -434,14 +370,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn cmp_ne(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        let mut buf_a = [T::ZERO; 128];
-        let mut buf_b = [T::ZERO; 128];
-        Self::store_unaligned(buf_a.as_mut_ptr(), a);
-        Self::store_unaligned(buf_b.as_mut_ptr(), b);
-        for i in 0..Self::LANE_COUNT {
-            buf_a[i] = if buf_a[i] != buf_b[i] { T::ALL_ONES } else { T::ZERO };
-        }
-        Self::load_unaligned(buf_a.as_ptr())
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| if x != y { T::ALL_ONES } else { T::ZERO })
     }
 
     /// Elementwise less than: `a < b`.
@@ -449,14 +378,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn cmp_lt(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        let mut buf_a = [T::ZERO; 128];
-        let mut buf_b = [T::ZERO; 128];
-        Self::store_unaligned(buf_a.as_mut_ptr(), a);
-        Self::store_unaligned(buf_b.as_mut_ptr(), b);
-        for i in 0..Self::LANE_COUNT {
-            buf_a[i] = if buf_a[i] < buf_b[i] { T::ALL_ONES } else { T::ZERO };
-        }
-        Self::load_unaligned(buf_a.as_ptr())
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| if x < y { T::ALL_ONES } else { T::ZERO })
     }
 
     /// Elementwise less than or equal: `a <= b`.
@@ -464,14 +386,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn cmp_le(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        let mut buf_a = [T::ZERO; 128];
-        let mut buf_b = [T::ZERO; 128];
-        Self::store_unaligned(buf_a.as_mut_ptr(), a);
-        Self::store_unaligned(buf_b.as_mut_ptr(), b);
-        for i in 0..Self::LANE_COUNT {
-            buf_a[i] = if buf_a[i] <= buf_b[i] { T::ALL_ONES } else { T::ZERO };
-        }
-        Self::load_unaligned(buf_a.as_ptr())
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| if x <= y { T::ALL_ONES } else { T::ZERO })
     }
 
     /// Elementwise greater than: `a > b`.
@@ -479,14 +394,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn cmp_gt(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        let mut buf_a = [T::ZERO; 128];
-        let mut buf_b = [T::ZERO; 128];
-        Self::store_unaligned(buf_a.as_mut_ptr(), a);
-        Self::store_unaligned(buf_b.as_mut_ptr(), b);
-        for i in 0..Self::LANE_COUNT {
-            buf_a[i] = if buf_a[i] > buf_b[i] { T::ALL_ONES } else { T::ZERO };
-        }
-        Self::load_unaligned(buf_a.as_ptr())
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| if x > y { T::ALL_ONES } else { T::ZERO })
     }
 
     /// Elementwise greater than or equal: `a >= b`.
@@ -494,14 +402,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn cmp_ge(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        let mut buf_a = [T::ZERO; 128];
-        let mut buf_b = [T::ZERO; 128];
-        Self::store_unaligned(buf_a.as_mut_ptr(), a);
-        Self::store_unaligned(buf_b.as_mut_ptr(), b);
-        for i in 0..Self::LANE_COUNT {
-            buf_a[i] = if buf_a[i] >= buf_b[i] { T::ALL_ONES } else { T::ZERO };
-        }
-        Self::load_unaligned(buf_a.as_ptr())
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| if x >= y { T::ALL_ONES } else { T::ZERO })
     }
 
     /// Elementwise blend: select lanes from `true_val` where the sign bit of `mask` is set,
@@ -510,17 +411,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn blend(mask: Self::Vector, true_val: Self::Vector, false_val: Self::Vector) -> Self::Vector {
-        let mut buf_mask = [T::ZERO; 128];
-        let mut buf_true = [T::ZERO; 128];
-        let mut buf_false = [T::ZERO; 128];
-        Self::store_unaligned(buf_mask.as_mut_ptr(), mask);
-        Self::store_unaligned(buf_true.as_mut_ptr(), true_val);
-        Self::store_unaligned(buf_false.as_mut_ptr(), false_val);
-        for i in 0..Self::LANE_COUNT {
-            let is_true = buf_mask[i].is_nan() || buf_mask[i].to_f64() != 0.0;
-            buf_true[i] = if is_true { buf_true[i] } else { buf_false[i] };
-        }
-        Self::load_unaligned(buf_true.as_ptr())
+        crate::kernel_helpers::generic_blend::<T, Self>(mask, true_val, false_val)
     }
 
     /// Elementwise unary negation: `-a`.

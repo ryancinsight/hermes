@@ -162,49 +162,11 @@ impl<'a> Packed4Slice<'a, F4> {
     #[inline]
     pub fn unpack_to_f32(&self, dest: &mut [F32]) {
         let n = self.len.min(dest.len());
-        for i in 0..(n / 2) {
-            let byte = self.data[i] as u32;
-            let b1 = byte & 0x0f;
-            let b2 = (byte >> 4) & 0x0f;
-
-            let sign1 = (b1 & 0x08) << 28;
-            let exp1 = b1 & 0x07;
-            let f32_val1 = if exp1 == 0 {
-                f32::from_bits(sign1)
-            } else if exp1 == 7 {
-                f32::NAN
-            } else {
-                let f32_exp = (exp1 + 127 - 3) << 23;
-                f32::from_bits(sign1 | f32_exp)
-            };
-            dest[2 * i] = F32(f32_val1);
-
-            let sign2 = (b2 & 0x08) << 28;
-            let exp2 = b2 & 0x07;
-            let f32_val2 = if exp2 == 0 {
-                f32::from_bits(sign2)
-            } else if exp2 == 7 {
-                f32::NAN
-            } else {
-                let f32_exp = (exp2 + 127 - 3) << 23;
-                f32::from_bits(sign2 | f32_exp)
-            };
-            dest[2 * i + 1] = F32(f32_val2);
-        }
+        let even_len = (n / 2) * 2;
+        super::unpack::unpack_f4_to_f32_packed(&self.data[..even_len / 2], &mut dest[..even_len]);
         if n % 2 != 0 {
             if let Some(b) = self.get(n - 1) {
-                let b_val = b.0 as u32;
-                let sign = (b_val & 0x08) << 28;
-                let exp = b_val & 0x07;
-                let f32_val = if exp == 0 {
-                    f32::from_bits(sign)
-                } else if exp == 7 {
-                    f32::NAN
-                } else {
-                    let f32_exp = (exp + 127 - 3) << 23;
-                    f32::from_bits(sign | f32_exp)
-                };
-                dest[n - 1] = F32(f32_val);
+                dest[n - 1] = F32(b.to_f32());
             }
         }
     }

@@ -596,6 +596,33 @@ fn test_low_precision_unpacking() {
     assert_eq!(unpacked_bf16_pairs[1].to_f32(), -1.0);
     assert_eq!(unpacked_bf16_pairs[2].to_f32(), 1.5);
     assert_eq!(unpacked_bf16_pairs[3].to_f32(), 0.0);
+
+    // F4 Unpacked
+    use hermes_numeric::{F4, F32, unpack_f4_to_f32, unpack_f4_to_f32_packed};
+    let f4_inputs = [
+        F4::from_f32(0.0),
+        F4::from_f32(1.0),
+        F4::from_f32(-1.0),
+        F4::from_f32(2.0),
+    ];
+    let mut f32_outputs = [F32(0.0); 4];
+    unpack_f4_to_f32(&f4_inputs, &mut f32_outputs);
+    assert_eq!(f32_outputs[0].0, 0.0);
+    assert_eq!(f32_outputs[1].0, 1.0);
+    assert_eq!(f32_outputs[2].0, -1.0);
+    assert_eq!(f32_outputs[3].0, 2.0);
+
+    // F4 Packed
+    let mut packed_bytes_f4 = [0u8; 2];
+    packed_bytes_f4[0] = F4::pack_pair(F4::from_f32(1.0), F4::from_f32(-1.0));
+    packed_bytes_f4[1] = F4::pack_pair(F4::from_f32(2.0), F4::from_f32(0.0));
+    
+    let mut unpacked_f32_pairs = [F32(0.0); 4];
+    unpack_f4_to_f32_packed(&packed_bytes_f4, &mut unpacked_f32_pairs);
+    assert_eq!(unpacked_f32_pairs[0].0, 1.0);
+    assert_eq!(unpacked_f32_pairs[1].0, -1.0);
+    assert_eq!(unpacked_f32_pairs[2].0, 2.0);
+    assert_eq!(unpacked_f32_pairs[3].0, 0.0);
 }
 
 #[test]
@@ -808,6 +835,69 @@ fn test_vectorized_packed_unpackers() {
         let expected = F4(val).to_f32();
         assert_eq!(unpacked_f32[i].0, expected, "F4 mismatch at index {}", i);
     }
+}
+
+#[test]
+fn test_packed4_cow() {
+    use hermes_numeric::{Bf4, F4, Bf16, F32};
+    use hermes_simd::{Packed4Cow, PackedBf4Cow, PackedF4Cow, PackedBf4CowExt, PackedF4CowExt, Scalar, Unaligned, SimdCow};
+
+    // 1. Test PackedBf4Cow Borrowed
+    let original_bytes = vec![
+        Bf4::pack_pair(Bf4::from_f32(1.0), Bf4::from_f32(-1.0)),
+        Bf4::pack_pair(Bf4::from_f32(3.0), Bf4::from_f32(0.0)),
+    ];
+    let mut cow = PackedBf4Cow::from_packed_slice(&original_bytes, 4).unwrap();
+    assert!(matches!(cow, Packed4Cow::Borrowed(_)));
+    assert_eq!(cow.len(), 4);
+    assert_eq!(cow.get(0).unwrap().to_f32(), 1.0);
+    assert_eq!(cow.get(1).unwrap().to_f32(), -1.0);
+    assert_eq!(cow.get(2).unwrap().to_f32(), 3.0);
+    assert_eq!(cow.get(3).unwrap().to_f32(), 0.0);
+
+    // 2. Upgrade to Mut/Owned
+    cow.set(1, Bf4::from_f32(1.5));
+    assert!(matches!(cow, Packed4Cow::Owned(_)));
+    assert_eq!(cow.get(1).unwrap().to_f32(), 1.5);
+    // index 0 should still be 1.0
+    assert_eq!(cow.get(0).unwrap().to_f32(), 1.0);
+
+    // 3. Test PackedF4Cow and IntoOwned
+    let f4_bytes = vec![
+        F4::pack_pair(F4::from_f32(1.0), F4::from_f32(2.0)),
+    ];
+    let cow_f4 = PackedF4Cow::from_packed_slice(&f4_bytes, 2).unwrap();
+    let owned_vec = cow_f4.into_owned();
+    assert_eq!(owned_vec.len(), 2);
+    assert_eq!(owned_vec.get(0).unwrap().to_f32(), 1.0);
+    assert_eq!(owned_vec.get(1).unwrap().to_f32(), 2.0);
+
+    // 4. Test Unpacking from PackedBf4Cow to SimdCow of Bf16
+    let orig = vec![
+        Bf4::pack_pair(Bf4::from_f32(1.0), Bf4::from_f32(-1.0)),
+    ];
+    let cow_bf4 = PackedBf4Cow::from_packed_slice(&orig, 2).unwrap();
+    let simd_cow: SimdCow<'static, Bf16, Scalar, Unaligned> = cow_bf4.unpack_to_bf16_cow();
+    assert_eq!(simd_cow.len(), 2);
+    assert_eq!(simd_cow[0].to_f32(), 1.0);
+    assert_eq!(simd_cow[1].to_f32(), -1.0);
+
+    // 5. Test Unpacking from PackedF4Cow to SimdCow of F32
+    let orig_f4 = vec![
+        F4::pack_pair(F4::from_f32(1.0), F4::from_f32(4.0)),
+    ];
+    let cow_f4 = PackedF4Cow::from_packed_slice(&orig_f4, 2).unwrap();
+    let simd_cow_f32: SimdCow<'static, F32, Scalar, Unaligned> = cow_f4.unpack_to_f32_cow();
+    assert_eq!(simd_cow_f32.len(), 2);
+    assert_eq!(simd_cow_f32[0].0, 1.0);
+    assert_eq!(simd_cow_f32[1].0, 4.0);
+
+    // 6. Test iteration
+    let mut sum = 0.0;
+    for elem in &cow_bf4 {
+        sum += elem.to_f32();
+    }
+    assert_eq!(sum, 0.0); // 1.0 + -1.0
 }
 
 

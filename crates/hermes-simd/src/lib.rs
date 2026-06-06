@@ -49,7 +49,7 @@ pub use hermes_simd_core::{
     kernel::SimdKernel,
     view::{SimdView, SimdError, TileView, TileMatrixMultiply, Vector, Mask},
     vec::AlignedVec,
-    cow::SimdCow,
+    cow::{SimdCow, ArchivedSimdCow, SimdCowResolver},
     mask::BitMask,
     compute::ComputeView,
     bitboard::{BitBoardView, BitBoardKernel},
@@ -76,7 +76,13 @@ pub use hermes_simd_intrinsics::{
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub use hermes_simd_intrinsics::{AmxBf16, AmxInt8, AmxConfig, AmxSession, AmxBatchSession};
 
-pub use hermes_numeric::{F16, F32, F64, Bf16, Bf8, Bf4, F8, F4, I8, I16, I32};
+pub use hermes_numeric::{
+    F16, F32, F64, Bf16, Bf8, Bf4, F8, F4, I8, I16, I32,
+    Packable4, Packed4Slice, Packed4SliceMut,
+    PackedBf4Slice, PackedBf4SliceMut, PackedF4Slice, PackedF4SliceMut,
+    Packed4Vec, Packed4Iter, PackedBf4Vec, PackedF4Vec,
+    Packed4Cow, PackedBf4Cow, PackedF4Cow,
+};
 
 /// Runtime CPU feature detection utilities.
 pub mod cpu;
@@ -245,5 +251,57 @@ where
                 }
             }
         }
+    }
+}
+
+/// Extension trait for packed Bf4 Clone-on-Write containers.
+pub trait PackedBf4CowExt<'a> {
+    /// Unpack Bf4 elements directly to a `SimdCow` of `Bf16` with zero intermediate allocations.
+    fn unpack_to_bf16_cow<Arch, Align>(&self) -> SimdCow<'static, Bf16, Arch, Align>
+    where
+        Arch: SimdArch,
+        Align: Alignment;
+}
+
+/// Extension trait for packed F4 Clone-on-Write containers.
+pub trait PackedF4CowExt<'a> {
+    /// Unpack F4 elements directly to a `SimdCow` of `F32` with zero intermediate allocations.
+    fn unpack_to_f32_cow<Arch, Align>(&self) -> SimdCow<'static, F32, Arch, Align>
+    where
+        Arch: SimdArch,
+        Align: Alignment;
+}
+
+impl<'a> PackedBf4CowExt<'a> for Packed4Cow<'a, Bf4> {
+    #[inline]
+    fn unpack_to_bf16_cow<Arch, Align>(&self) -> SimdCow<'static, Bf16, Arch, Align>
+    where
+        Arch: SimdArch,
+        Align: Alignment,
+    {
+        let len = self.len();
+        let mut dest = AlignedVec::with_capacity(len);
+        unsafe {
+            dest.set_len(len);
+        }
+        self.as_view().unpack_to_bf16(dest.as_mut_slice());
+        SimdCow::Owned(dest)
+    }
+}
+
+impl<'a> PackedF4CowExt<'a> for Packed4Cow<'a, F4> {
+    #[inline]
+    fn unpack_to_f32_cow<Arch, Align>(&self) -> SimdCow<'static, F32, Arch, Align>
+    where
+        Arch: SimdArch,
+        Align: Alignment,
+    {
+        let len = self.len();
+        let mut dest = AlignedVec::with_capacity(len);
+        unsafe {
+            dest.set_len(len);
+        }
+        self.as_view().unpack_to_f32(dest.as_mut_slice());
+        SimdCow::Owned(dest)
     }
 }

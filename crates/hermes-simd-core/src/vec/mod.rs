@@ -11,6 +11,11 @@ use crate::numa::NumaAllocator;
 
 use std::alloc::{alloc, dealloc};
 
+/// Zero-copy serialization support for aligned vectors using `rkyv`.
+pub mod rkyv;
+#[cfg(test)]
+mod tests;
+
 /// A heap-allocated vector with statically guaranteed memory alignment layout.
 ///
 /// Underpinned by custom memory allocation using `core::alloc::Layout` to ensure that
@@ -402,7 +407,6 @@ impl<T: core::fmt::Debug, Align: Alignment> core::fmt::Debug for AlignedVec<T, A
     }
 }
 
-
 impl<T: PartialEq, Align1: Alignment, Align2: Alignment> PartialEq<AlignedVec<T, Align2>> for AlignedVec<T, Align1> {
     #[inline]
     fn eq(&self, other: &AlignedVec<T, Align2>) -> bool {
@@ -423,137 +427,5 @@ impl<T: PartialEq, Align: Alignment> PartialEq<AlignedVec<T, Align>> for [T] {
     #[inline]
     fn eq(&self, other: &AlignedVec<T, Align>) -> bool {
         self == other.as_slice()
-    }
-}
-
-
-#[repr(transparent)]
-/// Archived representation of an `AlignedVec` used by `rkyv` zero-copy serialization.
-pub struct ArchivedAlignedVec<T> {
-    elements: rkyv::vec::ArchivedVec<T>,
-}
-
-/// Resolver type for `AlignedVec` serialization.
-pub struct AlignedVecResolver {
-    elements_resolver: rkyv::vec::VecResolver,
-}
-
-impl<T, Align> rkyv::Archive for AlignedVec<T, Align>
-where
-    T: rkyv::Archive,
-    Align: Alignment,
-{
-    type Archived = ArchivedAlignedVec<T::Archived>;
-    type Resolver = AlignedVecResolver;
-
-    #[inline]
-    unsafe fn resolve(&self, pos: usize, resolver: Self::Resolver, out: *mut Self::Archived) {
-        let out_elements = core::ptr::addr_of_mut!((*out).elements);
-        rkyv::vec::ArchivedVec::resolve_from_slice(self.as_slice(), pos, resolver.elements_resolver, out_elements);
-    }
-}
-
-impl<T, Align, S> rkyv::Serialize<S> for AlignedVec<T, Align>
-where
-    T: rkyv::Serialize<S> + rkyv::Archive,
-    Align: Alignment,
-    S: rkyv::Fallible + rkyv::ser::Serializer + ?Sized,
-    [T]: rkyv::SerializeUnsized<S>,
-{
-    #[inline]
-    fn serialize(&self, serializer: &mut S) -> Result<Self::Resolver, S::Error> {
-        let elements_resolver = rkyv::vec::ArchivedVec::serialize_from_slice(self.as_slice(), serializer)?;
-        Ok(AlignedVecResolver { elements_resolver })
-    }
-}
-
-impl<T, Align, D> rkyv::Deserialize<AlignedVec<T, Align>, D> for ArchivedAlignedVec<T>
-where
-    T: rkyv::Archive,
-    T: rkyv::Deserialize<T, D>,
-    Align: Alignment,
-    D: rkyv::Fallible + ?Sized,
-{
-    #[inline]
-    fn deserialize(&self, deserializer: &mut D) -> Result<AlignedVec<T, Align>, D::Error> {
-        let slice = self.elements.as_slice();
-        let mut v = AlignedVec::with_capacity(slice.len());
-        for x in slice {
-            v.push(x.deserialize(deserializer)?);
-        }
-        Ok(v)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::align::Unaligned;
-
-    #[test]
-    fn test_aligned_vec_zst() {
-        let mut v = AlignedVec::<(), Unaligned>::new();
-        assert_eq!(v.len(), 0);
-        v.push(());
-        v.push(());
-        assert_eq!(v.len(), 2);
-        assert_eq!(v[0], ());
-        assert_eq!(v[1], ());
-
-        let v2 = v.clone();
-        assert_eq!(v2.len(), 2);
-        assert_eq!(v2[0], ());
-    }
-
-    #[test]
-    fn test_aligned_vec_zst_drops() {
-        use std::sync::atomic::{AtomicUsize, Ordering};
-        static DROP_COUNT: AtomicUsize = AtomicUsize::new(0);
-
-        #[derive(Clone)]
-        struct ZstDropper;
-        impl Drop for ZstDropper {
-            fn drop(&mut self) {
-                DROP_COUNT.fetch_add(1, Ordering::SeqCst);
-            }
-        }
-
-        DROP_COUNT.store(0, Ordering::SeqCst);
-        {
-            let mut v = AlignedVec::<ZstDropper, Unaligned>::new();
-            v.push(ZstDropper);
-            v.push(ZstDropper);
-            assert_eq!(DROP_COUNT.load(Ordering::SeqCst), 0);
-
-            {
-                let _v2 = v.clone();
-                assert_eq!(DROP_COUNT.load(Ordering::SeqCst), 0);
-            }
-            assert_eq!(DROP_COUNT.load(Ordering::SeqCst), 2);
-        }
-        assert_eq!(DROP_COUNT.load(Ordering::SeqCst), 4);
-    }
-
-    #[test]
-    fn test_aligned_vec_rkyv() {
-        use rkyv::Deserialize;
-        let mut v = AlignedVec::<i32, Unaligned>::new();
-        v.push(10);
-        v.push(20);
-        v.push(30);
-
-        let bytes = rkyv::to_bytes::<_, 256>(&v).unwrap();
-
-        let archived = unsafe { rkyv::archived_root::<AlignedVec<i32, Unaligned>>(&bytes[..]) };
-        assert_eq!(archived.elements.len(), 3);
-        assert_eq!(archived.elements[0], 10);
-        assert_eq!(archived.elements[1], 20);
-        assert_eq!(archived.elements[2], 30);
-
-        let deserialized: AlignedVec<i32, Unaligned> = archived.deserialize(&mut rkyv::Infallible).unwrap();
-        assert_eq!(deserialized.len(), 3);
-        assert_eq!(deserialized[0], 10);
-        assert_eq!(deserialized[1], 20);
-        assert_eq!(deserialized[2], 30);
     }
 }

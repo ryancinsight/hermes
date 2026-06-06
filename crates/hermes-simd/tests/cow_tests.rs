@@ -282,3 +282,34 @@ fn test_cow_enhancements() {
     assert_eq!(&*cow_mut, &[11.0, 22.0, 33.0, 44.0, 55.0, 66.0]);
 }
 
+#[test]
+fn test_simd_cow_rkyv_serialization() {
+    use rkyv::Deserialize;
+
+    let original_data = [1.5f32, 2.5, 3.5, 4.5];
+    let cow = SimdCow::<f32, Scalar, Unaligned>::from_slice(&original_data);
+
+    // Serialize
+    let bytes = rkyv::to_bytes::<_, 256>(&cow).unwrap();
+
+    // Zero-copy access (archived root)
+    let archived = unsafe { rkyv::archived_root::<SimdCow<f32, Scalar, Unaligned>>(&bytes[..]) };
+    assert_eq!(archived.len(), 4);
+    assert_eq!(archived.as_slice(), &original_data);
+    assert_eq!(&archived[..], &original_data);
+
+    // Convert archived to borrowed SimdCow
+    let borrowed_cow: SimdCow<'_, f32, Scalar, Unaligned> = unsafe { archived.as_borrowed().unwrap() };
+    assert_eq!(&*borrowed_cow, &original_data);
+    assert!(matches!(borrowed_cow, SimdCow::Borrowed(_)));
+
+    // Deserialize to owned
+    let deserialized: SimdCow<'static, f32, Scalar, Unaligned> = archived.deserialize(&mut rkyv::Infallible).unwrap();
+    assert_eq!(&*deserialized, &original_data);
+    assert!(matches!(deserialized, SimdCow::Owned(_)));
+
+    // Test that serializing a Borrowed variant works and yields identical bytes
+    let borrowed_original = SimdCow::<f32, Scalar, Unaligned>::borrow_slice(&original_data).unwrap();
+    let bytes_borrowed = rkyv::to_bytes::<_, 256>(&borrowed_original).unwrap();
+    assert_eq!(&bytes[..], &bytes_borrowed[..]);
+}

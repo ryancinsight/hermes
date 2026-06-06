@@ -23,6 +23,7 @@ pub mod arch;
 pub mod align;
 pub mod execution;
 pub mod kernel;
+mod kernel_helpers;
 pub mod scalar;
 pub mod mask;
 pub mod ops;
@@ -58,7 +59,7 @@ pub use sparse::{
     CsrData, SellPData, BlockedCooData, DenseWithMaskData,
 };
 pub use vec::AlignedVec;
-pub use cow::SimdCow;
+pub use cow::{SimdCow, ArchivedSimdCow, SimdCowResolver};
 pub use iter::SimdChunks;
 pub use compute::ComputeView;
 pub use bitboard::{BitBoardView, BitBoardKernel};
