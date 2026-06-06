@@ -1,0 +1,13 @@
+[package]
+name = "hermes-simd-intrinsics"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+
+[dependencies]
+hermes-simd-core = { path = "../hermes-simd-core" }
+hermes-numeric = { path = "../hermes-numeric" }
+half = { workspace = true }
+bytemuck = { version = "1.14" }
+rkyv = { version = "0.7" }

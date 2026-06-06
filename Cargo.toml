@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/hermes-numeric",
+    "crates/hermes-simd-macros",
+    "crates/hermes-simd-core",
+    "crates/hermes-simd-intrinsics",
+    "crates/hermes-simd",
+    "crates/hermes-simd-benches",
+    "crates/hermes-simd-examples",
+    "crates/hermes-simd-types",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Ryan Clanton <ryanclanton@outlook.com>"]
+description = "High-performance, zero-overhead SIMD abstraction library"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+half = { version = "2.3", default-features = false }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+
+[profile.bench]
+opt-level = 3
+lto = "fat"
+codegen-units = 1

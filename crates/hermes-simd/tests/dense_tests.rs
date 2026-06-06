@@ -1,0 +1,383 @@
+use hermes_simd::*;
+
+#[test]
+fn test_size_invariants() {
+    use core::mem::size_of;
+    assert_eq!(
+        size_of::<SimdView<'_, f32, Scalar, Unaligned, Unmasked, &[f32]>>(),
+        size_of::<&[f32]>()
+    );
+}
+
+#[test]
+fn test_sum_f32() {
+    assert_eq!(sum::<f32>(&[]), 0.0);
+    let data = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+    assert_eq!(sum::<f32>(&data), 55.0);
+}
+
+#[test]
+fn test_dot_f32() {
+    let a = [1.0f32, 2.0, 3.0, 4.0, 5.0];
+    let b = [2.0f32, 3.0, 4.0, 5.0, 6.0];
+    assert_eq!(dot::<f32>(&a, &b).unwrap(), 70.0);
+}
+
+#[test]
+fn test_elementwise_mul_f32() {
+    let a = [1.0f32, 2.0, 3.0, 4.0, 5.0];
+    let b = [2.0f32, 3.0, 4.0, 5.0, 6.0];
+    let mut out = [0.0f32; 5];
+    elementwise_mul::<f32>(&a, &b, &mut out).unwrap();
+    assert_eq!(out, [2.0, 6.0, 12.0, 20.0, 30.0]);
+}
+
+#[test]
+fn test_mismatched_lengths() {
+    assert!(dot::<f32>(&[1.0, 2.0], &[1.0]).is_err());
+}
+
+#[test]
+fn test_masked_sum_all_active() {
+    let data = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+    let mask = [true; 8];
+    let result = masked_sum::<f32>(&data, &mask);
+    let expected: f32 = data.iter().sum();
+    assert!((result - expected).abs() < 1e-5, "{result} != {expected}");
+}
+
+#[test]
+fn test_masked_sum_alternating() {
+    let data = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+    let mask = [true, false, true, false, true, false, true, false];
+    let result = masked_sum::<f32>(&data, &mask);
+    // 1 + 3 + 5 + 7 = 16
+    assert!((result - 16.0).abs() < 1e-5, "{result}");
+}
+
+#[test]
+fn test_masked_sum_none_active() {
+    let data = [1.0f32; 8];
+    let mask = [false; 8];
+    assert_eq!(masked_sum::<f32>(&data, &mask), 0.0);
+}
+
+#[test]
+fn test_masked_sum_odd_length() {
+    // 5 elements = 1 full scalar-only chunk for 4-lane Scalar
+    let data = [1.0f32, 2.0, 3.0, 4.0, 5.0];
+    let mask = [true, false, true, false, true];
+    let result = masked_sum::<f32>(&data, &mask);
+    assert!((result - 9.0).abs() < 1e-5, "{result}");
+}
+
+#[test]
+fn test_masked_dot_f32_correctness() {
+    let a = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0];
+    let b = [2.0f32, 2.0, 2.0, 2.0, 2.0, 2.0];
+    let mask = [true, false, true, false, true, false];
+    let result = masked_dot::<f32>(&a, &b, &mask).unwrap();
+    // (1*2) + (3*2) + (5*2) = 2 + 6 + 10 = 18
+    assert!((result - 18.0).abs() < 1e-5, "{result}");
+}
+
+#[test]
+fn test_masked_dot_length_mismatch() {
+    assert!(masked_dot::<f32>(&[1.0, 2.0], &[1.0], &[true, false]).is_err());
+}
+
+#[test]
+fn test_masked_add_f32() {
+    let a = [1.0f32, 2.0, 3.0, 4.0];
+    let b = [10.0f32, 10.0, 10.0, 10.0];
+    let mask = [true, false, true, false];
+    let mut out = [0.0f32; 4];
+    masked_add::<f32>(&a, &b, &mask, &mut out).unwrap();
+    // Active: 1+10=11, 3+10=13. Inactive: keep a[i]: 2, 4
+    assert_eq!(out, [11.0, 2.0, 13.0, 4.0]);
+}
+
+#[test]
+fn test_generic_masked_ops_f32() {
+    let a = [1.0f32, 2.0, 3.0, 4.0];
+    let b = [10.0f32, 10.0, 10.0, 10.0];
+    let mask = [true, false, true, false];
+    let mut out = [0.0f32; 4];
+    
+    assert!((masked_sum(&a, &mask) - 4.0).abs() < 1e-5);
+    assert!((masked_dot(&a, &b, &mask).unwrap() - 40.0).abs() < 1e-5);
+    masked_add(&a, &b, &mask, &mut out).unwrap();
+    assert_eq!(out, [11.0, 2.0, 13.0, 4.0]);
+}
+
+#[test]
+fn test_generic_masked_ops_f64() {
+    let a = [1.0f64, 2.0, 3.0, 4.0];
+    let b = [10.0f64, 10.0, 10.0, 10.0];
+    let mask = [true, false, true, false];
+    let mut out = [0.0f64; 4];
+    
+    assert!((masked_sum(&a, &mask) - 4.0).abs() < 1e-12);
+    assert!((masked_dot(&a, &b, &mask).unwrap() - 40.0).abs() < 1e-12);
+    masked_add(&a, &b, &mask, &mut out).unwrap();
+    assert_eq!(out, [11.0, 2.0, 13.0, 4.0]);
+}
+
+#[test]
+fn test_f16_basic_ops() {
+    use half::f16;
+    let data = vec![f16::from_f32(1.0); 16];
+    let s = sum(&data);
+    assert_eq!(s, f16::from_f32(16.0));
+
+    let a = vec![f16::from_f32(1.0), f16::from_f32(2.0), f16::from_f32(3.0)];
+    let b = vec![f16::from_f32(4.0), f16::from_f32(5.0), f16::from_f32(6.0)];
+    let d = dot(&a, &b).unwrap();
+    assert_eq!(d, f16::from_f32(32.0));
+
+    let mut mul_out = vec![f16::ZERO; 3];
+    elementwise_mul(&a, &b, &mut mul_out).unwrap();
+    assert_eq!(mul_out, vec![f16::from_f32(4.0), f16::from_f32(10.0), f16::from_f32(18.0)]);
+
+    let mask = [true, false, true];
+    assert_eq!(masked_sum(&a, &mask), f16::from_f32(4.0));
+    assert_eq!(masked_dot(&a, &b, &mask).unwrap(), f16::from_f32(22.0));
+
+    let mut add_out = vec![f16::ZERO; 3];
+    masked_add(&a, &b, &mask, &mut add_out).unwrap();
+    assert_eq!(add_out, vec![f16::from_f32(5.0), f16::from_f32(2.0), f16::from_f32(9.0)]);
+}
+
+#[test]
+fn test_dispatch_view_selection() {
+    let data = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+    let view = dispatch_view::<f32, Unaligned>(&data);
+    assert!(view.is_some());
+
+    let mut data_mut = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+    let view_mut = dispatch_view_mut::<f32, Unaligned>(&mut data_mut);
+    assert!(view_mut.is_some());
+
+    use half::f16;
+    let data_f16 = vec![f16::from_f32(1.0); 8];
+    let view_f16 = dispatch_view::<f16, Unaligned>(&data_f16);
+    assert!(view_f16.is_some());
+}
+
+#[test]
+fn test_monomorphized_vector_ops() {
+    // -------------------------------------------------------------------------
+    // Scalar f32 tests
+    // -------------------------------------------------------------------------
+    {
+        let a = Vector::<f32, Scalar>::splat(2.0f32);
+        let b = Vector::<f32, Scalar>::splat(3.0f32);
+        
+        let c = a + b;
+        let d = a * b;
+        let e = a - b;
+        
+        let mut buf = [0.0f32; 4];
+        unsafe { c.store_unaligned(buf.as_mut_ptr()); }
+        assert_eq!(buf, [5.0f32; 4]);
+        
+        unsafe { d.store_unaligned(buf.as_mut_ptr()); }
+        assert_eq!(buf, [6.0f32; 4]);
+        
+        unsafe { e.store_unaligned(buf.as_mut_ptr()); }
+        assert_eq!(buf, [-1.0f32; 4]);
+
+        let mut a_mut = a;
+        a_mut += b;
+        assert_eq!(a_mut, c);
+        
+        a_mut *= b;
+        unsafe { a_mut.store_unaligned(buf.as_mut_ptr()); }
+        assert_eq!(buf, [15.0f32; 4]);
+
+        assert_eq!(c.sum_reduce(), 20.0f32);
+        
+        let f = Vector::<f32, Scalar>::splat(6.0f32);
+        let g = Vector::<f32, Scalar>::splat(2.0f32);
+        let h = f / g;
+        unsafe { h.store_unaligned(buf.as_mut_ptr()); }
+        assert_eq!(buf, [3.0f32; 4]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Scalar f64 tests
+    // -------------------------------------------------------------------------
+    {
+        let a = Vector::<f64, Scalar>::splat(2.0f64);
+        let b = Vector::<f64, Scalar>::splat(3.0f64);
+        
+        let c = a + b;
+        let d = a * b;
+        let e = a - b;
+        
+        let mut buf = [0.0f64; 2];
+        unsafe { c.store_unaligned(buf.as_mut_ptr()); }
+        assert_eq!(buf, [5.0f64; 2]);
+        
+        unsafe { d.store_unaligned(buf.as_mut_ptr()); }
+        assert_eq!(buf, [6.0f64; 2]);
+        
+        unsafe { e.store_unaligned(buf.as_mut_ptr()); }
+        assert_eq!(buf, [-1.0f64; 2]);
+
+        let mut a_mut = a;
+        a_mut += b;
+        assert_eq!(a_mut, c);
+        
+        a_mut *= b;
+        unsafe { a_mut.store_unaligned(buf.as_mut_ptr()); }
+        assert_eq!(buf, [15.0f64; 2]);
+
+        assert_eq!(c.sum_reduce(), 10.0f64);
+        
+        let f = Vector::<f64, Scalar>::splat(6.0f64);
+        let g = Vector::<f64, Scalar>::splat(2.0f64);
+        let h = f / g;
+        unsafe { h.store_unaligned(buf.as_mut_ptr()); }
+        assert_eq!(buf, [3.0f64; 2]);
+    }
+
+    // -------------------------------------------------------------------------
+    // AVX2 tests (if supported at compile and runtime)
+    // -------------------------------------------------------------------------
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if std::is_x86_feature_detected!("avx2") {
+            // f32 (8 lanes)
+            let a = Vector::<f32, Avx2>::splat(2.0f32);
+            let b = Vector::<f32, Avx2>::splat(3.0f32);
+            let c = a + b;
+            let d = a * b;
+            let mut buf_f32 = [0.0f32; 8];
+            unsafe { c.store_unaligned(buf_f32.as_mut_ptr()); }
+            assert_eq!(buf_f32, [5.0f32; 8]);
+            unsafe { d.store_unaligned(buf_f32.as_mut_ptr()); }
+            assert_eq!(buf_f32, [6.0f32; 8]);
+            assert_eq!(c.sum_reduce(), 40.0f32);
+
+            // f64 (4 lanes)
+            let a_f64 = Vector::<f64, Avx2>::splat(2.0f64);
+            let b_f64 = Vector::<f64, Avx2>::splat(3.0f64);
+            let c_f64 = a_f64 + b_f64;
+            let d_f64 = a_f64 * b_f64;
+            let mut buf_f64 = [0.0f64; 4];
+            unsafe { c_f64.store_unaligned(buf_f64.as_mut_ptr()); }
+            assert_eq!(buf_f64, [5.0f64; 4]);
+            unsafe { d_f64.store_unaligned(buf_f64.as_mut_ptr()); }
+            assert_eq!(buf_f64, [6.0f64; 4]);
+            assert_eq!(c_f64.sum_reduce(), 20.0f64);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // AVX-512 tests (if supported at compile and runtime)
+    // -------------------------------------------------------------------------
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if std::is_x86_feature_detected!("avx512f") {
+            // f32 (16 lanes)
+            let a = Vector::<f32, Avx512>::splat(2.0f32);
+            let b = Vector::<f32, Avx512>::splat(3.0f32);
+            let c = a + b;
+            let d = a * b;
+            let mut buf_f32 = [0.0f32; 16];
+            unsafe { c.store_unaligned(buf_f32.as_mut_ptr()); }
+            assert_eq!(buf_f32, [5.0f32; 16]);
+            unsafe { d.store_unaligned(buf_f32.as_mut_ptr()); }
+            assert_eq!(buf_f32, [6.0f32; 16]);
+            assert_eq!(c.sum_reduce(), 80.0f32);
+
+            // f64 (8 lanes)
+            let a_f64 = Vector::<f64, Avx512>::splat(2.0f64);
+            let b_f64 = Vector::<f64, Avx512>::splat(3.0f64);
+            let c_f64 = a_f64 + b_f64;
+            let d_f64 = a_f64 * b_f64;
+            let mut buf_f64 = [0.0f64; 8];
+            unsafe { c_f64.store_unaligned(buf_f64.as_mut_ptr()); }
+            assert_eq!(buf_f64, [5.0f64; 8]);
+            unsafe { d_f64.store_unaligned(buf_f64.as_mut_ptr()); }
+            assert_eq!(buf_f64, [6.0f64; 8]);
+            assert_eq!(c_f64.sum_reduce(), 40.0f64);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // NEON tests (if supported at compile time for AArch64)
+    // -------------------------------------------------------------------------
+    #[cfg(target_arch = "aarch64")]
+    {
+        // f32 (4 lanes)
+        let a = Vector::<f32, Neon>::splat(2.0f32);
+        let b = Vector::<f32, Neon>::splat(3.0f32);
+        let c = a + b;
+        let d = a * b;
+        let mut buf_f32 = [0.0f32; 4];
+        unsafe { c.store_unaligned(buf_f32.as_mut_ptr()); }
+        assert_eq!(buf_f32, [5.0f32; 4]);
+        unsafe { d.store_unaligned(buf_f32.as_mut_ptr()); }
+        assert_eq!(buf_f32, [6.0f32; 4]);
+        assert_eq!(c.sum_reduce(), 20.0f32);
+
+        // f64 (2 lanes)
+        let a_f64 = Vector::<f64, Neon>::splat(2.0f64);
+        let b_f64 = Vector::<f64, Neon>::splat(3.0f64);
+        let c_f64 = a_f64 + b_f64;
+        let d_f64 = a_f64 * b_f64;
+        let mut buf_f64 = [0.0f64; 2];
+        unsafe { c_f64.store_unaligned(buf_f64.as_mut_ptr()); }
+        assert_eq!(buf_f64, [5.0f64; 2]);
+        unsafe { d_f64.store_unaligned(buf_f64.as_mut_ptr()); }
+        assert_eq!(buf_f64, [6.0f64; 2]);
+        assert_eq!(c_f64.sum_reduce(), 10.0f64);
+    }
+}
+
+#[test]
+fn test_new_emulated_types() {
+    // 1. half::bf16
+    {
+        use half::bf16;
+        let data = vec![bf16::from_f32(1.5); 16];
+        assert_eq!(sum(&data), bf16::from_f32(24.0));
+
+        let a = vec![bf16::from_f32(1.0), bf16::from_f32(2.0)];
+        let b = vec![bf16::from_f32(3.0), bf16::from_f32(4.0)];
+        assert_eq!(dot(&a, &b).unwrap(), bf16::from_f32(11.0));
+    }
+
+    // 2. i8
+    {
+        let data = vec![2i8; 16];
+        assert_eq!(sum(&data), 32);
+
+        let a = vec![1i8, 2, 3];
+        let b = vec![4i8, 5, 6];
+        assert_eq!(dot(&a, &b).unwrap(), 32);
+    }
+
+    // 3. i16
+    {
+        let data = vec![3i16; 16];
+        assert_eq!(sum(&data), 48);
+
+        let a = vec![1i16, 2, 3];
+        let b = vec![4i16, 5, 6];
+        assert_eq!(dot(&a, &b).unwrap(), 32);
+    }
+
+    // 4. i32
+    {
+        let data = vec![4i32; 16];
+        assert_eq!(sum(&data), 64);
+
+        let a = vec![1i32, 2, 3];
+        let b = vec![4i32, 5, 6];
+        assert_eq!(dot(&a, &b).unwrap(), 32);
+    }
+}
+

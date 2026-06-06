@@ -1,0 +1,16 @@
+[package]
+name = "hermes-numeric"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "Foundational Single Source of Truth (SSOT) for all numeric types and abstractions in the hermes ecosystem"
+
+[dependencies]
+half = { workspace = true }
+bytemuck = { version = "1.14", features = ["derive"] }
+libm = { version = "0.2.8", default-features = false }
+
+[features]
+default = ["std"]
+std = []
+

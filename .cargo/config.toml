@@ -1,0 +1,2 @@
+[alias]
+bench-gen = "run --release -p hermes-simd-benches --bin run-benches"

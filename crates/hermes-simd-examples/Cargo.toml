@@ -1,0 +1,18 @@
+[package]
+name = "hermes-simd-examples"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+publish = false
+
+[dependencies]
+hermes-simd = { path = "../hermes-simd" }
+
+[[example]]
+name = "dot_product"
+path = "examples/dot_product.rs"
+
+[[example]]
+name = "cow_example"
+path = "examples/cow_example.rs"

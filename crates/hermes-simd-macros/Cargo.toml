@@ -1,0 +1,15 @@
+[package]
+name = "hermes-simd-macros"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "Procedural macros for hermes-simd code generation"
+
+[lib]
+proc-macro = true
+doctest = false
+
+[dependencies]
+syn = { version = "2", features = ["full"] }
+quote = "1"
+proc-macro2 = "1"

@@ -1,0 +1,26 @@
+//! Generic runtime-dispatch dot product kernel.
+
+use hermes_simd_core::{
+    view::{SimdView, SimdError},
+    align::Unaligned,
+    execution::Unmasked,
+    kernel::SimdKernel,
+    scalar::Scalar,
+    arch::SimdArch,
+};
+use hermes_simd_macros::runtime_dispatch;
+
+#[runtime_dispatch(avx512f, avx2, neon, scalar)]
+pub(super) fn dispatch_dot_kernel<T, A>(a: &[T], b: &[T]) -> Result<T, SimdError>
+where
+    T: Scalar,
+    A: SimdArch + SimdKernel<T>,
+{
+    match (
+        SimdView::<T, A, Unaligned, Unmasked, &[T]>::new(a),
+        SimdView::<T, A, Unaligned, Unmasked, &[T]>::new(b),
+    ) {
+        (Some(v1), Some(v2)) => v1.dot(&v2),
+        _ => unsafe { core::hint::unreachable_unchecked() },
+    }
+}

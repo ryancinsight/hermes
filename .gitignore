@@ -1,0 +1,19 @@
+# Cargo build directory
+/target
+/target_benches
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary/test outputs
+*.log
+*.bak
+*.bk
+check_output.txt

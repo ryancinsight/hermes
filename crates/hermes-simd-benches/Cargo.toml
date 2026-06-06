@@ -1,0 +1,41 @@
+[package]
+name = "hermes-simd-benches"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+publish = false
+
+[dependencies]
+hermes-simd = { path = "../hermes-simd" }
+hermes-simd-core = { path = "../hermes-simd-core" }
+half = { workspace = true }
+criterion = { version = "0.5", features = ["html_reports"] }
+divan = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = "0.4"
+
+[[bin]]
+name = "run-benches"
+path = "src/main.rs"
+
+[[bench]]
+name = "simd_bench"
+harness = false
+
+[[bench]]
+name = "masked_bench"
+harness = false
+
+[[bench]]
+name = "sparse_bench"
+harness = false
+
+[[bench]]
+name = "tiling_bench"
+harness = false
+
+[[bench]]
+name = "tiled_gemm_bench"
+harness = false
