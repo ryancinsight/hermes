@@ -6,7 +6,7 @@ authors.workspace = true
 description.workspace = true
 
 [dependencies]
-hermes-numeric = { path = "../hermes-numeric" }
+hermes-numeric = { path = "../hermes-numeric", default-features = false, features = ["rkyv"] }
 half = { workspace = true }
 bytemuck = { version = "1.14", features = ["derive"] }
 rkyv = { version = "0.7" }
@@ -16,4 +16,9 @@ hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics" }
 
 [lib]
 doctest = false
+
+[features]
+default = ["std"]
+std = ["hermes-numeric/std"]
+
 

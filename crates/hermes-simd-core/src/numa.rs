@@ -34,7 +34,7 @@ impl NumaAllocator for MnemosyneNumaAllocator {
             }
             let ptr = numa_alloc_onnode(layout.size(), node as i32);
             if ptr.is_null() {
-                std::alloc::alloc(layout)
+                alloc::alloc::alloc(layout)
             } else {
                 ptr
             }
@@ -43,15 +43,15 @@ impl NumaAllocator for MnemosyneNumaAllocator {
         {
             // On Windows we can use VirtualAllocExNuma.
             extern "system" {
-                fn GetCurrentProcess() -> *mut std::ffi::c_void;
+                fn GetCurrentProcess() -> *mut core::ffi::c_void;
                 fn VirtualAllocExNuma(
-                    hProcess: *mut std::ffi::c_void,
-                    lpAddress: *mut std::ffi::c_void,
+                    hProcess: *mut core::ffi::c_void,
+                    lpAddress: *mut core::ffi::c_void,
                     dwSize: usize,
                     flAllocationType: u32,
                     flProtect: u32,
                     nndPreferred: u32,
-                ) -> *mut std::ffi::c_void;
+                ) -> *mut core::ffi::c_void;
             }
             const MEM_COMMIT: u32 = 0x00001000;
             const MEM_RESERVE: u32 = 0x00002000;
@@ -66,7 +66,7 @@ impl NumaAllocator for MnemosyneNumaAllocator {
                 node,
             );
             if ptr.is_null() {
-                std::alloc::alloc(layout)
+                alloc::alloc::alloc(layout)
             } else {
                 ptr as *mut u8
             }
@@ -74,7 +74,7 @@ impl NumaAllocator for MnemosyneNumaAllocator {
         #[cfg(not(any(target_os = "linux", target_os = "windows")))]
         {
             let _ = node;
-            std::alloc::alloc(layout)
+            alloc::alloc::alloc(layout)
         }
     }
 
@@ -89,24 +89,24 @@ impl NumaAllocator for MnemosyneNumaAllocator {
         #[cfg(target_os = "windows")]
         {
             extern "system" {
-                fn GetCurrentProcess() -> *mut std::ffi::c_void;
+                fn GetCurrentProcess() -> *mut core::ffi::c_void;
                 fn VirtualFreeEx(
-                    hProcess: *mut std::ffi::c_void,
-                    lpAddress: *mut std::ffi::c_void,
+                    hProcess: *mut core::ffi::c_void,
+                    lpAddress: *mut core::ffi::c_void,
                     dwSize: usize,
                     dwFreeType: u32,
                 ) -> i32;
             }
             const MEM_RELEASE: u32 = 0x00008000;
-            let res = VirtualFreeEx(GetCurrentProcess(), ptr as *mut std::ffi::c_void, 0, MEM_RELEASE);
+            let res = VirtualFreeEx(GetCurrentProcess(), ptr as *mut core::ffi::c_void, 0, MEM_RELEASE);
             if res == 0 {
-                std::alloc::dealloc(ptr, layout);
+                alloc::alloc::dealloc(ptr, layout);
             }
         }
         #[cfg(not(any(target_os = "linux", target_os = "windows")))]
         {
-            let _ = node;
-            std::alloc::dealloc(ptr, layout);
+            let _ = _node;
+            alloc::alloc::dealloc(ptr, layout);
         }
     }
 }
@@ -255,7 +255,7 @@ pub fn verify_numa_locality(ptr: *const u8, size: usize, expected_node: u32) -> 
 
     #[cfg(target_os = "windows")]
     unsafe {
-        use std::ffi::c_void;
+        use core::ffi::c_void;
         #[repr(C)]
         struct MemoryBasicInformation {
             base_address: *mut c_void,
@@ -274,11 +274,11 @@ pub fn verify_numa_locality(ptr: *const u8, size: usize, expected_node: u32) -> 
                 dwLength: usize,
             ) -> usize;
         }
-        let mut info = std::mem::zeroed::<MemoryBasicInformation>();
+        let mut info = core::mem::zeroed::<MemoryBasicInformation>();
         let res_size = VirtualQuery(
             segment_ptr as *const c_void,
             &mut info,
-            std::mem::size_of::<MemoryBasicInformation>(),
+            core::mem::size_of::<MemoryBasicInformation>(),
         );
         if res_size > 0 && info.state == 0x1000 { // MEM_COMMIT
             let owner_ptr = (segment_ptr + 8) as *const *const c_void;
@@ -294,20 +294,20 @@ pub fn verify_numa_locality(ptr: *const u8, size: usize, expected_node: u32) -> 
     #[cfg(target_os = "linux")]
     unsafe {
         extern "C" {
-            fn mincore(addr: *mut std::ffi::c_void, length: usize, vec: *mut u8) -> i32;
+            fn mincore(addr: *mut core::ffi::c_void, length: usize, vec: *mut u8) -> i32;
             fn move_pages(
                 pid: i32,
                 count: usize,
-                pages: *const *mut std::ffi::c_void,
+                pages: *const *mut core::ffi::c_void,
                 nodes: *const i32,
                 status: *mut i32,
                 flags: i32,
             ) -> i32;
         }
         let mut vec = 0u8;
-        let res = mincore(segment_ptr as *mut std::ffi::c_void, 4096, &mut vec);
+        let res = mincore(segment_ptr as *mut core::ffi::c_void, 4096, &mut vec);
         if res == 0 && (vec & 1) != 0 {
-            let owner_ptr = (segment_ptr + 8) as *const *const std::ffi::c_void;
+            let owner_ptr = (segment_ptr + 8) as *const *const core::ffi::c_void;
             let owner = *owner_ptr;
             if !owner.is_null() {
                 let node_ptr = (segment_ptr + 60) as *const u32;
@@ -324,11 +324,11 @@ pub fn verify_numa_locality(ptr: *const u8, size: usize, expected_node: u32) -> 
         if pages_count == 0 {
             return true;
         }
-        let mut pages = vec![core::ptr::null_mut(); pages_count];
+        let mut pages = alloc::vec![core::ptr::null_mut(); pages_count];
         for i in 0..pages_count {
-            pages[i] = (start_page + i * page_size) as *mut std::ffi::c_void;
+            pages[i] = (start_page + i * page_size) as *mut core::ffi::c_void;
         }
-        let mut status = vec![0i32; pages_count];
+        let mut status = alloc::vec![0i32; pages_count];
         if move_pages(0, pages_count, pages.as_ptr(), core::ptr::null(), status.as_mut_ptr(), 0) >= 0 {
             return status.iter().all(|&node| node == expected_node as i32);
         }
@@ -346,7 +346,7 @@ pub fn verify_numa_locality(ptr: *const u8, size: usize, expected_node: u32) -> 
 /// RAII scope guard that binds the current thread to a specific NUMA node.
 pub struct NumaBinding {
     #[cfg(target_os = "linux")]
-    old_mask: *mut std::ffi::c_void,
+    old_mask: *mut core::ffi::c_void,
     #[cfg(target_os = "windows")]
     old_mask: usize,
 }
@@ -357,11 +357,11 @@ impl NumaBinding {
         #[cfg(target_os = "linux")]
         {
             extern "C" {
-                fn numa_allocate_nodemask() -> *mut std::ffi::c_void;
-                fn numa_bitmask_setbit(mask: *mut std::ffi::c_void, bit: u32);
-                fn numa_bind(mask: *mut std::ffi::c_void);
-                fn numa_get_run_node_mask() -> *mut std::ffi::c_void;
-                fn numa_bitmask_free(mask: *mut std::ffi::c_void);
+                fn numa_allocate_nodemask() -> *mut core::ffi::c_void;
+                fn numa_bitmask_setbit(mask: *mut core::ffi::c_void, bit: u32);
+                fn numa_bind(mask: *mut core::ffi::c_void);
+                fn numa_get_run_node_mask() -> *mut core::ffi::c_void;
+                fn numa_bitmask_free(mask: *mut core::ffi::c_void);
             }
             unsafe {
                 let old = numa_get_run_node_mask();
@@ -377,8 +377,8 @@ impl NumaBinding {
         #[cfg(target_os = "windows")]
         {
             extern "system" {
-                fn GetCurrentThread() -> *mut std::ffi::c_void;
-                fn SetThreadAffinityMask(hThread: *mut std::ffi::c_void, dwThreadAffinityMask: usize) -> usize;
+                fn GetCurrentThread() -> *mut core::ffi::c_void;
+                fn SetThreadAffinityMask(hThread: *mut core::ffi::c_void, dwThreadAffinityMask: usize) -> usize;
                 fn GetNumaNodeProcessorMask(node: u8, processor_mask: *mut u64) -> i32;
             }
             unsafe {
@@ -407,8 +407,8 @@ impl Drop for NumaBinding {
         {
             if !self.old_mask.is_null() {
                 extern "C" {
-                    fn numa_bind(mask: *mut std::ffi::c_void);
-                    fn numa_bitmask_free(mask: *mut std::ffi::c_void);
+                    fn numa_bind(mask: *mut core::ffi::c_void);
+                    fn numa_bitmask_free(mask: *mut core::ffi::c_void);
                 }
                 unsafe {
                     numa_bind(self.old_mask);
@@ -420,8 +420,8 @@ impl Drop for NumaBinding {
         {
             if self.old_mask != 0 {
                 extern "system" {
-                    fn GetCurrentThread() -> *mut std::ffi::c_void;
-                    fn SetThreadAffinityMask(hThread: *mut std::ffi::c_void, dwThreadAffinityMask: usize) -> usize;
+                    fn GetCurrentThread() -> *mut core::ffi::c_void;
+                    fn SetThreadAffinityMask(hThread: *mut core::ffi::c_void, dwThreadAffinityMask: usize) -> usize;
                 }
                 unsafe {
                     SetThreadAffinityMask(GetCurrentThread(), self.old_mask);

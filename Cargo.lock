@@ -494,6 +494,7 @@ dependencies = [
  "bytemuck",
  "half",
  "libm",
+ "rkyv",
 ]
 
 [[package]]
@@ -560,14 +561,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
-]
-
-[[package]]
-name = "hermes-simd-types"
-version = "0.1.0"
-dependencies = [
- "half",
- "hermes-simd-core",
 ]
 
 [[package]]

@@ -28,6 +28,7 @@ pub mod ops;
 pub mod rkyv;
 
 pub use rkyv::{ArchivedSimdCow, SimdCowResolver};
+pub use hermes_numeric::{ArchivedPacked4Cow, Packed4CowResolver};
 
 /// A Clone-on-Write SIMD container.
 ///

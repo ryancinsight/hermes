@@ -804,6 +804,7 @@ fn test_generic_packed_vector_and_f4_slice() {
     assert_eq!(vec_bf4.get(1).unwrap().to_f32(), -2.0);
 }
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[test]
 fn test_vectorized_packed_unpackers() {
     use hermes_numeric::{Bf4, F4, Bf16, F32};
@@ -817,30 +818,45 @@ fn test_vectorized_packed_unpackers() {
     }
     
     let mut unpacked_bf16 = vec![Bf16::from_f32(0.0); packed_bytes.len() * 2];
-    hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_packed_bf4_to_bf16(&packed_bytes, &mut unpacked_bf16);
-    
-    for i in 0..n {
-        let byte = packed_bytes[i / 2];
-        let val = if i % 2 == 0 { byte & 0x0F } else { (byte >> 4) & 0x0F };
-        let expected = Bf4(val).to_f32();
-        assert_eq!(unpacked_bf16[i].to_f32(), expected, "Bf4 mismatch at index {}", i);
+    if std::is_x86_feature_detected!("avx512bw") {
+        hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_packed_bf4_to_bf16(&packed_bytes, &mut unpacked_bf16);
+        
+        for i in 0..10 {
+            let byte = packed_bytes[i / 2];
+            let val = if i % 2 == 0 { byte & 0x0F } else { (byte >> 4) & 0x0F };
+            let expected = Bf4(val).to_f32();
+            println!("unpacked_bf16[{}] = {}, expected = {}", i, unpacked_bf16[i].to_f32(), expected);
+        }
+
+        for i in 0..n {
+            let byte = packed_bytes[i / 2];
+            let val = if i % 2 == 0 { byte & 0x0F } else { (byte >> 4) & 0x0F };
+            let expected = Bf4(val).to_f32();
+            assert_eq!(unpacked_bf16[i].to_f32(), expected, "Bf4 mismatch at index {}", i);
+        }
+    } else {
+        println!("Skipping direct AVX-512 unpacked_bf16 test (avx512bw not detected)");
     }
     
     let mut unpacked_f32 = vec![F32(0.0); packed_bytes.len() * 2];
-    hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_packed_f4_to_f32(&packed_bytes, &mut unpacked_f32);
-    
-    for i in 0..n {
-        let byte = packed_bytes[i / 2];
-        let val = if i % 2 == 0 { byte & 0x0F } else { (byte >> 4) & 0x0F };
-        let expected = F4(val).to_f32();
-        assert_eq!(unpacked_f32[i].0, expected, "F4 mismatch at index {}", i);
+    if std::is_x86_feature_detected!("avx512f") {
+        hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_packed_f4_to_f32(&packed_bytes, &mut unpacked_f32);
+        
+        for i in 0..n {
+            let byte = packed_bytes[i / 2];
+            let val = if i % 2 == 0 { byte & 0x0F } else { (byte >> 4) & 0x0F };
+            let expected = F4(val).to_f32();
+            assert_eq!(unpacked_f32[i].0, expected, "F4 mismatch at index {}", i);
+        }
+    } else {
+        println!("Skipping direct AVX-512 unpacked_f32 test (avx512f not detected)");
     }
 }
 
 #[test]
 fn test_packed4_cow() {
     use hermes_numeric::{Bf4, F4, Bf16, F32};
-    use hermes_simd::{Packed4Cow, PackedBf4Cow, PackedF4Cow, PackedBf4CowExt, PackedF4CowExt, Scalar, Unaligned, SimdCow};
+    use hermes_simd::{Packed4Cow, PackedBf4Cow, PackedF4Cow, Packed4CowExt, Scalar, Unaligned, SimdCow};
 
     // 1. Test PackedBf4Cow Borrowed
     let original_bytes = vec![
@@ -877,7 +893,7 @@ fn test_packed4_cow() {
         Bf4::pack_pair(Bf4::from_f32(1.0), Bf4::from_f32(-1.0)),
     ];
     let cow_bf4 = PackedBf4Cow::from_packed_slice(&orig, 2).unwrap();
-    let simd_cow: SimdCow<'static, Bf16, Scalar, Unaligned> = cow_bf4.unpack_to_bf16_cow();
+    let simd_cow: SimdCow<'static, Bf16, Scalar, Unaligned> = cow_bf4.unpack_to_cow();
     assert_eq!(simd_cow.len(), 2);
     assert_eq!(simd_cow[0].to_f32(), 1.0);
     assert_eq!(simd_cow[1].to_f32(), -1.0);
@@ -887,7 +903,7 @@ fn test_packed4_cow() {
         F4::pack_pair(F4::from_f32(1.0), F4::from_f32(4.0)),
     ];
     let cow_f4 = PackedF4Cow::from_packed_slice(&orig_f4, 2).unwrap();
-    let simd_cow_f32: SimdCow<'static, F32, Scalar, Unaligned> = cow_f4.unpack_to_f32_cow();
+    let simd_cow_f32: SimdCow<'static, F32, Scalar, Unaligned> = cow_f4.unpack_to_cow();
     assert_eq!(simd_cow_f32.len(), 2);
     assert_eq!(simd_cow_f32[0].0, 1.0);
     assert_eq!(simd_cow_f32[1].0, 4.0);
@@ -898,6 +914,103 @@ fn test_packed4_cow() {
         sum += elem.to_f32();
     }
     assert_eq!(sum, 0.0); // 1.0 + -1.0
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[test]
+fn test_bf8_and_f8_unpacking() {
+    use hermes_numeric::{Bf8, F8, Bf16, F32, unpack_f8_to_f32};
+    
+    // 1. Test Bf8 to Bf16 unpacking (using AVX-512 when available, via hermes-simd-intrinsics)
+    let bf8_inputs = [
+        Bf8::from_f32(0.0),
+        Bf8::from_f32(1.0),
+        Bf8::from_f32(-1.0),
+        Bf8::from_f32(2.5),
+        Bf8::from_f32(-3.0),
+    ];
+    let mut bf16_outputs = [Bf16(half::bf16::ZERO); 5];
+    
+    if std::is_x86_feature_detected!("avx512bw") {
+        // Direct hardware routed call
+        hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_bf8_to_bf16(&bf8_inputs, &mut bf16_outputs);
+        
+        assert_eq!(bf16_outputs[0].to_f32(), 0.0);
+        assert_eq!(bf16_outputs[1].to_f32(), 1.0);
+        assert_eq!(bf16_outputs[2].to_f32(), -1.0);
+        assert_eq!(bf16_outputs[3].to_f32(), 2.5);
+        assert_eq!(bf16_outputs[4].to_f32(), -3.0);
+    } else {
+        println!("Skipping direct AVX-512 unpack_bf8_to_bf16 test (avx512bw not detected)");
+    }
+
+    // 2. Test F8 to F32 unpacking (using AVX2 gather when available, via hermes_numeric)
+    let f8_inputs = [
+        F8::from_f32(0.0),
+        F8::from_f32(1.0),
+        F8::from_f32(-1.0),
+        F8::from_f32(2.0),
+        F8::from_f32(-4.0),
+    ];
+    let mut f32_outputs = [F32(0.0); 5];
+    
+    unpack_f8_to_f32(&f8_inputs, &mut f32_outputs);
+    
+    assert_eq!(f32_outputs[0].0, 0.0);
+    assert_eq!(f32_outputs[1].0, 1.0);
+    assert_eq!(f32_outputs[2].0, -1.0);
+    assert_eq!(f32_outputs[3].0, 2.0);
+    assert_eq!(f32_outputs[4].0, -4.0);
+}
+
+#[test]
+fn test_packed_cow_rkyv_serialization() {
+    use hermes_numeric::{Bf4, F4, PackedBf4Cow, PackedF4Cow, Packed4Cow};
+    use rkyv::Deserialize;
+
+    // 1. PackedBf4Cow test
+    let bf4_bytes = vec![
+        Bf4::pack_pair(Bf4::from_f32(1.0), Bf4::from_f32(-1.0)),
+        Bf4::pack_pair(Bf4::from_f32(1.5), Bf4::from_f32(0.0)),
+    ];
+    let original_bf4_cow = PackedBf4Cow::from_packed_slice(&bf4_bytes, 4).unwrap();
+
+    let bytes_bf4 = rkyv::to_bytes::<_, 256>(&original_bf4_cow).unwrap();
+    let archived_bf4 = unsafe { rkyv::archived_root::<PackedBf4Cow>(&bytes_bf4[..]) };
+
+    assert_eq!(archived_bf4.len(), 4);
+    assert!(!archived_bf4.is_empty());
+    
+    // Test zero-copy borrow
+    let borrowed_bf4 = archived_bf4.as_borrowed().unwrap();
+    assert_eq!(borrowed_bf4.len(), 4);
+    assert_eq!(borrowed_bf4.get(0).unwrap().to_f32(), 1.0);
+    assert_eq!(borrowed_bf4.get(1).unwrap().to_f32(), -1.0);
+    assert_eq!(borrowed_bf4.get(2).unwrap().to_f32(), 1.5);
+    assert_eq!(borrowed_bf4.get(3).unwrap().to_f32(), 0.0);
+
+    // Test deserialization to owned
+    let deserialized_bf4: PackedBf4Cow = archived_bf4.deserialize(&mut rkyv::Infallible).unwrap();
+    assert!(matches!(deserialized_bf4, Packed4Cow::Owned(_)));
+    assert_eq!(deserialized_bf4.len(), 4);
+    assert_eq!(deserialized_bf4.get(2).unwrap().to_f32(), 1.5);
+
+    // 2. PackedF4Cow test
+    let f4_bytes = vec![
+        F4::pack_pair(F4::from_f32(-1.0), F4::from_f32(2.0)),
+    ];
+    let original_f4_cow = PackedF4Cow::from_packed_slice(&f4_bytes, 2).unwrap();
+
+    let bytes_f4 = rkyv::to_bytes::<_, 256>(&original_f4_cow).unwrap();
+    let archived_f4 = unsafe { rkyv::archived_root::<PackedF4Cow>(&bytes_f4[..]) };
+
+    assert_eq!(archived_f4.len(), 2);
+    let borrowed_f4 = archived_f4.as_borrowed().unwrap();
+    assert_eq!(borrowed_f4.get(0).unwrap().to_f32(), -1.0);
+    assert_eq!(borrowed_f4.get(1).unwrap().to_f32(), 2.0);
+
+    let deserialized_f4: PackedF4Cow = archived_f4.deserialize(&mut rkyv::Infallible).unwrap();
+    assert_eq!(deserialized_f4.len(), 2);
 }
 
 

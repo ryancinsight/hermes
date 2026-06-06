@@ -9,7 +9,7 @@ use crate::align::Alignment;
 use crate::view::SimdView;
 use crate::numa::NumaAllocator;
 
-use std::alloc::{alloc, dealloc};
+use alloc::alloc::{alloc, dealloc};
 
 /// Zero-copy serialization support for aligned vectors using `rkyv`.
 pub mod rkyv;
@@ -74,7 +74,7 @@ where
 
         let ptr = unsafe { alloc(layout) as *mut T };
         if ptr.is_null() {
-            std::alloc::handle_alloc_error(layout);
+            alloc::alloc::handle_alloc_error(layout);
         }
 
         Self {
@@ -120,7 +120,7 @@ where
         let allocator = crate::numa::MnemosyneNumaAllocator;
         let ptr = unsafe { allocator.alloc_on_node(layout, node) as *mut T };
         if ptr.is_null() {
-            std::alloc::handle_alloc_error(layout);
+            alloc::alloc::handle_alloc_error(layout);
         }
 
         Self {

@@ -28,7 +28,16 @@ impl NumericElement for f32 {
         }
     }
     #[inline(always)]
-    fn scalar_fmadd(self, b: Self, c: Self) -> Self { self.mul_add(b, c) }
+    fn scalar_fmadd(self, b: Self, c: Self) -> Self {
+        #[cfg(feature = "std")]
+        {
+            self.mul_add(b, c)
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            libm::fmaf(self, b, c)
+        }
+    }
     #[inline(always)]
     fn sqrt(self) -> Self {
         #[cfg(feature = "std")]
@@ -75,7 +84,16 @@ impl NumericElement for f64 {
         }
     }
     #[inline(always)]
-    fn scalar_fmadd(self, b: Self, c: Self) -> Self { self.mul_add(b, c) }
+    fn scalar_fmadd(self, b: Self, c: Self) -> Self {
+        #[cfg(feature = "std")]
+        {
+            self.mul_add(b, c)
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            libm::fma(self, b, c)
+        }
+    }
     #[inline(always)]
     fn sqrt(self) -> Self {
         #[cfg(feature = "std")]
@@ -113,7 +131,7 @@ impl NumericElement for half::f16 {
     #[inline(always)]
     fn abs(self) -> Self { half::f16::from_f32(self.to_f32().abs()) }
     #[inline(always)]
-    fn scalar_fmadd(self, b: Self, c: Self) -> Self { half::f16::from_f32(self.to_f32().mul_add(b.to_f32(), c.to_f32())) }
+    fn scalar_fmadd(self, b: Self, c: Self) -> Self { half::f16::from_f32(self.to_f32().scalar_fmadd(b.to_f32(), c.to_f32())) }
     #[inline(always)]
     fn sqrt(self) -> Self { half::f16::from_f32(self.to_f32().sqrt()) }
     #[inline(always)]
@@ -141,7 +159,7 @@ impl NumericElement for half::bf16 {
     #[inline(always)]
     fn abs(self) -> Self { half::bf16::from_f32(self.to_f32().abs()) }
     #[inline(always)]
-    fn scalar_fmadd(self, b: Self, c: Self) -> Self { half::bf16::from_f32(self.to_f32().mul_add(b.to_f32(), c.to_f32())) }
+    fn scalar_fmadd(self, b: Self, c: Self) -> Self { half::bf16::from_f32(self.to_f32().scalar_fmadd(b.to_f32(), c.to_f32())) }
     #[inline(always)]
     fn sqrt(self) -> Self { half::bf16::from_f32(self.to_f32().sqrt()) }
     #[inline(always)]

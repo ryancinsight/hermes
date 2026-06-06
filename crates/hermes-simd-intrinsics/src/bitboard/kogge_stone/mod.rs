@@ -110,16 +110,29 @@ pub(crate) fn step_sw(g: u64, p: u64, s: usize) -> (u64, u64) {
 
 impl BitBoardKernel for KoggeStone {
     #[inline(always)]
+    #[allow(unreachable_code)]
     unsafe fn rook_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
         
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
-            if std::is_x86_feature_detected!("avx512f") {
-                return avx512::kogge_stone_rook_avx512(slider, occupancy);
+            #[cfg(feature = "std")]
+            {
+                if std::is_x86_feature_detected!("avx512f") {
+                    return avx512::kogge_stone_rook_avx512(slider, occupancy);
+                }
+                if std::is_x86_feature_detected!("avx2") {
+                    return avx2::kogge_stone_rook_avx2(slider, occupancy);
+                }
             }
-            if std::is_x86_feature_detected!("avx2") {
-                return avx2::kogge_stone_rook_avx2(slider, occupancy);
+            #[cfg(not(feature = "std"))]
+            {
+                if cfg!(target_feature = "avx512f") {
+                    return avx512::kogge_stone_rook_avx512(slider, occupancy);
+                }
+                if cfg!(target_feature = "avx2") {
+                    return avx2::kogge_stone_rook_avx2(slider, occupancy);
+                }
             }
         }
         
@@ -132,16 +145,29 @@ impl BitBoardKernel for KoggeStone {
     }
 
     #[inline(always)]
+    #[allow(unreachable_code)]
     unsafe fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
         
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
-            if std::is_x86_feature_detected!("avx512f") {
-                return avx512::kogge_stone_bishop_avx512(slider, occupancy);
+            #[cfg(feature = "std")]
+            {
+                if std::is_x86_feature_detected!("avx512f") {
+                    return avx512::kogge_stone_bishop_avx512(slider, occupancy);
+                }
+                if std::is_x86_feature_detected!("avx2") {
+                    return avx2::kogge_stone_bishop_avx2(slider, occupancy);
+                }
             }
-            if std::is_x86_feature_detected!("avx2") {
-                return avx2::kogge_stone_bishop_avx2(slider, occupancy);
+            #[cfg(not(feature = "std"))]
+            {
+                if cfg!(target_feature = "avx512f") {
+                    return avx512::kogge_stone_bishop_avx512(slider, occupancy);
+                }
+                if cfg!(target_feature = "avx2") {
+                    return avx2::kogge_stone_bishop_avx2(slider, occupancy);
+                }
             }
         }
         
@@ -154,16 +180,29 @@ impl BitBoardKernel for KoggeStone {
     }
 
     #[inline(always)]
+    #[allow(unreachable_code)]
     unsafe fn queen_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
         
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
-            if std::is_x86_feature_detected!("avx512f") {
-                return avx512::kogge_stone_queen_avx512(slider, occupancy);
+            #[cfg(feature = "std")]
+            {
+                if std::is_x86_feature_detected!("avx512f") {
+                    return avx512::kogge_stone_queen_avx512(slider, occupancy);
+                }
+                if std::is_x86_feature_detected!("avx2") {
+                    return avx2::kogge_stone_queen_avx2(slider, occupancy);
+                }
             }
-            if std::is_x86_feature_detected!("avx2") {
-                return avx2::kogge_stone_queen_avx2(slider, occupancy);
+            #[cfg(not(feature = "std"))]
+            {
+                if cfg!(target_feature = "avx512f") {
+                    return avx512::kogge_stone_queen_avx512(slider, occupancy);
+                }
+                if cfg!(target_feature = "avx2") {
+                    return avx2::kogge_stone_queen_avx2(slider, occupancy);
+                }
             }
         }
         

@@ -365,12 +365,17 @@ unsafe fn sellp_spmv_vectorized<T, const C: usize, Arch>(
             col += 1;
         }
 
-        let mut temp = [T::ZERO; C];
-        Arch::store_unaligned(temp.as_mut_ptr(), acc);
-        for row in 0..C {
-            let r_idx = s * C + row;
-            if r_idx < y.len() {
-                y[r_idx] += temp[row];
+        let r_idx = s * C;
+        if r_idx + C <= y.len() {
+            let y_ptr = y.as_mut_ptr().add(r_idx);
+            let y_vec = Arch::load_unaligned(y_ptr);
+            let res_vec = Arch::add(y_vec, acc);
+            Arch::store_unaligned(y_ptr, res_vec);
+        } else {
+            let mut temp = [T::ZERO; C];
+            Arch::store_unaligned(temp.as_mut_ptr(), acc);
+            for row in 0..y.len() - r_idx {
+                y[r_idx + row] += temp[row];
             }
         }
     }

@@ -1,5 +1,8 @@
 use hermes_simd_core::view::{TileMatrixMultiply, SimdError};
-use hermes_simd_intrinsics::{AmxInt8, Avx512, Scalar};
+use hermes_simd_intrinsics::Scalar;
+#[cfg(target_arch = "x86_64")]
+use hermes_simd_intrinsics::{AmxInt8, Avx512};
+#[cfg(target_arch = "x86_64")]
 use crate::cpu::{AmxSupport, Avx512Support};
 use hermes_numeric::{I8, I32};
 use super::{TiledGemm, validate_gemm_sizes, tile_loop_generic};

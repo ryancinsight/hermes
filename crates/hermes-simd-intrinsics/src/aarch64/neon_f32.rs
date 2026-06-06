@@ -87,6 +87,18 @@ impl SimdKernel<f32> for Neon {
         NeonF32Vec(vmulq_f32(a.0, b.0))
     }
 
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn sub(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vsubq_f32(a.0, b.0))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn div(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vdivq_f32(a.0, b.0))
+    }
+
     /// NEON FMA: `vfmaq_f32(c, a, b)` computes `a*b + c`.
     #[target_feature(enable = "neon")]
     #[inline]
@@ -98,6 +110,99 @@ impl SimdKernel<f32> for Neon {
     #[inline]
     unsafe fn sum_reduce(v: Self::Vector) -> f32 {
         vaddvq_f32(v.0)
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn abs(a: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vabsq_f32(a.0))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn min(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vminq_f32(a.0, b.0))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn max(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vmaxq_f32(a.0, b.0))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn sqrt(a: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vsqrtq_f32(a.0))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn bitand(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vreinterpretq_f32_u32(vandq_u32(
+            vreinterpretq_u32_f32(a.0),
+            vreinterpretq_u32_f32(b.0),
+        )))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn bitor(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vreinterpretq_f32_u32(vorrq_u32(
+            vreinterpretq_u32_f32(a.0),
+            vreinterpretq_u32_f32(b.0),
+        )))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn bitxor(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vreinterpretq_f32_u32(veorq_u32(
+            vreinterpretq_u32_f32(a.0),
+            vreinterpretq_u32_f32(b.0),
+        )))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn cmp_eq(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vreinterpretq_f32_u32(vceqq_f32(a.0, b.0)))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn cmp_ne(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vreinterpretq_f32_u32(vmvnq_u32(vceqq_f32(a.0, b.0))))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn cmp_lt(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vreinterpretq_f32_u32(vcltq_f32(a.0, b.0)))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn cmp_le(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vreinterpretq_f32_u32(vcleq_f32(a.0, b.0)))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn cmp_gt(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vreinterpretq_f32_u32(vcgtq_f32(a.0, b.0)))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn cmp_ge(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vreinterpretq_f32_u32(vcgeq_f32(a.0, b.0)))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn blend(mask: Self::Vector, true_val: Self::Vector, false_val: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vbslq_f32(vreinterpretq_u32_f32(mask.0), true_val.0, false_val.0))
     }
 
     // -----------------------------------------------------------------------

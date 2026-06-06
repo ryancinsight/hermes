@@ -1,6 +1,51 @@
 //! Fancy Magic Bitboards sliding attack generation with lazy table initialization.
 
-use std::sync::OnceLock;
+use core::sync::atomic::{AtomicUsize, Ordering};
+use core::cell::UnsafeCell;
+
+pub struct OnceLock<T> {
+    state: AtomicUsize, // 0 = uninitialized, 1 = initializing, 2 = initialized
+    value: UnsafeCell<Option<T>>,
+}
+
+unsafe impl<T: Send + Sync> Sync for OnceLock<T> {}
+unsafe impl<T: Send> Send for OnceLock<T> {}
+
+impl<T> OnceLock<T> {
+    pub const fn new() -> Self {
+        Self {
+            state: AtomicUsize::new(0),
+            value: UnsafeCell::new(None),
+        }
+    }
+
+    pub fn get_or_init<F>(&self, f: F) -> &T
+    where
+        F: FnOnce() -> T,
+    {
+        loop {
+            match self.state.compare_exchange_weak(0, 1, Ordering::Acquire, Ordering::Relaxed) {
+                Ok(_) => {
+                    unsafe {
+                        *self.value.get() = Some(f());
+                    }
+                    self.state.store(2, Ordering::Release);
+                    break;
+                }
+                Err(2) => {
+                    break;
+                }
+                Err(_) => {
+                    core::hint::spin_loop();
+                }
+            }
+        }
+        unsafe {
+            (*self.value.get()).as_ref().unwrap()
+        }
+    }
+}
+
 use hermes_simd_core::bitboard::BitBoardKernel;
 
 /// ZST marker for Fancy Magic Bitboards backend.
@@ -114,8 +159,8 @@ const BISHOP_MAGICS: [u64; 64] = [
 
 // Flat lookup tables and offsets
 struct MagicTable {
-    rook_table: Vec<u64>,
-    bishop_table: Vec<u64>,
+    rook_table: alloc::vec::Vec<u64>,
+    bishop_table: alloc::vec::Vec<u64>,
     rook_offsets: [usize; 64],
     bishop_offsets: [usize; 64],
     rook_magics: [u64; 64],
@@ -142,8 +187,8 @@ fn get_magic_data() -> &'static MagicTable {
             bishop_total_size += 1 << bishop_pop;
         }
 
-        let mut rook_table = vec![0u64; rook_total_size];
-        let mut bishop_table = vec![0u64; bishop_total_size];
+        let mut rook_table = alloc::vec![0u64; rook_total_size];
+        let mut bishop_table = alloc::vec![0u64; bishop_total_size];
 
         // Populate tables using static precomputed magics
         for sq in 0..64 {

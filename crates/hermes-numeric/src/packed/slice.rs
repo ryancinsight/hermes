@@ -2,13 +2,22 @@ use crate::types::{Bf4, F4, Bf16, F32};
 
 /// Trait for 4-bit types that can be packed two per byte.
 pub trait Packable4: Copy + 'static {
+    /// The unpacked representation type.
+    type Unpacked: Copy + Default;
+
     /// Pack a low and high element into a single byte.
     fn pack_pair(low: Self, high: Self) -> u8;
     /// Unpack a single byte into a low and high element.
     fn unpack_pair(packed: u8) -> (Self, Self);
+    /// Unpack a slice of packed pairs to a slice of unpacked elements.
+    fn unpack_slice_packed(packed: &[u8], unpacked: &mut [Self::Unpacked]);
+    /// Unpack a single element.
+    fn unpack_single(element: Self) -> Self::Unpacked;
 }
 
 impl Packable4 for Bf4 {
+    type Unpacked = Bf16;
+
     #[inline(always)]
     fn pack_pair(low: Self, high: Self) -> u8 {
         Bf4::pack_pair(low, high)
@@ -17,9 +26,19 @@ impl Packable4 for Bf4 {
     fn unpack_pair(packed: u8) -> (Self, Self) {
         Bf4::unpack_pair(packed)
     }
+    #[inline(always)]
+    fn unpack_slice_packed(packed: &[u8], unpacked: &mut [Bf16]) {
+        super::unpack::unpack_bf4_to_bf16_packed(packed, unpacked);
+    }
+    #[inline(always)]
+    fn unpack_single(element: Self) -> Bf16 {
+        Bf16(half::bf16::from_bits(super::unpack::bf4_to_bf16_bits(element.0)))
+    }
 }
 
 impl Packable4 for F4 {
+    type Unpacked = F32;
+
     #[inline(always)]
     fn pack_pair(low: Self, high: Self) -> u8 {
         F4::pack_pair(low, high)
@@ -27,6 +46,14 @@ impl Packable4 for F4 {
     #[inline(always)]
     fn unpack_pair(packed: u8) -> (Self, Self) {
         F4::unpack_pair(packed)
+    }
+    #[inline(always)]
+    fn unpack_slice_packed(packed: &[u8], unpacked: &mut [F32]) {
+        super::unpack::unpack_f4_to_f32_packed(packed, unpacked);
+    }
+    #[inline(always)]
+    fn unpack_single(element: Self) -> F32 {
+        F32(element.to_f32())
     }
 }
 
@@ -59,6 +86,12 @@ impl<'a, T: Packable4> Packed4Slice<'a, T> {
     #[inline(always)]
     pub fn len(&self) -> usize {
         self.len
+    }
+
+    /// Returns the underlying packed byte slice.
+    #[inline(always)]
+    pub fn as_packed_slice(&self) -> &'a [u8] {
+        self.data
     }
 
     /// Returns true if empty.
@@ -115,6 +148,18 @@ impl<'a, T: Packable4> Packed4SliceMut<'a, T> {
         self.len
     }
 
+    /// Returns the underlying packed byte slice.
+    #[inline(always)]
+    pub fn as_packed_slice(&self) -> &[u8] {
+        self.data
+    }
+
+    /// Returns the underlying mutable packed byte slice.
+    #[inline(always)]
+    pub fn as_packed_slice_mut(&mut self) -> &mut [u8] {
+        self.data
+    }
+
     /// Returns true if empty.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
@@ -138,22 +183,26 @@ impl<'a, T: Packable4> Packed4SliceMut<'a, T> {
     }
 }
 
+impl<'a, T: Packable4> Packed4Slice<'a, T> {
+    /// Unpack all elements into a destination slice.
+    #[inline]
+    pub fn unpack(&self, dest: &mut [T::Unpacked]) {
+        let n = self.len.min(dest.len());
+        let even_len = (n / 2) * 2;
+        T::unpack_slice_packed(&self.data[..even_len / 2], &mut dest[..even_len]);
+        if n % 2 != 0 {
+            if let Some(b) = self.get(n - 1) {
+                dest[n - 1] = T::unpack_single(b);
+            }
+        }
+    }
+}
+
 impl<'a> Packed4Slice<'a, Bf4> {
     /// Unpack all elements into a destination slice of Bf16.
     #[inline]
     pub fn unpack_to_bf16(&self, dest: &mut [Bf16]) {
-        let n = self.len.min(dest.len());
-        let even_len = (n / 2) * 2;
-        super::unpack::unpack_bf4_to_bf16_packed(&self.data[..even_len / 2], &mut dest[..even_len]);
-        if n % 2 != 0 {
-            if let Some(b) = self.get(n - 1) {
-                let b_val = b.0 as u16;
-                let sign = (b_val & 0x08) << 12;
-                let rest = (b_val & 0x07) << 6;
-                let bias_diff = if rest == 0 { 0 } else { 126 << 7 };
-                dest[n - 1] = Bf16(half::bf16::from_bits(sign | (rest + bias_diff)));
-            }
-        }
+        self.unpack(dest);
     }
 }
 
@@ -161,14 +210,7 @@ impl<'a> Packed4Slice<'a, F4> {
     /// Unpack all elements into a destination slice of F32.
     #[inline]
     pub fn unpack_to_f32(&self, dest: &mut [F32]) {
-        let n = self.len.min(dest.len());
-        let even_len = (n / 2) * 2;
-        super::unpack::unpack_f4_to_f32_packed(&self.data[..even_len / 2], &mut dest[..even_len]);
-        if n % 2 != 0 {
-            if let Some(b) = self.get(n - 1) {
-                dest[n - 1] = F32(b.to_f32());
-            }
-        }
+        self.unpack(dest);
     }
 }
 

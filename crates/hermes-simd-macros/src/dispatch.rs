@@ -278,6 +278,7 @@ fn generate_dispatcher(
     quote! {
         #[cfg(#arch_cfg)]
         #[inline]
+        #[allow(unreachable_code)]
         #visibility fn #dispatch_name #dispatcher_generics(#inner_args) #inner_ret #dispatcher_where {
             #(#helper_fns)*
             #(#dispatch_arms)*

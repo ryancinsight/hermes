@@ -292,239 +292,108 @@ pub unsafe fn unpack_int4_avx2(packed: &[u8], unpacked: &mut [i8]) {
 /// Unpacks Bf8 elements to Bf16 for accumulation.
 #[inline]
 pub fn unpack_bf8_to_bf16(packed: &[Bf8], unpacked: &mut [Bf16]) {
+    #[cfg(target_arch = "x86_64")]
+    {
+        #[cfg(feature = "std")]
+        {
+            if std::is_x86_feature_detected!("avx512bw") && std::is_x86_feature_detected!("avx512vl") {
+                unsafe {
+                    hermes_numeric::unsafe_intrinsics::avx512::unpack_bf8_to_bf16(packed, unpacked);
+                    return;
+                }
+            }
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            if cfg!(target_feature = "avx512bw") {
+                unsafe {
+                    hermes_numeric::unsafe_intrinsics::avx512::unpack_bf8_to_bf16(packed, unpacked);
+                    return;
+                }
+            }
+        }
+    }
     hermes_numeric::unpack_bf8_to_bf16(packed, unpacked);
 }
 
 /// Unpacks Bf4 elements to Bf16 for accumulation.
 #[inline]
 pub fn unpack_bf4_to_bf16(packed: &[Bf4], unpacked: &mut [Bf16]) {
-    hermes_numeric::unpack_bf4_to_bf16(packed, unpacked);
-}
-
-const fn bf4_to_bf16_bits(bits: u8) -> u16 {
-    let bits = bits & 0x0F;
-    let sign = (bits & 0x08) as u32;
-    let exp = (bits & 0x06) >> 1;
-    let mant = bits & 0x01;
-    let f32_bits = if exp == 0 {
-        if mant == 0 {
-            sign << 28
-        } else {
-            if sign != 0 { 0xBE00_0000 } else { 0x3E00_0000 }
+    #[cfg(target_arch = "x86_64")]
+    {
+        #[cfg(feature = "std")]
+        {
+            if std::is_x86_feature_detected!("avx512bw") && std::is_x86_feature_detected!("avx512vl") {
+                unsafe {
+                    hermes_numeric::unsafe_intrinsics::avx512::unpack_bf4_to_bf16(packed, unpacked);
+                    return;
+                }
+            }
         }
-    } else if exp == 3 {
-        if sign != 0 { 0xFFC0_0000 } else { 0x7FC0_0000 }
-    } else {
-        let f32_exp = (exp as u32 + 127 - 1) << 23;
-        let f32_mant = (mant as u32) << 22;
-        (sign << 28) | f32_exp | f32_mant
-    };
-    (f32_bits >> 16) as u16
+        #[cfg(not(feature = "std"))]
+        {
+            if cfg!(target_feature = "avx512bw") {
+                unsafe {
+                    hermes_numeric::unsafe_intrinsics::avx512::unpack_bf4_to_bf16(packed, unpacked);
+                    return;
+                }
+            }
+        }
+    }
+    hermes_numeric::unpack_bf4_to_bf16(packed, unpacked);
 }
 
 /// Unpacks packed Bf4 elements (stored 2 per byte in `packed`) into a Bf16 slice.
 #[inline]
 pub fn unpack_packed_bf4_to_bf16(packed: &[u8], unpacked: &mut [Bf16]) {
-    let len = packed.len();
-    assert!(unpacked.len() >= len * 2);
-    
     #[cfg(target_arch = "x86_64")]
     {
-        #[cfg(target_feature = "avx512bw")]
+        #[cfg(feature = "std")]
         {
             if std::is_x86_feature_detected!("avx512bw") && std::is_x86_feature_detected!("avx512vl") {
                 unsafe {
-                    unpack_packed_bf4_to_bf16_avx512(packed, unpacked);
+                    hermes_numeric::unsafe_intrinsics::avx512::unpack_bf4_to_bf16_packed(packed, unpacked);
+                    return;
+                }
+            }
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            if cfg!(target_feature = "avx512bw") {
+                unsafe {
+                    hermes_numeric::unsafe_intrinsics::avx512::unpack_bf4_to_bf16_packed(packed, unpacked);
                     return;
                 }
             }
         }
     }
-
-    // Fallback scalar loop
-    static TABLE: [Bf16; 16] = {
-        let mut t = [Bf16(half::bf16::ZERO); 16];
-        let mut i = 0;
-        while i < 16 {
-            t[i] = Bf16(half::bf16::from_bits(bf4_to_bf16_bits(i as u8)));
-            i += 1;
-        }
-        t
-    };
-    for i in 0..len {
-        let byte = packed[i];
-        unpacked[2 * i] = TABLE[(byte & 0x0F) as usize];
-        unpacked[2 * i + 1] = TABLE[((byte >> 4) & 0x0F) as usize];
-    }
-}
-
-/// AVX-512 optimized packed Bf4 unpacker.
-#[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx512f,avx512bw,avx512vl")]
-pub unsafe fn unpack_packed_bf4_to_bf16_avx512(packed: &[u8], unpacked: &mut [Bf16]) {
-    use core::arch::x86_64::*;
-    
-    let len = packed.len();
-    let n = len.min(unpacked.len() / 2);
-    let mut i = 0;
-    
-    static TABLE_BITS: [u16; 16] = {
-        let mut t = [0u16; 16];
-        let mut idx = 0;
-        while idx < 16 {
-            t[idx] = bf4_to_bf16_bits(idx as u8);
-            idx += 1;
-        }
-        t
-    };
-    
-    let table_ymm = _mm256_loadu_si256(TABLE_BITS.as_ptr() as *const _);
-    let mask_0f = _mm_set1_epi8(0x0F);
-    
-    while i + 16 <= n {
-        let v = _mm_loadu_si128(packed.as_ptr().add(i) as *const _);
-        
-        let low_nibbles = _mm_and_si128(v, mask_0f);
-        let high_nibbles = _mm_and_si128(_mm_srli_epi16(v, 4), mask_0f);
-        
-        let res_lo = _mm_unpacklo_epi8(low_nibbles, high_nibbles);
-        let res_hi = _mm_unpackhi_epi8(low_nibbles, high_nibbles);
-        
-        let idx_lo = _mm256_cvtepu8_epi16(res_lo);
-        let idx_hi = _mm256_cvtepu8_epi16(res_hi);
-        
-        let val_lo = _mm256_permutexvar_epi16(idx_lo, table_ymm);
-        let val_hi = _mm256_permutexvar_epi16(idx_hi, table_ymm);
-        
-        _mm256_storeu_si256(unpacked.as_mut_ptr().add(2 * i) as *mut _, val_lo);
-        _mm256_storeu_si256(unpacked.as_mut_ptr().add(2 * i + 16) as *mut _, val_hi);
-        
-        i += 16;
-    }
-    
-    static TABLE: [Bf16; 16] = {
-        let mut t = [Bf16(half::bf16::ZERO); 16];
-        let mut idx = 0;
-        while idx < 16 {
-            t[idx] = Bf16(half::bf16::from_bits(TABLE_BITS[idx]));
-            idx += 1;
-        }
-        t
-    };
-    for j in i..n {
-        let byte = packed[j];
-        unpacked[2 * j] = TABLE[(byte & 0x0F) as usize];
-        unpacked[2 * j + 1] = TABLE[((byte >> 4) & 0x0F) as usize];
-    }
-}
-
-const fn f4_to_f32_bits(bits: u8) -> u32 {
-    let bits = bits & 0x0F;
-    let sign = (bits & 0x08) as u32;
-    let exp = bits & 0x07;
-    if exp == 0 {
-        sign << 28
-    } else if exp == 7 {
-        0x7FC0_0000
-    } else {
-        let f32_exp = (exp as u32 + 127 - 3) << 23;
-        (sign << 28) | f32_exp
-    }
+    hermes_numeric::unpack_bf4_to_bf16_packed(packed, unpacked);
 }
 
 /// Unpacks packed F4 elements (stored 2 per byte in `packed`) into an F32 slice.
 #[inline]
 pub fn unpack_packed_f4_to_f32(packed: &[u8], unpacked: &mut [F32]) {
-    let len = packed.len();
-    assert!(unpacked.len() >= len * 2);
-    
     #[cfg(target_arch = "x86_64")]
     {
-        #[cfg(target_feature = "avx512f")]
+        #[cfg(feature = "std")]
         {
             if std::is_x86_feature_detected!("avx512f") && std::is_x86_feature_detected!("avx512vl") {
                 unsafe {
-                    unpack_packed_f4_to_f32_avx512(packed, unpacked);
+                    hermes_numeric::unsafe_intrinsics::avx512::unpack_f4_to_f32_packed(packed, unpacked);
+                    return;
+                }
+            }
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            if cfg!(target_feature = "avx512f") {
+                unsafe {
+                    hermes_numeric::unsafe_intrinsics::avx512::unpack_f4_to_f32_packed(packed, unpacked);
                     return;
                 }
             }
         }
     }
-
-    // Fallback scalar loop
-    static TABLE: [F32; 16] = {
-        let mut t = [F32(0.0); 16];
-        let mut i = 0;
-        while i < 16 {
-            t[i] = F32(f32::from_bits(f4_to_f32_bits(i as u8)));
-            i += 1;
-        }
-        t
-    };
-    for i in 0..len {
-        let byte = packed[i];
-        unpacked[2 * i] = TABLE[(byte & 0x0F) as usize];
-        unpacked[2 * i + 1] = TABLE[((byte >> 4) & 0x0F) as usize];
-    }
-}
-
-/// AVX-512 optimized packed F4 unpacker.
-#[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx512f,avx512vl")]
-pub unsafe fn unpack_packed_f4_to_f32_avx512(packed: &[u8], unpacked: &mut [F32]) {
-    use core::arch::x86_64::*;
-    
-    let len = packed.len();
-    let n = len.min(unpacked.len() / 2);
-    let mut i = 0;
-    
-    static TABLE_BITS: [u32; 16] = {
-        let mut t = [0u32; 16];
-        let mut idx = 0;
-        while idx < 16 {
-            t[idx] = f4_to_f32_bits(idx as u8);
-            idx += 1;
-        }
-        t
-    };
-    
-    let table_zmm = _mm512_loadu_si512(TABLE_BITS.as_ptr() as *const _);
-    let mask_0f = _mm_set1_epi8(0x0F);
-    
-    while i + 16 <= n {
-        let v = _mm_loadu_si128(packed.as_ptr().add(i) as *const _);
-        
-        let low_nibbles = _mm_and_si128(v, mask_0f);
-        let high_nibbles = _mm_and_si128(_mm_srli_epi16(v, 4), mask_0f);
-        
-        let res_lo = _mm_unpacklo_epi8(low_nibbles, high_nibbles);
-        let res_hi = _mm_unpackhi_epi8(low_nibbles, high_nibbles);
-        
-        let idx_lo = _mm512_cvtepu8_epi32(res_lo);
-        let idx_hi = _mm512_cvtepu8_epi32(res_hi);
-        
-        let val_lo = _mm512_permutexvar_epi32(idx_lo, table_zmm);
-        let val_hi = _mm512_permutexvar_epi32(idx_hi, table_zmm);
-        
-        _mm512_storeu_si512(unpacked.as_mut_ptr().add(2 * i) as *mut _, val_lo);
-        _mm512_storeu_si512(unpacked.as_mut_ptr().add(2 * i + 16) as *mut _, val_hi);
-        
-        i += 16;
-    }
-    
-    static TABLE: [F32; 16] = {
-        let mut t = [F32(0.0); 16];
-        let mut idx = 0;
-        while idx < 16 {
-            t[idx] = F32(f32::from_bits(TABLE_BITS[idx]));
-            idx += 1;
-        }
-        t
-    };
-    for j in i..n {
-        let byte = packed[j];
-        unpacked[2 * j] = TABLE[(byte & 0x0F) as usize];
-        unpacked[2 * j + 1] = TABLE[((byte >> 4) & 0x0F) as usize];
-    }
+    hermes_numeric::unpack_f4_to_f32_packed(packed, unpacked);
 }
 

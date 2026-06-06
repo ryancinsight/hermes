@@ -48,7 +48,7 @@ impl_numeric_element!(
     2,
     F16(half::f16::from_bits(0xFFFF)),
     |x: F16| x.0.to_f32() as f64,
-    |x: F16, b: F16, c: F16| F16(half::f16::from_f32(x.0.to_f32().mul_add(b.0.to_f32(), c.0.to_f32()))),
+    |x: F16, b: F16, c: F16| F16(half::f16::from_f32(x.0.to_f32().scalar_fmadd(b.0.to_f32(), c.0.to_f32()))),
     |x: F16| F16(half::f16::from_f32(x.0.to_f32().abs())),
     |x: F16| F16(half::f16::from_f32(x.0.to_f32().sqrt())),
     |x: F16| x.0.is_finite(),
@@ -67,7 +67,7 @@ impl_numeric_element!(
     4,
     F32(f32::from_bits(0xFFFF_FFFF)),
     |x: F32| x.0 as f64,
-    |x: F32, b: F32, c: F32| F32(x.0.mul_add(b.0, c.0)),
+    |x: F32, b: F32, c: F32| F32(x.0.scalar_fmadd(b.0, c.0)),
     |x: F32| F32(x.0.abs()),
     |x: F32| F32(x.0.sqrt()),
     |x: F32| x.0.is_finite(),
@@ -86,7 +86,7 @@ impl_numeric_element!(
     8,
     F64(f64::from_bits(0xFFFF_FFFF_FFFF_FFFF)),
     |x: F64| x.0,
-    |x: F64, b: F64, c: F64| F64(x.0.mul_add(b.0, c.0)),
+    |x: F64, b: F64, c: F64| F64(x.0.scalar_fmadd(b.0, c.0)),
     |x: F64| F64(x.0.abs()),
     |x: F64| F64(x.0.sqrt()),
     |x: F64| x.0.is_finite(),
@@ -105,7 +105,7 @@ impl_numeric_element!(
     2,
     Bf16(half::bf16::from_bits(0xFFFF)),
     |x: Bf16| x.0.to_f32() as f64,
-    |x: Bf16, b: Bf16, c: Bf16| Bf16(half::bf16::from_f32(x.0.to_f32().mul_add(b.0.to_f32(), c.0.to_f32()))),
+    |x: Bf16, b: Bf16, c: Bf16| Bf16(half::bf16::from_f32(x.0.to_f32().scalar_fmadd(b.0.to_f32(), c.0.to_f32()))),
     |x: Bf16| Bf16(half::bf16::from_f32(x.0.to_f32().abs())),
     |x: Bf16| Bf16(half::bf16::from_f32(x.0.to_f32().sqrt())),
     |x: Bf16| x.0.is_finite(),
@@ -116,17 +116,17 @@ impl_numeric_element!(
 );
 
 macro_rules! impl_numeric_for_byte_float {
-    ($t:ident) => {
+    ($t:ident, $zero:expr, $one:expr, $nan:expr, $inf:expr) => {
         impl_numeric_element!(
             $t,
-            $t(0),
-            $t(0),
-            $t(0),
-            $t(0),
+            $zero,
+            $one,
+            $nan,
+            $inf,
             1,
             $t(0xFF),
             |x: $t| x.to_f32() as f64,
-            |x: $t, b: $t, c: $t| $t::from_f32(x.to_f32().mul_add(b.to_f32(), c.to_f32())),
+            |x: $t, b: $t, c: $t| $t::from_f32(x.to_f32().scalar_fmadd(b.to_f32(), c.to_f32())),
             |x: $t| $t::from_f32(x.to_f32().abs()),
             |x: $t| $t::from_f32(x.to_f32().sqrt()),
             |x: $t| x.to_f32().is_finite(),
@@ -138,10 +138,10 @@ macro_rules! impl_numeric_for_byte_float {
     };
 }
 
-impl_numeric_for_byte_float!(Bf8);
-impl_numeric_for_byte_float!(Bf4);
-impl_numeric_for_byte_float!(F8);
-impl_numeric_for_byte_float!(F4);
+impl_numeric_for_byte_float!(Bf8, Bf8(0), Bf8(0x3C), Bf8(0x7F), Bf8(0x7C));
+impl_numeric_for_byte_float!(Bf4, Bf4(0), Bf4(0x02), Bf4(0x07), Bf4(0x06));
+impl_numeric_for_byte_float!(F8, F8(0), F8(0x38), F8(0x7F), F8(0x77));
+impl_numeric_for_byte_float!(F4, F4(0), F4(0x03), F4(0x07), F4(0x06));
 
 impl_numeric_element!(
     I8,

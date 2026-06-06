@@ -1,6 +1,8 @@
 //! Dynamic runtime dispatch choosing the optimal execution backend.
 
+#[cfg(target_arch = "x86_64")]
 use hermes_simd_core::numa::{NumaTopologyService, verify_numa_locality};
+#[cfg(target_arch = "x86_64")]
 use crate::cpu::{AmxSupport, Avx512Support};
 
 /// Dynamic hardware and layout configuration dispatcher.
@@ -59,7 +61,7 @@ impl AdaptiveDispatcher {
                             return DispatchDecision::Amx;
                         } else {
                             // Cross-socket access detected: warn once in debug build, re-route to AVX-512 if available
-                            #[cfg(debug_assertions)]
+                            #[cfg(all(debug_assertions, feature = "std"))]
                             {
                                 static WARNED: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
                                 if !WARNED.swap(true, core::sync::atomic::Ordering::Relaxed) {

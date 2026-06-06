@@ -6,9 +6,9 @@ authors.workspace = true
 description.workspace = true
 
 [dependencies]
-hermes-simd-core = { path = "../hermes-simd-core" }
-hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics" }
-hermes-numeric = { path = "../hermes-numeric" }
+hermes-simd-core = { path = "../hermes-simd-core", default-features = false }
+hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", default-features = false }
+hermes-numeric = { path = "../hermes-numeric", default-features = false }
 hermes-simd-macros = { path = "../hermes-simd-macros" }
 half = { workspace = true }
 bytemuck = { version = "1.14" }
@@ -16,3 +16,8 @@ rkyv = { version = "0.7" }
 
 [dev-dependencies]
 proptest = "1.4"
+
+[features]
+default = ["std"]
+std = ["hermes-simd-core/std", "hermes-simd-intrinsics/std", "hermes-numeric/std"]
+

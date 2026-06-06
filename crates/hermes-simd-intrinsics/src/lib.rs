@@ -15,7 +15,8 @@
 //! - `wide` — wraps the [`wide`](https://docs.rs/wide) crate.
 //! - `portable-simd` — wraps nightly `std::simd`.
 
-
+#![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
 use hermes_simd_core::arch::SimdArch;
 

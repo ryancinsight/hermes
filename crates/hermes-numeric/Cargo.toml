@@ -9,8 +9,10 @@ description = "Foundational Single Source of Truth (SSOT) for all numeric types 
 half = { workspace = true }
 bytemuck = { version = "1.14", features = ["derive"] }
 libm = { version = "0.2.8", default-features = false }
+rkyv = { version = "0.7", default-features = false, optional = true }
 
 [features]
 default = ["std"]
 std = []
+rkyv = ["dep:rkyv"]
 

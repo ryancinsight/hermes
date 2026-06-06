@@ -51,6 +51,7 @@ impl core::fmt::Display for SimdError {
 }
 
 // Implement standard Error trait if std is available.
+#[cfg(feature = "std")]
 impl std::error::Error for SimdError {}
 
 /// A zero-copy, typed slice view parameterized by architecture, alignment, execution mode, and reference typestates.

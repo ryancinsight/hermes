@@ -86,6 +86,18 @@ impl SimdKernel<f64> for Neon {
         NeonF64Vec(vmulq_f64(a.0, b.0))
     }
 
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn sub(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF64Vec(vsubq_f64(a.0, b.0))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn div(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF64Vec(vdivq_f64(a.0, b.0))
+    }
+
     /// `vfmaq_f64(c, a, b)` computes `a*b + c`.
     #[target_feature(enable = "neon")]
     #[inline]
@@ -97,6 +109,101 @@ impl SimdKernel<f64> for Neon {
     #[inline]
     unsafe fn sum_reduce(v: Self::Vector) -> f64 {
         vaddvq_f64(v.0)
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn abs(a: Self::Vector) -> Self::Vector {
+        NeonF64Vec(vabsq_f64(a.0))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn min(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF64Vec(vminq_f64(a.0, b.0))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn max(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF64Vec(vmaxq_f64(a.0, b.0))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn sqrt(a: Self::Vector) -> Self::Vector {
+        NeonF64Vec(vsqrtq_f64(a.0))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn bitand(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF64Vec(vreinterpretq_f64_u64(vandq_u64(
+            vreinterpretq_u64_f64(a.0),
+            vreinterpretq_u64_f64(b.0),
+        )))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn bitor(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF64Vec(vreinterpretq_f64_u64(vorrq_u64(
+            vreinterpretq_u64_f64(a.0),
+            vreinterpretq_u64_f64(b.0),
+        )))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn bitxor(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF64Vec(vreinterpretq_f64_u64(veorq_u64(
+            vreinterpretq_u64_f64(a.0),
+            vreinterpretq_u64_f64(b.0),
+        )))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn cmp_eq(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF64Vec(vreinterpretq_f64_u64(vceqq_f64(a.0, b.0)))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn cmp_ne(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF64Vec(vreinterpretq_f64_u64(vreinterpretq_u64_u32(vmvnq_u32(
+            vreinterpretq_u32_u64(vceqq_f64(a.0, b.0))
+        ))))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn cmp_lt(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF64Vec(vreinterpretq_f64_u64(vcltq_f64(a.0, b.0)))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn cmp_le(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF64Vec(vreinterpretq_f64_u64(vcleq_f64(a.0, b.0)))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn cmp_gt(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF64Vec(vreinterpretq_f64_u64(vcgtq_f64(a.0, b.0)))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn cmp_ge(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        NeonF64Vec(vreinterpretq_f64_u64(vcgeq_f64(a.0, b.0)))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn blend(mask: Self::Vector, true_val: Self::Vector, false_val: Self::Vector) -> Self::Vector {
+        NeonF64Vec(vbslq_f64(vreinterpretq_u64_f64(mask.0), true_val.0, false_val.0))
     }
 
     // -----------------------------------------------------------------------

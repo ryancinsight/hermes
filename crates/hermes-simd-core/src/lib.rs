@@ -17,7 +17,11 @@
 //! | [`vec`] | `AlignedVec` — heap-allocated aligned vector |
 //! | [`cow`] | `SimdCow` — SIMD-aware copy-on-write |
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
 #![warn(missing_docs)]
+
+extern crate alloc;
 
 pub mod arch;
 pub mod align;
@@ -59,7 +63,7 @@ pub use sparse::{
     CsrData, SellPData, BlockedCooData, DenseWithMaskData,
 };
 pub use vec::AlignedVec;
-pub use cow::{SimdCow, ArchivedSimdCow, SimdCowResolver};
+pub use cow::{SimdCow, ArchivedSimdCow, SimdCowResolver, ArchivedPacked4Cow, Packed4CowResolver};
 pub use iter::SimdChunks;
 pub use compute::ComputeView;
 pub use bitboard::{BitBoardView, BitBoardKernel};

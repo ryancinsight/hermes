@@ -38,8 +38,11 @@
 //! assert_eq!(masked_dot(&a, &b, &mask).unwrap(), 9.0); // 1+3+5
 //! ```
 
+#![cfg_attr(not(feature = "std"), no_std)]
 #![warn(missing_docs)]
 #![allow(unused_unsafe)]
+
+extern crate alloc;
 
 // Re-export core types
 pub use hermes_simd_core::{
@@ -49,7 +52,7 @@ pub use hermes_simd_core::{
     kernel::SimdKernel,
     view::{SimdView, SimdError, TileView, TileMatrixMultiply, Vector, Mask},
     vec::AlignedVec,
-    cow::{SimdCow, ArchivedSimdCow, SimdCowResolver},
+    cow::{SimdCow, ArchivedSimdCow, SimdCowResolver, ArchivedPacked4Cow, Packed4CowResolver},
     mask::BitMask,
     compute::ComputeView,
     bitboard::{BitBoardView, BitBoardKernel},
@@ -146,6 +149,7 @@ where
 
 /// Dispatches a shared slice into the best matching `DispatchedView` based on runtime CPU feature detection.
 #[inline]
+#[allow(unreachable_code)]
 pub fn dispatch_view<'a, T, Align>(data: &'a [T]) -> Option<DispatchedView<'a, T, Align, Unmasked, &'a [T]>>
 where
     T: FloatElement,
@@ -153,11 +157,23 @@ where
 {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if std::is_x86_feature_detected!("avx512f") {
-            return SimdView::<T, Avx512, Align, Unmasked, &'a [T]>::new(data).map(DispatchedView::Avx512);
+        #[cfg(feature = "std")]
+        {
+            if std::is_x86_feature_detected!("avx512f") {
+                return SimdView::<T, Avx512, Align, Unmasked, &'a [T]>::new(data).map(DispatchedView::Avx512);
+            }
+            if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+                return SimdView::<T, Avx2, Align, Unmasked, &'a [T]>::new(data).map(DispatchedView::Avx2);
+            }
         }
-        if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
-            return SimdView::<T, Avx2, Align, Unmasked, &'a [T]>::new(data).map(DispatchedView::Avx2);
+        #[cfg(not(feature = "std"))]
+        {
+            if cfg!(target_feature = "avx512f") {
+                return SimdView::<T, Avx512, Align, Unmasked, &'a [T]>::new(data).map(DispatchedView::Avx512);
+            }
+            if cfg!(target_feature = "avx2") && cfg!(target_feature = "fma") {
+                return SimdView::<T, Avx2, Align, Unmasked, &'a [T]>::new(data).map(DispatchedView::Avx2);
+            }
         }
     }
     #[cfg(target_arch = "aarch64")]
@@ -169,6 +185,7 @@ where
 
 /// Dispatches a mutable slice into the best matching `DispatchedView` based on runtime CPU feature detection.
 #[inline]
+#[allow(unreachable_code)]
 pub fn dispatch_view_mut<'a, T, Align>(data: &'a mut [T]) -> Option<DispatchedView<'a, T, Align, Unmasked, &'a mut [T]>>
 where
     T: FloatElement,
@@ -176,11 +193,23 @@ where
 {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if std::is_x86_feature_detected!("avx512f") {
-            return SimdView::<T, Avx512, Align, Unmasked, &'a mut [T]>::new_mut(data).map(DispatchedView::Avx512);
+        #[cfg(feature = "std")]
+        {
+            if std::is_x86_feature_detected!("avx512f") {
+                return SimdView::<T, Avx512, Align, Unmasked, &'a mut [T]>::new_mut(data).map(DispatchedView::Avx512);
+            }
+            if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+                return SimdView::<T, Avx2, Align, Unmasked, &'a mut [T]>::new_mut(data).map(DispatchedView::Avx2);
+            }
         }
-        if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
-            return SimdView::<T, Avx2, Align, Unmasked, &'a mut [T]>::new_mut(data).map(DispatchedView::Avx2);
+        #[cfg(not(feature = "std"))]
+        {
+            if cfg!(target_feature = "avx512f") {
+                return SimdView::<T, Avx512, Align, Unmasked, &'a mut [T]>::new_mut(data).map(DispatchedView::Avx512);
+            }
+            if cfg!(target_feature = "avx2") && cfg!(target_feature = "fma") {
+                return SimdView::<T, Avx2, Align, Unmasked, &'a mut [T]>::new_mut(data).map(DispatchedView::Avx2);
+            }
         }
     }
     #[cfg(target_arch = "aarch64")]
@@ -254,44 +283,51 @@ where
     }
 }
 
-/// Extension trait for packed Bf4 Clone-on-Write containers.
-pub trait PackedBf4CowExt<'a> {
-    /// Unpack Bf4 elements directly to a `SimdCow` of `Bf16` with zero intermediate allocations.
-    fn unpack_to_bf16_cow<Arch, Align>(&self) -> SimdCow<'static, Bf16, Arch, Align>
+/// Extension trait for packed Clone-on-Write containers to support zero-copy unpacking directly into `SimdCow`.
+pub trait Packed4CowExt<'a, T: Packable4> {
+    /// Unpack packed elements directly to a `SimdCow` of wider precision with zero intermediate allocations.
+    fn unpack_to_cow<Arch, Align>(&self) -> SimdCow<'static, T::Unpacked, Arch, Align>
     where
         Arch: SimdArch,
         Align: Alignment;
 }
 
-/// Extension trait for packed F4 Clone-on-Write containers.
-pub trait PackedF4CowExt<'a> {
-    /// Unpack F4 elements directly to a `SimdCow` of `F32` with zero intermediate allocations.
-    fn unpack_to_f32_cow<Arch, Align>(&self) -> SimdCow<'static, F32, Arch, Align>
-    where
-        Arch: SimdArch,
-        Align: Alignment;
+// Private helper trait to dispatch unpacking to the best hardware backends
+pub(crate) trait HardwareUnpack: Packable4 {
+    fn hardware_unpack(packed: &[u8], unpacked: &mut [Self::Unpacked]);
 }
 
-impl<'a> PackedBf4CowExt<'a> for Packed4Cow<'a, Bf4> {
-    #[inline]
-    fn unpack_to_bf16_cow<Arch, Align>(&self) -> SimdCow<'static, Bf16, Arch, Align>
-    where
-        Arch: SimdArch,
-        Align: Alignment,
-    {
-        let len = self.len();
-        let mut dest = AlignedVec::with_capacity(len);
-        unsafe {
-            dest.set_len(len);
+impl HardwareUnpack for Bf4 {
+    #[inline(always)]
+    fn hardware_unpack(packed: &[u8], unpacked: &mut [Bf16]) {
+        #[cfg(target_arch = "x86_64")]
+        {
+            hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_packed_bf4_to_bf16(packed, unpacked);
         }
-        self.as_view().unpack_to_bf16(dest.as_mut_slice());
-        SimdCow::Owned(dest)
+        #[cfg(not(target_arch = "x86_64"))]
+        {
+            <Self as Packable4>::unpack_slice_packed(packed, unpacked);
+        }
     }
 }
 
-impl<'a> PackedF4CowExt<'a> for Packed4Cow<'a, F4> {
+impl HardwareUnpack for F4 {
+    #[inline(always)]
+    fn hardware_unpack(packed: &[u8], unpacked: &mut [F32]) {
+        #[cfg(target_arch = "x86_64")]
+        {
+            hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_packed_f4_to_f32(packed, unpacked);
+        }
+        #[cfg(not(target_arch = "x86_64"))]
+        {
+            <Self as Packable4>::unpack_slice_packed(packed, unpacked);
+        }
+    }
+}
+
+impl<'a, T: Packable4 + HardwareUnpack> Packed4CowExt<'a, T> for Packed4Cow<'a, T> {
     #[inline]
-    fn unpack_to_f32_cow<Arch, Align>(&self) -> SimdCow<'static, F32, Arch, Align>
+    fn unpack_to_cow<Arch, Align>(&self) -> SimdCow<'static, T::Unpacked, Arch, Align>
     where
         Arch: SimdArch,
         Align: Alignment,
@@ -301,7 +337,15 @@ impl<'a> PackedF4CowExt<'a> for Packed4Cow<'a, F4> {
         unsafe {
             dest.set_len(len);
         }
-        self.as_view().unpack_to_f32(dest.as_mut_slice());
+        let view = self.as_view();
+        let n = view.len().min(dest.len());
+        let even_len = (n / 2) * 2;
+        T::hardware_unpack(&view.as_packed_slice()[..even_len / 2], &mut dest[..even_len]);
+        if n % 2 != 0 {
+            if let Some(b) = view.get(n - 1) {
+                dest[n - 1] = T::unpack_single(b);
+            }
+        }
         SimdCow::Owned(dest)
     }
 }
