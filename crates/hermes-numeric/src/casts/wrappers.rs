@@ -1,4 +1,4 @@
-use crate::traits::{CastFrom, FloatElement};
+use crate::traits::{CastFrom, FloatElement, NumericElement};
 use crate::types::{F16, F32, F64, Bf16, Bf8, Bf4, F8, F4, I8, I16, I32};
 
 macro_rules! impl_cast_between {

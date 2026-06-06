@@ -84,3 +84,11 @@ pub trait CastTo: Copy {
 }
 
 impl<T: Copy> CastTo for T {}
+
+/// Trait for 4-bit types that can be packed two per byte.
+pub trait Packable4: Copy + 'static {
+    /// Pack a low and high element into a single byte.
+    fn pack_pair(low: Self, high: Self) -> u8;
+    /// Unpack a single byte into a low and high element.
+    fn unpack_pair(packed: u8) -> (Self, Self);
+}

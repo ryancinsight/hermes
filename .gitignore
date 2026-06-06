@@ -1,6 +1,6 @@
 # Cargo build directory
-/target
-/target_benches
+target/
+target_benches/
 
 # OS files
 .DS_Store

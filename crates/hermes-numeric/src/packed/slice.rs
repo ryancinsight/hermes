@@ -142,7 +142,18 @@ impl<'a> Packed4Slice<'a, Bf4> {
     /// Unpack all elements into a destination slice of Bf16.
     #[inline]
     pub fn unpack_to_bf16(&self, dest: &mut [Bf16]) {
-        super::unpack::unpack_bf4_to_bf16_packed(self.data, dest);
+        let n = self.len.min(dest.len());
+        let even_len = (n / 2) * 2;
+        super::unpack::unpack_bf4_to_bf16_packed(&self.data[..even_len / 2], &mut dest[..even_len]);
+        if n % 2 != 0 {
+            if let Some(b) = self.get(n - 1) {
+                let b_val = b.0 as u16;
+                let sign = (b_val & 0x08) << 12;
+                let rest = (b_val & 0x07) << 6;
+                let bias_diff = if rest == 0 { 0 } else { 126 << 7 };
+                dest[n - 1] = Bf16(half::bf16::from_bits(sign | (rest + bias_diff)));
+            }
+        }
     }
 }
 
