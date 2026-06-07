@@ -559,3 +559,89 @@ fn test_diag_iter_rectangular() {
     // diag[1] = data[1*5] = data[5] = 6.0
     assert_eq!(diag, vec![1.0, 6.0]);
 }
+
+// ---------------------------------------------------------------------------
+// Element-wise arithmetic tensor operations
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_tensor_arithmetic_contiguous() {
+    let a_data = [1.0f32, 2.0, 3.0, 4.0];
+    let b_data = [5.0f32, 6.0, 7.0, 8.0];
+
+    let a = TensorView::<f32, 2>::new(&a_data, [2, 2]).unwrap();
+    let b = TensorView::<f32, 2>::new(&b_data, [2, 2]).unwrap();
+
+    // 1. Add
+    let c_add: AlignedVec<f32, Unaligned> = tensor_add::<f32, Scalar, Unaligned, 2, RowMajor, RowMajor>(&a, &b).unwrap();
+    assert_eq!(c_add.as_slice(), &[6.0f32, 8.0, 10.0, 12.0]);
+
+    // 2. Sub
+    let c_sub: AlignedVec<f32, Unaligned> = tensor_sub::<f32, Scalar, Unaligned, 2, RowMajor, RowMajor>(&b, &a).unwrap();
+    assert_eq!(c_sub.as_slice(), &[4.0f32, 4.0, 4.0, 4.0]);
+
+    // 3. Mul
+    let c_mul: AlignedVec<f32, Unaligned> = tensor_mul::<f32, Scalar, Unaligned, 2, RowMajor, RowMajor>(&a, &b).unwrap();
+    assert_eq!(c_mul.as_slice(), &[5.0f32, 12.0, 21.0, 32.0]);
+
+    // 4. Div
+    let c_div: AlignedVec<f32, Unaligned> = tensor_div::<f32, Scalar, Unaligned, 2, RowMajor, RowMajor>(&b, &a).unwrap();
+    assert_eq!(c_div.as_slice(), &[5.0f32, 3.0, 7.0 / 3.0, 2.0]);
+
+    // 5. In-place addition (tensor_add_to)
+    let mut c_data = [0.0f32; 4];
+    let mut c = TensorView::new_mut(&mut c_data, [2, 2]).unwrap();
+    tensor_add_to::<f32, Scalar, Unaligned, 2, RowMajor, RowMajor, RowMajor>(&a, &b, &mut c).unwrap();
+    assert_eq!(c_data, [6.0f32, 8.0, 10.0, 12.0]);
+}
+
+#[test]
+fn test_tensor_arithmetic_strided() {
+    let a_data = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0];
+    let b_data = [10.0f32, 20.0, 30.0, 40.0, 50.0, 60.0];
+
+    let a_base = TensorView::<f32, 2>::new(&a_data, [2, 3]).unwrap();
+    let b_base = TensorView::<f32, 2>::new(&b_data, [2, 3]).unwrap();
+
+    let a = a_base.transpose(); // shape [3, 2]
+    let b = b_base.transpose(); // shape [3, 2]
+
+    assert!(!a.is_contiguous());
+    assert!(!b.is_contiguous());
+
+    let c_add: AlignedVec<f32, Unaligned> = tensor_add::<f32, Scalar, Unaligned, 2, ColMajor, ColMajor>(&a, &b).unwrap();
+    assert_eq!(c_add.as_slice(), &[11.0f32, 44.0, 22.0, 55.0, 33.0, 66.0]);
+}
+
+// ---------------------------------------------------------------------------
+// 2-D row-wise layer normalization
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_layer_norm_2d_rows() {
+    let data = [
+        1.0f32, 2.0, 3.0, 4.0,
+        2.0, 4.0, 6.0, 8.0,
+    ];
+    let t = TensorView::new(&data, [2, 4]).unwrap();
+
+    let gamma = [2.0f32; 4];
+    let beta = [0.0f32; 4];
+    let out = layer_norm_2d_rows::<f32, Scalar, RowMajor>(&t, 1e-5, Some(&gamma), Some(&beta));
+
+    assert_eq!(out.len(), 8);
+
+    let row0 = &out[0..4];
+    let mean0: f32 = row0.iter().sum::<f32>() / 4.0;
+    assert!(mean0.abs() < 1e-4, "mean0 = {mean0}");
+
+    let row1 = &out[4..8];
+    let mean1: f32 = row1.iter().sum::<f32>() / 4.0;
+    assert!(mean1.abs() < 1e-4, "mean1 = {mean1}");
+
+    let mut data_mut = data;
+    let mut t_mut = TensorView::new_mut(&mut data_mut, [2, 4]).unwrap();
+    layer_norm_2d_rows_inplace::<f32, Scalar, RowMajor>(&mut t_mut, 1e-5, Some(&gamma), Some(&beta));
+    assert!((data_mut[0] - out[0]).abs() < 1e-5);
+}
+

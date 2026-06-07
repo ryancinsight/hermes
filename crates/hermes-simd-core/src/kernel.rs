@@ -282,6 +282,39 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// Processor must support the required target feature.
     unsafe fn mask_to_vector(mask: Self::Mask) -> Self::Vector;
 
+    /// Perform an intra-vector prefix scan (inclusive or exclusive) of the vector,
+    /// using the specified `ScanOp` strategy and starting carry value.
+    /// Returns the scanned vector and the final carry value.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn scan_vector<Op: crate::ops::ScanOp<T>, SMode: crate::ops::ScanMode>(
+        v: Self::Vector,
+        mut carry: T,
+    ) -> (Self::Vector, T) {
+        let mut buf = [T::ZERO; 128];
+        let lanes = Self::LANE_COUNT.min(128);
+        Self::store_unaligned(buf.as_mut_ptr(), v);
+
+        let mut out_buf = [T::ZERO; 128];
+        if SMode::IS_INCLUSIVE {
+            for j in 0..lanes {
+                carry = Op::combine(carry, buf[j]);
+                out_buf[j] = carry;
+            }
+        } else {
+            for j in 0..lanes {
+                let temp = buf[j];
+                out_buf[j] = carry;
+                carry = Op::combine(carry, temp);
+            }
+        }
+
+        (Self::load_unaligned(out_buf.as_ptr()), carry)
+    }
+
+
     /// Set all lanes to zero.
     ///
     /// Default: delegates to `splat(T::ZERO)`. Backends may override with an

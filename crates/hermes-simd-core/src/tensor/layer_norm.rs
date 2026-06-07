@@ -110,6 +110,8 @@ where
     }
 }
 
+use super::TensorView;
+
 /// Allocating layer normalization: returns a new `Vec<T>`.
 ///
 /// Allocates exactly one `Vec`. Delegates to [`layer_norm_inplace`].
@@ -129,4 +131,83 @@ where
     out
 }
 
-// Unit tests moved to integration tests in crates/hermes-simd/tests/tensor_tests.rs
+/// In-place numerically stable layer normalization over rows of a mutable 2-D tensor.
+///
+/// `gamma` and `beta` are optional 1-D affine parameter slices of length equal to the number of columns.
+#[inline]
+pub fn layer_norm_2d_rows_inplace<'a, T, Arch, Layout>(
+    tensor: &mut TensorView<'a, T, 2, Layout, &'a mut [T]>,
+    eps: T,
+    gamma: Option<&[T]>,
+    beta: Option<&[T]>,
+)
+where
+    T: Scalar + FloatElement,
+    Arch: SimdArch + SimdKernel<T>,
+{
+    if tensor.num_elements() == 0 {
+        return;
+    }
+    
+    let shape = tensor.shape();
+    
+    if let Some(g) = gamma { assert_eq!(g.len(), shape[1], "gamma length mismatch"); }
+    if let Some(b) = beta  { assert_eq!(b.len(), shape[1], "beta length mismatch"); }
+
+    if tensor.is_contiguous() {
+        if let Ok(rows) = tensor.iter_rows_mut() {
+            for row in rows {
+                layer_norm_inplace::<T, Arch>(row, eps, gamma, beta);
+            }
+            return;
+        }
+    }
+    
+    let mut temp = alloc::vec![T::ZERO; shape[1]];
+    for r in 0..shape[0] {
+        for c in 0..shape[1] {
+            if let Ok(val) = tensor.get([r, c]) {
+                temp[c] = val;
+            }
+        }
+        layer_norm_inplace::<T, Arch>(&mut temp, eps, gamma, beta);
+        for c in 0..shape[1] {
+            let _ = tensor.set([r, c], temp[c]);
+        }
+    }
+}
+
+/// Allocating row-wise layer normalization: returns a new `alloc::vec::Vec<T>`.
+///
+/// The returned vector contains the flattened row-wise normalized tensor in C-order.
+#[inline]
+pub fn layer_norm_2d_rows<T, Arch, Layout>(
+    tensor: &TensorView<'_, T, 2, Layout, &'_ [T]>,
+    eps: T,
+    gamma: Option<&[T]>,
+    beta: Option<&[T]>,
+) -> alloc::vec::Vec<T>
+where
+    T: Scalar + FloatElement,
+    Arch: SimdArch + SimdKernel<T>,
+{
+    let shape = tensor.shape();
+    let total = shape[0] * shape[1];
+    let mut out = alloc::vec![T::ZERO; total];
+    if tensor.is_contiguous() {
+        out.copy_from_slice(tensor.as_slice());
+    } else {
+        let mut idx = 0;
+        for r in 0..shape[0] {
+            for c in 0..shape[1] {
+                out[idx] = tensor.get([r, c]).unwrap_or(T::ZERO);
+                idx += 1;
+            }
+        }
+    }
+    
+    let mut out_tensor = TensorView::new_mut(&mut out, shape).unwrap();
+    layer_norm_2d_rows_inplace::<T, Arch, super::RowMajor>(&mut out_tensor, eps, gamma, beta);
+    out
+}
+

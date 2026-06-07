@@ -225,3 +225,81 @@ fn test_prefix_scan_max_unary_correctness() {
     v.prefix_scan(&mut out, ScanMax, Inclusive).unwrap();
     assert_eq!(out, [3.0f32, 3.0, 4.0, 4.0, 5.0]);
 }
+
+// ---------------------------------------------------------------------------
+// SimdCow::map_cow — generic UnaryOp dispatch (cow/unary.rs)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_map_cow_abs_f32() {
+    let data = [-1.0f32, 2.0, -3.0, 4.0];
+    let cow  = Cow::<f32>::borrow_slice(&data).unwrap();
+    let out  = cow.map_cow(Abs);
+    assert_eq!(&*out, &[1.0f32, 2.0, 3.0, 4.0]);
+}
+
+#[test]
+fn test_map_cow_neg_f32() {
+    let data = [1.0f32, -2.0, 3.0, -4.0];
+    let cow  = Cow::<f32>::borrow_slice(&data).unwrap();
+    let out  = cow.map_cow(Neg);
+    assert_eq!(&*out, &[-1.0f32, 2.0, -3.0, 4.0]);
+}
+
+#[test]
+fn test_map_cow_sqrt_f32() {
+    let data = [4.0f32, 9.0, 16.0, 25.0];
+    let cow  = Cow::<f32>::borrow_slice(&data).unwrap();
+    let out  = cow.map_cow(Sqrt);
+    let expected = [2.0f32, 3.0, 4.0, 5.0];
+    for (a, b) in out.iter().zip(expected.iter()) {
+        assert!((a - b).abs() < 1e-5, "got={a}, expected={b}");
+    }
+}
+
+#[test]
+fn test_map_cow_returns_owned() {
+    let data = [1.0f32, 2.0, 3.0];
+    let cow  = Cow::<f32>::borrow_slice(&data).unwrap();
+    let out  = cow.map_cow(Abs);
+    assert!(matches!(out, SimdCow::Owned(_)));
+}
+
+// ---------------------------------------------------------------------------
+// SimdCow::fma_cow — fused multiply-add (cow/unary.rs)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_fma_cow_basic_f32() {
+    let a = [1.0f32, 2.0, 3.0, 4.0];
+    let b = [2.0f32, 2.0, 2.0, 2.0];
+    let c = [0.5f32, 0.5, 0.5, 0.5];
+    let ca = Cow::<f32>::borrow_slice(&a).unwrap();
+    let cb = Cow::<f32>::borrow_slice(&b).unwrap();
+    let cc = Cow::<f32>::borrow_slice(&c).unwrap();
+    let out = ca.fma_cow(&cb, &cc).unwrap();
+    assert_eq!(&*out, &[2.5f32, 4.5, 6.5, 8.5]);
+}
+
+#[test]
+fn test_fma_cow_zero_addend() {
+    let a = [3.0f32, 4.0];
+    let b = [2.0f32, 2.0];
+    let c = [0.0f32, 0.0];
+    let ca = Cow::<f32>::borrow_slice(&a).unwrap();
+    let cb = Cow::<f32>::borrow_slice(&b).unwrap();
+    let cc = Cow::<f32>::borrow_slice(&c).unwrap();
+    let out = ca.fma_cow(&cb, &cc).unwrap();
+    assert_eq!(&*out, &[6.0f32, 8.0]);
+}
+
+#[test]
+fn test_fma_cow_length_mismatch() {
+    let a = [1.0f32, 2.0];
+    let b = [1.0f32, 2.0, 3.0];
+    let c = [0.0f32, 0.0, 0.0];
+    let ca = Cow::<f32>::borrow_slice(&a).unwrap();
+    let cb = Cow::<f32>::borrow_slice(&b).unwrap();
+    let cc = Cow::<f32>::borrow_slice(&c).unwrap();
+    assert!(ca.fma_cow(&cb, &cc).is_err());
+}

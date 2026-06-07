@@ -101,12 +101,18 @@ pub use hermes_simd_core::tensor::softmax::{
 };
 pub use hermes_simd_core::tensor::ops::{
     matmul, batch_matmul, matmul_to, batch_matmul_to, DefaultTilePolicy,
+    tensor_elementwise_op_to, tensor_elementwise_op,
+    tensor_add_to, tensor_add,
+    tensor_sub_to, tensor_sub,
+    tensor_mul_to, tensor_mul,
+    tensor_div_to, tensor_div,
 };
 pub use hermes_simd_core::tensor::norm::{
     norm_l1, norm_l2, norm_linf, normalize_l2_inplace, row_norms_l2, SquaredSum,
 };
 pub use hermes_simd_core::tensor::layer_norm::{
     layer_norm_inplace, layer_norm,
+    layer_norm_2d_rows_inplace, layer_norm_2d_rows,
 };
 
 // Re-export concrete ZST architecture markers

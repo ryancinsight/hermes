@@ -31,21 +31,51 @@ where
         }
 
         let src = self.as_slice();
-        let mut acc = Op::identity();
+        let lane_count = Arch::LANE_COUNT;
+        let simd_len = (len / lane_count) * lane_count;
+        let ptr_in = src.as_ptr();
+        let ptr_out = out.as_mut_ptr();
+
+        let mut carry = Op::identity();
+
+        unsafe {
+            let load = |p: *const T| {
+                if Align::IS_ALIGNED {
+                    Arch::load_aligned(p)
+                } else {
+                    Arch::load_unaligned(p)
+                }
+            };
+            let store = |p: *mut T, v: Arch::Vector| {
+                if Align::IS_ALIGNED {
+                    Arch::store_aligned(p, v)
+                } else {
+                    Arch::store_unaligned(p, v)
+                }
+            };
+
+            for i in (0..simd_len).step_by(lane_count) {
+                let v = load(ptr_in.add(i));
+                let (r, next_carry) = Arch::scan_vector::<Op, SMode>(v, carry);
+                store(ptr_out.add(i), r);
+                carry = next_carry;
+            }
+        }
 
         if SMode::IS_INCLUSIVE {
-            for i in 0..len {
-                acc = Op::combine(acc, src[i]);
-                out[i] = acc;
+            for i in simd_len..len {
+                carry = Op::combine(carry, src[i]);
+                out[i] = carry;
             }
         } else {
-            for i in 0..len {
+            for i in simd_len..len {
                 let temp = src[i];
-                out[i] = acc;
-                acc = Op::combine(acc, temp);
+                out[i] = carry;
+                carry = Op::combine(carry, temp);
             }
         }
 
         Ok(())
     }
+
 }

@@ -86,7 +86,7 @@ pub use numa::{
     verify_numa_locality, NumaBinding, NumaTopologyService, numa_node_count, numa_node_distance,
 };
 pub use tensor::{
-    TensorView, TensorError, RowMajor, ColMajor,
+    TensorView, TensorCow, TensorError, RowMajor, ColMajor,
     softmax::{softmax_inplace, softmax, softmax_2d_rows_inplace, softmax_2d_rows},
     layer_norm::{layer_norm_inplace, layer_norm},
     attention::{attention, batch_attention},

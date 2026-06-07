@@ -20,7 +20,8 @@ use crate::scalar::Scalar;
 use crate::tiling::{TilingPolicy, TilingStrategy};
 use crate::vec::AlignedVec;
 use crate::view::{SimdError, SimdView};
-use super::{TensorView, RowMajor};
+use super::{TensorView, RowMajor, Layout};
+use crate::ops::ElementOp;
 
 /// 2-D matrix multiplication: `C = A * B`, writing the result into `c`.
 ///
@@ -206,3 +207,211 @@ where
 ///
 /// 4 × 4 tile fits within 16 YMM registers on AVX2 and conservatively on AVX-512.
 pub type DefaultTilePolicy = TilingPolicy<4, 4>;
+
+/// Perform element-wise binary operation on two tensors, writing the result into the output tensor.
+///
+/// If layouts are contiguous row-major, we utilize `SimdView::zip_into` for vectorization.
+/// Otherwise, we fallback to a rank-agnostic index-iteration loop to remain zero-copy and support strided layouts.
+#[inline]
+pub fn tensor_elementwise_op_to<T, Arch, Align, Op, const N: usize, L1: Layout, L2: Layout, L3: Layout>(
+    a: &TensorView<'_, T, N, L1, &[T]>,
+    b: &TensorView<'_, T, N, L2, &[T]>,
+    c: &mut TensorView<'_, T, N, L3, &mut [T]>,
+    op: Op,
+) -> Result<(), SimdError>
+where
+    T: Scalar,
+    Arch: SimdArch + SimdKernel<T>,
+    Align: Alignment,
+    Op: ElementOp<T>,
+{
+    let shape_a = a.shape();
+    let shape_b = b.shape();
+    let shape_c = c.shape();
+    if shape_a != shape_b || shape_a != shape_c {
+        return Err(SimdError::LengthMismatch);
+    }
+
+    if a.is_empty() {
+        return Ok(());
+    }
+
+    if a.is_contiguous() && b.is_contiguous() && c.is_contiguous() {
+        let Some(a_view) = SimdView::<'_, T, Arch, Unaligned, Unmasked, &[T]>::new(a.as_slice()) else {
+            return Ok(());
+        };
+        let Some(b_view) = SimdView::<'_, T, Arch, Unaligned, Unmasked, &[T]>::new(b.as_slice()) else {
+            return Ok(());
+        };
+        a_view.zip_into(&b_view, c.as_slice_mut(), op)?;
+    } else {
+        let mut idx = [0usize; N];
+        loop {
+            unsafe {
+                let va = a.get_unchecked(idx);
+                let vb = b.get_unchecked(idx);
+                let vr = op.apply_scalar(va, vb);
+                c.set_unchecked(idx, vr);
+            }
+
+            let mut carry = true;
+            for i in (0..N).rev() {
+                idx[i] += 1;
+                if idx[i] < shape_a[i] {
+                    carry = false;
+                    break;
+                }
+                idx[i] = 0;
+            }
+            if carry {
+                break;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Perform element-wise binary operation on two tensors, returning an owned `AlignedVec`.
+///
+/// The output has shape matching `a` and is contiguous row-major.
+#[inline]
+pub fn tensor_elementwise_op<T, Arch, Align, Op, const N: usize, L1: Layout, L2: Layout>(
+    a: &TensorView<'_, T, N, L1, &[T]>,
+    b: &TensorView<'_, T, N, L2, &[T]>,
+    op: Op,
+) -> Result<AlignedVec<T, Align>, SimdError>
+where
+    T: Scalar,
+    Arch: SimdArch + SimdKernel<T>,
+    Align: Alignment,
+    Op: ElementOp<T>,
+{
+    let shape = a.shape();
+    if shape != b.shape() {
+        return Err(SimdError::LengthMismatch);
+    }
+    let total = shape.iter().product::<usize>();
+    let mut out: AlignedVec<T, Align> = AlignedVec::with_capacity(total);
+    unsafe { out.set_len(total); }
+    let mut c = TensorView::new_mut(out.as_mut_slice(), shape)
+        .map_err(|_| SimdError::LengthMismatch)?;
+    tensor_elementwise_op_to::<T, Arch, Align, Op, N, L1, L2, RowMajor>(a, b, &mut c, op)?;
+    Ok(out)
+}
+
+/// Element-wise addition of two tensors: `c = a + b`.
+#[inline]
+pub fn tensor_add_to<T, Arch, Align, const N: usize, L1: Layout, L2: Layout, L3: Layout>(
+    a: &TensorView<'_, T, N, L1, &[T]>,
+    b: &TensorView<'_, T, N, L2, &[T]>,
+    c: &mut TensorView<'_, T, N, L3, &mut [T]>,
+) -> Result<(), SimdError>
+where
+    T: Scalar,
+    Arch: SimdArch + SimdKernel<T>,
+    Align: Alignment,
+{
+    tensor_elementwise_op_to::<T, Arch, Align, crate::ops::Add, N, L1, L2, L3>(a, b, c, crate::ops::Add)
+}
+
+/// Element-wise addition of two tensors, returning an owned `AlignedVec`.
+#[inline]
+pub fn tensor_add<T, Arch, Align, const N: usize, L1: Layout, L2: Layout>(
+    a: &TensorView<'_, T, N, L1, &[T]>,
+    b: &TensorView<'_, T, N, L2, &[T]>,
+) -> Result<AlignedVec<T, Align>, SimdError>
+where
+    T: Scalar,
+    Arch: SimdArch + SimdKernel<T>,
+    Align: Alignment,
+{
+    tensor_elementwise_op::<T, Arch, Align, crate::ops::Add, N, L1, L2>(a, b, crate::ops::Add)
+}
+
+/// Element-wise subtraction of two tensors: `c = a - b`.
+#[inline]
+pub fn tensor_sub_to<T, Arch, Align, const N: usize, L1: Layout, L2: Layout, L3: Layout>(
+    a: &TensorView<'_, T, N, L1, &[T]>,
+    b: &TensorView<'_, T, N, L2, &[T]>,
+    c: &mut TensorView<'_, T, N, L3, &mut [T]>,
+) -> Result<(), SimdError>
+where
+    T: Scalar,
+    Arch: SimdArch + SimdKernel<T>,
+    Align: Alignment,
+{
+    tensor_elementwise_op_to::<T, Arch, Align, crate::ops::Sub, N, L1, L2, L3>(a, b, c, crate::ops::Sub)
+}
+
+/// Element-wise subtraction of two tensors, returning an owned `AlignedVec`.
+#[inline]
+pub fn tensor_sub<T, Arch, Align, const N: usize, L1: Layout, L2: Layout>(
+    a: &TensorView<'_, T, N, L1, &[T]>,
+    b: &TensorView<'_, T, N, L2, &[T]>,
+) -> Result<AlignedVec<T, Align>, SimdError>
+where
+    T: Scalar,
+    Arch: SimdArch + SimdKernel<T>,
+    Align: Alignment,
+{
+    tensor_elementwise_op::<T, Arch, Align, crate::ops::Sub, N, L1, L2>(a, b, crate::ops::Sub)
+}
+
+/// Element-wise multiplication of two tensors: `c = a * b`.
+#[inline]
+pub fn tensor_mul_to<T, Arch, Align, const N: usize, L1: Layout, L2: Layout, L3: Layout>(
+    a: &TensorView<'_, T, N, L1, &[T]>,
+    b: &TensorView<'_, T, N, L2, &[T]>,
+    c: &mut TensorView<'_, T, N, L3, &mut [T]>,
+) -> Result<(), SimdError>
+where
+    T: Scalar,
+    Arch: SimdArch + SimdKernel<T>,
+    Align: Alignment,
+{
+    tensor_elementwise_op_to::<T, Arch, Align, crate::ops::Mul, N, L1, L2, L3>(a, b, c, crate::ops::Mul)
+}
+
+/// Element-wise multiplication of two tensors, returning an owned `AlignedVec`.
+#[inline]
+pub fn tensor_mul<T, Arch, Align, const N: usize, L1: Layout, L2: Layout>(
+    a: &TensorView<'_, T, N, L1, &[T]>,
+    b: &TensorView<'_, T, N, L2, &[T]>,
+) -> Result<AlignedVec<T, Align>, SimdError>
+where
+    T: Scalar,
+    Arch: SimdArch + SimdKernel<T>,
+    Align: Alignment,
+{
+    tensor_elementwise_op::<T, Arch, Align, crate::ops::Mul, N, L1, L2>(a, b, crate::ops::Mul)
+}
+
+/// Element-wise division of two tensors: `c = a / b`.
+#[inline]
+pub fn tensor_div_to<T, Arch, Align, const N: usize, L1: Layout, L2: Layout, L3: Layout>(
+    a: &TensorView<'_, T, N, L1, &[T]>,
+    b: &TensorView<'_, T, N, L2, &[T]>,
+    c: &mut TensorView<'_, T, N, L3, &mut [T]>,
+) -> Result<(), SimdError>
+where
+    T: Scalar,
+    Arch: SimdArch + SimdKernel<T>,
+    Align: Alignment,
+{
+    tensor_elementwise_op_to::<T, Arch, Align, crate::ops::Div, N, L1, L2, L3>(a, b, c, crate::ops::Div)
+}
+
+/// Element-wise division of two tensors, returning an owned `AlignedVec`.
+#[inline]
+pub fn tensor_div<T, Arch, Align, const N: usize, L1: Layout, L2: Layout>(
+    a: &TensorView<'_, T, N, L1, &[T]>,
+    b: &TensorView<'_, T, N, L2, &[T]>,
+) -> Result<AlignedVec<T, Align>, SimdError>
+where
+    T: Scalar,
+    Arch: SimdArch + SimdKernel<T>,
+    Align: Alignment,
+{
+    tensor_elementwise_op::<T, Arch, Align, crate::ops::Div, N, L1, L2>(a, b, crate::ops::Div)
+}
+
