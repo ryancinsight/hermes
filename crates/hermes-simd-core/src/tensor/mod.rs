@@ -25,17 +25,6 @@ use core::marker::PhantomData;
 use crate::align::{Alignment, Unaligned};
 use crate::vec::AlignedVec;
 
-/// Softmax computation over float slices.
-pub mod softmax;
-/// SIMD matmul and batch matmul on `TensorView`.
-pub mod ops;
-/// SIMD-accelerated Layer Normalization.
-pub mod layer_norm;
-/// Scaled dot-product attention (SDPA).
-pub mod attention;
-/// L1/L2/L∞ norms and in-place L2 normalization over slices and tensor rows.
-pub mod norm;
-
 /// Row-major (C-order) layout marker ZST.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RowMajor;

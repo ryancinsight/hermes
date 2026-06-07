@@ -87,9 +87,4 @@ pub use numa::{
 };
 pub use tensor::{
     TensorView, TensorCow, TensorError, RowMajor, ColMajor,
-    softmax::{softmax_inplace, softmax, softmax_2d_rows_inplace, softmax_2d_rows},
-    layer_norm::{layer_norm_inplace, layer_norm},
-    attention::{attention, batch_attention},
-    ops::{matmul, matmul_to, batch_matmul, batch_matmul_to, DefaultTilePolicy},
-    norm::{norm_l1, norm_l2, norm_linf, normalize_l2_inplace, row_norms_l2, SquaredSum},
 };

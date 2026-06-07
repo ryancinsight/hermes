@@ -148,28 +148,6 @@ where
         self.mul_scalar_cow(inv)
     }
 
-    /// Numerically stable softmax: returns owned `SimdCow` where `∑ out[i] ≈ 1.0`.
-    ///
-    /// Uses the three-pass max-shift algorithm to avoid overflow for large logits.
-    /// Allocates exactly one `AlignedVec` for the output; the input `SimdCow` is unchanged.
-    ///
-    /// # Algorithm
-    /// 1. `max = max_reduce(self)`
-    /// 2. `out[i] = exp(self[i] - max)`   (scalar exp loop — see `tensor::softmax`)
-    /// 3. `out[i] /= sum(out)`
-    #[inline]
-    pub fn softmax_cow(&self) -> SimdCow<'static, T, Arch, Align> {
-        // Clone to owned — one allocation.
-        let mut out_vec: crate::vec::AlignedVec<T, Align> =
-            crate::vec::AlignedVec::with_capacity(self.len());
-        // SAFETY: written immediately below.
-        unsafe { out_vec.set_len(self.len()); }
-        let src = self.as_ref();
-        out_vec.as_mut_slice().copy_from_slice(src);
-        crate::tensor::softmax::softmax_inplace::<T, Arch>(out_vec.as_mut_slice());
-        SimdCow::Owned(out_vec)
-    }
-
     /// Scalar histogram over this cow's values.
     ///
     /// Partitions `[lo, hi)` into `n_bins` equal-width bins and counts how many

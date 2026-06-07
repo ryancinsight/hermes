@@ -1,4 +1,4 @@
-//! Integration tests for TensorView, matmul, batch_matmul, softmax, and histogram.
+//! Integration tests for `TensorView`/`TensorCow` layout primitives and histogram.
 
 use hermes_simd::*;
 
@@ -133,126 +133,7 @@ fn test_tensor_matrix_at() {
     assert_eq!(mat1.get([2, 3]).unwrap(), 23.0);
 }
 
-// ---------------------------------------------------------------------------
-// 2-D matmul via TilingPolicy (Scalar architecture)
-// ---------------------------------------------------------------------------
 
-#[test]
-fn test_tensor_matmul_f32_scalar() {
-    // A = [[1,2],[3,4]]  B = [[5,6],[7,8]]
-    // C = A * B = [[1*5+2*7, 1*6+2*8],[3*5+4*7, 3*6+4*8]]
-    //           = [[19, 22], [43, 50]]
-    let a_data = [1.0f32, 2.0, 3.0, 4.0];
-    let b_data = [5.0f32, 6.0, 7.0, 8.0];
-
-    let a = TensorView::<f32, 2>::new(&a_data, [2, 2]).unwrap();
-    let b = TensorView::<f32, 2>::new(&b_data, [2, 2]).unwrap();
-
-    let c: AlignedVec<f32, Unaligned> =
-        matmul::<f32, Scalar, Unaligned, 1, 1>(&a, &b).unwrap();
-
-    assert_eq!(c.as_slice().len(), 4);
-    assert!((c.as_slice()[0] - 19.0).abs() < 1e-4, "c[0][0] = {}", c.as_slice()[0]);
-    assert!((c.as_slice()[1] - 22.0).abs() < 1e-4, "c[0][1] = {}", c.as_slice()[1]);
-    assert!((c.as_slice()[2] - 43.0).abs() < 1e-4, "c[1][0] = {}", c.as_slice()[2]);
-    assert!((c.as_slice()[3] - 50.0).abs() < 1e-4, "c[1][1] = {}", c.as_slice()[3]);
-}
-
-#[test]
-fn test_tensor_matmul_identity_4x4() {
-    // A = 4×4 identity, B = random 4×4 → C = B
-    let mut a_data = [0.0f32; 16];
-    for i in 0..4 { a_data[i * 4 + i] = 1.0; }
-    let b_data: Vec<f32> = (1..=16).map(|x| x as f32).collect();
-
-    let a = TensorView::<f32, 2>::new(&a_data, [4, 4]).unwrap();
-    let b = TensorView::<f32, 2>::new(&b_data, [4, 4]).unwrap();
-
-    let c: AlignedVec<f32, Unaligned> =
-        matmul::<f32, Scalar, Unaligned, 1, 1>(&a, &b).unwrap();
-
-    for (i, (&actual, &expected)) in c.as_slice().iter().zip(b_data.iter()).enumerate() {
-        assert!((actual - expected).abs() < 1e-4, "c[{i}] = {actual} expected {expected}");
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Batched matmul
-// ---------------------------------------------------------------------------
-
-#[test]
-fn test_tensor_batch_matmul_f32() {
-    // Batch=2, each is a 2×2 identity * [[1,2],[3,4]]
-    let identity = [1.0f32, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0]; // 2 matrices flattened
-    let b_data   = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];  // 2 matrices flattened
-
-    let a = TensorView::<f32, 3>::new(&identity, [2, 2, 2]).unwrap();
-    let b = TensorView::<f32, 3>::new(&b_data,   [2, 2, 2]).unwrap();
-
-    let c: AlignedVec<f32, Unaligned> =
-        batch_matmul::<f32, Scalar, Unaligned, 1, 1>(&a, &b).unwrap();
-
-    assert_eq!(c.as_slice().len(), 8);
-    // First batch: I * [[1,2],[3,4]] = [[1,2],[3,4]]
-    assert!((c.as_slice()[0] - 1.0).abs() < 1e-4);
-    assert!((c.as_slice()[3] - 4.0).abs() < 1e-4);
-    // Second batch: I * [[5,6],[7,8]] = [[5,6],[7,8]]
-    assert!((c.as_slice()[4] - 5.0).abs() < 1e-4);
-    assert!((c.as_slice()[7] - 8.0).abs() < 1e-4);
-}
-
-// ---------------------------------------------------------------------------
-// Softmax (via hermes-simd free function)
-// ---------------------------------------------------------------------------
-
-#[test]
-fn test_softmax_scalar_sums_to_one() {
-    let logits = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
-    let probs = softmax_alloc::<f32, Scalar>(&logits);
-    let total: f32 = probs.iter().sum();
-    assert!((total - 1.0).abs() < 1e-5, "softmax sum = {total}");
-    for &p in &probs {
-        assert!(p >= 0.0 && p <= 1.0, "out of [0,1]: {p}");
-    }
-}
-
-#[test]
-fn test_softmax_inplace_empty() {
-    let mut empty: Vec<f32> = vec![];
-    softmax_inplace::<f32, Scalar>(&mut empty);
-    assert!(empty.is_empty());
-}
-
-#[test]
-fn test_softmax_inplace_single_element() {
-    let mut v = [2.0f32];
-    softmax_inplace::<f32, Scalar>(&mut v);
-    assert!((v[0] - 1.0).abs() < 1e-6, "single element softmax should be 1.0");
-}
-
-#[test]
-fn test_softmax_uniform_logits() {
-    // All equal logits → uniform distribution
-    let logits = [1.0f32; 8];
-    let probs = softmax_alloc::<f32, Scalar>(&logits);
-    for &p in &probs {
-        assert!((p - 0.125).abs() < 1e-5, "expected 0.125, got {p}");
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Softmax via SimdCow::softmax_cow
-// ---------------------------------------------------------------------------
-
-#[test]
-fn test_softmax_cow_f32() {
-    let logits = vec![0.5f32, 1.0, 1.5, 2.0];
-    let view = SimdView::<'_, f32, Scalar, Unaligned, Unmasked, &[f32]>::new(&logits).unwrap();
-    let cow: SimdCow<'_, f32, Scalar, Unaligned> = SimdCow::Borrowed(view);
-    let result = cow.softmax_cow();
-    let total: f32 = result.as_ref().iter().sum();
-    assert!((total - 1.0).abs() < 1e-5, "cow softmax sum = {total}");
-}
 
 // ---------------------------------------------------------------------------
 // Histogram via SimdCow::histogram_cow
@@ -261,7 +142,7 @@ fn test_softmax_cow_f32() {
 #[test]
 fn test_histogram_cow_uniform() {
     // 100 values uniformly in [0, 10): should give 10 elements per bin
-    let data: Vec<f32> = (0..100).map(|i| (i as f32 % 10.0)).collect();
+    let data: Vec<f32> = (0..100).map(|i| i as f32 % 10.0).collect();
     let view = SimdView::<'_, f32, Scalar, Unaligned, Unmasked, &[f32]>::new(&data).unwrap();
     let cow: SimdCow<'_, f32, Scalar, Unaligned> = SimdCow::Borrowed(view);
     let hist = cow.histogram_cow(10, 0.0, 10.0);
@@ -331,21 +212,6 @@ fn test_tensor_view_transpose() {
 }
 
 #[test]
-fn test_tensor_matmul_to() {
-    let a_data = [1.0f32, 2.0, 3.0, 4.0];
-    let b_data = [5.0f32, 6.0, 7.0, 8.0];
-    let mut c_data = [0.0f32; 4];
-
-    let a = TensorView::new(&a_data, [2, 2]).unwrap();
-    let b = TensorView::new(&b_data, [2, 2]).unwrap();
-    let mut c = TensorView::new_mut(&mut c_data, [2, 2]).unwrap();
-
-    matmul_to::<f32, Scalar, Unaligned, 1, 1>(&a, &b, &mut c).unwrap();
-
-    assert_eq!(c_data, [19.0f32, 22.0, 43.0, 50.0]);
-}
-
-#[test]
 fn test_tensor_cow_lazy_reshape() {
     let data = vec![1.0f32, 2.0, 3.0, 4.0];
     let view = TensorView::new(&data, [2, 2]).unwrap();
@@ -363,158 +229,21 @@ fn test_tensor_cow_lazy_reshape() {
 }
 
 #[test]
-fn test_softmax_2d_rows() {
-    let logits = [
-        1.0f32, 2.0, 3.0,
-        1.0, 1.0, 1.0,
-    ];
-    let t = TensorView::new(&logits, [2, 3]).unwrap();
-    let probs = softmax_2d_rows::<f32, Scalar, RowMajor>(&t);
-
-    // Row 1: softmax([1, 1, 1]) -> [1/3, 1/3, 1/3]
-    assert!((probs[3] - 0.33333).abs() < 1e-4);
-    assert!((probs[4] - 0.33333).abs() < 1e-4);
-    assert!((probs[5] - 0.33333).abs() < 1e-4);
-
-    let mut mut_logits = logits;
-    let mut mut_tensor = TensorView::new_mut(&mut mut_logits, [2, 3]).unwrap();
-    softmax_2d_rows_inplace::<f32, Scalar, RowMajor>(&mut mut_tensor);
-    assert!((mut_logits[3] - 0.33333).abs() < 1e-4);
-}
-
-// ---------------------------------------------------------------------------
-// Norm functions: L1, L2, L∞
-// ---------------------------------------------------------------------------
-
-#[test]
-fn test_norm_l2_pythagorean() {
-    let data = [3.0f32, 4.0];
-    let n = norm_l2::<f32, Scalar>(&data);
-    assert!((n - 5.0).abs() < 1e-5, "expected 5.0, got {n}");
-}
-
-#[test]
-fn test_norm_l2_zero_vector() {
-    let data = [0.0f32; 8];
-    let n = norm_l2::<f32, Scalar>(&data);
-    assert_eq!(n, 0.0);
-}
-
-#[test]
-fn test_norm_l1_basic() {
-    let data = [-1.0f32, 2.0, -3.0];
-    let n = norm_l1::<f32, Scalar>(&data);
-    assert!((n - 6.0).abs() < 1e-5, "expected 6.0, got {n}");
-}
-
-#[test]
-fn test_norm_linf_basic() {
-    let data = [1.0f32, -5.0, 3.0];
-    let n = norm_linf::<f32, Scalar>(&data);
-    assert!((n - 5.0).abs() < 1e-5, "expected 5.0, got {n}");
-}
-
-#[test]
-fn test_norm_empty_slices() {
-    let empty: [f32; 0] = [];
-    assert_eq!(norm_l2::<f32, Scalar>(&empty), 0.0);
-    assert_eq!(norm_l1::<f32, Scalar>(&empty), 0.0);
-    assert_eq!(norm_linf::<f32, Scalar>(&empty), 0.0);
-}
-
-#[test]
-fn test_normalize_l2_inplace_unit_norm() {
-    let mut data = [3.0f32, 4.0];
-    normalize_l2_inplace::<f32, Scalar>(&mut data);
-    let n = norm_l2::<f32, Scalar>(&data);
-    assert!((n - 1.0).abs() < 1e-5, "expected unit norm, got {n}");
-}
-
-#[test]
-fn test_normalize_l2_inplace_zero_noop() {
-    let mut data = [0.0f32, 0.0, 0.0];
-    normalize_l2_inplace::<f32, Scalar>(&mut data);
-    // Should not NaN — remains zero
-    for &x in &data {
-        assert!(x.is_finite(), "expected finite, got {x}");
-    }
-}
-
-#[test]
-fn test_row_norms_l2_basic() {
-    // 2×3 matrix; rows = [3,4,0], [0,0,5]
-    let data = [3.0f32, 4.0, 0.0, 0.0, 0.0, 5.0];
-    let t = TensorView::<f32, 2>::new(&data, [2, 3]).unwrap();
-    let norms = row_norms_l2::<f32, Scalar>(&t).unwrap();
-    assert_eq!(norms.len(), 2);
-    assert!((norms[0] - 5.0).abs() < 1e-5, "row 0 norm = {}", norms[0]);
-    assert!((norms[1] - 5.0).abs() < 1e-5, "row 1 norm = {}", norms[1]);
-}
-
-// ---------------------------------------------------------------------------
-// Layer normalization
-// ---------------------------------------------------------------------------
-
-#[test]
-fn test_layer_norm_zero_mean_unit_var() {
-    let data = [1.0f32, 2.0, 3.0, 4.0];
-    let out = layer_norm::<f32, Scalar>(&data, 1e-5, None, None);
-    let mean: f32 = out.iter().sum::<f32>() / out.len() as f32;
-    let var: f32 = out.iter().map(|&x| (x - mean).powi(2)).sum::<f32>() / out.len() as f32;
-    assert!(mean.abs() < 1e-4, "expected zero mean, got {mean}");
-    assert!((var - 1.0).abs() < 0.02, "expected unit variance, got {var}");
-}
-
-#[test]
-fn test_layer_norm_affine_scale() {
-    let data = [1.0f32, 2.0, 3.0, 4.0];
-    let gamma = [2.0f32; 4];
-    let beta  = [1.0f32; 4];
-    let out = layer_norm::<f32, Scalar>(&data, 1e-5, Some(&gamma), Some(&beta));
-    // After LayerNorm: y = gamma * x_norm + beta
-    // Sum of gamma*x_norm = 0 (zero mean) → sum = 4 * beta[0] = 4.0
-    let total: f32 = out.iter().sum();
-    assert!((total - 4.0).abs() < 1e-3, "expected sum=4.0 (beta contribution), got {total}");
-}
-
-#[test]
-fn test_layer_norm_inplace_preserves_length() {
-    let mut data = [0.5f32, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5];
-    layer_norm_inplace::<f32, Scalar>(&mut data, 1e-5, None, None);
-    let mean: f32 = data.iter().sum::<f32>() / data.len() as f32;
-    assert!(mean.abs() < 1e-4, "expected zero mean, got {mean}");
-}
-
-#[test]
-fn test_layer_norm_uniform_input() {
-    // Uniform input → variance = 0 → output should be near zero (not NaN)
-    let data = [3.0f32; 8];
-    let out = layer_norm::<f32, Scalar>(&data, 1e-5, None, None);
-    for &x in &out {
-        assert!(x.is_finite(), "non-finite for uniform input: {x}");
-    }
-}
-
-// ---------------------------------------------------------------------------
-// New zero-copy TensorView methods: transpose_view, col_iter, diag_iter
-// ---------------------------------------------------------------------------
-
-#[test]
 fn test_transpose_view_zero_copy() {
     let data = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0];
     let t = TensorView::<f32, 2>::new(&data, [2, 3]).unwrap(); // row-major [2,3]
-    let tT = t.transpose_view(); // ColMajor, shape [3,2]
+    let t_t = t.transpose_view(); // ColMajor, shape [3,2]
 
-    assert_eq!(tT.shape(), [3, 2]);
-    assert_eq!(tT.strides(), [1, 3]);
+    assert_eq!(t_t.shape(), [3, 2]);
+    assert_eq!(t_t.strides(), [1, 3]);
 
     // Original [0][1] = data[1] = 2.0
     // Transposed: [1][0] in ColMajor, offset = 1*1 + 0*3 = 1 → data[1] = 2.0
-    assert_eq!(tT.get([1, 0]).unwrap(), 2.0);
+    assert_eq!(t_t.get([1, 0]).unwrap(), 2.0);
 
     // Original [1][2] = data[5] = 6.0
     // Transposed: [2][1] in ColMajor, offset = 2*1 + 1*3 = 5 → data[5] = 6.0
-    assert_eq!(tT.get([2, 1]).unwrap(), 6.0);
+    assert_eq!(t_t.get([2, 1]).unwrap(), 6.0);
 }
 
 #[test]
@@ -560,88 +289,5 @@ fn test_diag_iter_rectangular() {
     assert_eq!(diag, vec![1.0, 6.0]);
 }
 
-// ---------------------------------------------------------------------------
-// Element-wise arithmetic tensor operations
-// ---------------------------------------------------------------------------
 
-#[test]
-fn test_tensor_arithmetic_contiguous() {
-    let a_data = [1.0f32, 2.0, 3.0, 4.0];
-    let b_data = [5.0f32, 6.0, 7.0, 8.0];
-
-    let a = TensorView::<f32, 2>::new(&a_data, [2, 2]).unwrap();
-    let b = TensorView::<f32, 2>::new(&b_data, [2, 2]).unwrap();
-
-    // 1. Add
-    let c_add: AlignedVec<f32, Unaligned> = tensor_add::<f32, Scalar, Unaligned, 2, RowMajor, RowMajor>(&a, &b).unwrap();
-    assert_eq!(c_add.as_slice(), &[6.0f32, 8.0, 10.0, 12.0]);
-
-    // 2. Sub
-    let c_sub: AlignedVec<f32, Unaligned> = tensor_sub::<f32, Scalar, Unaligned, 2, RowMajor, RowMajor>(&b, &a).unwrap();
-    assert_eq!(c_sub.as_slice(), &[4.0f32, 4.0, 4.0, 4.0]);
-
-    // 3. Mul
-    let c_mul: AlignedVec<f32, Unaligned> = tensor_mul::<f32, Scalar, Unaligned, 2, RowMajor, RowMajor>(&a, &b).unwrap();
-    assert_eq!(c_mul.as_slice(), &[5.0f32, 12.0, 21.0, 32.0]);
-
-    // 4. Div
-    let c_div: AlignedVec<f32, Unaligned> = tensor_div::<f32, Scalar, Unaligned, 2, RowMajor, RowMajor>(&b, &a).unwrap();
-    assert_eq!(c_div.as_slice(), &[5.0f32, 3.0, 7.0 / 3.0, 2.0]);
-
-    // 5. In-place addition (tensor_add_to)
-    let mut c_data = [0.0f32; 4];
-    let mut c = TensorView::new_mut(&mut c_data, [2, 2]).unwrap();
-    tensor_add_to::<f32, Scalar, Unaligned, 2, RowMajor, RowMajor, RowMajor>(&a, &b, &mut c).unwrap();
-    assert_eq!(c_data, [6.0f32, 8.0, 10.0, 12.0]);
-}
-
-#[test]
-fn test_tensor_arithmetic_strided() {
-    let a_data = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0];
-    let b_data = [10.0f32, 20.0, 30.0, 40.0, 50.0, 60.0];
-
-    let a_base = TensorView::<f32, 2>::new(&a_data, [2, 3]).unwrap();
-    let b_base = TensorView::<f32, 2>::new(&b_data, [2, 3]).unwrap();
-
-    let a = a_base.transpose(); // shape [3, 2]
-    let b = b_base.transpose(); // shape [3, 2]
-
-    assert!(!a.is_contiguous());
-    assert!(!b.is_contiguous());
-
-    let c_add: AlignedVec<f32, Unaligned> = tensor_add::<f32, Scalar, Unaligned, 2, ColMajor, ColMajor>(&a, &b).unwrap();
-    assert_eq!(c_add.as_slice(), &[11.0f32, 44.0, 22.0, 55.0, 33.0, 66.0]);
-}
-
-// ---------------------------------------------------------------------------
-// 2-D row-wise layer normalization
-// ---------------------------------------------------------------------------
-
-#[test]
-fn test_layer_norm_2d_rows() {
-    let data = [
-        1.0f32, 2.0, 3.0, 4.0,
-        2.0, 4.0, 6.0, 8.0,
-    ];
-    let t = TensorView::new(&data, [2, 4]).unwrap();
-
-    let gamma = [2.0f32; 4];
-    let beta = [0.0f32; 4];
-    let out = layer_norm_2d_rows::<f32, Scalar, RowMajor>(&t, 1e-5, Some(&gamma), Some(&beta));
-
-    assert_eq!(out.len(), 8);
-
-    let row0 = &out[0..4];
-    let mean0: f32 = row0.iter().sum::<f32>() / 4.0;
-    assert!(mean0.abs() < 1e-4, "mean0 = {mean0}");
-
-    let row1 = &out[4..8];
-    let mean1: f32 = row1.iter().sum::<f32>() / 4.0;
-    assert!(mean1.abs() < 1e-4, "mean1 = {mean1}");
-
-    let mut data_mut = data;
-    let mut t_mut = TensorView::new_mut(&mut data_mut, [2, 4]).unwrap();
-    layer_norm_2d_rows_inplace::<f32, Scalar, RowMajor>(&mut t_mut, 1e-5, Some(&gamma), Some(&beta));
-    assert!((data_mut[0] - out[0]).abs() < 1e-5);
-}
 
