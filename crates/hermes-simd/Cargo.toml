@@ -10,6 +10,7 @@ hermes-simd-core = { path = "../hermes-simd-core", default-features = false }
 hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", default-features = false }
 hermes-numeric = { path = "../hermes-numeric", default-features = false }
 hermes-simd-macros = { path = "../hermes-simd-macros" }
+hermes-simd-types = { path = "../hermes-simd-types", default-features = false }
 half = { workspace = true }
 bytemuck = { version = "1.14" }
 rkyv = { version = "0.7" }
@@ -19,5 +20,9 @@ proptest = "1.4"
 
 [features]
 default = ["std"]
-std = ["hermes-simd-core/std", "hermes-simd-intrinsics/std", "hermes-numeric/std"]
-
+std = [
+    "hermes-simd-core/std",
+    "hermes-simd-intrinsics/std",
+    "hermes-numeric/std",
+    "hermes-simd-types/std",
+]

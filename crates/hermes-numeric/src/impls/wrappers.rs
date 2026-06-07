@@ -2,7 +2,27 @@ use crate::traits::{private, NumericElement, FloatElement};
 use crate::types::{F16, F32, F64, Bf16, Bf8, Bf4, F8, F4, I8, I16, I32};
 
 macro_rules! impl_numeric_element {
-    ($t:ident, $zero:expr, $one:expr, $nan:expr, $inf:expr, $width:expr, $ones:expr, $to_f64:expr, $fmadd:expr, $abs:expr, $sqrt:expr, $finite:expr, $nan_check:expr, $and:expr, $or:expr, $xor:expr) => {
+    (
+        $t:ident,
+        $zero:expr,
+        $one:expr,
+        $nan:expr,
+        $inf:expr,
+        $min:expr,
+        $max:expr,
+        $width:expr,
+        $ones:expr,
+        $sign_mask:expr,
+        $to_f64:expr,
+        $fmadd:expr,
+        $abs:expr,
+        $sqrt:expr,
+        $finite:expr,
+        $nan_check:expr,
+        $and:expr,
+        $or:expr,
+        $xor:expr
+    ) => {
         impl private::Sealed for $t {}
 
         impl NumericElement for $t {
@@ -10,8 +30,11 @@ macro_rules! impl_numeric_element {
             const ONE: Self = $one;
             const NAN: Self = $nan;
             const INFINITY: Self = $inf;
+            const MIN_VALUE: Self = $min;
+            const MAX_VALUE: Self = $max;
             const BYTE_WIDTH: usize = $width;
             const ALL_ONES: Self = $ones;
+            const SIGN_MASK: Self = $sign_mask;
 
             #[inline(always)]
             fn abs(self) -> Self { $abs(self) }
@@ -45,8 +68,11 @@ impl_numeric_element!(
     F16(half::f16::ONE),
     F16(half::f16::NAN),
     F16(half::f16::INFINITY),
+    F16(half::f16::NEG_INFINITY),
+    F16(half::f16::INFINITY),
     2,
     F16(half::f16::from_bits(0xFFFF)),
+    F16(half::f16::from_bits(0x8000)), // sign bit
     |x: F16| x.0.to_f32() as f64,
     |x: F16, b: F16, c: F16| F16(half::f16::from_f32(x.0.to_f32().scalar_fmadd(b.0.to_f32(), c.0.to_f32()))),
     |x: F16| F16(half::f16::from_f32(x.0.to_f32().abs())),
@@ -64,8 +90,11 @@ impl_numeric_element!(
     F32(1.0),
     F32(f32::NAN),
     F32(f32::INFINITY),
+    F32(f32::NEG_INFINITY),
+    F32(f32::INFINITY),
     4,
     F32(f32::from_bits(0xFFFF_FFFF)),
+    F32(f32::from_bits(0x8000_0000)), // sign bit
     |x: F32| x.0 as f64,
     |x: F32, b: F32, c: F32| F32(x.0.scalar_fmadd(b.0, c.0)),
     |x: F32| F32(x.0.abs()),
@@ -83,8 +112,11 @@ impl_numeric_element!(
     F64(1.0),
     F64(f64::NAN),
     F64(f64::INFINITY),
+    F64(f64::NEG_INFINITY),
+    F64(f64::INFINITY),
     8,
     F64(f64::from_bits(0xFFFF_FFFF_FFFF_FFFF)),
+    F64(f64::from_bits(0x8000_0000_0000_0000)), // sign bit
     |x: F64| x.0,
     |x: F64, b: F64, c: F64| F64(x.0.scalar_fmadd(b.0, c.0)),
     |x: F64| F64(x.0.abs()),
@@ -102,8 +134,11 @@ impl_numeric_element!(
     Bf16(half::bf16::ONE),
     Bf16(half::bf16::NAN),
     Bf16(half::bf16::INFINITY),
+    Bf16(half::bf16::NEG_INFINITY),
+    Bf16(half::bf16::INFINITY),
     2,
     Bf16(half::bf16::from_bits(0xFFFF)),
+    Bf16(half::bf16::from_bits(0x8000)), // sign bit
     |x: Bf16| x.0.to_f32() as f64,
     |x: Bf16, b: Bf16, c: Bf16| Bf16(half::bf16::from_f32(x.0.to_f32().scalar_fmadd(b.0.to_f32(), c.0.to_f32()))),
     |x: Bf16| Bf16(half::bf16::from_f32(x.0.to_f32().abs())),
@@ -116,15 +151,18 @@ impl_numeric_element!(
 );
 
 macro_rules! impl_numeric_for_byte_float {
-    ($t:ident, $zero:expr, $one:expr, $nan:expr, $inf:expr) => {
+    ($t:ident, $zero:expr, $one:expr, $nan:expr, $inf:expr, $min:expr, $max:expr, $sign_mask:expr) => {
         impl_numeric_element!(
             $t,
             $zero,
             $one,
             $nan,
             $inf,
+            $min,
+            $max,
             1,
             $t(0xFF),
+            $sign_mask,
             |x: $t| x.to_f32() as f64,
             |x: $t, b: $t, c: $t| $t::from_f32(x.to_f32().scalar_fmadd(b.to_f32(), c.to_f32())),
             |x: $t| $t::from_f32(x.to_f32().abs()),
@@ -138,10 +176,14 @@ macro_rules! impl_numeric_for_byte_float {
     };
 }
 
-impl_numeric_for_byte_float!(Bf8, Bf8(0), Bf8(0x3C), Bf8(0x7F), Bf8(0x7C));
-impl_numeric_for_byte_float!(Bf4, Bf4(0), Bf4(0x02), Bf4(0x07), Bf4(0x06));
-impl_numeric_for_byte_float!(F8, F8(0), F8(0x38), F8(0x7F), F8(0x77));
-impl_numeric_for_byte_float!(F4, F4(0), F4(0x03), F4(0x07), F4(0x06));
+// Bf8: 1.4.3 format — sign bit is bit 7 (0x80)
+impl_numeric_for_byte_float!(Bf8, Bf8(0), Bf8(0x3C), Bf8(0x7F), Bf8(0x7C), Bf8(0xFC), Bf8(0x7C), Bf8(0x80));
+// Bf4: 4-bit packed in u8 — sign bit is bit 3 (0x08)
+impl_numeric_for_byte_float!(Bf4, Bf4(0), Bf4(0x02), Bf4(0x07), Bf4(0x06), Bf4(0x86), Bf4(0x06), Bf4(0x08));
+// F8: 1.4.3 format — sign bit is bit 7 (0x80)
+impl_numeric_for_byte_float!(F8, F8(0), F8(0x38), F8(0x7F), F8(0x77), F8(0xF7), F8(0x77), F8(0x80));
+// F4: 4-bit packed in u8 — sign bit is bit 3 (0x08)
+impl_numeric_for_byte_float!(F4, F4(0), F4(0x03), F4(0x07), F4(0x06), F4(0x86), F4(0x06), F4(0x08));
 
 impl_numeric_element!(
     I8,
@@ -149,8 +191,11 @@ impl_numeric_element!(
     I8(1),
     I8(0),
     I8(0),
+    I8(i8::MIN),
+    I8(i8::MAX),
     1,
     I8(-1),
+    I8(i8::MIN), // sign bit = 0x80 as two's complement = i8::MIN
     |x: I8| x.0 as f64,
     |x: I8, b: I8, c: I8| I8(x.0.wrapping_mul(b.0).wrapping_add(c.0)),
     |x: I8| I8(x.0.abs()),
@@ -168,8 +213,11 @@ impl_numeric_element!(
     I16(1),
     I16(0),
     I16(0),
+    I16(i16::MIN),
+    I16(i16::MAX),
     2,
     I16(-1),
+    I16(i16::MIN), // sign bit = bit 15
     |x: I16| x.0 as f64,
     |x: I16, b: I16, c: I16| I16(x.0.wrapping_mul(b.0).wrapping_add(c.0)),
     |x: I16| I16(x.0.abs()),
@@ -187,8 +235,11 @@ impl_numeric_element!(
     I32(1),
     I32(0),
     I32(0),
+    I32(i32::MIN),
+    I32(i32::MAX),
     4,
     I32(-1),
+    I32(i32::MIN), // sign bit = bit 31
     |x: I32| x.0 as f64,
     |x: I32, b: I32, c: I32| I32(x.0.wrapping_mul(b.0).wrapping_add(c.0)),
     |x: I32| I32(x.0.abs()),

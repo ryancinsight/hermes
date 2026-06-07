@@ -317,3 +317,150 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
         Some(SimdView::new_mut(chunk_slice).expect("chunk alignment invariant violated"))
     }
 }
+
+// ---------------------------------------------------------------------------
+// FusedIterator — optimizer hint: once exhausted, next() always returns None.
+// ---------------------------------------------------------------------------
+
+impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
+    core::iter::FusedIterator for SimdChunks<'a, T, Arch, Align, Mode>
+{}
+
+impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
+    core::iter::FusedIterator for SimdChunksMut<'a, T, Arch, Align, Mode>
+{}
+
+// ---------------------------------------------------------------------------
+// ZipChunks — paired chunk iterator for two immutable SimdViews.
+// ---------------------------------------------------------------------------
+
+/// Iterator over non-overlapping paired `LANE_COUNT`-wide sub-views of two `SimdView`s.
+///
+/// Advances both views in lockstep, yielding pairs of chunks until the shorter
+/// view's SIMD prefix is exhausted.  Access the tails via [`ZipChunks::remainder`].
+///
+/// # Type Parameters
+/// Mirrors both parent `SimdView`s — element type `T`, architecture `Arch`,
+/// alignment `Align`, and execution mode `Mode` are shared between the two views.
+///
+/// # Zero-Cost Guarantee
+/// Stores two base pointers, two positions, and one shared `simd_end` — 5 words
+/// on 64-bit targets. No heap allocation. `LANE_COUNT` is a compile-time constant so
+/// the advancement step optimizes identically to the single-view `SimdChunks` case.
+pub struct ZipChunks<'a, 'b, T, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode> {
+    base_a: *const T,
+    base_b: *const T,
+    pos: usize,
+    simd_end: usize,
+    total_a: usize,
+    total_b: usize,
+    _marker: core::marker::PhantomData<(&'a T, &'b T, Arch, Align, Mode)>,
+}
+
+// SAFETY: ZipChunks borrows two `'a`/`'b` immutable slices; forwarding Send/Sync is sound.
+unsafe impl<'a, 'b, T: Send, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
+    Send for ZipChunks<'a, 'b, T, Arch, Align, Mode>
+where
+    T: Scalar,
+{}
+unsafe impl<'a, 'b, T: Sync, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
+    Sync for ZipChunks<'a, 'b, T, Arch, Align, Mode>
+where
+    T: Scalar,
+{}
+
+impl<'a, 'b, T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
+    ZipChunks<'a, 'b, T, Arch, Align, Mode>
+{
+    /// Construct a `ZipChunks` from two slice pointers.
+    ///
+    /// # Safety
+    /// `base_a` must be valid for reads of `total_a` elements for `'a`.
+    /// `base_b` must be valid for reads of `total_b` elements for `'b`.
+    #[inline]
+    pub(crate) unsafe fn from_raw_parts(
+        base_a: *const T,
+        total_a: usize,
+        base_b: *const T,
+        total_b: usize,
+    ) -> Self {
+        let lane_count = Arch::LANE_COUNT;
+        let min_total = total_a.min(total_b);
+        let simd_end = (min_total / lane_count) * lane_count;
+        Self {
+            base_a,
+            base_b,
+            pos: 0,
+            simd_end,
+            total_a,
+            total_b,
+            _marker: core::marker::PhantomData,
+        }
+    }
+
+    /// Returns the scalar tails for both views.
+    ///
+    /// Each tail contains elements from `simd_end` to `total` for the respective slice.
+    #[inline(always)]
+    pub fn remainder(&self) -> (&'a [T], &'b [T]) {
+        // SAFETY: base + simd_end is within bounds by construction.
+        unsafe {
+            (
+                core::slice::from_raw_parts(self.base_a.add(self.simd_end), self.total_a - self.simd_end),
+                core::slice::from_raw_parts(self.base_b.add(self.simd_end), self.total_b - self.simd_end),
+            )
+        }
+    }
+
+    /// Returns the number of complete paired SIMD chunks remaining.
+    #[inline(always)]
+    pub fn chunks_remaining(&self) -> usize {
+        if self.simd_end > self.pos {
+            (self.simd_end - self.pos) / Arch::LANE_COUNT
+        } else {
+            0
+        }
+    }
+}
+
+impl<'a, 'b, T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
+    Iterator for ZipChunks<'a, 'b, T, Arch, Align, Mode>
+{
+    type Item = (
+        SimdView<'a, T, Arch, Align, Mode, &'a [T]>,
+        SimdView<'b, T, Arch, Align, Mode, &'b [T]>,
+    );
+
+    #[inline(always)]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pos >= self.simd_end {
+            return None;
+        }
+        // SAFETY: pos < simd_end <= min(total_a, total_b) <= total_a and total_b.
+        let (chunk_a, chunk_b) = unsafe {
+            (
+                core::slice::from_raw_parts(self.base_a.add(self.pos), Arch::LANE_COUNT),
+                core::slice::from_raw_parts(self.base_b.add(self.pos), Arch::LANE_COUNT),
+            )
+        };
+        self.pos += Arch::LANE_COUNT;
+        Some((
+            SimdView::new(chunk_a).expect("zip chunk_a alignment invariant violated"),
+            SimdView::new(chunk_b).expect("zip chunk_b alignment invariant violated"),
+        ))
+    }
+
+    #[inline(always)]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let r = self.chunks_remaining();
+        (r, Some(r))
+    }
+}
+
+impl<'a, 'b, T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
+    ExactSizeIterator for ZipChunks<'a, 'b, T, Arch, Align, Mode>
+{}
+
+impl<'a, 'b, T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
+    core::iter::FusedIterator for ZipChunks<'a, 'b, T, Arch, Align, Mode>
+{}

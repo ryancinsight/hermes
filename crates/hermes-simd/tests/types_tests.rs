@@ -1013,6 +1013,242 @@ fn test_packed_cow_rkyv_serialization() {
     assert_eq!(deserialized_f4.len(), 2);
 }
 
+#[test]
+fn test_preferred_and_monomorphized_types() {
+    use hermes_simd_types::{SimdF32, F32};
+    
+    let vec_zeros = SimdF32::zero();
+    let vec_splat = SimdF32::splat(F32(3.0));
+    
+    assert_eq!(vec_zeros.extract::<0>().0, 0.0);
+    assert_eq!(vec_splat.extract::<0>().0, 3.0);
+}
+
+#[test]
+fn test_simd_view_slicing_and_alignment_transitions() {
+    use hermes_simd::{SimdView, Unaligned, Scalar};
+    use hermes_numeric::F32;
+
+    let data = vec![F32(1.0), F32(2.0), F32(3.0), F32(4.0), F32(5.0), F32(6.0)];
+    let view: SimdView<'_, F32, Scalar, Unaligned> = SimdView::new(&data).unwrap();
+
+    // 1. Slicing unaligned
+    let sub_view = view.slice_unaligned(1..5);
+    assert_eq!(sub_view.len(), 4);
+    assert_eq!(sub_view[0].0, 2.0);
+    assert_eq!(sub_view[3].0, 5.0);
+
+    // 2. Alignment demotion
+    let unaligned_view = sub_view.into_unaligned();
+    assert_eq!(unaligned_view.len(), 4);
+
+    // 3. Alignment promotion attempts
+    let opt_aligned = unaligned_view.try_into_aligned::<4>();
+    assert!(opt_aligned.is_some());
+
+    // 4. Slicing aligned
+    let aligned_slice = view.slice_aligned::<4>(0..4);
+    assert!(aligned_slice.is_some());
+}
+
+#[test]
+fn test_simd_cow_slicing_and_alignment_transitions() {
+    use hermes_simd::{SimdCow, Unaligned, Scalar};
+    use hermes_numeric::F32;
+
+    // 1. Borrowed SimdCow
+    let data = vec![F32(10.0), F32(20.0), F32(30.0), F32(40.0)];
+    let cow = SimdCow::<F32, Scalar, Unaligned>::borrow_slice(&data).unwrap();
+
+    // Slicing
+    let sliced_cow = cow.slice_unaligned(1..3);
+    assert!(matches!(sliced_cow, SimdCow::Borrowed(_)));
+    assert_eq!(sliced_cow.len(), 2);
+    assert_eq!(sliced_cow[0].0, 20.0);
+
+    // Alignment promotion
+    let aligned_cow = sliced_cow.try_into_aligned::<4>();
+    assert!(aligned_cow.is_some());
+
+    // 2. Owned SimdCow
+    let cow_owned = SimdCow::<F32, Scalar, Unaligned>::from_slice(&data);
+    let sliced_owned = cow_owned.slice_unaligned(2..4);
+    // Should return a Borrowed view of the owned buffer (zero-copy!)
+    assert!(matches!(sliced_owned, SimdCow::Borrowed(_)));
+    assert_eq!(sliced_owned.len(), 2);
+    assert_eq!(sliced_owned[0].0, 30.0);
+}
+
+#[test]
+fn test_simd_cow_mutable_views_and_slicing() {
+    use hermes_simd::{SimdCow, Unaligned, Scalar};
+    use hermes_numeric::F32;
+
+    let data = vec![F32(1.0), F32(2.0), F32(3.0), F32(4.0)];
+    let mut cow = SimdCow::<F32, Scalar, Unaligned>::borrow_slice(&data).unwrap();
+
+    // 1. view_mut on borrowed cow upgrades it to owned
+    {
+        let mut v_mut = cow.view_mut();
+        assert_eq!(v_mut.len(), 4);
+        v_mut[0] = F32(10.0);
+    }
+    assert!(matches!(cow, SimdCow::Owned(_)));
+    assert_eq!(cow[0].0, 10.0);
+
+    // 2. slice_unaligned_mut
+    {
+        let mut sub_v_mut = cow.slice_unaligned_mut(1..3);
+        assert_eq!(sub_v_mut.len(), 2);
+        assert_eq!(sub_v_mut[0].0, 2.0);
+        sub_v_mut[0] = F32(20.0);
+    }
+    assert_eq!(cow[1].0, 20.0);
+
+    // 3. slice_aligned_mut
+    {
+        let opt_aligned_mut = cow.slice_aligned_mut::<4>(0..4);
+        assert!(opt_aligned_mut.is_some());
+        let mut aligned_mut = opt_aligned_mut.unwrap();
+        aligned_mut[3] = F32(40.0);
+    }
+    assert_eq!(cow[3].0, 40.0);
+}
+
+#[test]
+fn test_packed_4bit_zero_copy_slicing() {
+    use hermes_numeric::{Bf4, PackedBf4Slice, PackedBf4SliceMut, PackedBf4Cow, Packed4Cow};
+
+    // Pack: elements are low, high per byte.
+    // 0x12 -> low = 2, high = 1
+    // 0x34 -> low = 4, high = 3
+    let bytes = [0x12, 0x34];
+    
+    // 1. Packed4Slice sub_slice
+    let slice = PackedBf4Slice::new(&bytes, 4).unwrap();
+    
+    // Even start is allowed (byte-aligned)
+    let sub_even = slice.sub_slice(2..4).unwrap();
+    assert_eq!(sub_even.len(), 2);
+    // index 2 is the low part of 0x34 (value 4), index 3 is high part of 0x34 (value 3)
+    assert_eq!(sub_even.get(0).unwrap().0, 4);
+    assert_eq!(sub_even.get(1).unwrap().0, 3);
+    
+    // Odd start is disallowed
+    let sub_odd = slice.sub_slice(1..3);
+    assert!(sub_odd.is_none());
+
+    // 2. Packed4SliceMut sub_slice_mut
+    let mut bytes_mut = [0x12, 0x34];
+    let slice_mut = PackedBf4SliceMut::new(&mut bytes_mut, 4).unwrap();
+    
+    // Even start is allowed
+    let mut sub_even_mut = slice_mut.sub_slice_mut(2..4).unwrap();
+    assert_eq!(sub_even_mut.len(), 2);
+    sub_even_mut.set(0, Bf4(9));
+    assert_eq!(sub_even_mut.get(0).unwrap().0, 9);
+    
+    // Odd start is disallowed
+    let slice_mut_2 = PackedBf4SliceMut::new(&mut bytes_mut, 4).unwrap();
+    assert!(slice_mut_2.sub_slice_mut(1..3).is_none());
+
+    // 3. Packed4Cow sub_slice
+    let cow = PackedBf4Cow::from_packed_slice(&bytes, 4).unwrap();
+    let sub_cow = cow.sub_slice(2..4).unwrap();
+    assert!(matches!(sub_cow, Packed4Cow::Borrowed(_)));
+    assert_eq!(sub_cow.len(), 2);
+    assert_eq!(sub_cow.get(0).unwrap().0, 4);
+
+    let sub_cow_odd = cow.sub_slice(1..3);
+    assert!(sub_cow_odd.is_none());
+}
+
+macro_rules! test_select_ops_for_arch {
+    ($t:ty, $arch:ident, $lanes:expr) => {
+        {
+            let len = $lanes * 2 + 3;
+            let mut data_a = vec![<$t as hermes_simd_core::scalar::NumericElement>::ZERO; len];
+            let mut data_b = vec![<$t as hermes_simd_core::scalar::NumericElement>::ZERO; len];
+            let mut mask = vec![false; len];
+
+            for i in 0..len {
+                data_a[i] = <$t as CastFrom<f64>>::cast_from(i as f64);
+                data_b[i] = <$t as CastFrom<f64>>::cast_from((i + 100) as f64);
+                mask[i] = i % 2 == 0;
+            }
+
+            let view_a = SimdView::<'_, $t, $arch, Unaligned, Unmasked, &[$t]>::new(&data_a).unwrap();
+            let view_b = SimdView::<'_, $t, $arch, Unaligned, Unmasked, &[$t]>::new(&data_b).unwrap();
+            
+            // 1. select
+            let sel_res = view_a.select(&mask, &view_b).unwrap();
+            assert_eq!(sel_res.len(), len);
+            let sel_slice = sel_res.as_slice();
+            for i in 0..len {
+                let expected = if mask[i] { data_a[i] } else { data_b[i] };
+                assert_eq!(sel_slice[i], expected, "select failed for {} at index {} on {}", stringify!($t), i, stringify!($arch));
+            }
+
+            // 2. masked_negate
+            let neg_res = view_a.masked_negate(&mask).unwrap();
+            assert_eq!(neg_res.len(), len);
+            let neg_slice = neg_res.as_slice();
+            for i in 0..len {
+                let expected = if mask[i] { -data_a[i] } else { data_a[i] };
+                assert_eq!(neg_slice[i], expected, "masked_negate failed for {} at index {} on {}", stringify!($t), i, stringify!($arch));
+            }
+        }
+    };
+}
+
+#[test]
+fn test_select_ops_scalar() {
+    test_select_ops_for_arch!(f32, Scalar, 4);
+    test_select_ops_for_arch!(f64, Scalar, 2);
+    test_select_ops_for_arch!(half::bf16, Scalar, 8);
+    test_select_ops_for_arch!(i8, Scalar, 16);
+    test_select_ops_for_arch!(i16, Scalar, 8);
+    test_select_ops_for_arch!(i32, Scalar, 4);
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[test]
+fn test_select_ops_avx2() {
+    if std::is_x86_feature_detected!("avx2") {
+        test_select_ops_for_arch!(f32, Avx2, 8);
+        test_select_ops_for_arch!(f64, Avx2, 4);
+        test_select_ops_for_arch!(half::bf16, Avx2, 16);
+        test_select_ops_for_arch!(i8, Avx2, 32);
+        test_select_ops_for_arch!(i16, Avx2, 16);
+        test_select_ops_for_arch!(i32, Avx2, 8);
+    }
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[test]
+fn test_select_ops_avx512() {
+    if std::is_x86_feature_detected!("avx512f") {
+        test_select_ops_for_arch!(f32, Avx512, 16);
+        test_select_ops_for_arch!(f64, Avx512, 8);
+        test_select_ops_for_arch!(half::bf16, Avx512, 32);
+        test_select_ops_for_arch!(i8, Avx512, 64);
+        test_select_ops_for_arch!(i16, Avx512, 32);
+        test_select_ops_for_arch!(i32, Avx512, 16);
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+#[test]
+fn test_select_ops_neon() {
+    test_select_ops_for_arch!(f32, Neon, 4);
+    test_select_ops_for_arch!(f64, Neon, 2);
+    test_select_ops_for_arch!(half::bf16, Neon, 8);
+    test_select_ops_for_arch!(i8, Neon, 16);
+    test_select_ops_for_arch!(i16, Neon, 8);
+    test_select_ops_for_arch!(i32, Neon, 4);
+}
+
+
 
 
 

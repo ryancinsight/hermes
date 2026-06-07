@@ -25,7 +25,7 @@ impl<T: Packable4> Packed4Vec<T> {
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            data: Vec::with_capacity((capacity + 1) / 2),
+            data: Vec::with_capacity(capacity.div_ceil(2)),
             len: 0,
             _marker: core::marker::PhantomData,
         }
@@ -53,7 +53,7 @@ impl<T: Packable4> Packed4Vec<T> {
     /// Push an element to the back of the vector.
     #[inline]
     pub fn push(&mut self, val: T) {
-        if self.len % 2 == 0 {
+        if self.len.is_multiple_of(2) {
             let byte = T::pack_pair(val, val);
             self.data.push(byte);
         } else {
@@ -74,7 +74,7 @@ impl<T: Packable4> Packed4Vec<T> {
             let byte_idx = index / 2;
             let byte = self.data[byte_idx];
             let (low, high) = T::unpack_pair(byte);
-            if index % 2 == 0 {
+            if index.is_multiple_of(2) {
                 Some(low)
             } else {
                 Some(high)
@@ -89,7 +89,7 @@ impl<T: Packable4> Packed4Vec<T> {
             let byte_idx = index / 2;
             let byte = self.data[byte_idx];
             let (mut low, mut high) = T::unpack_pair(byte);
-            if index % 2 == 0 {
+            if index.is_multiple_of(2) {
                 low = val;
             } else {
                 high = val;
@@ -175,7 +175,80 @@ impl<'a, T: Packable4> IntoIterator for Packed4Slice<'a, T> {
     }
 }
 
+impl<'a, T: Packable4> core::iter::FusedIterator for Packed4Iter<'a, T> {}
+
+impl<T: Packable4> IntoIterator for Packed4Vec<T> {
+    type Item = T;
+    type IntoIter = Packed4OwnedIter<T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        Packed4OwnedIter { vec: self, index: 0 }
+    }
+}
+
+/// Owning iterator over a `Packed4Vec`.
+pub struct Packed4OwnedIter<T: Packable4> {
+    vec: Packed4Vec<T>,
+    index: usize,
+}
+
+impl<T: Packable4> Iterator for Packed4OwnedIter<T> {
+    type Item = T;
+
+    #[inline]
+    fn next(&mut self) -> Option<T> {
+        if self.index >= self.vec.len() {
+            return None;
+        }
+        let val = self.vec.get(self.index)?;
+        self.index += 1;
+        Some(val)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let rem = self.vec.len() - self.index;
+        (rem, Some(rem))
+    }
+}
+
+impl<T: Packable4> ExactSizeIterator for Packed4OwnedIter<T> {}
+impl<T: Packable4> core::iter::FusedIterator for Packed4OwnedIter<T> {}
+
+impl<T: Packable4> Extend<T> for Packed4Vec<T> {
+    /// Extend the vector from any iterator yielding `T`.
+    ///
+    /// Uses `size_hint` to pre-allocate the backing byte storage before pushing,
+    /// avoiding per-element reallocation when the iterator advertises a lower bound.
+    #[inline]
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        let iter = iter.into_iter();
+        let (lower, _) = iter.size_hint();
+        // Pre-allocate additional byte capacity from the size hint.
+        let extra_bytes = lower.div_ceil(2);
+        self.data.reserve(extra_bytes);
+        for item in iter {
+            self.push(item);
+        }
+    }
+}
+
+impl<T: Packable4> FromIterator<T> for Packed4Vec<T> {
+    /// Collect any iterator of `T` into a `Packed4Vec<T>`.
+    ///
+    /// Uses the iterator's `size_hint` to reserve byte capacity before collecting,
+    /// so a tight upper bound eliminates all but one allocation.
+    #[inline]
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let mut vec = Self::new();
+        vec.extend(iter);
+        vec
+    }
+}
+
 /// Type alias for a heap-allocated packed vector of Bf4 values.
 pub type PackedBf4Vec = Packed4Vec<Bf4>;
 /// Type alias for a heap-allocated packed vector of F4 values.
 pub type PackedF4Vec = Packed4Vec<F4>;
+

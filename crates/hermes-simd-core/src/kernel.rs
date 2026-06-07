@@ -119,14 +119,14 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
 
     /// Elementwise subtraction: `a - b`.
     ///
-    /// Default: panics with "not implemented" — override in each backend.
-    /// Required for `Sub` ElementOp strategy (`zip_cow` / `transform_in_place`).
+    /// Default: scalar fallback via [`crate::kernel_helpers::generic_binary_op`].
+    /// Float and SIMD backends override this with the appropriate vectorized instruction
+    /// (e.g., `_mm256_sub_ps` for AVX2 f32, `vsubq_f32` for NEON).
     ///
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn sub(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        let _ = (a, b);
-        unreachable!("SimdKernel::sub not implemented for this architecture")
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| x - y)
     }
 
     /// Fused multiply-add: `(a * b) + c`.
@@ -414,13 +414,17 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
         crate::kernel_helpers::generic_blend::<T, Self>(mask, true_val, false_val)
     }
 
-    /// Elementwise unary negation: `-a`.
+    /// Elementwise negate: `-a`.
+    ///
+    /// Default implementation: XOR each lane with `T::SIGN_MASK` (the IEEE 754 sign bit).
+    /// This avoids the `sub(zero, a)` path, which panics on backends that do not implement
+    /// subtraction (e.g. `bf16` on AVX2). Every backend implements `bitxor` and `splat`.
     ///
     /// # Safety
     /// Processor must support the required target feature.
     #[inline(always)]
     unsafe fn neg(a: Self::Vector) -> Self::Vector {
-        Self::sub(Self::zero(), a)
+        Self::bitxor(a, Self::splat(T::SIGN_MASK))
     }
 
     /// Elementwise bitwise NOT: `!a`.
@@ -437,4 +441,26 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn mask_to_bitmask(mask: Self::Mask) -> u64;
+
+    /// Horizontal minimum across all lanes.
+    ///
+    /// Default: scalar lane-by-lane scan using [`crate::scalar::NumericElement::min_scalar`].
+    /// AVX-512 impls override with `_mm512_reduce_min_ps` / `_mm256_reduce_min_ps` or equivalent.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    unsafe fn min_reduce(v: Self::Vector) -> T {
+        crate::kernel_helpers::generic_horizontal_reduce::<T, Self>(v, T::MAX_VALUE, |a, b| a.min_scalar(b))
+    }
+
+    /// Horizontal maximum across all lanes.
+    ///
+    /// Default: scalar lane-by-lane scan using [`crate::scalar::NumericElement::max_scalar`].
+    /// AVX-512 impls override with `_mm512_reduce_max_ps` / `_mm256_reduce_max_ps` or equivalent.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    unsafe fn max_reduce(v: Self::Vector) -> T {
+        crate::kernel_helpers::generic_horizontal_reduce::<T, Self>(v, T::MIN_VALUE, |a, b| a.max_scalar(b))
+    }
 }

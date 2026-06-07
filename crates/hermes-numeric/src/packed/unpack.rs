@@ -1,5 +1,7 @@
 //! Unpacking functions for low-precision data representations.
 
+#![allow(clippy::missing_safety_doc)]
+
 use crate::types::{Bf8, Bf4, Bf16, F4, F32, F8};
 
 const fn f8_to_f32_bits(bits: u8) -> u32 {
@@ -27,6 +29,7 @@ const fn f8_to_f32_bits(bits: u8) -> u32 {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) const fn f4_to_f32_bits(bits: u8) -> u32 {
     let bits = bits & 0x0F;
     let sign = (bits & 0x08) as u32;
@@ -41,6 +44,7 @@ pub(crate) const fn f4_to_f32_bits(bits: u8) -> u32 {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) const fn bf4_to_bf16_bits(bits: u8) -> u16 {
     let bits = bits & 0x0F;
     let sign = (bits & 0x08) as u32;

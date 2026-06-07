@@ -6,5 +6,10 @@ authors.workspace = true
 description = "Monomorphized vector register types for the hermes-simd workspace"
 
 [dependencies]
-hermes-simd-core = { path = "../hermes-simd-core" }
+hermes-simd-core = { path = "../hermes-simd-core", default-features = false }
+hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", default-features = false }
 half = { workspace = true }
+
+[features]
+default = ["std"]
+std = ["hermes-simd-core/std", "hermes-simd-intrinsics/std"]

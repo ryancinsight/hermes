@@ -26,10 +26,7 @@ where
 {
     #[inline(always)]
     fn clone(&self) -> Self {
-        Self {
-            raw: self.raw,
-            _marker: PhantomData,
-        }
+        *self
     }
 }
 

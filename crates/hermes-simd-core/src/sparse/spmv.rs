@@ -8,6 +8,15 @@ use super::{
     SellPData,
 };
 
+/// Unified trait for sparse matrix-vector multiplication.
+pub trait SparseSpMv<T> {
+    /// Perform matrix-vector multiplication: `y += A * x`.
+    ///
+    /// # Panics
+    /// Panics if the dimensions of `x` or `y` are incompatible with the matrix.
+    fn spmv(&self, x: &[T], y: &mut [T]);
+}
+
 /// Build an `Arch::IndexVector` from a slice of `i32` column indices.
 ///
 /// # Safety
@@ -30,16 +39,13 @@ fn validate_spmv_sizes(x_len: usize, y_len: usize, ncols: usize, nrows: usize, f
     assert!(y_len >= nrows, "y too short for {} nrows (got {}, expected >= {})", format_name, y_len, nrows);
 }
 
-impl<'a, T, Arch> SparseView<'a, T, Csr, Arch>
+impl<'a, T, Arch> SparseSpMv<T> for SparseView<'a, T, Csr, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
 {
-    /// Sparse matrix-vector multiply: `y += A * x`.
-    ///
-    /// # Panics
-    /// Panics if `x.len() < ncols` or `y.len() < nrows`.
-    pub fn spmv(&self, x: &[T], y: &mut [T]) {
+    #[inline]
+    fn spmv(&self, x: &[T], y: &mut [T]) {
         let data = &self.data;
         validate_spmv_sizes(x.len(), y.len(), data.ncols, data.nrows, "CSR");
 
@@ -115,16 +121,13 @@ where
     }
 }
 
-impl<'a, T, Arch> SparseView<'a, T, DenseWithMask, Arch>
+impl<'a, T, Arch> SparseSpMv<T> for SparseView<'a, T, DenseWithMask, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
 {
-    /// SpMV using masked SIMD on dense-with-mask format: `y += A * x`.
-    ///
-    /// # Panics
-    /// Panics if `x.len() < ncols` or `y.len() < nrows`.
-    pub fn spmv(&self, x: &[T], y: &mut [T]) {
+    #[inline]
+    fn spmv(&self, x: &[T], y: &mut [T]) {
         let data = &self.data;
         validate_spmv_sizes(x.len(), y.len(), data.ncols, data.nrows, "DenseWithMask");
 
@@ -197,16 +200,14 @@ where
     }
 }
 
-impl<'a, T, const BM: usize, const BN: usize, Arch> SparseView<'a, T, BlockedCoo<BM, BN>, Arch>
+impl<'a, T, const BM: usize, const BN: usize, Arch> SparseSpMv<T>
+    for SparseView<'a, T, BlockedCoo<BM, BN>, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
 {
-    /// SpMV on Blocked-COO: `y += A * x`.
-    ///
-    /// # Panics
-    /// Panics if `x.len() < ncols` or `y.len() < nrows`.
-    pub fn spmv(&self, x: &[T], y: &mut [T]) {
+    #[inline]
+    fn spmv(&self, x: &[T], y: &mut [T]) {
         let data = &self.data;
         validate_spmv_sizes(x.len(), y.len(), data.ncols, data.nrows, "BlockedCoo");
 
@@ -381,13 +382,13 @@ unsafe fn sellp_spmv_vectorized<T, const C: usize, Arch>(
     }
 }
 
-impl<'a, T, const C: usize, Arch> SparseView<'a, T, SellP<C>, Arch>
+impl<'a, T, const C: usize, Arch> SparseSpMv<T> for SparseView<'a, T, SellP<C>, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
 {
-    /// Sliced ELLPACK SpMV: `y += A * x`.
-    pub fn spmv(&self, x: &[T], y: &mut [T]) {
+    #[inline]
+    fn spmv(&self, x: &[T], y: &mut [T]) {
         validate_spmv_sizes(x.len(), y.len(), self.data.ncols, self.data.nrows, "SellP");
 
         if Arch::LANE_COUNT == C {

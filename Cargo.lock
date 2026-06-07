@@ -507,6 +507,7 @@ dependencies = [
  "hermes-simd-core",
  "hermes-simd-intrinsics",
  "hermes-simd-macros",
+ "hermes-simd-types",
  "proptest",
  "rkyv",
 ]
@@ -561,6 +562,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "hermes-simd-types"
+version = "0.1.0"
+dependencies = [
+ "half",
+ "hermes-simd-core",
+ "hermes-simd-intrinsics",
 ]
 
 [[package]]

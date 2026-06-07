@@ -68,8 +68,8 @@ macro_rules! impl_arithmetic {
 }
 
 impl_arithmetic!(F16, half::f16, |x: F16| x.0.to_f32(), |val| F16(half::f16::from_f32(val)));
-impl_arithmetic!(F32, f32, |x: F32| x.0, |val| F32(val));
-impl_arithmetic!(F64, f64, |x: F64| x.0, |val| F64(val));
+impl_arithmetic!(F32, f32, |x: F32| x.0, F32);
+impl_arithmetic!(F64, f64, |x: F64| x.0, F64);
 impl_arithmetic!(Bf16, half::bf16, |x: Bf16| x.0.to_f32(), |val| Bf16(half::bf16::from_f32(val)));
 impl_arithmetic!(Bf8, u8, |x: Bf8| x.to_f32(), Bf8::from_f32);
 impl_arithmetic!(Bf4, u8, |x: Bf4| x.to_f32(), Bf4::from_f32);

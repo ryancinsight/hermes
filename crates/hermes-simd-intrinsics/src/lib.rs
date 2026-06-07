@@ -16,6 +16,14 @@
 //! - `portable-simd` — wraps nightly `std::simd`.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(
+    clippy::needless_range_loop,
+    clippy::missing_safety_doc,
+    clippy::new_without_default,
+    clippy::too_many_arguments,
+    clippy::manual_is_multiple_of,
+    clippy::missing_const_for_thread_local
+)]
 extern crate alloc;
 
 use hermes_simd_core::arch::SimdArch;
@@ -68,6 +76,11 @@ macro_rules! impl_emulated_kernel {
             #[inline(always)]
             unsafe fn sub(a: Self::Vector, b: Self::Vector) -> Self::Vector {
                 core::array::from_fn(|i| a[i] - b[i])
+            }
+
+            #[inline(always)]
+            unsafe fn neg(a: Self::Vector) -> Self::Vector {
+                core::array::from_fn(|i| -a[i])
             }
 
             #[inline(always)]

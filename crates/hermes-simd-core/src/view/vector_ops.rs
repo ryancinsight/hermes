@@ -154,7 +154,7 @@ where
     fn neg(self) -> Self { Self::new(unsafe { Arch::neg(self.raw) }) }
 }
 
-impl<'a, T, Arch> core::ops::Neg for &'a Vector<T, Arch>
+impl<T, Arch> core::ops::Neg for &Vector<T, Arch>
 where
     Arch: SimdArch + SimdKernel<T>,
     T: Scalar,
@@ -174,7 +174,7 @@ where
     fn not(self) -> Self { Self::new(unsafe { Arch::bitnot(self.raw) }) }
 }
 
-impl<'a, T, Arch> core::ops::Not for &'a Vector<T, Arch>
+impl<T, Arch> core::ops::Not for &Vector<T, Arch>
 where
     Arch: SimdArch + SimdKernel<T>,
     T: Scalar,

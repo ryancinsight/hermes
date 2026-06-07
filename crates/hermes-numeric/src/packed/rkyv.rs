@@ -1,5 +1,7 @@
 //! rkyv zero-copy serialization support for packed 4-bit containers.
 
+#![allow(clippy::let_unit_value, clippy::unit_arg)]
+
 use crate::packed::slice::{Packable4, Packed4Slice};
 use crate::packed::vec::Packed4Vec;
 use crate::packed::cow::Packed4Cow;

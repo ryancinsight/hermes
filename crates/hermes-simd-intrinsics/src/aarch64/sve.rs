@@ -96,6 +96,9 @@ impl SimdKernel<f32> for SveArch {
     unsafe fn mul(_a: Self::Vector, _b: Self::Vector) -> Self::Vector {
         unimplemented!("SVE f32 stub: replace with svmul_f32_z")
     }
+    unsafe fn sub(_a: Self::Vector, _b: Self::Vector) -> Self::Vector {
+        unimplemented!("SVE f32 stub: replace with svsub_f32_z")
+    }
     unsafe fn fmadd(_a: Self::Vector, _b: Self::Vector, _c: Self::Vector) -> Self::Vector {
         unimplemented!("SVE f32 stub: replace with svmla_f32_z")
     }
@@ -218,6 +221,9 @@ impl SimdKernel<f64> for SveArch {
     }
     unsafe fn mul(_a: Self::Vector, _b: Self::Vector) -> Self::Vector {
         unimplemented!("SVE f64 stub: replace with svmul_f64_z")
+    }
+    unsafe fn sub(_a: Self::Vector, _b: Self::Vector) -> Self::Vector {
+        unimplemented!("SVE f64 stub: replace with svsub_f64_z")
     }
     unsafe fn fmadd(_a: Self::Vector, _b: Self::Vector, _c: Self::Vector) -> Self::Vector {
         unimplemented!("SVE f64 stub: replace with svmla_f64_z")

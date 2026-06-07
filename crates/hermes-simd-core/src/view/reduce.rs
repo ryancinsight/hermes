@@ -15,11 +15,21 @@ where
     ///
     /// Processes `UNROLL_FACTOR × LANE_COUNT` elements per iteration using
     /// `UNROLL_FACTOR` independent accumulators to saturate FMA throughput.
+    ///
+    /// The vector accumulator is initialized to `Op::identity_vector()` — the
+    /// identity element for this reduction (e.g. `+∞` for `Min`, `-∞` for `Max`,
+    /// `0` for `Sum`). This is required for correctness: starting from `Arch::zero()`
+    /// would produce wrong results for `Min`/`Max` on non-negative inputs.
+    ///
     /// Zero-cost: `_op` is a ZST erased entirely by the compiler.
     #[inline]
     pub fn reduce<Op: ReductionOp<T>>(&self, _op: Op) -> T {
         let data = self.as_slice();
         let len = data.len();
+        if len == 0 {
+            return Op::identity_scalar();
+        }
+
         let lane_count = Arch::LANE_COUNT;
         let unroll_factor = Arch::UNROLL_FACTOR;
         let chunk_size = lane_count * unroll_factor;
@@ -33,7 +43,8 @@ where
             }
         };
 
-        let mut acc = unsafe { Arch::zero() };
+        // Initialize with identity vector so Min/Max start from the correct bound.
+        let mut acc = unsafe { Op::identity_vector::<Arch>() };
         let mut i = 0usize;
 
         if unrolled_len >= chunk_size {
@@ -70,9 +81,9 @@ where
 
         let mut total = unsafe { Op::finalize::<Arch>(acc) };
 
-        // Scalar tail
+        // Scalar tail — use Op::scalar_combine for correctness with Min/Max.
         while i < len {
-            total += data[i];
+            total = Op::scalar_combine(total, data[i]);
             i += 1;
         }
 
@@ -112,7 +123,7 @@ where
 
         let s = self.as_slice();
         let o = other.as_slice();
-        let mut acc = unsafe { Arch::zero() };
+        let mut acc = unsafe { Op::identity_vector::<Arch>() };
         let mut i = 0usize;
 
         if unrolled_len >= chunk_size {
@@ -179,12 +190,50 @@ where
 
         let mut total = unsafe { Op::finalize::<Arch>(acc) };
 
-        // Scalar tail
+        // Scalar tail — use scalar_combine for correctness with Min/Max.
         while i < len {
-            total += s[i] * o[i];
+            total = Op::scalar_combine(total, s[i] * o[i]);
             i += 1;
         }
 
         Ok(total)
+    }
+}
+
+impl<'a, T: 'a, Arch: crate::arch::SimdArch + crate::kernel::SimdKernel<T>, Align: crate::align::Alignment, Mode: crate::execution::ExecutionMode, Ref: 'a>
+    SimdView<'a, T, Arch, Align, Mode, Ref>
+where
+    T: crate::scalar::Scalar + crate::scalar::NumericElement,
+{
+    /// Returns `Some((index, value))` of the minimum element, or `None` for an empty slice.
+    ///
+    /// Correctness: uses a SIMD-accelerated reduction pass to find the minimum value,
+    /// followed by a linear scan to locate the first occurrence of that value.
+    #[inline]
+    pub fn argmin(&self) -> Option<(usize, T)> {
+        let data = self.as_slice();
+        if data.is_empty() {
+            return None;
+        }
+        let min_val = self.reduce(crate::ops::Min);
+        let idx = data.iter()
+            .position(|x| x.partial_cmp(&min_val) == Some(core::cmp::Ordering::Equal))?;
+        Some((idx, min_val))
+    }
+
+    /// Returns `Some((index, value))` of the maximum element, or `None` for an empty slice.
+    ///
+    /// Correctness: uses a SIMD-accelerated reduction pass to find the maximum value,
+    /// followed by a linear scan to locate the first occurrence of that value.
+    #[inline]
+    pub fn argmax(&self) -> Option<(usize, T)> {
+        let data = self.as_slice();
+        if data.is_empty() {
+            return None;
+        }
+        let max_val = self.reduce(crate::ops::Max);
+        let idx = data.iter()
+            .position(|x| x.partial_cmp(&max_val) == Some(core::cmp::Ordering::Equal))?;
+        Some((idx, max_val))
     }
 }

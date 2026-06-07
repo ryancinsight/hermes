@@ -10,12 +10,22 @@ use crate::iter;
 
 /// Standard elementwise and accumulation operations on SIMD views.
 pub mod ops;
+/// Standard exclusive mutable elementwise operations on SIMD views.
+pub mod ops_mut;
+/// Unary mapping operations on SIMD views.
+pub mod unary;
 /// Lane-masked math and compaction/expansion operations on SIMD views.
 pub mod masked;
 /// Unrolled generic horizontal reductions on SIMD views.
 pub mod reduce;
 /// 2D matrix tile views and operations.
 pub mod tile;
+/// Inclusive/exclusive prefix scans and running min/max.
+pub mod scan;
+/// Lane-wise conditional select and masked-negate.
+pub mod select;
+/// Vectorized indirect load (gather) operations.
+pub mod gather;
 
 pub use tile::{TileView, TileMatrixMultiply};
 
@@ -38,6 +48,8 @@ pub enum SimdError {
     InsufficientOutputLength,
     /// The memory address is not aligned as required.
     UnalignedAddress,
+    /// An index is out of bounds of the view.
+    IndexOutOfBounds,
 }
 
 impl core::fmt::Display for SimdError {
@@ -46,6 +58,7 @@ impl core::fmt::Display for SimdError {
             Self::LengthMismatch => write!(f, "Operand views have mismatched lengths"),
             Self::InsufficientOutputLength => write!(f, "Output slice has insufficient length"),
             Self::UnalignedAddress => write!(f, "Memory address does not satisfy alignment constraints"),
+            Self::IndexOutOfBounds => write!(f, "Index is out of bounds of the view"),
         }
     }
 }
@@ -170,6 +183,90 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode, Ref: 'a>
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    /// Strips the static alignment guarantee of this view, returning an unaligned view zero-cost.
+    #[inline(always)]
+    pub fn into_unaligned(self) -> SimdView<'a, T, Arch, crate::align::Unaligned, Mode, Ref> {
+        SimdView {
+            ptr: self.ptr,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Attempts to promote the alignment of this view to boundary `A` bytes.
+    /// Returns `Some(SimdView)` if the start pointer is aligned to `A` bytes, otherwise `None`.
+    #[inline]
+    pub fn try_into_aligned<const A: usize>(self) -> Option<SimdView<'a, T, Arch, crate::align::Aligned<A>, Mode, Ref>> {
+        let addr = self.as_slice().as_ptr() as usize;
+        if addr % A == 0 {
+            Some(SimdView {
+                ptr: self.ptr,
+                _marker: PhantomData,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
+    SimdView<'a, T, Arch, Align, Mode, &'a [T]>
+{
+    /// Zero-copy sub-slice over a range of indices, returning an unaligned view.
+    #[inline]
+    pub fn slice_unaligned(self, range: core::ops::Range<usize>) -> SimdView<'a, T, Arch, crate::align::Unaligned, Mode, &'a [T]> {
+        let sub = &self.as_slice()[range];
+        SimdView {
+            ptr: sub as *const [T] as *mut [T],
+            _marker: PhantomData,
+        }
+    }
+
+    /// Zero-copy sub-slice over a range of indices, returning an aligned view with boundary `A` bytes.
+    /// Returns `Some(SimdView)` if the sub-slice satisfies the alignment, otherwise `None`.
+    #[inline]
+    pub fn slice_aligned<const A: usize>(self, range: core::ops::Range<usize>) -> Option<SimdView<'a, T, Arch, crate::align::Aligned<A>, Mode, &'a [T]>> {
+        let sub = &self.as_slice()[range];
+        let addr = sub.as_ptr() as usize;
+        if addr % A == 0 {
+            Some(SimdView {
+                ptr: sub as *const [T] as *mut [T],
+                _marker: PhantomData,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
+    SimdView<'a, T, Arch, Align, Mode, &'a mut [T]>
+{
+    /// Zero-copy mutable sub-slice over a range of indices, returning an unaligned view.
+    #[inline]
+    pub fn slice_unaligned_mut(mut self, range: core::ops::Range<usize>) -> SimdView<'a, T, Arch, crate::align::Unaligned, Mode, &'a mut [T]> {
+        let sub = &mut self.as_slice_mut()[range];
+        SimdView {
+            ptr: sub as *mut [T],
+            _marker: PhantomData,
+        }
+    }
+
+    /// Zero-copy mutable sub-slice over a range of indices, returning an aligned view with boundary `A` bytes.
+    /// Returns `Some(SimdView)` if the sub-slice satisfies the alignment, otherwise `None`.
+    #[inline]
+    pub fn slice_aligned_mut<const A: usize>(mut self, range: core::ops::Range<usize>) -> Option<SimdView<'a, T, Arch, crate::align::Aligned<A>, Mode, &'a mut [T]>> {
+        let sub = &mut self.as_slice_mut()[range];
+        let addr = sub.as_ptr() as usize;
+        if addr % A == 0 {
+            Some(SimdView {
+                ptr: sub as *mut [T],
+                _marker: PhantomData,
+            })
+        } else {
+            None
+        }
+    }
 }
 
 impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode, Ref: 'a>
@@ -188,6 +285,27 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
                 self.as_slice().as_ptr(),
                 self.len(),
                 Arch::LANE_COUNT,
+            )
+        }
+    }
+
+    /// Return a zero-copy iterator that advances two views in lockstep.
+    ///
+    /// Iterates non-overlapping `LANE_COUNT`-wide pairs of sub-views from `self` and `other`
+    /// until the shorter SIMD prefix is exhausted. Access the tails via
+    /// [`iter::ZipChunks::remainder`].
+    #[inline(always)]
+    pub fn zip_chunks<'b>(
+        &self,
+        other: &'b SimdView<'b, T, Arch, Align, Mode, &'b [T]>,
+    ) -> iter::ZipChunks<'a, 'b, T, Arch, Align, Mode> {
+        // SAFETY: both slice pointers are valid for their respective lifetimes.
+        unsafe {
+            iter::ZipChunks::from_raw_parts(
+                self.as_slice().as_ptr(),
+                self.len(),
+                other.as_slice().as_ptr(),
+                other.len(),
             )
         }
     }

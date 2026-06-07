@@ -24,6 +24,22 @@ where
     Format: SparseFormat,
     Arch: SimdArch,
 {
+    /// Create a `SparseView` from the format's storage representation.
+    #[inline(always)]
+    pub fn new(data: Format::Storage<'a, T>) -> Self {
+        Self {
+            data,
+            _arch: PhantomData,
+            _lifetime: PhantomData,
+        }
+    }
+
+    /// Get a reference to the underlying storage representation.
+    #[inline(always)]
+    pub fn storage(&self) -> &Format::Storage<'a, T> {
+        &self.data
+    }
+
     /// Number of rows in the sparse matrix.
     #[inline(always)]
     pub fn nrows(&self) -> usize {

@@ -4,7 +4,7 @@ use crate::kernel::SimdKernel;
 use crate::scalar::Scalar;
 
 #[inline(always)]
-pub unsafe fn generic_binary_op<T, Arch: ?Sized, F>(a: Arch::Vector, b: Arch::Vector, mut op: F) -> Arch::Vector
+pub unsafe fn generic_binary_op<T, Arch, F>(a: Arch::Vector, b: Arch::Vector, mut op: F) -> Arch::Vector
 where
     T: Scalar,
     Arch: SimdKernel<T>,
@@ -21,7 +21,7 @@ where
 }
 
 #[inline(always)]
-pub unsafe fn generic_unary_op<T, Arch: ?Sized, F>(a: Arch::Vector, mut op: F) -> Arch::Vector
+pub unsafe fn generic_unary_op<T, Arch, F>(a: Arch::Vector, mut op: F) -> Arch::Vector
 where
     T: Scalar,
     Arch: SimdKernel<T>,
@@ -36,7 +36,7 @@ where
 }
 
 #[inline(always)]
-pub unsafe fn generic_blend<T, Arch: ?Sized>(
+pub unsafe fn generic_blend<T, Arch>(
     mask: Arch::Vector,
     true_val: Arch::Vector,
     false_val: Arch::Vector,
@@ -59,7 +59,7 @@ where
 }
 
 #[inline(always)]
-pub unsafe fn generic_mask_from_bitmask<T, Arch: ?Sized>(bm: u64) -> Arch::Mask
+pub unsafe fn generic_mask_from_bitmask<T, Arch>(bm: u64) -> Arch::Mask
 where
     T: Scalar,
     Arch: SimdKernel<T>,
@@ -69,4 +69,26 @@ where
         bools[i] = (bm >> i) & 1 == 1;
     }
     Arch::mask_from_bools(&bools[..Arch::LANE_COUNT])
+}
+
+/// Scalar lane-by-lane horizontal fold used by `min_reduce` and `max_reduce` defaults.
+///
+/// Stores the vector to a stack buffer, then folds with `op` starting from `identity`.
+#[inline(always)]
+pub unsafe fn generic_horizontal_reduce<T, Arch>(
+    v: Arch::Vector,
+    identity: T,
+    mut op: impl FnMut(T, T) -> T,
+) -> T
+where
+    T: Scalar,
+    Arch: SimdKernel<T>,
+{
+    let mut buf = [T::ZERO; 128];
+    Arch::store_unaligned(buf.as_mut_ptr(), v);
+    let mut acc = identity;
+    for i in 0..Arch::LANE_COUNT {
+        acc = op(acc, buf[i]);
+    }
+    acc
 }

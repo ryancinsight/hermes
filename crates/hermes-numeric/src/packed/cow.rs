@@ -103,6 +103,18 @@ impl<'a, T: Packable4> Packed4Cow<'a, T> {
         let vec = self.to_mut();
         vec.set(index, val);
     }
+
+    /// Attempts to create a zero-copy sub-slice of the packed Clone-on-Write container.
+    ///
+    /// Returns `Some(Packed4Cow::Borrowed)` if the sub-slice range starts at an even logical index
+    /// (aligned to byte boundaries), otherwise returns `None`.
+    #[inline]
+    pub fn sub_slice(&self, range: core::ops::Range<usize>) -> Option<Packed4Cow<'_, T>> {
+        match self {
+            Self::Borrowed(view) => view.sub_slice(range).map(Packed4Cow::Borrowed),
+            Self::Owned(vec) => vec.as_view().sub_slice(range).map(Packed4Cow::Borrowed),
+        }
+    }
 }
 
 pub enum Packed4CowIntoIter<'a, T: Packable4> {

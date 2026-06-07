@@ -10,11 +10,16 @@ pub mod mul;
 pub mod masked;
 pub mod sparse;
 pub mod gemm;
+pub mod min;
+pub mod max;
+pub mod scale;
+pub mod argmin;
+pub mod argmax;
 
 use hermes_simd_core::view::SimdError;
 use hermes_simd_core::sparse::{
     CsrData, BlockedCooData, DenseWithMaskData, SellPData,
-    SparseView, BlockedCoo,
+    SparseView, BlockedCoo, SparseSpMv,
 };
 use hermes_simd_core::scalar::Scalar as ScalarTrait;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -53,6 +58,20 @@ impl private::Sealed for hermes_numeric::I32 {}
 pub trait SimdOps: ScalarTrait + private::Sealed {
     /// Reduces the slice to its sum.
     fn sum(data: &[Self]) -> Self;
+    /// Reduces the slice to its minimum element.
+    ///
+    /// Returns `T::MAX_VALUE` for empty slices (the identity element for min).
+    fn min(data: &[Self]) -> Self;
+    /// Reduces the slice to its maximum element.
+    ///
+    /// Returns `T::MIN_VALUE` for empty slices (the identity element for max).
+    fn max(data: &[Self]) -> Self;
+    /// Multiplies every element by `scalar` in-place.
+    fn scale(data: &mut [Self], scalar: Self);
+    /// Returns `Some((index, value))` of the minimum element, or `None` for empty.
+    fn argmin(data: &[Self]) -> Option<(usize, Self)>;
+    /// Returns `Some((index, value))` of the maximum element, or `None` for empty.
+    fn argmax(data: &[Self]) -> Option<(usize, Self)>;
     /// Computes the dot product of two slices.
     fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError>;
     /// Computes the elementwise product and writes to `out`.
@@ -90,6 +109,16 @@ where
 {
     #[inline(always)]
     fn sum(data: &[Self]) -> Self { sum::dispatch_sum::<Self>(data) }
+    #[inline(always)]
+    fn min(data: &[Self]) -> Self { min::dispatch_min::<Self>(data) }
+    #[inline(always)]
+    fn max(data: &[Self]) -> Self { max::dispatch_max::<Self>(data) }
+    #[inline(always)]
+    fn scale(data: &mut [Self], scalar: Self) { scale::dispatch_scale::<Self>(data, scalar) }
+    #[inline(always)]
+    fn argmin(data: &[Self]) -> Option<(usize, Self)> { argmin::dispatch_argmin::<Self>(data) }
+    #[inline(always)]
+    fn argmax(data: &[Self]) -> Option<(usize, Self)> { argmax::dispatch_argmax::<Self>(data) }
     #[inline(always)]
     fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError> { dot::dispatch_dot::<Self>(a, b) }
     #[inline(always)]
@@ -147,6 +176,16 @@ where
     #[inline(always)]
     fn sum(data: &[Self]) -> Self { sum::dispatch_sum::<Self>(data) }
     #[inline(always)]
+    fn min(data: &[Self]) -> Self { min::dispatch_min::<Self>(data) }
+    #[inline(always)]
+    fn max(data: &[Self]) -> Self { max::dispatch_max::<Self>(data) }
+    #[inline(always)]
+    fn scale(data: &mut [Self], scalar: Self) { scale::dispatch_scale::<Self>(data, scalar) }
+    #[inline(always)]
+    fn argmin(data: &[Self]) -> Option<(usize, Self)> { argmin::dispatch_argmin::<Self>(data) }
+    #[inline(always)]
+    fn argmax(data: &[Self]) -> Option<(usize, Self)> { argmax::dispatch_argmax::<Self>(data) }
+    #[inline(always)]
     fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError> { dot::dispatch_dot::<Self>(a, b) }
     #[inline(always)]
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
@@ -202,6 +241,16 @@ where
     #[inline(always)]
     fn sum(data: &[Self]) -> Self { sum::dispatch_sum::<Self>(data) }
     #[inline(always)]
+    fn min(data: &[Self]) -> Self { min::dispatch_min::<Self>(data) }
+    #[inline(always)]
+    fn max(data: &[Self]) -> Self { max::dispatch_max::<Self>(data) }
+    #[inline(always)]
+    fn scale(data: &mut [Self], scalar: Self) { scale::dispatch_scale::<Self>(data, scalar) }
+    #[inline(always)]
+    fn argmin(data: &[Self]) -> Option<(usize, Self)> { argmin::dispatch_argmin::<Self>(data) }
+    #[inline(always)]
+    fn argmax(data: &[Self]) -> Option<(usize, Self)> { argmax::dispatch_argmax::<Self>(data) }
+    #[inline(always)]
     fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError> { dot::dispatch_dot::<Self>(a, b) }
     #[inline(always)]
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
@@ -250,6 +299,30 @@ where
 /// Computes the sum of elements in the slice using runtime-dispatched SIMD.
 #[inline(always)]
 pub fn sum<T: SimdOps>(data: &[T]) -> T { T::sum(data) }
+
+/// Computes the minimum element of the slice using runtime-dispatched SIMD.
+///
+/// Returns `T::MAX_VALUE` for empty slices.
+#[inline(always)]
+pub fn min<T: SimdOps>(data: &[T]) -> T { T::min(data) }
+
+/// Computes the maximum element of the slice using runtime-dispatched SIMD.
+///
+/// Returns `T::MIN_VALUE` for empty slices.
+#[inline(always)]
+pub fn max<T: SimdOps>(data: &[T]) -> T { T::max(data) }
+
+/// Multiplies every element of `data` by `scalar` in-place.
+#[inline(always)]
+pub fn scale<T: SimdOps>(data: &mut [T], scalar: T) { T::scale(data, scalar) }
+
+/// Returns `Some((index, value))` of the minimum element, or `None` for empty.
+#[inline(always)]
+pub fn argmin<T: SimdOps>(data: &[T]) -> Option<(usize, T)> { T::argmin(data) }
+
+/// Returns `Some((index, value))` of the maximum element, or `None` for empty.
+#[inline(always)]
+pub fn argmax<T: SimdOps>(data: &[T]) -> Option<(usize, T)> { T::argmax(data) }
 
 /// Computes the dot product of two slices using runtime-dispatched SIMD.
 #[inline(always)]

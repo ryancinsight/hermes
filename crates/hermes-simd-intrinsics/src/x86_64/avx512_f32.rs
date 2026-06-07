@@ -81,6 +81,12 @@ impl SimdKernel<f32> for Avx512 {
 
     #[target_feature(enable = "avx512f")]
     #[inline]
+    unsafe fn sub(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        Avx512F32Vec(_mm512_sub_ps(a.0, b.0))
+    }
+
+    #[target_feature(enable = "avx512f")]
+    #[inline]
     unsafe fn fmadd(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
         Avx512F32Vec(_mm512_fmadd_ps(a.0, b.0, c.0))
     }

@@ -34,6 +34,12 @@ pub trait NumericElement:
     const BYTE_WIDTH: usize;
     /// Bitwise representation with all bits set to 1.
     const ALL_ONES: Self;
+    /// IEEE 754 sign-bit mask: only the most-significant bit is set.
+    ///
+    /// XOR-ing any value with this mask negates it (flips the sign bit).
+    /// Used by the default [`crate::kernel::SimdKernel::neg`] implementation to
+    /// avoid subtraction, which is not universally available across SIMD backends.
+    const SIGN_MASK: Self;
 
     /// Absolute value.
     fn abs(self) -> Self;
@@ -53,6 +59,40 @@ pub trait NumericElement:
     fn bitor(self, rhs: Self) -> Self;
     /// Bitwise XOR.
     fn bitxor(self, rhs: Self) -> Self;
+
+    /// Elementwise minimum: returns `self` if `self <= other`, else `other`.
+    ///
+    /// Default: uses `PartialOrd` comparison. Concrete impls (e.g. `f32`, `f64`) may
+    /// override with a hardware intrinsic.
+    #[inline(always)]
+    fn min_scalar(self, other: Self) -> Self
+    where
+        Self: PartialOrd,
+    {
+        if self <= other { self } else { other }
+    }
+
+    /// Elementwise maximum: returns `self` if `self >= other`, else `other`.
+    ///
+    /// Default: uses `PartialOrd` comparison. Concrete impls (e.g. `f32`, `f64`) may
+    /// override with a hardware intrinsic.
+    #[inline(always)]
+    fn max_scalar(self, other: Self) -> Self
+    where
+        Self: PartialOrd,
+    {
+        if self >= other { self } else { other }
+    }
+
+    /// The minimum representable finite value (negative infinity or `i32::MIN`).
+    ///
+    /// Used as the identity element for `Max` reductions.
+    const MIN_VALUE: Self;
+
+    /// The maximum representable finite value (positive infinity or `i32::MAX`).
+    ///
+    /// Used as the identity element for `Min` reductions.
+    const MAX_VALUE: Self;
 }
 
 /// Float-specific capabilities.

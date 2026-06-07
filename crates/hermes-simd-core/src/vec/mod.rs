@@ -260,6 +260,19 @@ where
         SimdView::new_mut(self.as_mut_slice()).unwrap()
     }
 
+    /// Converts this `AlignedVec` to another alignment layout type-safely and zero-cost.
+    #[inline(always)]
+    pub fn into_alignment<NewAlign: Alignment>(self) -> AlignedVec<T, NewAlign> {
+        let md = core::mem::ManuallyDrop::new(self);
+        AlignedVec {
+            ptr: md.ptr,
+            len: md.len,
+            cap: md.cap,
+            node: md.node,
+            _marker: PhantomData,
+        }
+    }
+
     fn layout_for(&self, capacity: usize) -> Layout {
         let size = capacity.checked_mul(core::mem::size_of::<T>())
             .expect("Capacity overflow");
@@ -343,14 +356,14 @@ impl<T, Align: Alignment> Drop for AlignedVec<T, Align> {
         if core::mem::size_of::<T>() == 0 {
             if self.len > 0 {
                 unsafe {
-                    core::ptr::drop_in_place(core::slice::from_raw_parts_mut(self.ptr, self.len));
+                    core::ptr::drop_in_place(core::ptr::slice_from_raw_parts_mut(self.ptr, self.len));
                 }
             }
             return;
         }
         if !self.ptr.is_null() && self.cap > 0 {
             unsafe {
-                core::ptr::drop_in_place(core::slice::from_raw_parts_mut(self.ptr, self.len));
+                core::ptr::drop_in_place(core::ptr::slice_from_raw_parts_mut(self.ptr, self.len));
                 let layout = self.layout_for(self.cap);
                 if let Some(node) = self.node {
                     let allocator = crate::numa::MnemosyneNumaAllocator;

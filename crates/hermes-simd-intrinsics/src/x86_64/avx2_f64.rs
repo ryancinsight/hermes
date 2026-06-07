@@ -100,6 +100,12 @@ impl SimdKernel<f64> for Avx2 {
         Avx2F64Vec(_mm256_mul_pd(a.0, b.0))
     }
 
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn sub(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        Avx2F64Vec(_mm256_sub_pd(a.0, b.0))
+    }
+
     #[target_feature(enable = "avx2,fma")]
     #[inline]
     unsafe fn fmadd(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {

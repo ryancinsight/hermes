@@ -109,9 +109,7 @@ impl<const N: usize> BitMask<N> {
     #[inline(always)]
     pub fn or(self, other: Self) -> Self { Self(self.0 | other.0) }
 
-    /// Bitwise NOT (complement within `N` active bits).
-    #[inline(always)]
-    pub fn not(self) -> Self { Self(!self.0 & Self::ALL_ACTIVE.0) }
+
 
     /// Expand this mask to a `[bool; N]` array.
     ///
@@ -274,7 +272,7 @@ impl<const N: usize> core::ops::BitOr for BitMask<N> {
 impl<const N: usize> core::ops::Not for BitMask<N> {
     type Output = Self;
     #[inline(always)]
-    fn not(self) -> Self { BitMask::not(self) }
+    fn not(self) -> Self { Self(!self.0 & Self::ALL_ACTIVE.0) }
 }
 
 #[cfg(test)]

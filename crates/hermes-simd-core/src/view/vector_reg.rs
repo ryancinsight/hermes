@@ -26,10 +26,7 @@ where
 {
     #[inline(always)]
     fn clone(&self) -> Self {
-        Self {
-            raw: self.raw,
-            _marker: PhantomData,
-        }
+        *self
     }
 }
 
@@ -354,7 +351,7 @@ where
         self,
         view: &mut super::SimdView<'a, T, Arch, Align, Mode, &'a mut [T]>,
         chunk_idx: usize,
-    ) -> ()
+    )
     where
         Align: crate::align::Alignment,
         Mode: crate::execution::ExecutionMode,

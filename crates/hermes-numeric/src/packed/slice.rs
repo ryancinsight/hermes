@@ -70,7 +70,7 @@ impl<'a, T: Packable4> Packed4Slice<'a, T> {
     /// Returns `None` if the backing buffer is too small for the requested length.
     #[inline]
     pub fn new(data: &'a [u8], len: usize) -> Option<Self> {
-        let required_bytes = (len + 1) / 2;
+        let required_bytes = len.div_ceil(2);
         if data.len() < required_bytes {
             None
         } else {
@@ -109,11 +109,35 @@ impl<'a, T: Packable4> Packed4Slice<'a, T> {
             let byte_idx = index / 2;
             let byte = self.data[byte_idx];
             let (low, high) = T::unpack_pair(byte);
-            if index % 2 == 0 {
+            if index.is_multiple_of(2) {
                 Some(low)
             } else {
                 Some(high)
             }
+        }
+    }
+
+    /// Attempts to create a zero-copy sub-slice of the packed slice.
+    ///
+    /// This is only possible without allocation if the range starts at an even logical index
+    /// (aligned to byte boundaries). If the range starts at an odd index, returns `None`.
+    #[inline]
+    pub fn sub_slice(self, range: core::ops::Range<usize>) -> Option<Self> {
+        if range.start > range.end || range.end > self.len {
+            return None;
+        }
+        if range.start.is_multiple_of(2) {
+            let byte_start = range.start / 2;
+            let byte_end = range.end.div_ceil(2);
+            let sub_data = &self.data[byte_start..byte_end];
+            let sub_len = range.end - range.start;
+            Some(Self {
+                data: sub_data,
+                len: sub_len,
+                _marker: core::marker::PhantomData,
+            })
+        } else {
+            None
         }
     }
 }
@@ -130,7 +154,7 @@ impl<'a, T: Packable4> Packed4SliceMut<'a, T> {
     /// Returns `None` if the backing buffer is too small for the requested length.
     #[inline]
     pub fn new(data: &'a mut [u8], len: usize) -> Option<Self> {
-        let required_bytes = (len + 1) / 2;
+        let required_bytes = len.div_ceil(2);
         if data.len() < required_bytes {
             None
         } else {
@@ -160,6 +184,33 @@ impl<'a, T: Packable4> Packed4SliceMut<'a, T> {
         self.data
     }
 
+    /// Return a borrowed read-only view of this mutable packed slice.
+    #[inline]
+    pub fn as_borrowed(&self) -> Packed4Slice<'_, T> {
+        Packed4Slice {
+            data: self.data,
+            len: self.len,
+            _marker: core::marker::PhantomData,
+        }
+    }
+
+    /// Get an element at the given logical index.
+    #[inline]
+    pub fn get(&self, index: usize) -> Option<T> {
+        if index >= self.len {
+            None
+        } else {
+            let byte_idx = index / 2;
+            let byte = self.data[byte_idx];
+            let (low, high) = T::unpack_pair(byte);
+            if index.is_multiple_of(2) {
+                Some(low)
+            } else {
+                Some(high)
+            }
+        }
+    }
+
     /// Returns true if empty.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
@@ -173,12 +224,36 @@ impl<'a, T: Packable4> Packed4SliceMut<'a, T> {
             let byte_idx = index / 2;
             let byte = self.data[byte_idx];
             let (mut low, mut high) = T::unpack_pair(byte);
-            if index % 2 == 0 {
+            if index.is_multiple_of(2) {
                 low = val;
             } else {
                 high = val;
             }
             self.data[byte_idx] = T::pack_pair(low, high);
+        }
+    }
+
+    /// Attempts to create a zero-copy mutable sub-slice of the packed slice.
+    ///
+    /// This is only possible without allocation if the range starts at an even logical index
+    /// (aligned to byte boundaries). If the range starts at an odd index, returns `None`.
+    #[inline]
+    pub fn sub_slice_mut(self, range: core::ops::Range<usize>) -> Option<Self> {
+        if range.start > range.end || range.end > self.len {
+            return None;
+        }
+        if range.start.is_multiple_of(2) {
+            let byte_start = range.start / 2;
+            let byte_end = range.end.div_ceil(2);
+            let sub_data = &mut self.data[byte_start..byte_end];
+            let sub_len = range.end - range.start;
+            Some(Self {
+                data: sub_data,
+                len: sub_len,
+                _marker: core::marker::PhantomData,
+            })
+        } else {
+            None
         }
     }
 }

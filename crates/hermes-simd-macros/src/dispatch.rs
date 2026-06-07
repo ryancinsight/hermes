@@ -85,6 +85,7 @@ fn replace_ident(stream: TokenStream, target: &Ident, replacement: &TokenStream)
     result
 }
 
+#[allow(clippy::too_many_arguments)]
 fn generate_dispatcher(
     arch_cfg: &TokenStream,
     active_targets: &[DispatchTarget],
@@ -111,7 +112,7 @@ fn generate_dispatcher(
         let feat = target.feature_str().unwrap();
         let arch = target.arch_marker();
         let arch_cfg = target.target_arch_cfg();
-        let helper_name = format_ident!("{}_{}", dispatch_name, feat.replace('-', "_").replace(',', "_"));
+        let helper_name = format_ident!("{}_{}", dispatch_name, feat.replace(['-', ','], "_"));
 
         let helper_generics = if other_params.is_empty() {
             quote!()

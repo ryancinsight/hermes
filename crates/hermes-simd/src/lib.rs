@@ -44,7 +44,6 @@
 
 extern crate alloc;
 
-// Re-export core types
 pub use hermes_simd_core::{
     arch::SimdArch,
     align::{Alignment, Aligned, Unaligned},
@@ -56,15 +55,26 @@ pub use hermes_simd_core::{
     mask::BitMask,
     compute::ComputeView,
     bitboard::{BitBoardView, BitBoardKernel},
-    scalar::{FloatElement, Scalar as SimdScalar},
+    scalar::{FloatElement, Scalar as SimdScalar, CastFrom, CastTo},
     current_numa_node, refresh_numa_node, verify_numa_locality, NumaBinding, NumaTopologyService, numa_node_count, numa_node_distance,
+    // Operation strategy ZSTs and sealed traits — zero-cost, erased at monomorphization.
+    ReductionOp, ElementOp, UnaryOp,
+    Sum, Dot, Mul, Add, Sub, Div, BitAnd, BitOr, BitXor,
+    // Unary strategy ZSTs
+    Abs, Neg, Sqrt, Clamp,
+    // Scan strategy ZSTs
+    ScanOp, ScanMode, ScanAdd, ScanMul, ScanMin, ScanMax, Inclusive, Exclusive,
 };
 
 // Re-export sparse types
 pub use hermes_simd_core::sparse::{
-    SparseFormat, SparseView,
+    SparseFormat, SparseView, SparseSpMv, SparseOps,
     Csr, SellP, BlockedCoo, DenseWithMask,
     CsrData, SellPData, BlockedCooData, DenseWithMaskData,
+    // Clone-on-Write sparse containers
+    SparseCow, CsrCow, SellPCow, BlockedCooCow, DenseWithMaskCow,
+    // Owned heap-backed sparse storage types
+    OwnedCsr, OwnedSellP, OwnedBlockedCoo, OwnedDenseWithMask,
 };
 
 // Re-export tiling
@@ -85,6 +95,31 @@ pub use hermes_numeric::{
     PackedBf4Slice, PackedBf4SliceMut, PackedF4Slice, PackedF4SliceMut,
     Packed4Vec, Packed4Iter, PackedBf4Vec, PackedF4Vec,
     Packed4Cow, PackedBf4Cow, PackedF4Cow,
+};
+
+// Re-export monomorphized vector register types and PreferredArch
+pub use hermes_simd_types::{
+    PreferredArch,
+    VectorF32, VectorF64, VectorF16, VectorBf16, VectorBf8, VectorBf4, VectorF8, VectorF4, VectorI8, VectorI16, VectorI32,
+    MaskF32, MaskF64, MaskF16, MaskBf16, MaskBf8, MaskBf4, MaskF8, MaskF4, MaskI8, MaskI16, MaskI32,
+    SimdF32, SimdF64, SimdF16, SimdBf16, SimdBf8, SimdBf4, SimdF8, SimdF4, SimdI8, SimdI16, SimdI32,
+    SimdMaskF32, SimdMaskF64, SimdMaskF16, SimdMaskBf16, SimdMaskBf8, SimdMaskBf4, SimdMaskF8, SimdMaskF4, SimdMaskI8, SimdMaskI16, SimdMaskI32,
+    ScalarF32, ScalarF64, ScalarF16, ScalarBf16, ScalarBf8, ScalarBf4, ScalarF8, ScalarF4, ScalarI8, ScalarI16, ScalarI32,
+    ScalarMaskF32, ScalarMaskF64,
+};
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+pub use hermes_simd_types::{
+    Avx2F32, Avx2F64, Avx2F16, Avx2Bf16, Avx2Bf8, Avx2Bf4, Avx2F8, Avx2F4, Avx2I8, Avx2I16, Avx2I32,
+    Avx2MaskF32, Avx2MaskF64, Avx2MaskF16, Avx2MaskBf16,
+    Avx512F32, Avx512F64, Avx512F16, Avx512Bf16, Avx512Bf8, Avx512Bf4, Avx512F8, Avx512F4, Avx512I8, Avx512I16, Avx512I32,
+    Avx512MaskF32, Avx512MaskF64, Avx512MaskF16, Avx512MaskBf16,
+};
+
+#[cfg(target_arch = "aarch64")]
+pub use hermes_simd_types::{
+    NeonF32, NeonF64, NeonF16, NeonBf16, NeonBf8, NeonBf4, NeonF8, NeonF4, NeonI8, NeonI16, NeonI32,
+    NeonMaskF32, NeonMaskF64, NeonMaskF16, NeonMaskBf16,
 };
 
 /// Runtime CPU feature detection utilities.
@@ -112,6 +147,11 @@ pub use dispatch::{
     SimdOps,
     // Generic free functions — the primary public API.
     sum,
+    min,
+    max,
+    scale,
+    argmin,
+    argmax,
     dot,
     elementwise_mul,
     masked_sum,

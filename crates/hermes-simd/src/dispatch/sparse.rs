@@ -3,6 +3,7 @@
 use hermes_simd_core::sparse::{
     CsrData, DenseWithMaskData, SellPData,
     SparseView, Csr, DenseWithMask, SellP,
+    SparseSpMv,
 };
 use hermes_simd_core::kernel::SimdKernel;
 use hermes_simd_core::scalar::Scalar;

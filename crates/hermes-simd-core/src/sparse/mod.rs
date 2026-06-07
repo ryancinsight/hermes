@@ -4,9 +4,20 @@ pub mod types;
 pub mod view;
 pub mod ops;
 pub mod spmv;
+pub mod cow;
 
 pub use types::{CsrData, SellPData, BlockedCooData, DenseWithMaskData, SparseShape};
 pub use view::{SparseView, SparseViewShape};
+pub use spmv::SparseSpMv;
+pub use ops::SparseOps;
+pub use cow::{
+    // Per-format Cow containers
+    CsrCow, SellPCow, BlockedCooCow, DenseWithMaskCow,
+    // Default SparseCow alias (= CsrCow)
+    SparseCow,
+    // Owned heap-backed storage types
+    OwnedCsr, OwnedSellP, OwnedBlockedCoo, OwnedDenseWithMask,
+};
 
 /// Compressed Sparse Row format marker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,7 +39,6 @@ pub struct BlockedCoo<const BM: usize, const BN: usize>;
 /// Dense storage with a boolean mask indicating non-zero elements.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DenseWithMask;
-
 
 impl crate::private::Sealed for Csr {}
 impl<const C: usize> crate::private::Sealed for SellP<C> {}

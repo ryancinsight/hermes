@@ -4,6 +4,7 @@ use crate::kernel::SimdKernel;
 use crate::execution::ExecutionMode;
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
+use crate::ops::ElementOp;
 
 impl<'a, T: 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode, Ref: 'a>
     SimdView<'a, T, Arch, Align, Mode, Ref>
@@ -269,41 +270,34 @@ where
 
         Ok(())
     }
-}
 
-impl<'a, T: 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
-    SimdView<'a, T, Arch, Align, Mode, &'a mut [T]>
-where
-    T: Scalar,
-{
-    /// Add another view elementwise to this mutable view in-place.
+    /// Pairwise elementwise operation on `self` and `other`, writing results to `out`.
+    ///
+    /// The SIMD vectorized loop covers `floor(len / LANE_COUNT) * LANE_COUNT` elements.
+    /// The scalar tail handles the remaining elements element-by-element.
     ///
     /// # Errors
-    /// Returns `SimdError::LengthMismatch` if operand lengths do not match.
+    /// Returns `SimdError::LengthMismatch` if operand lengths do not match, or
+    /// `SimdError::InsufficientOutputLength` if `out.len() < self.len()`.
     #[inline(always)]
-    pub fn add_assign<ORef>(&mut self, other: &SimdView<'_, T, Arch, Align, Mode, ORef>) -> Result<(), SimdError>
+    pub fn zip_into<ORef, Op>(&self, other: &SimdView<'_, T, Arch, Align, Mode, ORef>, out: &mut [T], op: Op) -> Result<(), SimdError>
     where
         ORef: 'a,
+        Op: ElementOp<T>,
     {
         super::check_lengths_equal(self.len(), other.len())?;
+        super::check_output_length(self.len(), out.len())?;
 
         let len = self.len();
         let lane_count = Arch::LANE_COUNT;
         let simd_len = (len / lane_count) * lane_count;
 
-        let mut ptr_self = self.as_slice_mut().as_mut_ptr();
-        let mut ptr_other = other.as_slice().as_ptr();
+        let ptr_self = self.as_slice().as_ptr();
+        let ptr_other = other.as_slice().as_ptr();
+        let ptr_out = out.as_mut_ptr();
 
         unsafe {
-            let load_self = |p| {
-                if Align::IS_ALIGNED {
-                    Arch::load_aligned(p)
-                } else {
-                    Arch::load_unaligned(p)
-                }
-            };
-
-            let load_other = |p| {
+            let load = |p| {
                 if Align::IS_ALIGNED {
                     Arch::load_aligned(p)
                 } else {
@@ -312,93 +306,53 @@ where
             };
 
             let store = |p, val| {
-                if Align::IS_ALIGNED {
+                let is_out_aligned = Align::IS_ALIGNED && (p as usize) % Align::ALIGN_BYTES == 0;
+                if is_out_aligned {
                     Arch::store_aligned(p, val);
                 } else {
                     Arch::store_unaligned(p, val);
                 }
             };
 
-            for _ in 0..(simd_len / lane_count) {
-                let v1 = load_self(ptr_self);
-                let v2 = load_other(ptr_other);
-                let res = Arch::add(v1, v2);
-                store(ptr_self, res);
-
-                ptr_self = ptr_self.add(lane_count);
-                ptr_other = ptr_other.add(lane_count);
+            for i in (0..simd_len).step_by(lane_count) {
+                let va = load(ptr_self.add(i));
+                let vb = load(ptr_other.add(i));
+                let vr = op.apply::<Arch>(va, vb);
+                store(ptr_out.add(i), vr);
             }
         }
 
-        let s_mut_slice = self.as_slice_mut();
+        let s_slice = self.as_slice();
         let o_slice = other.as_slice();
         for i in simd_len..len {
-            s_mut_slice[i] += o_slice[i];
+            out[i] = op.apply_scalar(s_slice[i], o_slice[i]);
         }
 
         Ok(())
     }
 
-    /// Multiply another view elementwise with this mutable view in-place.
+    /// Pairwise elementwise operation on `self` and `other`, returning a new `AlignedVec<T, Align>`.
+    ///
+    /// One allocation for the output buffer. Monomorphizes per `(T, Arch, Align, Op)` — the
+    /// compiler generates the specialization most efficient for the target ISA and alignment.
     ///
     /// # Errors
     /// Returns `SimdError::LengthMismatch` if operand lengths do not match.
-    #[inline(always)]
-    pub fn mul_assign<ORef>(&mut self, other: &SimdView<'_, T, Arch, Align, Mode, ORef>) -> Result<(), SimdError>
+    pub fn zip_transform<ORef, Op>(
+        &self,
+        other: &SimdView<'_, T, Arch, Align, Mode, ORef>,
+        op: Op,
+    ) -> Result<crate::vec::AlignedVec<T, Align>, SimdError>
     where
         ORef: 'a,
+        Op: ElementOp<T>,
     {
         super::check_lengths_equal(self.len(), other.len())?;
-
         let len = self.len();
-        let lane_count = Arch::LANE_COUNT;
-        let simd_len = (len / lane_count) * lane_count;
-
-        let mut ptr_self = self.as_slice_mut().as_mut_ptr();
-        let mut ptr_other = other.as_slice().as_ptr();
-
-        unsafe {
-            let load_self = |p| {
-                if Align::IS_ALIGNED {
-                    Arch::load_aligned(p)
-                } else {
-                    Arch::load_unaligned(p)
-                }
-            };
-
-            let load_other = |p| {
-                if Align::IS_ALIGNED {
-                    Arch::load_aligned(p)
-                } else {
-                    Arch::load_unaligned(p)
-                }
-            };
-
-            let store = |p, val| {
-                if Align::IS_ALIGNED {
-                    Arch::store_aligned(p, val);
-                } else {
-                    Arch::store_unaligned(p, val);
-                }
-            };
-
-            for _ in 0..(simd_len / lane_count) {
-                let v1 = load_self(ptr_self);
-                let v2 = load_other(ptr_other);
-                let res = Arch::mul(v1, v2);
-                store(ptr_self, res);
-
-                ptr_self = ptr_self.add(lane_count);
-                ptr_other = ptr_other.add(lane_count);
-            }
-        }
-
-        let s_mut_slice = self.as_slice_mut();
-        let o_slice = other.as_slice();
-        for i in simd_len..len {
-            s_mut_slice[i] *= o_slice[i];
-        }
-
-        Ok(())
+        let mut out = crate::vec::AlignedVec::with_capacity(len);
+        // SAFETY: we write all `len` elements below via `zip_into`.
+        unsafe { out.set_len(len); }
+        self.zip_into(other, out.as_mut_slice(), op)?;
+        Ok(out)
     }
 }

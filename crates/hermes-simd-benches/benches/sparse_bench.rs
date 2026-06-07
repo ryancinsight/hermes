@@ -109,13 +109,7 @@ fn bench_csr_spmv(c: &mut Criterion) {
                 b.iter(|| {
                     y.fill(0.0);
                     spmv_csr::<f32>(
-                        CsrData {
-                            values: &vals,
-                            col_indices: &cols,
-                            row_ptr: &ptr,
-                            nrows: n,
-                            ncols: n,
-                        },
+                        CsrData::new(&vals[..], &cols[..], &ptr[..], n, n),
                         &x,
                         &mut y,
                     );
@@ -143,12 +137,7 @@ fn bench_dense_masked_spmv(c: &mut Criterion) {
                 b.iter(|| {
                     y.fill(0.0);
                     spmv_dense_masked::<f32>(
-                        DenseWithMaskData {
-                            values: &vals,
-                            mask: &mask,
-                            nrows: n,
-                            ncols: n,
-                        },
+                        DenseWithMaskData::new(&vals[..], &mask[..], n, n),
                         &x,
                         &mut y,
                     );
@@ -174,14 +163,7 @@ fn bench_bcoo_spmv(c: &mut Criterion) {
             b.iter(|| {
                 y.fill(0.0);
                 spmv_bcoo4x4::<f32>(
-                    BlockedCooData {
-                        blocks: &blocks,
-                        block_row: &brow,
-                        block_col: &bcol,
-                        nblocks,
-                        nrows: n,
-                        ncols: n,
-                    },
+                    BlockedCooData::new(&blocks[..], &brow[..], &bcol[..], nblocks, n, n),
                     &x,
                     &mut y,
                 );
@@ -197,14 +179,7 @@ fn bench_bcoo_spmv(c: &mut Criterion) {
             b.iter(|| {
                 y.fill(0.0);
                 spmv_bcoo8x8::<f32>(
-                    BlockedCooData {
-                        blocks: &blocks,
-                        block_row: &brow,
-                        block_col: &bcol,
-                        nblocks,
-                        nrows: n,
-                        ncols: n,
-                    },
+                    BlockedCooData::new(&blocks[..], &brow[..], &bcol[..], nblocks, n, n),
                     &x,
                     &mut y,
                 );

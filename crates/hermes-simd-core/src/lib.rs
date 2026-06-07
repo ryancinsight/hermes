@@ -20,6 +20,14 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #![warn(missing_docs)]
+#![allow(
+    clippy::needless_range_loop,
+    clippy::let_unit_value,
+    clippy::manual_div_ceil,
+    clippy::manual_is_multiple_of,
+    clippy::assign_op_pattern,
+    clippy::unit_arg
+)]
 
 extern crate alloc;
 
@@ -54,7 +62,10 @@ pub use execution::{ExecutionMode, Unmasked, Masked};
 pub use kernel::SimdKernel;
 pub use scalar::{Scalar, FloatElement, NumericElement};
 pub use mask::BitMask;
-pub use ops::{ReductionOp, ElementOp, Sum, Dot, Mul, Add, Sub};
+pub use ops::{
+    ReductionOp, ElementOp, UnaryOp, Sum, Dot, Mul, Add, Sub, Div, BitAnd, BitOr, BitXor, Min, Max,
+    Abs, Neg, Sqrt, Clamp, ScanOp, ScanMode, ScanAdd, ScanMul, ScanMin, ScanMax, Inclusive, Exclusive,
+};
 pub use view::{SimdView, SimdError, TileView, TileMatrixMultiply, Vector, Mask};
 pub use tiling::{tiled_dot, TilingPolicy, TilingStrategy, tiled_gemv, tiled_gemm};
 pub use sparse::{
@@ -64,7 +75,7 @@ pub use sparse::{
 };
 pub use vec::AlignedVec;
 pub use cow::{SimdCow, ArchivedSimdCow, SimdCowResolver, ArchivedPacked4Cow, Packed4CowResolver};
-pub use iter::SimdChunks;
+pub use iter::{SimdChunks, ZipChunks};
 pub use compute::ComputeView;
 pub use bitboard::{BitBoardView, BitBoardKernel};
 pub use numa::{NumaAllocator, MnemosyneNumaAllocator, current_numa_node, refresh_numa_node, verify_numa_locality, NumaBinding, NumaTopologyService, numa_node_count, numa_node_distance};

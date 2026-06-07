@@ -17,6 +17,7 @@ use super::SimdCow;
 fn binary_lhs_inplace<T, Arch, Align, Op>(
     lhs: &SimdCow<'_, T, Arch, Align>,
     rhs: &mut AlignedVec<T, Align>,
+    op: Op,
 ) where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
@@ -36,7 +37,7 @@ fn binary_lhs_inplace<T, Arch, Align, Op>(
         unsafe {
             let va = Arch::load_unaligned(chunk_lhs.as_ptr());
             let vb = Arch::load_unaligned(chunk_rhs.as_ptr());
-            let vr = Op::apply::<Arch>(va, vb);
+            let vr = ElementOp::apply::<Arch>(op, va, vb);
             Arch::store_unaligned(chunk_rhs.as_mut_ptr(), vr);
         }
     }
@@ -44,7 +45,7 @@ fn binary_lhs_inplace<T, Arch, Align, Op>(
     let tail_lhs = chunks_lhs.remainder();
     let tail_rhs = chunks_rhs.into_remainder();
     for (&a, b) in tail_lhs.iter().zip(tail_rhs.iter_mut()) {
-        *b = Op::apply_scalar(a, *b);
+        *b = ElementOp::apply_scalar(op, a, *b);
     }
 }
 
@@ -80,7 +81,7 @@ macro_rules! impl_binary_op {
                                 _ => unreachable!(),
                             }
                         } else {
-                            binary_lhs_inplace::<T, Arch, Align, $op_strategy>(&lhs, &mut rhs_vec);
+                            binary_lhs_inplace::<T, Arch, Align, $op_strategy>(&lhs, &mut rhs_vec, $op_val);
                             SimdCow::Owned(rhs_vec)
                         }
                     }
@@ -140,7 +141,7 @@ macro_rules! impl_binary_op {
                                 _ => unreachable!(),
                             }
                         } else {
-                            binary_lhs_inplace::<T, Arch, Align, $op_strategy>(self, &mut rhs_vec);
+                            binary_lhs_inplace::<T, Arch, Align, $op_strategy>(self, &mut rhs_vec, $op_val);
                             SimdCow::Owned(rhs_vec)
                         }
                     }

@@ -8,6 +8,7 @@ members = [
     "crates/hermes-simd",
     "crates/hermes-simd-benches",
     "crates/hermes-simd-examples",
+    "crates/hermes-simd-types",
 ]
 
 [workspace.package]
