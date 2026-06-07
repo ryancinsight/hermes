@@ -1,3 +1,4 @@
+#![allow(clippy::while_let_on_iterator)]
 //! Unit tests for sprint A–D additions.
 //!
 //! Covers:

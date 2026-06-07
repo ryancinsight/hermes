@@ -17,6 +17,15 @@ rkyv = { version = "0.7" }
 
 [dev-dependencies]
 proptest = "1.4"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "dense"
+harness = false
+
+[[bench]]
+name = "tensor"
+harness = false
 
 [features]
 default = ["std"]

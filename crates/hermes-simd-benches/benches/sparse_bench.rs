@@ -1,3 +1,4 @@
+#![allow(clippy::same_item_push)]
 //! Sparse matrix-vector multiplication benchmarks.
 //!
 //! Benchmarks SpMV across formats and sparsity levels:

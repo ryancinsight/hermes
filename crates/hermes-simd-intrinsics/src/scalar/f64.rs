@@ -213,4 +213,12 @@ impl SimdKernel<f64> for Scalar {
         }
         m
     }
+
+    #[inline(always)]
+    unsafe fn mask_to_vector(mask: Self::Mask) -> Self::Vector {
+        [
+            if mask[0] { f64::from_bits(0xFFFF_FFFF_FFFF_FFFF) } else { 0.0f64 },
+            if mask[1] { f64::from_bits(0xFFFF_FFFF_FFFF_FFFF) } else { 0.0f64 },
+        ]
+    }
 }

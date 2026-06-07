@@ -40,7 +40,13 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![warn(missing_docs)]
-#![allow(unused_unsafe)]
+#![allow(
+    unused_unsafe,
+    clippy::too_many_arguments,
+    clippy::needless_range_loop,
+    clippy::assign_op_pattern,
+    clippy::manual_memcpy
+)]
 
 extern crate alloc;
 
@@ -53,7 +59,6 @@ pub use hermes_simd_core::{
     vec::AlignedVec,
     cow::{SimdCow, ArchivedSimdCow, SimdCowResolver, ArchivedPacked4Cow, Packed4CowResolver},
     mask::BitMask,
-    compute::ComputeView,
     bitboard::{BitBoardView, BitBoardKernel},
     scalar::{FloatElement, Scalar as SimdScalar, CastFrom, CastTo},
     current_numa_node, refresh_numa_node, verify_numa_locality, NumaBinding, NumaTopologyService, numa_node_count, numa_node_distance,
@@ -64,6 +69,12 @@ pub use hermes_simd_core::{
     Abs, Neg, Sqrt, Clamp,
     // Scan strategy ZSTs
     ScanOp, ScanMode, ScanAdd, ScanMul, ScanMin, ScanMax, Inclusive, Exclusive,
+    // Extended strategy ZSTs (v2)
+    FmaAdd, Product,
+    // Chunk iterators
+    iter::{SimdChunks, ZipChunks, ZipChunksMut, SimdChunksMut},
+    // ComputeView extension
+    compute::{ComputeView, ComputeReduce},
 };
 
 // Re-export sparse types
@@ -79,6 +90,24 @@ pub use hermes_simd_core::sparse::{
 
 // Re-export tiling
 pub use hermes_simd_core::tiling::{tiled_dot, TilingPolicy, TilingStrategy, tiled_gemv};
+
+// Re-export tensor views, softmax, matmul, norms, and layer norm
+pub use hermes_simd_core::tensor::{
+    TensorView, TensorCow, TensorError, RowMajor, ColMajor,
+};
+pub use hermes_simd_core::tensor::softmax::{
+    softmax_inplace, softmax as softmax_alloc,
+    softmax_2d_rows_inplace, softmax_2d_rows,
+};
+pub use hermes_simd_core::tensor::ops::{
+    matmul, batch_matmul, matmul_to, batch_matmul_to, DefaultTilePolicy,
+};
+pub use hermes_simd_core::tensor::norm::{
+    norm_l1, norm_l2, norm_linf, normalize_l2_inplace, row_norms_l2, SquaredSum,
+};
+pub use hermes_simd_core::tensor::layer_norm::{
+    layer_norm_inplace, layer_norm,
+};
 
 // Re-export concrete ZST architecture markers
 pub use hermes_simd_intrinsics::{

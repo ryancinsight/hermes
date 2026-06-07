@@ -371,4 +371,10 @@ impl SimdKernel<f64> for Neon {
         m |= ((vgetq_lane_u64(mask.0, 1) >> 63) as u64) << 1;
         m
     }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn mask_to_vector(mask: Self::Mask) -> Self::Vector {
+        NeonF64Vec(vreinterpretq_f64_u64(mask.0))
+    }
 }

@@ -69,9 +69,17 @@ where
         unsafe {
             while i + lane_count <= len {
                 let m = Arch::mask_from_bools(&mask[i..i + lane_count]);
-                let vb = Arch::load_unaligned(b.as_ptr().add(i));
+                let vb = if Align::IS_ALIGNED {
+                    Arch::load_aligned(b.as_ptr().add(i))
+                } else {
+                    Arch::load_unaligned(b.as_ptr().add(i))
+                };
                 let v_res = Arch::masked_load_unaligned(a.as_ptr().add(i), m, vb);
-                Arch::store_unaligned(out_slice.as_mut_ptr().add(i), v_res);
+                if Align::IS_ALIGNED {
+                    Arch::store_aligned(out_slice.as_mut_ptr().add(i), v_res);
+                } else {
+                    Arch::store_unaligned(out_slice.as_mut_ptr().add(i), v_res);
+                }
                 i += lane_count;
             }
         }
@@ -104,12 +112,29 @@ where
         unsafe { out.set_len(len); }
         let out_slice = out.as_mut_slice();
 
-        // Scalar loop: correct for all T including two's-complement integers.
-        // The compiler auto-vectorizes this on float types where negation is a
-        // single VXORPS/VXORPD; integer SIMD negation requires architecture-specific
-        // override of SimdKernel::neg which is not universally available.
-        for i in 0..len {
-            out_slice[i] = if mask[i] { -data[i] } else { data[i] };
+        let lane_count = Arch::LANE_COUNT;
+        let mut i = 0;
+        unsafe {
+            while i + lane_count <= len {
+                let v = if Align::IS_ALIGNED {
+                    Arch::load_aligned(data.as_ptr().add(i))
+                } else {
+                    Arch::load_unaligned(data.as_ptr().add(i))
+                };
+                let m = Arch::mask_from_bools(&mask[i..i + lane_count]);
+                let vmask = Arch::mask_to_vector(m);
+                let neg_v = Arch::neg(v);
+                let v_res = Arch::blend(vmask, neg_v, v);
+                if Align::IS_ALIGNED {
+                    Arch::store_aligned(out_slice.as_mut_ptr().add(i), v_res);
+                } else {
+                    Arch::store_unaligned(out_slice.as_mut_ptr().add(i), v_res);
+                }
+                i += lane_count;
+            }
+        }
+        for j in i..len {
+            out_slice[j] = if mask[j] { -data[j] } else { data[j] };
         }
 
         Ok(out)

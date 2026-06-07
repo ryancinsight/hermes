@@ -26,6 +26,8 @@ use crate::scalar::Scalar;
 pub mod ops;
 /// Norm, normalize, and scalar-broadcast arithmetic on Clone-on-Write SIMD containers.
 pub mod math;
+/// Unary op dispatch (map_cow), ternary FMA (fma_cow), and clamp_cow.
+pub mod unary;
 /// Zero-copy serialization support for Clone-on-Write SIMD containers using `rkyv`.
 pub mod rkyv;
 
@@ -359,10 +361,22 @@ where
         let mut i = 0usize;
         for (chunk_self, chunk_other) in (&mut chunks_self).zip(&mut chunks_other) {
             unsafe {
-                let va = Arch::load_unaligned(chunk_self.as_ptr());
-                let vb = Arch::load_unaligned(chunk_other.as_ptr());
+                let va = if Align::IS_ALIGNED {
+                    Arch::load_aligned(chunk_self.as_ptr())
+                } else {
+                    Arch::load_unaligned(chunk_self.as_ptr())
+                };
+                let vb = if Align::IS_ALIGNED {
+                    Arch::load_aligned(chunk_other.as_ptr())
+                } else {
+                    Arch::load_unaligned(chunk_other.as_ptr())
+                };
                 let vr = _op.apply::<Arch>(va, vb);
-                Arch::store_unaligned(out_ptr.add(i), vr);
+                if Align::IS_ALIGNED {
+                    Arch::store_aligned(out_ptr.add(i), vr);
+                } else {
+                    Arch::store_unaligned(out_ptr.add(i), vr);
+                }
             }
             i += Arch::LANE_COUNT;
         }
@@ -415,10 +429,22 @@ where
 
         for (mut chunk_self, chunk_other) in (&mut chunks_self).zip(&mut chunks_other) {
             unsafe {
-                let va = Arch::load_unaligned(chunk_self.as_ptr());
-                let vb = Arch::load_unaligned(chunk_other.as_ptr());
+                let va = if Align::IS_ALIGNED {
+                    Arch::load_aligned(chunk_self.as_ptr())
+                } else {
+                    Arch::load_unaligned(chunk_self.as_ptr())
+                };
+                let vb = if Align::IS_ALIGNED {
+                    Arch::load_aligned(chunk_other.as_ptr())
+                } else {
+                    Arch::load_unaligned(chunk_other.as_ptr())
+                };
                 let vr = _op.apply::<Arch>(va, vb);
-                Arch::store_unaligned(chunk_self.as_mut_ptr(), vr);
+                if Align::IS_ALIGNED {
+                    Arch::store_aligned(chunk_self.as_mut_ptr(), vr);
+                } else {
+                    Arch::store_unaligned(chunk_self.as_mut_ptr(), vr);
+                }
             }
         }
 
@@ -472,14 +498,6 @@ where
         self.zip_cow(other, crate::ops::Mul)
     }
 
-    /// Elementwise clamp to `[lo, hi]`: `min(max(self[i], lo), hi)`.
-    ///
-    /// Delegates to [`Self::map_unary`] with [`crate::ops::Clamp`].
-    /// One allocation for the output `AlignedVec`. No manually inlined SIMD loop.
-    #[inline]
-    pub fn clamp_cow(&self, lo: T, hi: T) -> SimdCow<'static, T, Arch, Align> {
-        self.map_unary(crate::ops::Clamp::new(lo, hi))
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -654,7 +672,11 @@ where
             let vsplat = Arch::splat(value);
             let mut i = 0usize;
             while i < simd_len {
-                Arch::store_unaligned(ptr.add(i), vsplat);
+                if Align::IS_ALIGNED {
+                    Arch::store_aligned(ptr.add(i), vsplat);
+                } else {
+                    Arch::store_unaligned(ptr.add(i), vsplat);
+                }
                 i += lane_count;
             }
         }

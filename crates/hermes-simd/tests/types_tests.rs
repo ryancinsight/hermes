@@ -1,3 +1,7 @@
+#![allow(
+    clippy::manual_div_ceil,
+    clippy::needless_range_loop
+)]
 use hermes_simd::*;
 use hermes_simd_core::scalar::NumericElement;
 

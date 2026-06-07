@@ -1,3 +1,8 @@
+#![allow(
+    clippy::derive_ord_xor_partial_ord,
+    clippy::needless_borrows_for_generic_args,
+    clippy::single_char_add_str
+)]
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::env;

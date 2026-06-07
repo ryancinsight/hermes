@@ -174,6 +174,9 @@ impl SimdKernel<f32> for SveArch {
     unsafe fn mask_to_bitmask(_mask: Self::Mask) -> u64 {
         unimplemented!("SVE f32 stub")
     }
+    unsafe fn mask_to_vector(_mask: Self::Mask) -> Self::Vector {
+        unimplemented!("SVE f32 stub")
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -298,6 +301,9 @@ impl SimdKernel<f64> for SveArch {
         unimplemented!("SVE f64 stub: replace with svdup_n_f64(val)")
     }
     unsafe fn mask_to_bitmask(_mask: Self::Mask) -> u64 {
+        unimplemented!("SVE f64 stub")
+    }
+    unsafe fn mask_to_vector(_mask: Self::Mask) -> Self::Vector {
         unimplemented!("SVE f64 stub")
     }
 }

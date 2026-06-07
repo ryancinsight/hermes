@@ -6,7 +6,7 @@ authors.workspace = true
 description.workspace = true
 
 [dependencies]
-hermes-simd-core = { path = "../hermes-simd-core", default-features = false }
+hermes-simd-core = { path = "../hermes-simd-core" }
 hermes-numeric = { path = "../hermes-numeric", default-features = false }
 half = { workspace = true }
 bytemuck = { version = "1.14" }

@@ -242,6 +242,17 @@ macro_rules! impl_emulated_kernel {
                 }
                 m
             }
+
+            #[inline(always)]
+            unsafe fn mask_to_vector(mask: Self::Mask) -> Self::Vector {
+                core::array::from_fn(|i| {
+                    if mask[i] {
+                        <$t as hermes_simd_core::scalar::NumericElement>::ALL_ONES
+                    } else {
+                        <$t as hermes_simd_core::scalar::NumericElement>::ZERO
+                    }
+                })
+            }
         }
     };
 }

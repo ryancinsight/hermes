@@ -390,4 +390,10 @@ impl SimdKernel<f32> for Avx2 {
     unsafe fn mask_to_bitmask(mask: Self::Mask) -> u64 {
         _mm256_movemask_ps(mask.0) as u64
     }
+
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn mask_to_vector(mask: Self::Mask) -> Self::Vector {
+        Avx2F32Vec(mask.0)
+    }
 }

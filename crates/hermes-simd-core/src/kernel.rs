@@ -275,6 +275,13 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
         crate::kernel_helpers::generic_mask_from_bitmask::<T, Self>(bm)
     }
 
+    /// Convert the native mask back to a vector register where active lanes
+    /// are set to `T::ALL_ONES` and inactive lanes to `T::ZERO`.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    unsafe fn mask_to_vector(mask: Self::Mask) -> Self::Vector;
+
     /// Set all lanes to zero.
     ///
     /// Default: delegates to `splat(T::ZERO)`. Backends may override with an

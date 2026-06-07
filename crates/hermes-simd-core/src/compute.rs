@@ -89,3 +89,54 @@ where
         self.as_slice().len()
     }
 }
+
+// ---------------------------------------------------------------------------
+// ComputeReduce — blanket extension trait for SIMD reduction over ComputeView
+// ---------------------------------------------------------------------------
+
+use crate::ops::ReductionOp;
+use crate::scalar::Scalar;
+
+/// Extension trait that provides `reduce()` over any [`SimdView`]-backed [`ComputeView`].
+///
+/// # Design
+///
+/// `ComputeReduce` is a blanket extension: it is automatically satisfied by any type
+/// that implements `ComputeView` with a `SimdView` backend. It does not add a vtable
+/// entry — the sole method `reduce` is `#[inline(always)]` and monomorphizes to the
+/// same code as calling `view.reduce(op)` directly.
+///
+/// # Usage
+///
+/// ```rust,ignore
+/// use hermes_simd_core::compute::ComputeReduce;
+/// use hermes_simd_core::ops::Max;
+///
+/// let max = view.compute_reduce(Max);  // or view.reduce(Max) if on SimdView
+/// ```
+pub trait ComputeReduce: ComputeView
+where
+    Self::Arch: crate::kernel::SimdKernel<Self::Element>,
+    Self::Element: Scalar,
+{
+    /// Reduce all elements to a scalar using the given strategy.
+    ///
+    /// Delegates to the `SimdView::reduce` implementation, which uses
+    /// multi-accumulator unrolled SIMD + scalar tail handling.
+    fn compute_reduce<Op: ReductionOp<Self::Element>>(&self, op: Op) -> Self::Element;
+}
+
+impl<'a, T, Arch, Align, Mode, Ref> ComputeReduce
+    for SimdView<'a, T, Arch, Align, Mode, Ref>
+where
+    T: Scalar,
+    Arch: SimdArch + crate::kernel::SimdKernel<T>,
+    Align: Alignment,
+    Mode: ExecutionMode,
+    Ref: 'a,
+{
+    #[inline(always)]
+    fn compute_reduce<Op: ReductionOp<T>>(&self, op: Op) -> T {
+        self.reduce(op)
+    }
+}

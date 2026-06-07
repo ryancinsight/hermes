@@ -81,9 +81,10 @@ where
 
         let mut total = unsafe { Op::finalize::<Arch>(acc) };
 
-        // Scalar tail — use Op::scalar_combine for correctness with Min/Max.
+        // Scalar tail — use Op::scalar_accumulate so per-element transforms (e.g. SquaredSum)
+        // apply correctly. For Sum/Min/Max the default delegates to scalar_combine.
         while i < len {
-            total = Op::scalar_combine(total, data[i]);
+            total = Op::scalar_accumulate(total, data[i]);
             i += 1;
         }
 

@@ -343,4 +343,10 @@ impl SimdKernel<f32> for Avx512 {
     unsafe fn mask_to_bitmask(mask: Self::Mask) -> u64 {
         mask as u64
     }
+
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn mask_to_vector(mask: Self::Mask) -> Self::Vector {
+        Avx512F32Vec(_mm512_mask_blend_ps(mask, _mm512_setzero_ps(), _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF))))
+    }
 }

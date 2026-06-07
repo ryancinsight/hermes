@@ -72,6 +72,18 @@ pub trait ReductionOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
     /// For `Sum`: addition. For `Min`: `min_scalar`. For `Max`: `max_scalar`.
     fn scalar_combine(a: T, b: T) -> T;
 
+    /// Accumulate a single scalar element `elem` into a scalar accumulator `acc`.
+    ///
+    /// Default: delegates to `Self::scalar_combine(acc, elem)`.
+    /// Override this for reductions whose SIMD `accumulate` applies a per-element transform
+    /// (e.g. `SquaredSum` applies `elem * elem` before adding). The scalar tail path uses this
+    /// method instead of `scalar_combine` to maintain correctness for slices shorter than
+    /// `Arch::LANE_COUNT`.
+    #[inline(always)]
+    fn scalar_accumulate(acc: T, elem: T) -> T {
+        Self::scalar_combine(acc, elem)
+    }
+
     /// Splat the identity element into a vector register.
     ///
     /// Default: `Arch::splat(Self::identity_scalar())`. Backends may override.
@@ -597,3 +609,102 @@ impl ScanMode for Inclusive {
 impl ScanMode for Exclusive {
     const IS_INCLUSIVE: bool = false;
 }
+
+// ---------------------------------------------------------------------------
+// FmaAdd — fused-multiply-add as a composable ElementOp
+// ---------------------------------------------------------------------------
+
+/// Fused-multiply-add elementwise operation: `out[i] = a[i] * b[i] + a[i]` (binary form).
+///
+/// As an `ElementOp`, this interprets the two operand vectors as `a` and `b`, and computes
+/// `fmadd(a, b, zero)` — i.e. `a * b` with hardware FMA precision, accumulating into zero.
+/// To use as a ternary `a*b + c` accumulation, call `Arch::fmadd` directly.
+///
+/// # Zero-Cost Guarantee
+///
+/// `size_of::<FmaAdd>() == 0`. Monomorphization over `Arch` eliminates the ZST entirely;
+/// the call site reduces to a direct `Arch::fmadd` instruction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FmaAdd;
+
+impl crate::private::Sealed for FmaAdd {}
+
+impl<T: Scalar> ElementOp<T> for FmaAdd {
+    /// `fmadd(a, b, zero)` — uses hardware FMA where available.
+    ///
+    /// # Safety
+    /// Processor must support the target feature of `Arch`.
+    #[inline(always)]
+    unsafe fn apply<Arch: SimdKernel<T>>(self, a: Arch::Vector, b: Arch::Vector) -> Arch::Vector {
+        // Accumulate into a zero register: a[i] * b[i] + 0.
+        let zero = Arch::zero();
+        Arch::fmadd(a, b, zero)
+    }
+
+    /// Scalar tail: `a * b` (scalar `mul`; the addend is the implicit zero).
+    #[inline(always)]
+    fn apply_scalar(self, a: T, b: T) -> T {
+        // scalar_fmadd(a, b, 0) — uses T's scalar FMA implementation.
+        a.scalar_fmadd(b, T::ZERO)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Product — multiplicative reduction ∏ data[i]
+// ---------------------------------------------------------------------------
+
+/// Multiplicative reduction: computes `∏ data[i]`.
+///
+/// Identity element is `T::ONE`. Uses SIMD `mul` to accumulate lane products, then
+/// reduces horizontally via a scalar lane-extraction loop (no `prod_reduce` on
+/// `SimdKernel` — the hardware does not expose one universally).
+///
+/// # Zero-Cost Guarantee
+///
+/// `size_of::<Product>() == 0`. All branching over `Product` vs other ops is
+/// eliminated via DCE during monomorphization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Product;
+
+impl crate::private::Sealed for Product {}
+
+impl<T: Scalar> ReductionOp<T> for Product {
+    /// Accumulate: `acc = acc * v` (lane-wise multiply).
+    ///
+    /// # Safety
+    /// Processor must support the target feature of `Arch`.
+    #[inline(always)]
+    unsafe fn accumulate<Arch: SimdKernel<T>>(acc: Arch::Vector, v: Arch::Vector) -> Arch::Vector {
+        Arch::mul(acc, v)
+    }
+
+    /// Finalize: store the accumulated product vector and reduce over lanes.
+    ///
+    /// There is no universal `prod_reduce` intrinsic, so this falls back to:
+    /// 1. Store the `LANE_COUNT` partial products into a local stack array.
+    /// 2. Scalar-fold with `*`.
+    ///
+    /// For Scalar arch this is always a single-element store + identity.
+    ///
+    /// # Safety
+    /// Processor must support the target feature of `Arch`.
+    #[inline(always)]
+    unsafe fn finalize<Arch: SimdKernel<T>>(acc: Arch::Vector) -> T {
+        // Fixed-size stack buffer — LANE_COUNT is a compile-time const, so the
+        // compiler stack-allocates exactly `LANE_COUNT * size_of::<T>()` bytes.
+        let mut buf = [T::ZERO; 16];
+        let lanes = Arch::LANE_COUNT.min(16);
+        Arch::store_unaligned(buf.as_mut_ptr(), acc);
+        let mut result = T::ONE;
+        for i in 0..lanes {
+            result = result * buf[i];
+        }
+        result
+    }
+
+    #[inline(always)]
+    fn identity_scalar() -> T { T::ONE }
+
+    #[inline(always)]
+    fn scalar_combine(a: T, b: T) -> T { a * b }
+}

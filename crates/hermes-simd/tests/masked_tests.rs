@@ -1,3 +1,4 @@
+#![allow(clippy::unnecessary_cast)]
 use hermes_simd::*;
 
 macro_rules! test_masked_ops_for_type {

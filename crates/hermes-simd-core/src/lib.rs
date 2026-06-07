@@ -16,6 +16,7 @@
 //! | [`sparse`] | `SparseView`, format ZSTs, data structs, SpMV kernels |
 //! | [`vec`] | `AlignedVec` — heap-allocated aligned vector |
 //! | [`cow`] | `SimdCow` — SIMD-aware copy-on-write |
+//! | [`tensor`] | N-D tensor views, GEMM, softmax, LayerNorm, Attention |
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -48,6 +49,7 @@ pub mod iter;
 pub mod compute;
 pub mod bitboard;
 pub mod numa;
+pub mod tensor;
 
 /// Hidden private module containing the sealed trait supertrait.
 #[doc(hidden)]
@@ -65,6 +67,7 @@ pub use mask::BitMask;
 pub use ops::{
     ReductionOp, ElementOp, UnaryOp, Sum, Dot, Mul, Add, Sub, Div, BitAnd, BitOr, BitXor, Min, Max,
     Abs, Neg, Sqrt, Clamp, ScanOp, ScanMode, ScanAdd, ScanMul, ScanMin, ScanMax, Inclusive, Exclusive,
+    FmaAdd, Product,
 };
 pub use view::{SimdView, SimdError, TileView, TileMatrixMultiply, Vector, Mask};
 pub use tiling::{tiled_dot, TilingPolicy, TilingStrategy, tiled_gemv, tiled_gemm};
@@ -75,8 +78,18 @@ pub use sparse::{
 };
 pub use vec::AlignedVec;
 pub use cow::{SimdCow, ArchivedSimdCow, SimdCowResolver, ArchivedPacked4Cow, Packed4CowResolver};
-pub use iter::{SimdChunks, ZipChunks};
+pub use iter::{SimdChunks, ZipChunks, SimdChunksMut};
 pub use compute::ComputeView;
 pub use bitboard::{BitBoardView, BitBoardKernel};
-pub use numa::{NumaAllocator, MnemosyneNumaAllocator, current_numa_node, refresh_numa_node, verify_numa_locality, NumaBinding, NumaTopologyService, numa_node_count, numa_node_distance};
-
+pub use numa::{
+    NumaAllocator, MnemosyneNumaAllocator, current_numa_node, refresh_numa_node,
+    verify_numa_locality, NumaBinding, NumaTopologyService, numa_node_count, numa_node_distance,
+};
+pub use tensor::{
+    TensorView, TensorError, RowMajor, ColMajor,
+    softmax::{softmax_inplace, softmax, softmax_2d_rows_inplace, softmax_2d_rows},
+    layer_norm::{layer_norm_inplace, layer_norm},
+    attention::{attention, batch_attention},
+    ops::{matmul, matmul_to, batch_matmul, batch_matmul_to, DefaultTilePolicy},
+    norm::{norm_l1, norm_l2, norm_linf, normalize_l2_inplace, row_norms_l2, SquaredSum},
+};

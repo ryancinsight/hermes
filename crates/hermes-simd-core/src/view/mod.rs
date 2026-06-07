@@ -330,6 +330,36 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
             )
         }
     }
+
+    /// Return a paired mutable/immutable chunk iterator (the SAXPY pattern).
+    ///
+    /// Advances `self` (mutable) and `other` (immutable) in lockstep by `LANE_COUNT` per step.
+    /// The scalar tails are returned by [`iter::ZipChunksMut::into_remainder`].
+    ///
+    /// ```rust,ignore
+    /// let mut chunks = view_a.zip_chunks_mut(&view_b);
+    /// for (mut a_chunk, b_chunk) in &mut chunks {
+    ///     a_chunk.transform_in_place(&b_chunk, Add);
+    /// }
+    /// let (tail_a, tail_b) = chunks.into_remainder();
+    /// for (a, &b) in tail_a.iter_mut().zip(tail_b) { *a = *a + b; }
+    /// ```
+    #[inline(always)]
+    pub fn zip_chunks_mut<'b>(
+        self,
+        other: &'b SimdView<'b, T, Arch, Align, Mode, &'b [T]>,
+    ) -> iter::ZipChunksMut<'a, 'b, T, Arch, Align, Mode> {
+        // SAFETY: self is an exclusive mutable view for 'a; other is a shared view for 'b.
+        // Non-overlap is a caller invariant (enforced by the borrow checker: `self` is `&'a mut`).
+        unsafe {
+            iter::ZipChunksMut::from_raw_parts(
+                self.ptr as *mut T,
+                self.len(),
+                other.as_slice().as_ptr(),
+                other.len(),
+            )
+        }
+    }
 }
 
 impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode, Ref: 'a> core::ops::Deref

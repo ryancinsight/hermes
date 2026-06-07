@@ -22,6 +22,8 @@ use crate::vec::AlignedVec;
 use crate::view::SimdError;
 use super::SimdCow;
 
+extern crate alloc;
+
 // ---------------------------------------------------------------------------
 // Scalar-broadcast arithmetic
 // ---------------------------------------------------------------------------
@@ -144,6 +146,60 @@ where
         // Compute reciprocal once, multiply — avoids a per-element division.
         let inv = T::ONE / n;
         self.mul_scalar_cow(inv)
+    }
+
+    /// Numerically stable softmax: returns owned `SimdCow` where `∑ out[i] ≈ 1.0`.
+    ///
+    /// Uses the three-pass max-shift algorithm to avoid overflow for large logits.
+    /// Allocates exactly one `AlignedVec` for the output; the input `SimdCow` is unchanged.
+    ///
+    /// # Algorithm
+    /// 1. `max = max_reduce(self)`
+    /// 2. `out[i] = exp(self[i] - max)`   (scalar exp loop — see `tensor::softmax`)
+    /// 3. `out[i] /= sum(out)`
+    #[inline]
+    pub fn softmax_cow(&self) -> SimdCow<'static, T, Arch, Align> {
+        // Clone to owned — one allocation.
+        let mut out_vec: crate::vec::AlignedVec<T, Align> =
+            crate::vec::AlignedVec::with_capacity(self.len());
+        // SAFETY: written immediately below.
+        unsafe { out_vec.set_len(self.len()); }
+        let src = self.as_ref();
+        out_vec.as_mut_slice().copy_from_slice(src);
+        crate::tensor::softmax::softmax_inplace::<T, Arch>(out_vec.as_mut_slice());
+        SimdCow::Owned(out_vec)
+    }
+
+    /// Scalar histogram over this cow's values.
+    ///
+    /// Partitions `[lo, hi)` into `n_bins` equal-width bins and counts how many
+    /// elements fall in each bin. Elements outside `[lo, hi)` are ignored.
+    ///
+    /// Returns a `Vec<usize>` of length `n_bins`.
+    ///
+    /// # Panics
+    /// Panics if `n_bins == 0` or `lo >= hi`.
+    #[inline]
+    pub fn histogram_cow(&self, n_bins: usize, lo: T, hi: T) -> alloc::vec::Vec<usize>
+    where
+        T: PartialOrd,
+    {
+        assert!(n_bins > 0, "n_bins must be > 0");
+        assert!(lo < hi, "lo must be < hi");
+
+        let range = (hi - lo).to_f32();
+        let bin_width = range / n_bins as f32;
+        let mut counts = alloc::vec![0usize; n_bins];
+
+        for &x in self.as_ref().iter() {
+            if x < lo || x >= hi {
+                continue;
+            }
+            let offset = (x - lo).to_f32();
+            let bin = ((offset / bin_width) as usize).min(n_bins - 1);
+            counts[bin] += 1;
+        }
+        counts
     }
 }
 

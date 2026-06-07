@@ -216,4 +216,15 @@ impl SimdKernel<half::f16> for Neon {
         }
         m
     }
+
+    #[inline(always)]
+    unsafe fn mask_to_vector(mask: Self::Mask) -> Self::Vector {
+        core::array::from_fn(|i| {
+            if mask[i] {
+                half::f16::from_bits(0xFFFF)
+            } else {
+                half::f16::ZERO
+            }
+        })
+    }
 }
