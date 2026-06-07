@@ -33,6 +33,60 @@ fn test_elementwise_mul_f32() {
 }
 
 #[test]
+fn test_elementwise_add_sub_div_f32() {
+    let a = [1.0f32, 2.0, 3.0, 4.0, 5.0];
+    let b = [2.0f32, 3.0, 4.0, 5.0, 6.0];
+    let mut out = [0.0f32; 5];
+    elementwise_add::<f32>(&a, &b, &mut out).unwrap();
+    assert_eq!(out, [3.0, 5.0, 7.0, 9.0, 11.0]);
+    elementwise_sub::<f32>(&a, &b, &mut out).unwrap();
+    assert_eq!(out, [-1.0, -1.0, -1.0, -1.0, -1.0]);
+    elementwise_div::<f32>(&b, &a, &mut out).unwrap();
+    assert_eq!(out, [2.0, 1.5, 4.0 / 3.0, 1.25, 1.2]);
+}
+
+/// Differential check across sizes spanning the SIMD lane/tail boundary:
+/// vectorized add/sub/mul/div must match a plain scalar reference bit-for-bit
+/// (each is a single per-lane IEEE op — no reassociation).
+#[test]
+fn test_elementwise_binary_matches_scalar_reference() {
+    for &n in &[1usize, 3, 7, 8, 15, 16, 17, 64, 257, 1024] {
+        let a32: Vec<f32> = (0..n).map(|i| i as f32 * 0.5 - 3.0).collect();
+        let b32: Vec<f32> = (0..n).map(|i| (i % 7) as f32 + 1.0).collect();
+        let a64: Vec<f64> = (0..n).map(|i| i as f64 * 0.5 - 3.0).collect();
+        let b64: Vec<f64> = (0..n).map(|i| (i % 7) as f64 + 1.0).collect();
+
+        let mut o32 = vec![0.0f32; n];
+        let mut o64 = vec![0.0f64; n];
+
+        elementwise_add::<f32>(&a32, &b32, &mut o32).unwrap();
+        for i in 0..n { assert_eq!(o32[i].to_bits(), (a32[i] + b32[i]).to_bits(), "add f32 n={n} i={i}"); }
+        elementwise_sub::<f32>(&a32, &b32, &mut o32).unwrap();
+        for i in 0..n { assert_eq!(o32[i].to_bits(), (a32[i] - b32[i]).to_bits(), "sub f32 n={n} i={i}"); }
+        elementwise_mul::<f32>(&a32, &b32, &mut o32).unwrap();
+        for i in 0..n { assert_eq!(o32[i].to_bits(), (a32[i] * b32[i]).to_bits(), "mul f32 n={n} i={i}"); }
+        elementwise_div::<f32>(&a32, &b32, &mut o32).unwrap();
+        for i in 0..n { assert_eq!(o32[i].to_bits(), (a32[i] / b32[i]).to_bits(), "div f32 n={n} i={i}"); }
+
+        elementwise_add::<f64>(&a64, &b64, &mut o64).unwrap();
+        for i in 0..n { assert_eq!(o64[i].to_bits(), (a64[i] + b64[i]).to_bits(), "add f64 n={n} i={i}"); }
+        elementwise_sub::<f64>(&a64, &b64, &mut o64).unwrap();
+        for i in 0..n { assert_eq!(o64[i].to_bits(), (a64[i] - b64[i]).to_bits(), "sub f64 n={n} i={i}"); }
+        elementwise_mul::<f64>(&a64, &b64, &mut o64).unwrap();
+        for i in 0..n { assert_eq!(o64[i].to_bits(), (a64[i] * b64[i]).to_bits(), "mul f64 n={n} i={i}"); }
+        elementwise_div::<f64>(&a64, &b64, &mut o64).unwrap();
+        for i in 0..n { assert_eq!(o64[i].to_bits(), (a64[i] / b64[i]).to_bits(), "div f64 n={n} i={i}"); }
+    }
+}
+
+#[test]
+fn test_elementwise_binary_length_mismatch() {
+    let mut out = [0.0f32; 2];
+    assert!(elementwise_add::<f32>(&[1.0, 2.0], &[1.0], &mut out).is_err());
+    assert!(elementwise_div::<f32>(&[1.0], &[1.0, 2.0], &mut out).is_err());
+}
+
+#[test]
 fn test_mismatched_lengths() {
     assert!(dot::<f32>(&[1.0, 2.0], &[1.0]).is_err());
 }

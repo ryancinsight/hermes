@@ -6,7 +6,7 @@
 
 pub mod sum;
 pub mod dot;
-pub mod mul;
+pub mod binary;
 pub mod masked;
 pub mod sparse;
 pub mod gemm;
@@ -22,6 +22,7 @@ use hermes_simd_core::sparse::{
     SparseView, BlockedCoo, SparseSpMv,
 };
 use hermes_simd_core::scalar::Scalar as ScalarTrait;
+use hermes_simd_core::{Add, Sub, Mul, Div};
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[allow(unused_imports)]
 use hermes_simd_intrinsics::{Scalar as ScalarArch, Avx2, Avx512, Neon};
@@ -76,6 +77,12 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError>;
     /// Computes the elementwise product and writes to `out`.
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError>;
+    /// Computes the elementwise sum `a[i] + b[i]` and writes to `out`.
+    fn elementwise_add(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError>;
+    /// Computes the elementwise difference `a[i] - b[i]` and writes to `out`.
+    fn elementwise_sub(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError>;
+    /// Computes the elementwise quotient `a[i] / b[i]` and writes to `out`.
+    fn elementwise_div(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError>;
     /// Computes the sum of elements matching a boolean mask.
     fn masked_sum(data: &[Self], mask: &[bool]) -> Self;
     /// Computes the dot product of elements matching a boolean mask.
@@ -123,7 +130,19 @@ where
     fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError> { dot::dispatch_dot::<Self>(a, b) }
     #[inline(always)]
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
-        mul::dispatch_elementwise_mul::<Self>(a, b, out)
+        binary::dispatch_elementwise_binary::<Self, Mul>(a, b, out, Mul)
+    }
+    #[inline(always)]
+    fn elementwise_add(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
+        binary::dispatch_elementwise_binary::<Self, Add>(a, b, out, Add)
+    }
+    #[inline(always)]
+    fn elementwise_sub(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
+        binary::dispatch_elementwise_binary::<Self, Sub>(a, b, out, Sub)
+    }
+    #[inline(always)]
+    fn elementwise_div(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
+        binary::dispatch_elementwise_binary::<Self, Div>(a, b, out, Div)
     }
     #[inline(always)]
     fn masked_sum(data: &[Self], mask: &[bool]) -> Self { masked::dispatch_masked_sum::<Self>(data, mask) }
@@ -189,7 +208,19 @@ where
     fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError> { dot::dispatch_dot::<Self>(a, b) }
     #[inline(always)]
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
-        mul::dispatch_elementwise_mul::<Self>(a, b, out)
+        binary::dispatch_elementwise_binary::<Self, Mul>(a, b, out, Mul)
+    }
+    #[inline(always)]
+    fn elementwise_add(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
+        binary::dispatch_elementwise_binary::<Self, Add>(a, b, out, Add)
+    }
+    #[inline(always)]
+    fn elementwise_sub(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
+        binary::dispatch_elementwise_binary::<Self, Sub>(a, b, out, Sub)
+    }
+    #[inline(always)]
+    fn elementwise_div(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
+        binary::dispatch_elementwise_binary::<Self, Div>(a, b, out, Div)
     }
     #[inline(always)]
     fn masked_sum(data: &[Self], mask: &[bool]) -> Self { masked::dispatch_masked_sum::<Self>(data, mask) }
@@ -254,7 +285,19 @@ where
     fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError> { dot::dispatch_dot::<Self>(a, b) }
     #[inline(always)]
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
-        mul::dispatch_elementwise_mul::<Self>(a, b, out)
+        binary::dispatch_elementwise_binary::<Self, Mul>(a, b, out, Mul)
+    }
+    #[inline(always)]
+    fn elementwise_add(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
+        binary::dispatch_elementwise_binary::<Self, Add>(a, b, out, Add)
+    }
+    #[inline(always)]
+    fn elementwise_sub(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
+        binary::dispatch_elementwise_binary::<Self, Sub>(a, b, out, Sub)
+    }
+    #[inline(always)]
+    fn elementwise_div(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
+        binary::dispatch_elementwise_binary::<Self, Div>(a, b, out, Div)
     }
     #[inline(always)]
     fn masked_sum(data: &[Self], mask: &[bool]) -> Self { masked::dispatch_masked_sum::<Self>(data, mask) }
@@ -332,6 +375,24 @@ pub fn dot<T: SimdOps>(a: &[T], b: &[T]) -> Result<T, SimdError> { T::dot(a, b) 
 #[inline(always)]
 pub fn elementwise_mul<T: SimdOps>(a: &[T], b: &[T], out: &mut [T]) -> Result<(), SimdError> {
     T::elementwise_mul(a, b, out)
+}
+
+/// Computes the elementwise sum of two slices and writes to `out`.
+#[inline(always)]
+pub fn elementwise_add<T: SimdOps>(a: &[T], b: &[T], out: &mut [T]) -> Result<(), SimdError> {
+    T::elementwise_add(a, b, out)
+}
+
+/// Computes the elementwise difference of two slices and writes to `out`.
+#[inline(always)]
+pub fn elementwise_sub<T: SimdOps>(a: &[T], b: &[T], out: &mut [T]) -> Result<(), SimdError> {
+    T::elementwise_sub(a, b, out)
+}
+
+/// Computes the elementwise quotient of two slices and writes to `out`.
+#[inline(always)]
+pub fn elementwise_div<T: SimdOps>(a: &[T], b: &[T], out: &mut [T]) -> Result<(), SimdError> {
+    T::elementwise_div(a, b, out)
 }
 
 /// Computes the sum of elements matching a boolean mask.
