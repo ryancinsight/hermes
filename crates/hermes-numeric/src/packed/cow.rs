@@ -27,6 +27,18 @@ impl<'a, T: Packable4> Packed4Cow<'a, T> {
         Self::Owned(vec)
     }
 
+    /// Returns true when this container is borrowing caller-owned packed bytes.
+    #[inline(always)]
+    pub fn is_borrowed(&self) -> bool {
+        matches!(self, Self::Borrowed(_))
+    }
+
+    /// Returns true when this container owns its packed byte storage.
+    #[inline(always)]
+    pub fn is_owned(&self) -> bool {
+        matches!(self, Self::Owned(_))
+    }
+
     /// Creates a borrowed `Packed4Cow` from a byte slice and logical length.
     /// Returns `None` if the byte slice is too small for the requested length.
     #[inline]

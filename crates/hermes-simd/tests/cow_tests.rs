@@ -111,6 +111,45 @@ fn test_simd_cow_to_mut() {
     }
 }
 
+#[test]
+fn test_simd_cow_state_accessors_preserve_zero_copy_reads() {
+    let data = [1.0f32, 2.0, 3.0, 4.0];
+    let mut cow = SimdCow::<f32, Scalar, Unaligned>::borrow_slice(&data).unwrap();
+
+    assert!(cow.is_borrowed());
+    assert!(!cow.is_owned());
+    assert_eq!(cow.view().as_slice().as_ptr(), data.as_ptr());
+
+    cow.to_mut()[2] = 30.0;
+
+    assert!(cow.is_owned());
+    assert!(!cow.is_borrowed());
+    assert_ne!(cow.view().as_slice().as_ptr(), data.as_ptr());
+    assert_eq!(data, [1.0, 2.0, 3.0, 4.0]);
+    assert_eq!(&*cow, &[1.0, 2.0, 30.0, 4.0]);
+}
+
+#[test]
+fn test_packed4_cow_state_accessors_preserve_packed_borrow() {
+    let packed = [F4::pack_pair(F4(1), F4(2)), F4::pack_pair(F4(3), F4(4))];
+    let mut cow = Packed4Cow::<F4>::from_packed_slice(&packed, 4).unwrap();
+
+    assert!(cow.is_borrowed());
+    assert!(!cow.is_owned());
+    assert_eq!(cow.as_view().as_packed_slice().as_ptr(), packed.as_ptr());
+    assert_eq!(cow.get(2), Some(F4(3)));
+
+    cow.set(1, F4(7));
+
+    assert!(cow.is_owned());
+    assert!(!cow.is_borrowed());
+    assert_ne!(cow.as_view().as_packed_slice().as_ptr(), packed.as_ptr());
+    assert_eq!(packed, [F4::pack_pair(F4(1), F4(2)), F4::pack_pair(F4(3), F4(4))]);
+    assert_eq!(cow.get(0), Some(F4(1)));
+    assert_eq!(cow.get(1), Some(F4(7)));
+    assert_eq!(cow.get(2), Some(F4(3)));
+    assert_eq!(cow.get(3), Some(F4(4)));
+}
 
 #[test]
 fn test_simd_cow_new_operators() {

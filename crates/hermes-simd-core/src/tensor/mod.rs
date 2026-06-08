@@ -438,7 +438,7 @@ impl<'a, 'b, T, Layout> TensorView<'a, T, 2, Layout, &'b [T]> {
 // 2-D specific methods — mutable
 // ---------------------------------------------------------------------------
 
-impl<'a, 'b, T, Layout> TensorView<'a, T, 2, Layout, &'b mut [T]> {
+impl<'a, T, Layout> TensorView<'a, T, 2, Layout, &mut [T]> {
     /// Return a mutable 1-D view of row `i`.
     ///
     /// # Errors

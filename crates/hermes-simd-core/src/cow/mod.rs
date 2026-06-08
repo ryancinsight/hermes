@@ -63,6 +63,18 @@ where
         Self::Owned(vec)
     }
 
+    /// Returns true when this container is borrowing caller-owned storage.
+    #[inline(always)]
+    pub fn is_borrowed(&self) -> bool {
+        matches!(self, Self::Borrowed(_))
+    }
+
+    /// Returns true when this container owns aligned storage.
+    #[inline(always)]
+    pub fn is_owned(&self) -> bool {
+        matches!(self, Self::Owned(_))
+    }
+
     /// Obtains a read-only `SimdView` over the data.
     #[inline(always)]
     pub fn view(&self) -> SimdView<'_, T, Arch, Align, Unmasked, &'_ [T]> {
