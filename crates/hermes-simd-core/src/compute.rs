@@ -4,18 +4,36 @@
 //! masked views, sparse matrix views, and bitboard views. It provides a
 //! universal `len()` query and a blanket `reduce()` extension for dense views.
 
-use crate::arch::SimdArch;
-use crate::view::SimdView;
 use crate::align::Alignment;
-use crate::execution::ExecutionMode;
-use crate::sparse::{SparseView, SparseFormat};
+use crate::arch::SimdArch;
 use crate::bitboard::BitBoardView;
+use crate::execution::ExecutionMode;
+use crate::sparse::{SparseFormat, SparseView};
+use crate::view::SimdView;
 
 /// Top-level trait abstracting over dense, masked, sparse, tiled, and bitboard backends.
 ///
 /// Sealed via the `SimdArch` bound (which requires `crate::private::Sealed`). All
 /// implementations in this workspace are registered here; external crates cannot
 /// implement `ComputeView` without also implementing `SimdArch` (which is sealed).
+///
+/// # Examples
+///
+/// Query the length of a dense `SimdView` through the `ComputeView` facade:
+///
+/// ```rust,no_run
+/// use hermes_simd_core::compute::ComputeView;
+/// use hermes_simd_core::view::SimdView;
+/// use hermes_simd_intrinsics::Scalar;
+/// use hermes_simd_core::align::Unaligned;
+/// use hermes_simd_core::execution::Unmasked;
+///
+/// let data = [1.0_f32; 16];
+/// let view: SimdView<'_, f32, Scalar, Unaligned, Unmasked, &[f32]> =
+///     SimdView::new(&data).unwrap();
+/// assert_eq!(view.len(), 16);
+/// assert!(!view.is_empty());
+/// ```
 pub trait ComputeView {
     /// Scalar element type of the view (e.g. `f32`, `f64`, `u64`).
     type Element;
@@ -106,13 +124,21 @@ use crate::scalar::Scalar;
 /// entry — the sole method `reduce` is `#[inline(always)]` and monomorphizes to the
 /// same code as calling `view.reduce(op)` directly.
 ///
-/// # Usage
+/// # Examples
 ///
-/// ```rust,ignore
-/// use hermes_simd_core::compute::ComputeReduce;
-/// use hermes_simd_core::ops::Max;
+/// ```rust,no_run
+/// use hermes_simd_core::compute::{ComputeView, ComputeReduce};
+/// use hermes_simd_core::view::SimdView;
+/// use hermes_simd_core::ops::Sum;
+/// use hermes_simd_intrinsics::Scalar;
+/// use hermes_simd_core::align::Unaligned;
+/// use hermes_simd_core::execution::Unmasked;
 ///
-/// let max = view.compute_reduce(Max);  // or view.reduce(Max) if on SimdView
+/// let data = [1.0_f32; 8];
+/// let view: SimdView<'_, f32, Scalar, Unaligned, Unmasked, &[f32]> =
+///     SimdView::new(&data).unwrap();
+/// let total: f32 = view.compute_reduce(Sum);
+/// assert!((total - 8.0_f32).abs() < 1e-6);
 /// ```
 pub trait ComputeReduce: ComputeView
 where
@@ -126,8 +152,7 @@ where
     fn compute_reduce<Op: ReductionOp<Self::Element>>(&self, op: Op) -> Self::Element;
 }
 
-impl<'a, T, Arch, Align, Mode, Ref> ComputeReduce
-    for SimdView<'a, T, Arch, Align, Mode, Ref>
+impl<'a, T, Arch, Align, Mode, Ref> ComputeReduce for SimdView<'a, T, Arch, Align, Mode, Ref>
 where
     T: Scalar,
     Arch: SimdArch + crate::kernel::SimdKernel<T>,

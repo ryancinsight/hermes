@@ -14,14 +14,14 @@
 //! The existing `UNROLL_FACTOR` in `SimdKernel` addresses pipeline depth; `TILE_M` here
 //! addresses accumulator register pressure separately — these two dimensions compose.
 
-use core::marker::PhantomData;
 use crate::{
     align::Alignment,
     arch::SimdArch,
     kernel::SimdKernel,
-    view::{SimdError, SimdView},
     scalar::Scalar,
+    view::{SimdError, SimdView},
 };
+use core::marker::PhantomData;
 
 /// Compute the dot product of two slices using `TILE_M` independent vector accumulators.
 ///
@@ -42,6 +42,27 @@ use crate::{
 /// # Errors
 /// Returns [`SimdError::LengthMismatch`] if `a.len() != b.len()`.
 /// Trait representing a monomorphized register-blocking/tiling strategy.
+///
+/// Implemented as a blanket over `TilingPolicy<TILE_M, TILE_N>`. The const generic
+/// parameters encode the tile shape so the compiler emits loop-unrolled, register-blocked
+/// kernels with zero runtime overhead.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use hermes_simd_core::tiling::{TilingPolicy, TilingStrategy};
+/// use hermes_simd_core::view::SimdView;
+/// use hermes_simd_core::align::Unaligned;
+/// use hermes_simd_intrinsics::Scalar;
+///
+/// let a = [1.0_f32; 4];
+/// let b = [2.0_f32; 4];
+/// let va = SimdView::<f32, Scalar, Unaligned>::new(&a).unwrap();
+/// let vb = SimdView::<f32, Scalar, Unaligned>::new(&b).unwrap();
+/// let dot = <TilingPolicy<1, 1> as TilingStrategy<f32, Scalar, Unaligned>>::dot(&va, &vb)
+///     .expect("lengths equal");
+/// assert!((dot - 8.0_f32).abs() < 1e-6);
+/// ```
 pub trait TilingStrategy<T, Arch: SimdArch, Align: Alignment> {
     /// The number of rows in the register block.
     const TILE_M: usize;
@@ -95,6 +116,25 @@ where
 ///
 /// Encode tile shape in the type system as a ZST so tiling parameters are
 /// resolved at compile time with no runtime storage.
+///
+/// # Examples
+///
+/// Dot product via the `tiled_dot` free function (preferred API):
+///
+/// ```rust,no_run
+/// use hermes_simd_core::tiling::tiled_dot;
+/// use hermes_simd_core::view::SimdView;
+/// use hermes_simd_core::align::Unaligned;
+/// use hermes_simd_intrinsics::Scalar;
+///
+/// let a = [1.0_f32, 2.0, 3.0, 4.0];
+/// let b = [1.0_f32, 1.0, 1.0, 1.0];
+/// let va = SimdView::<f32, Scalar, Unaligned>::new(&a).unwrap();
+/// let vb = SimdView::<f32, Scalar, Unaligned>::new(&b).unwrap();
+/// // TILE_M = 4 unrolls into 4 independent FMA accumulators.
+/// let result = tiled_dot::<f32, Scalar, Unaligned, 4>(&va, &vb).unwrap();
+/// assert!((result - 10.0_f32).abs() < 1e-6);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TilingPolicy<const TILE_M: usize, const TILE_N: usize>;
 
@@ -119,7 +159,13 @@ impl<const TILE_M: usize, const TILE_N: usize> TilingPolicy<TILE_M, TILE_N> {
 pub struct _TileMarker<const M: usize, const N: usize>(PhantomData<TilingPolicy<M, N>>);
 
 #[inline(never)]
-fn check_gemv_dimensions(a_len: usize, x_len: usize, y_len: usize, nrows: usize, ncols: usize) -> Result<(), SimdError> {
+fn check_gemv_dimensions(
+    a_len: usize,
+    x_len: usize,
+    y_len: usize,
+    nrows: usize,
+    ncols: usize,
+) -> Result<(), SimdError> {
     if a_len < nrows * ncols || x_len < ncols || y_len < nrows {
         return Err(SimdError::LengthMismatch);
     }
@@ -147,7 +193,14 @@ where
 }
 
 #[inline(never)]
-fn check_tiled_gemm_dimensions(a_len: usize, b_len: usize, c_len: usize, m: usize, n: usize, k: usize) -> Result<(), SimdError> {
+fn check_tiled_gemm_dimensions(
+    a_len: usize,
+    b_len: usize,
+    c_len: usize,
+    m: usize,
+    n: usize,
+    k: usize,
+) -> Result<(), SimdError> {
     if a_len < m * k || b_len < k * n || c_len < m * n {
         return Err(SimdError::LengthMismatch);
     }
@@ -254,15 +307,15 @@ where
 
                     let mut b_regs = [unsafe { Arch::zero() }; TILE_N];
                     for j in 0..TILE_N {
-                        let b_ptr = unsafe { b_slice.as_ptr().add(kk * n + col_n + j * lane_count) };
+                        let b_ptr =
+                            unsafe { b_slice.as_ptr().add(kk * n + col_n + j * lane_count) };
                         b_regs[j] = load(b_ptr);
                     }
 
                     for i in 0..current_tile_m {
                         for j in 0..TILE_N {
-                            accumulators[i][j] = unsafe {
-                                Arch::fmadd(a_regs[i], b_regs[j], accumulators[i][j])
-                            };
+                            accumulators[i][j] =
+                                unsafe { Arch::fmadd(a_regs[i], b_regs[j], accumulators[i][j]) };
                         }
                     }
                 }
@@ -270,7 +323,8 @@ where
                 for i in 0..current_tile_m {
                     let row_idx = r + i;
                     for j in 0..TILE_N {
-                        let c_ptr = unsafe { c.as_mut_ptr().add(row_idx * n + col_n + j * lane_count) };
+                        let c_ptr =
+                            unsafe { c.as_mut_ptr().add(row_idx * n + col_n + j * lane_count) };
                         store(c_ptr, accumulators[i][j]);
                     }
                 }

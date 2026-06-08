@@ -42,7 +42,24 @@
 /// attribute on each `impl` block ensures the compiler emits the correct machine instruction;
 /// calling from a non-gated context requires wrapping in an `unsafe { ... }` block inside
 /// a function that is itself gated by `#[target_feature(enable = "...")]`.
-pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + Sync + Sized + 'static {
+///
+/// # Examples
+///
+/// Use the always-available `Scalar` backend for cross-platform code paths:
+///
+/// ```rust,no_run
+/// use hermes_simd_intrinsics::Scalar;
+/// use hermes_simd_core::kernel::SimdKernel;
+///
+/// // SAFETY: `Scalar` requires no special ISA features.
+/// let splat4: <Scalar as SimdKernel<f32>>::Vector =
+///     unsafe { <Scalar as SimdKernel<f32>>::splat(1.0_f32) };
+/// let sum: f32 = unsafe { <Scalar as SimdKernel<f32>>::sum_reduce(splat4) };
+/// assert_eq!(sum, 4.0_f32 * <Scalar as SimdKernel<f32>>::LANE_COUNT as f32);
+/// ```
+pub trait SimdKernel<T: crate::scalar::Scalar>:
+    crate::private::Sealed + Send + Sync + Sized + 'static
+{
     /// The underlying raw register/vector type for this architecture and element type.
     type Vector: Copy + Send + Sync + 'static;
 
@@ -81,6 +98,22 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     ///
     /// # Safety
     /// `ptr` must be valid for reads and aligned to `LANE_COUNT * size_of::<T>()` bytes.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use hermes_simd_intrinsics::Scalar;
+    /// use hermes_simd_core::kernel::SimdKernel;
+    ///
+    /// #[repr(align(64))]
+    /// struct AlignedBuf([f32; 4]);
+    ///
+    /// let buf = AlignedBuf([1.0, 2.0, 3.0, 4.0]);
+    /// // SAFETY: buf is 64-byte aligned and valid for LANE_COUNT reads.
+    /// let v = unsafe { <Scalar as SimdKernel<f32>>::load_aligned(buf.0.as_ptr()) };
+    /// let sum: f32 = unsafe { <Scalar as SimdKernel<f32>>::sum_reduce(v) };
+    /// assert_eq!(sum, 10.0_f32);
+    /// ```
     unsafe fn load_aligned(ptr: *const T) -> Self::Vector;
 
     /// Load a vector from an unaligned pointer.
@@ -139,6 +172,19 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     ///
     /// # Safety
     /// Processor must support the required target feature.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use hermes_simd_intrinsics::Scalar;
+    /// use hermes_simd_core::kernel::SimdKernel;
+    ///
+    /// let data = [1.0_f32, 2.0, 3.0, 4.0];
+    /// // SAFETY: Scalar requires no ISA feature; pointer is valid for LANE_COUNT reads.
+    /// let v = unsafe { <Scalar as SimdKernel<f32>>::load_unaligned(data.as_ptr()) };
+    /// let total: f32 = unsafe { <Scalar as SimdKernel<f32>>::sum_reduce(v) };
+    /// assert!((total - 10.0_f32).abs() < 1e-6);
+    /// ```
     unsafe fn sum_reduce(v: Self::Vector) -> T;
 
     // -------------------------------------------------------------------------
@@ -149,7 +195,11 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     ///
     /// # Safety
     /// `ptr` must be valid for reading `LANE_COUNT` elements. Active lanes determined by `mask`.
-    unsafe fn masked_load_unaligned(ptr: *const T, mask: Self::Mask, src: Self::Vector) -> Self::Vector;
+    unsafe fn masked_load_unaligned(
+        ptr: *const T,
+        mask: Self::Mask,
+        src: Self::Vector,
+    ) -> Self::Vector;
 
     /// Masked store: active lanes written to `ptr`, inactive lanes left unchanged.
     ///
@@ -314,7 +364,6 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
         (Self::load_unaligned(out_buf.as_ptr()), carry)
     }
 
-
     /// Set all lanes to zero.
     ///
     /// Default: delegates to `splat(T::ZERO)`. Backends may override with an
@@ -331,6 +380,18 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     ///
     /// # Safety
     /// Processor must support the required target feature.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use hermes_simd_intrinsics::Scalar;
+    /// use hermes_simd_core::kernel::SimdKernel;
+    ///
+    /// // SAFETY: Scalar backend requires no ISA feature.
+    /// let v = unsafe { <Scalar as SimdKernel<f32>>::splat(42.0_f32) };
+    /// let sum: f32 = unsafe { <Scalar as SimdKernel<f32>>::sum_reduce(v) };
+    /// assert_eq!(sum, 42.0_f32 * <Scalar as SimdKernel<f32>>::LANE_COUNT as f32);
+    /// ```
     unsafe fn splat(val: T) -> Self::Vector;
 
     /// Elementwise division: `a / b`.
@@ -378,7 +439,11 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn min(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| if x < y { x } else { y })
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(
+            a,
+            b,
+            |x, y| if x < y { x } else { y },
+        )
     }
 
     /// Elementwise maximum of `a` and `b`.
@@ -386,7 +451,11 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn max(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| if x > y { x } else { y })
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(
+            a,
+            b,
+            |x, y| if x > y { x } else { y },
+        )
     }
 
     /// Elementwise square root.
@@ -402,7 +471,13 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn cmp_eq(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| if x == y { T::ALL_ONES } else { T::ZERO })
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| {
+            if x == y {
+                T::ALL_ONES
+            } else {
+                T::ZERO
+            }
+        })
     }
 
     /// Elementwise not equal: `a != b`.
@@ -410,7 +485,13 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn cmp_ne(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| if x != y { T::ALL_ONES } else { T::ZERO })
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| {
+            if x != y {
+                T::ALL_ONES
+            } else {
+                T::ZERO
+            }
+        })
     }
 
     /// Elementwise less than: `a < b`.
@@ -418,7 +499,13 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn cmp_lt(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| if x < y { T::ALL_ONES } else { T::ZERO })
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| {
+            if x < y {
+                T::ALL_ONES
+            } else {
+                T::ZERO
+            }
+        })
     }
 
     /// Elementwise less than or equal: `a <= b`.
@@ -426,7 +513,13 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn cmp_le(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| if x <= y { T::ALL_ONES } else { T::ZERO })
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| {
+            if x <= y {
+                T::ALL_ONES
+            } else {
+                T::ZERO
+            }
+        })
     }
 
     /// Elementwise greater than: `a > b`.
@@ -434,7 +527,13 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn cmp_gt(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| if x > y { T::ALL_ONES } else { T::ZERO })
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| {
+            if x > y {
+                T::ALL_ONES
+            } else {
+                T::ZERO
+            }
+        })
     }
 
     /// Elementwise greater than or equal: `a >= b`.
@@ -442,7 +541,13 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn cmp_ge(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| if x >= y { T::ALL_ONES } else { T::ZERO })
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| {
+            if x >= y {
+                T::ALL_ONES
+            } else {
+                T::ZERO
+            }
+        })
     }
 
     /// Elementwise blend: select lanes from `true_val` where the sign bit of `mask` is set,
@@ -450,7 +555,11 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     ///
     /// # Safety
     /// Processor must support the required target feature.
-    unsafe fn blend(mask: Self::Vector, true_val: Self::Vector, false_val: Self::Vector) -> Self::Vector {
+    unsafe fn blend(
+        mask: Self::Vector,
+        true_val: Self::Vector,
+        false_val: Self::Vector,
+    ) -> Self::Vector {
         crate::kernel_helpers::generic_blend::<T, Self>(mask, true_val, false_val)
     }
 
@@ -490,7 +599,9 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn min_reduce(v: Self::Vector) -> T {
-        crate::kernel_helpers::generic_horizontal_reduce::<T, Self>(v, T::MAX_VALUE, |a, b| a.min_scalar(b))
+        crate::kernel_helpers::generic_horizontal_reduce::<T, Self>(v, T::MAX_VALUE, |a, b| {
+            a.min_scalar(b)
+        })
     }
 
     /// Horizontal maximum across all lanes.
@@ -501,6 +612,8 @@ pub trait SimdKernel<T: crate::scalar::Scalar>: crate::private::Sealed + Send + 
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn max_reduce(v: Self::Vector) -> T {
-        crate::kernel_helpers::generic_horizontal_reduce::<T, Self>(v, T::MIN_VALUE, |a, b| a.max_scalar(b))
+        crate::kernel_helpers::generic_horizontal_reduce::<T, Self>(v, T::MIN_VALUE, |a, b| {
+            a.max_scalar(b)
+        })
     }
 }
