@@ -9,7 +9,7 @@
 //! across sizes and SIMD widths.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use hermes_simd::{sum, dot, elementwise_mul};
+use hermes_simd::{dot, elementwise_mul, sum};
 
 const SIZES: &[usize] = &[256, 1024, 4096, 16384];
 
@@ -44,12 +44,18 @@ fn bench_elementwise_mul_f32(c: &mut Criterion) {
         group.throughput(Throughput::Elements(n as u64));
         let a: Vec<f32> = (0..n).map(|i| i as f32).collect();
         let b: Vec<f32> = (0..n).map(|i| (n - i) as f32).collect();
+        let mut out = vec![0.0f32; n];
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |bench, _| {
-            bench.iter(|| elementwise_mul(black_box(&a), black_box(&b)))
+            bench.iter(|| elementwise_mul(black_box(&a), black_box(&b), black_box(&mut out)))
         });
     }
     group.finish();
 }
 
-criterion_group!(dense_benches, bench_sum_f32, bench_dot_f32, bench_elementwise_mul_f32);
+criterion_group!(
+    dense_benches,
+    bench_sum_f32,
+    bench_dot_f32,
+    bench_elementwise_mul_f32
+);
 criterion_main!(dense_benches);
