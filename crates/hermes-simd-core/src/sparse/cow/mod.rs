@@ -1,191 +1,19 @@
 //! Clone-on-Write sparse matrix containers.
-//!
-//! `SparseCow<'a, T, Format, Arch>` wraps either a zero-copy borrowed
-//! `SparseView` or an owned heap allocation of the same format.
-//!
-//! # Design
-//! - `Borrowed` variant holds a `SparseView<'a, T, Format, Arch>` — zero allocation,
-//!   zero copy; the borrow expires with lifetime `'a`.
-//! - `Owned` variant holds a format-specific `OwnedSparse<T, Format>` whose
-//!   arrays live on the heap.  No allocation occurs until `to_owned()` is called.
-//! - `SparseSpMv<T>` and `SparseOps<T>` forward to the inner view produced by
-//!   `Format::owned_as_view`, achieving zero-cost monomorphization: the compiler
-//!   erases both variants and emits code identical to a direct `SparseView` call.
 
 use alloc::vec::Vec;
 use crate::arch::SimdArch;
 use crate::scalar::Scalar;
 use crate::kernel::SimdKernel;
 use super::{
-    SparseShape, SparseView,
+    SparseView,
     Csr, SellP, BlockedCoo, DenseWithMask,
-    types::{CsrMatrix, SellPMatrix, BlockedCooMatrix, DenseWithMaskMatrix,
-             CsrData, SellPData, BlockedCooData, DenseWithMaskData},
+    types::{CsrData, SellPData, BlockedCooData, DenseWithMaskData},
     spmv::SparseSpMv,
     ops::SparseOps,
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Owned sparse storage — one concrete type per format, heap-backed.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Owned heap-backed CSR storage.
-pub struct OwnedCsr<T> {
-    values:      Vec<T>,
-    col_indices: Vec<i32>,
-    row_ptr:     Vec<i32>,
-    nrows:       usize,
-    ncols:       usize,
-}
-
-impl<T> OwnedCsr<T> {
-    /// Construct owned CSR storage.
-    #[inline]
-    pub fn new(values: Vec<T>, col_indices: Vec<i32>, row_ptr: Vec<i32>, nrows: usize, ncols: usize) -> Self {
-        Self { values, col_indices, row_ptr, nrows, ncols }
-    }
-
-    /// Return a borrowed `CsrData` view over this owned storage.
-    #[inline]
-    pub fn as_view(&self) -> CsrData<'_, T> {
-        CsrMatrix::new(
-            self.values.as_slice(),
-            self.col_indices.as_slice(),
-            self.row_ptr.as_slice(),
-            self.nrows,
-            self.ncols,
-        )
-    }
-}
-
-impl<T> SparseShape for OwnedCsr<T> {
-    #[inline(always)] fn nrows(&self) -> usize { self.nrows }
-    #[inline(always)] fn ncols(&self) -> usize { self.ncols }
-}
-
-/// Owned heap-backed SELL-p storage.
-pub struct OwnedSellP<T, const C: usize> {
-    values:          Vec<T>,
-    col_indices:     Vec<i32>,
-    slice_ptr:       Vec<i32>,
-    slice_col_count: Vec<i32>,
-    nrows:           usize,
-    ncols:           usize,
-}
-
-impl<T, const C: usize> OwnedSellP<T, C> {
-    /// Construct owned SELL-p storage.
-    #[inline]
-    pub fn new(
-        values: Vec<T>,
-        col_indices: Vec<i32>,
-        slice_ptr: Vec<i32>,
-        slice_col_count: Vec<i32>,
-        nrows: usize,
-        ncols: usize,
-    ) -> Self {
-        Self { values, col_indices, slice_ptr, slice_col_count, nrows, ncols }
-    }
-
-    /// Return a borrowed `SellPData` view over this owned storage.
-    #[inline]
-    pub fn as_view(&self) -> SellPData<'_, T, C> {
-        SellPMatrix::new(
-            self.values.as_slice(),
-            self.col_indices.as_slice(),
-            self.slice_ptr.as_slice(),
-            self.slice_col_count.as_slice(),
-            self.nrows,
-            self.ncols,
-        )
-    }
-}
-
-impl<T, const C: usize> SparseShape for OwnedSellP<T, C> {
-    #[inline(always)] fn nrows(&self) -> usize { self.nrows }
-    #[inline(always)] fn ncols(&self) -> usize { self.ncols }
-}
-
-/// Owned heap-backed Blocked-COO storage.
-pub struct OwnedBlockedCoo<T, const BM: usize, const BN: usize> {
-    blocks:    Vec<T>,
-    block_row: Vec<i32>,
-    block_col: Vec<i32>,
-    nblocks:   usize,
-    nrows:     usize,
-    ncols:     usize,
-}
-
-impl<T, const BM: usize, const BN: usize> OwnedBlockedCoo<T, BM, BN> {
-    /// Construct owned Blocked-COO storage.
-    #[inline]
-    pub fn new(
-        blocks:    Vec<T>,
-        block_row: Vec<i32>,
-        block_col: Vec<i32>,
-        nblocks:   usize,
-        nrows:     usize,
-        ncols:     usize,
-    ) -> Self {
-        Self { blocks, block_row, block_col, nblocks, nrows, ncols }
-    }
-
-    /// Return a borrowed `BlockedCooData` view over this owned storage.
-    #[inline]
-    pub fn as_view(&self) -> BlockedCooData<'_, T, BM, BN> {
-        BlockedCooMatrix::new(
-            self.blocks.as_slice(),
-            self.block_row.as_slice(),
-            self.block_col.as_slice(),
-            self.nblocks,
-            self.nrows,
-            self.ncols,
-        )
-    }
-}
-
-impl<T, const BM: usize, const BN: usize> SparseShape for OwnedBlockedCoo<T, BM, BN> {
-    #[inline(always)] fn nrows(&self) -> usize { self.nrows }
-    #[inline(always)] fn ncols(&self) -> usize { self.ncols }
-}
-
-/// Owned heap-backed DenseWithMask storage.
-pub struct OwnedDenseWithMask<T> {
-    values: Vec<T>,
-    mask:   Vec<bool>,
-    nrows:  usize,
-    ncols:  usize,
-}
-
-impl<T> OwnedDenseWithMask<T> {
-    /// Construct owned DenseWithMask storage.
-    #[inline]
-    pub fn new(values: Vec<T>, mask: Vec<bool>, nrows: usize, ncols: usize) -> Self {
-        Self { values, mask, nrows, ncols }
-    }
-
-    /// Return a borrowed `DenseWithMaskData` view over this owned storage.
-    #[inline]
-    pub fn as_view(&self) -> DenseWithMaskData<'_, T> {
-        DenseWithMaskMatrix::new(
-            self.values.as_slice(),
-            self.mask.as_slice(),
-            self.nrows,
-            self.ncols,
-        )
-    }
-}
-
-impl<T> SparseShape for OwnedDenseWithMask<T> {
-    #[inline(always)] fn nrows(&self) -> usize { self.nrows }
-    #[inline(always)] fn ncols(&self) -> usize { self.ncols }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Per-format Clone-on-Write containers.
-// Concrete enums avoid GAT lifetime restrictions that arise when trying to
-// abstract over Format::Owned in a single generic enum.
-// ─────────────────────────────────────────────────────────────────────────────
+pub mod owned;
+pub use owned::{OwnedCsr, OwnedSellP, OwnedBlockedCoo, OwnedDenseWithMask};
 
 /// Clone-on-Write CSR sparse matrix.
 pub enum CsrCow<'a, T, Arch: SimdArch> {
@@ -289,10 +117,6 @@ impl<'a, T: Scalar, Arch: SimdArch> SparseOps<T> for CsrCow<'a, T, Arch> {
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SELL-p Clone-on-Write container
-// ─────────────────────────────────────────────────────────────────────────────
 
 /// Clone-on-Write SELL-p sparse matrix.
 pub enum SellPCow<'a, T, const C: usize, Arch: SimdArch> {
@@ -400,10 +224,6 @@ impl<'a, T: Scalar, const C: usize, Arch: SimdArch> SparseOps<T> for SellPCow<'a
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Blocked-COO Clone-on-Write container
-// ─────────────────────────────────────────────────────────────────────────────
 
 /// Clone-on-Write Blocked-COO sparse matrix.
 pub enum BlockedCooCow<'a, T, const BM: usize, const BN: usize, Arch: SimdArch> {
@@ -514,10 +334,6 @@ impl<'a, T: Scalar, const BM: usize, const BN: usize, Arch: SimdArch>
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DenseWithMask Clone-on-Write container
-// ─────────────────────────────────────────────────────────────────────────────
-
 /// Clone-on-Write DenseWithMask sparse matrix.
 pub enum DenseWithMaskCow<'a, T, Arch: SimdArch> {
     /// Zero-copy borrowed DenseWithMask view.
@@ -615,11 +431,6 @@ impl<'a, T: Scalar, Arch: SimdArch> SparseOps<T> for DenseWithMaskCow<'a, T, Arc
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Public re-export: SparseCow as an alias to CsrCow for API compat.
-// Users wanting other formats use CsrCow/SellPCow/BlockedCooCow/DenseWithMaskCow directly.
-// ─────────────────────────────────────────────────────────────────────────────
 
 /// Type alias: `SparseCow` defaults to the CSR Clone-on-Write container.
 ///
