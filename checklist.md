@@ -6,7 +6,7 @@
 
 - [x] [patch] `.github/workflows/ci.yml`: fmt-check, clippy `-D warnings`,
       `cargo test --workspace` (x86_64 + native aarch64 runner), warning-clean
-      docs, aarch64 cross-check, cargo-deny. → first green run pending push.
+      docs, aarch64 cross-check, cargo-deny. → green (run 27296233212; required three fixes: libnuma feature gating, license inheritance, AMX bench import cfg).
 - [x] [patch] `rust-toolchain.toml` (1.95.0) + `rust-version = "1.95"` in the
       workspace manifest, inherited by all members. MSRV verified empirically:
       full workspace build + 295-test pass on rustc 1.95.0.
@@ -23,8 +23,7 @@
 - [x] [minor] Version bump 0.1.0 → 0.2.0; CHANGELOG 0.2.0 section dated;
       `cargo-semver-checks` pass on hermes-simd and hermes-simd-core vs the
       previous rev (196 checks each, no regression).
-- [ ] [minor] Tag `v0.2.0` → created only after the first CI run on main is
-      observed green.
+- [x] [minor] Tag `v0.2.0` — created after CI run 27296233212 (all four jobs green, including runtime NEON validation on a native aarch64 runner).
 
 ## Residual risks
 
