@@ -9,8 +9,8 @@ description.workspace = true
 publish = false
 
 [dependencies]
-hermes-simd = { path = "../hermes-simd" }
-hermes-simd-core = { path = "../hermes-simd-core" }
+hermes-simd = { path = "../hermes-simd", version = "0.2.0" }
+hermes-simd-core = { path = "../hermes-simd-core", version = "0.2.0" }
 half = { workspace = true }
 criterion = { version = "0.5", features = ["html_reports"] }
 divan = "0.1"

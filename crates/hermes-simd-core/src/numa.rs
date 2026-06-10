@@ -324,14 +324,6 @@ pub fn verify_numa_locality(ptr: *const u8, size: usize, expected_node: u32) -> 
     unsafe {
         extern "C" {
             fn mincore(addr: *mut core::ffi::c_void, length: usize, vec: *mut u8) -> i32;
-            fn move_pages(
-                pid: i32,
-                count: usize,
-                pages: *const *mut core::ffi::c_void,
-                nodes: *const i32,
-                status: *mut i32,
-                flags: i32,
-            ) -> i32;
         }
         let mut vec = 0u8;
         let res = mincore(segment_ptr as *mut core::ffi::c_void, 4096, &mut vec);
@@ -345,29 +337,46 @@ pub fn verify_numa_locality(ptr: *const u8, size: usize, expected_node: u32) -> 
             }
         }
 
-        // Fallback to standard move_pages check if not a Mnemosyne segment or if owner check is skipped
-        let page_size = 4096;
-        let start_page = (ptr as usize) & !(page_size - 1);
-        let end_page = ((ptr as usize) + size + page_size - 1) & !(page_size - 1);
-        let pages_count = (end_page - start_page) / page_size;
-        if pages_count == 0 {
-            return true;
-        }
-        let mut pages = alloc::vec![core::ptr::null_mut(); pages_count];
-        for i in 0..pages_count {
-            pages[i] = (start_page + i * page_size) as *mut core::ffi::c_void;
-        }
-        let mut status = alloc::vec![0i32; pages_count];
-        if move_pages(
-            0,
-            pages_count,
-            pages.as_ptr(),
-            core::ptr::null(),
-            status.as_mut_ptr(),
-            0,
-        ) >= 0
+        // Fallback to a move_pages residency query if not a Mnemosyne segment.
+        // move_pages(2) is wrapped by libnuma, not libc, so this refinement is
+        // only available with the `libnuma` feature; without it the function
+        // reports locality optimistically (documented portable fallback).
+        #[cfg(feature = "libnuma")]
         {
-            return status.iter().all(|&node| node == expected_node as i32);
+            #[link(name = "numa")]
+            extern "C" {
+                fn move_pages(
+                    pid: i32,
+                    count: usize,
+                    pages: *const *mut core::ffi::c_void,
+                    nodes: *const i32,
+                    status: *mut i32,
+                    flags: i32,
+                ) -> i32;
+            }
+            let page_size = 4096;
+            let start_page = (ptr as usize) & !(page_size - 1);
+            let end_page = ((ptr as usize) + size + page_size - 1) & !(page_size - 1);
+            let pages_count = (end_page - start_page) / page_size;
+            if pages_count == 0 {
+                return true;
+            }
+            let mut pages = alloc::vec![core::ptr::null_mut(); pages_count];
+            for i in 0..pages_count {
+                pages[i] = (start_page + i * page_size) as *mut core::ffi::c_void;
+            }
+            let mut status = alloc::vec![0i32; pages_count];
+            if move_pages(
+                0,
+                pages_count,
+                pages.as_ptr(),
+                core::ptr::null(),
+                status.as_mut_ptr(),
+                0,
+            ) >= 0
+            {
+                return status.iter().all(|&node| node == expected_node as i32);
+            }
         }
     }
 

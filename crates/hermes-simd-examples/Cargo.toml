@@ -9,7 +9,7 @@ description.workspace = true
 publish = false
 
 [dependencies]
-hermes-simd = { path = "../hermes-simd" }
+hermes-simd = { path = "../hermes-simd", version = "0.2.0" }
 
 [[example]]
 name = "dot_product"
