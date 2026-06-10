@@ -136,6 +136,82 @@ fn interleaved_complex_dot_conjugated_runtime_matches_provider_architecture() {
     }
 }
 
+/// Differential verification of the vectorized kernels against the `Scalar`
+/// backend for an explicit architecture marker.
+///
+/// Inputs are dyadic rationals with few mantissa bits, so every product and
+/// partial sum is exactly representable in both `f32` and `f64`; fused and
+/// unfused multiply-add paths therefore produce bitwise-identical results and
+/// `assert_eq!` is exact, not tolerance-based.
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+macro_rules! assert_arch_matches_scalar {
+    ($t:ty, $arch:ty, $conj:expr) => {
+        for &complex_len in &[1usize, 2, 3, 4, 7, 8, 9, 16, 17, 33, 64, 65] {
+            let lhs: Vec<$t> = (0..complex_len * 2)
+                .map(|i| ((i % 9) as $t) * 0.25 - 1.0)
+                .collect();
+            let rhs: Vec<$t> = (0..complex_len * 2)
+                .map(|i| ((i % 7) as $t) * 0.5 - 1.5)
+                .collect();
+
+            let mut vectorized = lhs.clone();
+            let mut scalar = lhs.clone();
+            interleaved_complex_mul_assign::<$t, $arch, $conj>(&mut vectorized, &rhs).unwrap();
+            interleaved_complex_mul_assign::<$t, Scalar, $conj>(&mut scalar, &rhs).unwrap();
+            assert_eq!(vectorized, scalar, "mul complex_len={complex_len}");
+
+            let vec_dot = interleaved_complex_dot::<$t, $arch, $conj>(&lhs, &rhs).unwrap();
+            let scalar_dot = interleaved_complex_dot::<$t, Scalar, $conj>(&lhs, &rhs).unwrap();
+            assert_eq!(vec_dot, scalar_dot, "dot complex_len={complex_len}");
+        }
+    };
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[test]
+fn interleaved_complex_avx2_matches_scalar_backend() {
+    if !(std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma")) {
+        return;
+    }
+    assert_arch_matches_scalar!(f32, hermes_simd::Avx2, false);
+    assert_arch_matches_scalar!(f32, hermes_simd::Avx2, true);
+    assert_arch_matches_scalar!(f64, hermes_simd::Avx2, false);
+    assert_arch_matches_scalar!(f64, hermes_simd::Avx2, true);
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[test]
+fn interleaved_complex_avx512_matches_scalar_backend() {
+    if !std::is_x86_feature_detected!("avx512f") {
+        return;
+    }
+    assert_arch_matches_scalar!(f32, hermes_simd::Avx512, false);
+    assert_arch_matches_scalar!(f32, hermes_simd::Avx512, true);
+    assert_arch_matches_scalar!(f64, hermes_simd::Avx512, false);
+    assert_arch_matches_scalar!(f64, hermes_simd::Avx512, true);
+}
+
+#[test]
+fn interleaved_complex_runtime_conjugated_reduced_precision_lane_matches_scalar() {
+    for &complex_len in &[1usize, 3, 8, 33] {
+        let rhs: Vec<f32> = (0..complex_len * 2)
+            .map(|i| ((i % 7) as f32) * 0.5 - 1.5)
+            .collect();
+        let mut runtime: Vec<f32> = (0..complex_len * 2)
+            .map(|i| ((i % 9) as f32) * 0.25 - 1.0)
+            .collect();
+        let mut expected = runtime.clone();
+
+        interleaved_complex_mul_assign_runtime::<f32, true>(&mut runtime, &rhs).unwrap();
+        interleaved_complex_mul_assign::<f32, Scalar, true>(&mut expected, &rhs).unwrap();
+        assert_eq!(runtime, expected, "complex_len={complex_len}");
+
+        let runtime_dot = interleaved_complex_dot_runtime::<f32, true>(&runtime, &rhs).unwrap();
+        let expected_dot = interleaved_complex_dot::<f32, Scalar, true>(&runtime, &rhs).unwrap();
+        assert_eq!(runtime_dot, expected_dot, "dot complex_len={complex_len}");
+    }
+}
+
 #[test]
 fn interleaved_complex_mul_assign_rejects_invalid_shapes() {
     let mut odd = [1.0f32, 2.0, 3.0];

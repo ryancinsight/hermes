@@ -16,3 +16,7 @@ path = "examples/dot_product.rs"
 [[example]]
 name = "cow_example"
 path = "examples/cow_example.rs"
+
+[[example]]
+name = "complex_dot"
+path = "examples/complex_dot.rs"

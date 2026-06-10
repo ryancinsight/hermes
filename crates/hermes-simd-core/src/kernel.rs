@@ -616,4 +616,102 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
             a.max_scalar(b)
         })
     }
+
+    // -------------------------------------------------------------------------
+    // Adjacent-Pair Shuffles & Alternating FMA (interleaved complex support)
+    // -------------------------------------------------------------------------
+    //
+    // These five methods are the minimal primitive set required to express
+    // interleaved complex arithmetic (`[re, im, re, im, ...]` lane order)
+    // entirely in vector registers:
+    //
+    //   a * b       = fmaddsub(dup_even(a), b, mul(dup_odd(a), swap_adjacent(b)))
+    //   a * conj(b) = fmsubadd(dup_odd(a), swap_adjacent(b), mul(dup_even(a), b))
+    //
+    // Pair semantics assume an even `LANE_COUNT`; on a backend with an odd
+    // lane count the last (unpaired) lane passes through unchanged.
+
+    /// Swap each adjacent lane pair: `[a0, a1, a2, a3, ...] -> [a1, a0, a3, a2, ...]`.
+    ///
+    /// Default: scalar emulation via store/swap/load. x86 backends override with
+    /// `_mm256_permute_ps(v, 0b1011_0001)` / `_mm256_permute_pd(v, 0b0101)` and
+    /// the AVX-512 equivalents.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn swap_adjacent(v: Self::Vector) -> Self::Vector {
+        let mut buf = [T::ZERO; 128];
+        let lanes = Self::LANE_COUNT.min(128);
+        Self::store_unaligned(buf.as_mut_ptr(), v);
+        let mut i = 0usize;
+        while i + 1 < lanes {
+            buf.swap(i, i + 1);
+            i += 2;
+        }
+        Self::load_unaligned(buf.as_ptr())
+    }
+
+    /// Duplicate even lanes into odd lanes: `[a0, a1, a2, a3, ...] -> [a0, a0, a2, a2, ...]`.
+    ///
+    /// Default: scalar emulation. x86 backends override with `moveldup_ps` /
+    /// `movedup_pd`.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn dup_even(v: Self::Vector) -> Self::Vector {
+        let mut buf = [T::ZERO; 128];
+        let lanes = Self::LANE_COUNT.min(128);
+        Self::store_unaligned(buf.as_mut_ptr(), v);
+        let mut out = [T::ZERO; 128];
+        for i in 0..lanes {
+            out[i] = buf[i & !1];
+        }
+        Self::load_unaligned(out.as_ptr())
+    }
+
+    /// Duplicate odd lanes into even lanes: `[a0, a1, a2, a3, ...] -> [a1, a1, a3, a3, ...]`.
+    ///
+    /// Default: scalar emulation. x86 backends override with `movehdup_ps` /
+    /// an odd-lane `permute_pd`. An unpaired trailing lane (odd `LANE_COUNT`)
+    /// passes through unchanged.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn dup_odd(v: Self::Vector) -> Self::Vector {
+        let mut buf = [T::ZERO; 128];
+        let lanes = Self::LANE_COUNT.min(128);
+        Self::store_unaligned(buf.as_mut_ptr(), v);
+        let mut out = [T::ZERO; 128];
+        for i in 0..lanes {
+            out[i] = buf[(i | 1).min(lanes - 1)];
+        }
+        Self::load_unaligned(out.as_ptr())
+    }
+
+    /// Alternating fused multiply: even lanes `a*b - c`, odd lanes `a*b + c`.
+    ///
+    /// Default: scalar emulation. x86 backends override with
+    /// `_mm256_fmaddsub_ps/pd` / `_mm512_fmaddsub_ps/pd`.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn fmaddsub(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
+        crate::kernel_helpers::generic_alternating_fma::<T, Self, false>(a, b, c)
+    }
+
+    /// Alternating fused multiply: even lanes `a*b + c`, odd lanes `a*b - c`.
+    ///
+    /// Default: scalar emulation. x86 backends override with
+    /// `_mm256_fmsubadd_ps/pd` / `_mm512_fmsubadd_ps/pd`.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn fmsubadd(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
+        crate::kernel_helpers::generic_alternating_fma::<T, Self, true>(a, b, c)
+    }
 }

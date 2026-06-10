@@ -118,6 +118,38 @@ impl SimdKernel<f32> for Avx2 {
 
     #[target_feature(enable = "avx2")]
     #[inline]
+    unsafe fn swap_adjacent(v: Self::Vector) -> Self::Vector {
+        Avx2F32Vec(_mm256_permute_ps(v.0, 0b1011_0001))
+    }
+
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn dup_even(v: Self::Vector) -> Self::Vector {
+        Avx2F32Vec(_mm256_moveldup_ps(v.0))
+    }
+
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn dup_odd(v: Self::Vector) -> Self::Vector {
+        Avx2F32Vec(_mm256_movehdup_ps(v.0))
+    }
+
+    /// Alternating FMA requires `avx2` + `fma` target features.
+    #[target_feature(enable = "avx2,fma")]
+    #[inline]
+    unsafe fn fmaddsub(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
+        Avx2F32Vec(_mm256_fmaddsub_ps(a.0, b.0, c.0))
+    }
+
+    /// Alternating FMA requires `avx2` + `fma` target features.
+    #[target_feature(enable = "avx2,fma")]
+    #[inline]
+    unsafe fn fmsubadd(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
+        Avx2F32Vec(_mm256_fmsubadd_ps(a.0, b.0, c.0))
+    }
+
+    #[target_feature(enable = "avx2")]
+    #[inline]
     unsafe fn sum_reduce(v: Self::Vector) -> f32 {
         // Fold 8 → 4 → 2 → 1 using 128-bit halves.
         let hi_quad = _mm256_extractf128_ps(v.0, 1);

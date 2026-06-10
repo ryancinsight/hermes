@@ -104,6 +104,12 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     fn spmv_sellp8(data: SellPData<'_, Self, 8>, x: &[Self], y: &mut [Self]);
     /// Computes register-blocked tiled GEMM: `c += A * B`.
     fn tiled_gemm(a: &[Self], b: &[Self], c: &mut [Self], m: usize, n: usize, k: usize) -> Result<(), SimdError>;
+    /// Multiplies interleaved complex lanes in-place: `a[k] *= b[k]`
+    /// (`a[k] *= conj(b[k])` when `CONJ_B`).
+    fn interleaved_complex_mul_assign<const CONJ_B: bool>(a: &mut [Self], b: &[Self]) -> Result<(), SimdError>;
+    /// Computes the interleaved complex dot product `(re, im)` of `sum(a[k] * b[k])`
+    /// (`sum(a[k] * conj(b[k]))` when `CONJ_B`).
+    fn interleaved_complex_dot<const CONJ_B: bool>(a: &[Self], b: &[Self]) -> Result<(Self, Self), SimdError>;
 }
 
 /// x86/x86_64 specialized generic implementation of SimdOps.
@@ -183,6 +189,14 @@ where
     fn tiled_gemm(a: &[Self], b: &[Self], c: &mut [Self], m: usize, n: usize, k: usize) -> Result<(), SimdError> {
         gemm::dispatch_tiled_gemm::<Self>(a, b, c, m, n, k)
     }
+    #[inline(always)]
+    fn interleaved_complex_mul_assign<const CONJ_B: bool>(a: &mut [Self], b: &[Self]) -> Result<(), SimdError> {
+        complex::dispatch_interleaved_complex_mul_assign::<Self, CONJ_B>(a, b)
+    }
+    #[inline(always)]
+    fn interleaved_complex_dot<const CONJ_B: bool>(a: &[Self], b: &[Self]) -> Result<(Self, Self), SimdError> {
+        complex::dispatch_interleaved_complex_dot::<Self, CONJ_B>(a, b)
+    }
 }
 
 /// AArch64 specialized generic implementation of SimdOps.
@@ -261,6 +275,14 @@ where
     fn tiled_gemm(a: &[Self], b: &[Self], c: &mut [Self], m: usize, n: usize, k: usize) -> Result<(), SimdError> {
         gemm::dispatch_tiled_gemm::<Self>(a, b, c, m, n, k)
     }
+    #[inline(always)]
+    fn interleaved_complex_mul_assign<const CONJ_B: bool>(a: &mut [Self], b: &[Self]) -> Result<(), SimdError> {
+        complex::dispatch_interleaved_complex_mul_assign::<Self, CONJ_B>(a, b)
+    }
+    #[inline(always)]
+    fn interleaved_complex_dot<const CONJ_B: bool>(a: &[Self], b: &[Self]) -> Result<(Self, Self), SimdError> {
+        complex::dispatch_interleaved_complex_dot::<Self, CONJ_B>(a, b)
+    }
 }
 
 /// Fallback generic implementation of SimdOps.
@@ -337,6 +359,14 @@ where
     #[inline(always)]
     fn tiled_gemm(a: &[Self], b: &[Self], c: &mut [Self], m: usize, n: usize, k: usize) -> Result<(), SimdError> {
         gemm::dispatch_tiled_gemm::<Self>(a, b, c, m, n, k)
+    }
+    #[inline(always)]
+    fn interleaved_complex_mul_assign<const CONJ_B: bool>(a: &mut [Self], b: &[Self]) -> Result<(), SimdError> {
+        complex::dispatch_interleaved_complex_mul_assign::<Self, CONJ_B>(a, b)
+    }
+    #[inline(always)]
+    fn interleaved_complex_dot<const CONJ_B: bool>(a: &[Self], b: &[Self]) -> Result<(Self, Self), SimdError> {
+        complex::dispatch_interleaved_complex_dot::<Self, CONJ_B>(a, b)
     }
 }
 
@@ -502,9 +532,9 @@ pub fn interleaved_complex_mul_assign_runtime<T, const CONJ_B: bool>(
     b: &[T],
 ) -> Result<(), SimdError>
 where
-    T: complex::InterleavedComplexLane,
+    T: SimdOps,
 {
-    complex::interleaved_complex_mul_assign_runtime::<T, CONJ_B>(a, b)
+    T::interleaved_complex_mul_assign::<CONJ_B>(a, b)
 }
 
 /// Computes an interleaved complex dot product using Hermes runtime provider selection.
@@ -514,7 +544,7 @@ pub fn interleaved_complex_dot_runtime<T, const CONJ_B: bool>(
     b: &[T],
 ) -> Result<(T, T), SimdError>
 where
-    T: complex::InterleavedComplexLane,
+    T: SimdOps,
 {
-    complex::interleaved_complex_dot_runtime::<T, CONJ_B>(a, b)
+    T::interleaved_complex_dot::<CONJ_B>(a, b)
 }

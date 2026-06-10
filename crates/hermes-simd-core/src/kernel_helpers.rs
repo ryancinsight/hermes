@@ -71,6 +71,39 @@ where
     Arch::mask_from_bools(&bools[..Arch::LANE_COUNT])
 }
 
+/// Scalar lane-by-lane alternating FMA used by the `fmaddsub` / `fmsubadd` defaults.
+///
+/// Even lanes compute `a*b - c` and odd lanes `a*b + c` when `ADD_EVEN == false`
+/// (`fmaddsub` semantics); the signs flip per lane parity when `ADD_EVEN == true`
+/// (`fmsubadd` semantics).
+#[inline(always)]
+pub unsafe fn generic_alternating_fma<T, Arch, const ADD_EVEN: bool>(
+    a: Arch::Vector,
+    b: Arch::Vector,
+    c: Arch::Vector,
+) -> Arch::Vector
+where
+    T: Scalar,
+    Arch: SimdKernel<T>,
+{
+    let mut buf_a = [T::ZERO; 128];
+    let mut buf_b = [T::ZERO; 128];
+    let mut buf_c = [T::ZERO; 128];
+    Arch::store_unaligned(buf_a.as_mut_ptr(), a);
+    Arch::store_unaligned(buf_b.as_mut_ptr(), b);
+    Arch::store_unaligned(buf_c.as_mut_ptr(), c);
+    for i in 0..Arch::LANE_COUNT {
+        let prod = buf_a[i] * buf_b[i];
+        let add = (i & 1 == 1) ^ ADD_EVEN;
+        buf_a[i] = if add {
+            prod + buf_c[i]
+        } else {
+            prod - buf_c[i]
+        };
+    }
+    Arch::load_unaligned(buf_a.as_ptr())
+}
+
 /// Scalar lane-by-lane horizontal fold used by `min_reduce` and `max_reduce` defaults.
 ///
 /// Stores the vector to a stack buffer, then folds with `op` starting from `identity`.

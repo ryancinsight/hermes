@@ -95,6 +95,36 @@ impl SimdKernel<f64> for Avx512 {
 
     #[target_feature(enable = "avx512f")]
     #[inline]
+    unsafe fn swap_adjacent(v: Self::Vector) -> Self::Vector {
+        Avx512F64Vec(_mm512_permute_pd(v.0, 0b0101_0101))
+    }
+
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn dup_even(v: Self::Vector) -> Self::Vector {
+        Avx512F64Vec(_mm512_movedup_pd(v.0))
+    }
+
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn dup_odd(v: Self::Vector) -> Self::Vector {
+        Avx512F64Vec(_mm512_permute_pd(v.0, 0b1111_1111))
+    }
+
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn fmaddsub(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
+        Avx512F64Vec(_mm512_fmaddsub_pd(a.0, b.0, c.0))
+    }
+
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn fmsubadd(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
+        Avx512F64Vec(_mm512_fmsubadd_pd(a.0, b.0, c.0))
+    }
+
+    #[target_feature(enable = "avx512f")]
+    #[inline]
     unsafe fn sum_reduce(v: Self::Vector) -> f64 {
         _mm512_reduce_add_pd(v.0)
     }
