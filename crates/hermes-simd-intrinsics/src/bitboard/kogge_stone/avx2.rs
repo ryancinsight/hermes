@@ -1,5 +1,10 @@
 use super::{east_mask, west_mask};
 
+/// Rook sliding attacks via AVX2 Kogge-Stone fill: the four orthogonal
+/// directions flood in parallel, one per 64-bit lane of a `__m256i`.
+///
+/// # Safety
+/// Caller must ensure AVX2 is available.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[target_feature(enable = "avx2")]
 #[allow(unused_assignments)]
@@ -92,6 +97,11 @@ pub unsafe fn kogge_stone_rook_avx2(slider: u64, occupancy: u64) -> u64 {
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+/// Bishop sliding attacks via AVX2 Kogge-Stone fill: the four diagonal
+/// directions flood in parallel, one per 64-bit lane of a `__m256i`.
+///
+/// # Safety
+/// Caller must ensure AVX2 is available.
 #[target_feature(enable = "avx2")]
 #[allow(unused_assignments)]
 pub unsafe fn kogge_stone_bishop_avx2(slider: u64, occupancy: u64) -> u64 {
@@ -183,6 +193,10 @@ pub unsafe fn kogge_stone_bishop_avx2(slider: u64, occupancy: u64) -> u64 {
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+/// Queen sliding attacks: union of the rook and bishop AVX2 fills.
+///
+/// # Safety
+/// Caller must ensure AVX2 is available.
 #[target_feature(enable = "avx2")]
 #[allow(unused_assignments)]
 pub unsafe fn kogge_stone_queen_avx2(slider: u64, occupancy: u64) -> u64 {

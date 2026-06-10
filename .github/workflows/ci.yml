@@ -31,6 +31,21 @@ jobs:
         run: cargo doc --no-deps --workspace
         env:
           RUSTDOCFLAGS: -D warnings
+      - name: no_std check (compile-time dispatch + scalar fallback only)
+        run: cargo check --workspace --no-default-features
+
+  miri:
+    name: miri (hermes-simd-core pointer logic)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+          components: miri
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo miri test
+        run: cargo +nightly miri test -p hermes-simd-core
 
   test-aarch64:
     name: test (aarch64, runtime NEON validation)

@@ -34,9 +34,20 @@
   per-crate scoped runs are the working procedure.
 - `panic = "abort"` in the release profile: CI tests the dev profile.
 
+## Post-0.2.0 increment (2026-06-10)
+
+- [x] [patch] `cargo miri` over hermes-simd-core: unit tests green; rkyv 0.7
+      tests `#[cfg_attr(miri, ignore)]` (upstream Stacked Borrows violations);
+      CI `miri` job added.
+- [x] [patch] no_std: `#[runtime_dispatch]` std-gating fixed;
+      `--no-default-features` check green locally and in CI.
+- [x] [patch] `#![deny(missing_docs)]` on all six public crates; 12 items documented.
+- [x] [minor] Complex criterion bench suite + recorded baselines
+      (benchmarks_results.md); threshold automation remains open.
+
 ## Next sprint candidates (from [backlog](backlog.md))
 
-- [patch] `cargo miri` over hermes-simd-core pointer logic (P1).
-- [patch] no_std / feature-matrix CI job (P1).
-- [minor] Criterion baselines + regression thresholds (P2).
+- [minor] Criterion threshold automation (compare against recorded baselines in CI or pre-merge).
 - [minor] SpMV scalability sweep (P2).
+- [minor] Packed4 AVX2 unpack path (P2).
+- [minor] 0.2.1 release once the above accumulate.

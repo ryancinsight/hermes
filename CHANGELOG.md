@@ -2,6 +2,17 @@
 
 All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; versioning: SemVer 2.0.0 (pre-1.0: minor releases may break, documented under **Breaking**).
 
+## [Unreleased]
+
+### Added
+- Criterion benchmark suite for the interleaved complex kernels (`benches/complex.rs`), runtime-dispatch vs `Scalar` series as a built-in regression reference.
+- CI: `cargo miri test` job over hermes-simd-core (pointer/view/cow logic) and a `--no-default-features` build check.
+- `#![deny(missing_docs)]` on all six public crates; remaining undocumented items (bitboard backends, AMX submodules, emulated-kernel macro, magic `OnceLock`) documented.
+
+### Fixed
+- `#[runtime_dispatch]` emitted `std::is_x86_feature_detected!` unconditionally, breaking `--no-default-features` builds; runtime-detection arms are now gated on the consuming crate's `std` feature (no_std keeps compile-time arms + scalar fallback).
+- rkyv-exercising unit tests are ignored under Miri (rkyv 0.7 archived access violates Stacked Borrows inside the dependency); hermes's own unsafe passes Miri clean.
+
 ## [0.2.0] — 2026-06-10
 
 ### Added

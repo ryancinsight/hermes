@@ -51,15 +51,15 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
       `compress`∘`expand` identity under fixed mask, `mask_to_bitmask` ∘
       `mask_from_bitmask` round-trip, gather with permuted indices vs scalar
       reference, `leading_k_mask` boundary cases (k=0, k=LANE_COUNT, k>LANE_COUNT).
-- [ ] **[patch] `cargo miri` pass** over crates containing `unsafe`
+- [x] **[patch] `cargo miri` pass** (delivered post-0.2.0: core unit tests green under Miri; rkyv 0.7 tests excluded as upstream Stacked Borrows violations; CI job added) over crates containing `unsafe`
       (intrinsics excluded where Miri lacks ISA support; cover the
       view/cow/sparse pointer logic in hermes-simd-core).
-- [ ] **[patch] no_std + feature matrix**: verify `--no-default-features` and
+- [x] **[patch] no_std + feature matrix** (delivered post-0.2.0: runtime_dispatch std-gating fixed, --no-default-features green + CI step; broader feature-combination sweep remains open): verify `--no-default-features` and
       key feature combinations build and pass.
 
 ## P2 — Performance & memory <a id="p2"></a>
 
-- [ ] **[minor] Criterion regression thresholds**: record baseline numbers for
+- [~] **[minor] Criterion regression thresholds** (complex bench suite added with built-in scalar reference series; recorded baselines + threshold enforcement remain open): record baseline numbers for
       sum/dot/spmv/complex; a statistically significant slowdown blocks merge.
 - [ ] **[minor] SpMV scalability sweep**: bench n ∈ {1K, 10K, 100K} rows ×
       sparsity {0.1%, 1%, 10%} across CSR/SELL-p/BCOO to characterize
@@ -87,7 +87,7 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
 
 - [ ] **[patch] Doctest coverage**: `cargo doc` is warning-clean; extend
       runnable doctests to the complex, sparse-Cow, and tensor public surfaces.
-- [ ] **[patch] `#![deny(missing_docs)]`** on all public crates (currently
+- [x] **[patch] `#![deny(missing_docs)]`** (delivered post-0.2.0: all six public crates) on all public crates (currently
       `warn` in hermes-simd-core).
 
 ## Completed (recent)
