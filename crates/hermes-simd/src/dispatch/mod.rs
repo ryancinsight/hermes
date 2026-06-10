@@ -15,6 +15,7 @@ pub mod max;
 pub mod scale;
 pub mod argmin;
 pub mod argmax;
+pub mod complex;
 
 use hermes_simd_core::view::SimdError;
 use hermes_simd_core::sparse::{
@@ -458,4 +459,21 @@ pub fn tiled_gemm<T: SimdOps>(
     k: usize,
 ) -> Result<(), SimdError> {
     T::tiled_gemm(a, b, c, m, n, k)
+}
+
+/// Multiplies interleaved complex values in-place using a monomorphized SIMD architecture.
+///
+/// Inputs are primitive lane slices in `[re0, im0, re1, im1, ...]` order. `a`
+/// is updated with `a[i] * b[i]`; when `CONJ_B` is true, the operation is
+/// `a[i] * conj(b[i])`.
+#[inline]
+pub fn interleaved_complex_mul_assign<T, A, const CONJ_B: bool>(
+    a: &mut [T],
+    b: &[T],
+) -> Result<(), SimdError>
+where
+    T: ScalarTrait,
+    A: hermes_simd_core::arch::SimdArch + hermes_simd_core::kernel::SimdKernel<T>,
+{
+    complex::interleaved_complex_mul_assign::<T, A, CONJ_B>(a, b)
 }
