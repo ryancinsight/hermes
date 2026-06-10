@@ -177,16 +177,18 @@ where
         assert!(n_bins > 0, "n_bins must be > 0");
         assert!(lo < hi, "lo must be < hi");
 
-        let range = (hi - lo).to_f32();
-        let bin_width = range / n_bins as f32;
+        // Bin indices are computed in f64: it is a strict superset of every
+        // supported lane precision (f16/bf16/f32/f64), so the index — an
+        // integer output, never narrowed back to `T` — is exact for all `T`.
+        let lo_w = lo.to_f64();
+        let bin_width = (hi.to_f64() - lo_w) / n_bins as f64;
         let mut counts = alloc::vec![0usize; n_bins];
 
         for &x in self.as_ref().iter() {
             if x < lo || x >= hi {
                 continue;
             }
-            let offset = (x - lo).to_f32();
-            let bin = ((offset / bin_width) as usize).min(n_bins - 1);
+            let bin = (((x.to_f64() - lo_w) / bin_width) as usize).min(n_bins - 1);
             counts[bin] += 1;
         }
         counts

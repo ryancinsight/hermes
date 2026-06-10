@@ -210,37 +210,15 @@ where
     /// Promotes `self` to owned if currently borrowed (one allocation).
     /// Subsequent calls on the same already-owned `SimdCow` are allocation-free.
     #[inline]
-    pub fn prefix_scan_in_place<Op, SMode>(
-        &mut self,
-        _op: Op,
-        _mode: SMode,
-    ) -> Result<(), SimdError>
+    pub fn prefix_scan_in_place<Op, SMode>(&mut self, op: Op, mode: SMode) -> Result<(), SimdError>
     where
         Op: crate::ops::ScanOp<T>,
         SMode: crate::ops::ScanMode,
     {
-        let len = self.len();
-        if len == 0 {
-            return Ok(());
-        }
-
-        // `to_mut` promotes borrowed → owned (one allocation if borrowed, free if owned),
-        // then returns a direct `&mut AlignedVec`. No secondary match required.
-        let slice = self.to_mut().as_mut_slice();
-
-        let mut acc = Op::identity();
-        if SMode::IS_INCLUSIVE {
-            for x in slice {
-                acc = Op::combine(acc, *x);
-                *x = acc;
-            }
-        } else {
-            for x in slice {
-                let temp = *x;
-                *x = acc;
-                acc = Op::combine(acc, temp);
-            }
-        }
+        // `view_mut` promotes borrowed → owned (one allocation if borrowed,
+        // free if owned). The scan itself is the single authoritative
+        // vectorized implementation on `SimdView`.
+        self.view_mut().prefix_scan_in_place(op, mode);
         Ok(())
     }
 }

@@ -165,6 +165,21 @@ fn test_histogram_cow_out_of_range_ignored() {
     assert_eq!(total, 2, "only 2 values should be counted, got {total}");
 }
 
+#[test]
+fn test_histogram_cow_native_precision_binning() {
+    // 10^6 bins over [0, 1): bin boundaries are 1e-6 apart. The value
+    // 0.5 - 1e-9 lies in bin 499_999, distinguishable from 0.5 (bin 500_000)
+    // only at f64 precision — an f32 binning path (the former implementation)
+    // rounds it to 0.5 and collapses both into bin 500_000.
+    let data = vec![0.5f64 - 1e-9, 0.5f64];
+    let view = SimdView::<'_, f64, Scalar, Unaligned, Unmasked, &[f64]>::new(&data).unwrap();
+    let cow: SimdCow<'_, f64, Scalar, Unaligned> = SimdCow::Borrowed(view);
+    let hist = cow.histogram_cow(1_000_000, 0.0, 1.0);
+
+    assert_eq!(hist[499_999], 1, "0.5 - 1e-9 belongs in bin 499_999");
+    assert_eq!(hist[500_000], 1, "0.5 belongs in bin 500_000");
+}
+
 // ---------------------------------------------------------------------------
 // Advanced TensorView mutable view, transpose, matmul_to, TensorCow, row-wise softmax
 // ---------------------------------------------------------------------------

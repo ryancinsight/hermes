@@ -212,6 +212,93 @@ fn interleaved_complex_runtime_conjugated_reduced_precision_lane_matches_scalar(
     }
 }
 
+mod complex_properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// Per-component error bound for one complex multiply.
+    ///
+    /// Each output component is a two-term sum of products; the SIMD path
+    /// (fused multiply-add, alternating-sign form) and the scalar reference
+    /// differ by at most 2 roundings per product/sum step. Bound:
+    /// `4·ε·(|ar|+|ai|)·(|br|+|bi|)` per component, with a small absolute
+    /// floor of `4·ε` for results near zero.
+    fn mul_tolerance_f64(ar: f64, ai: f64, br: f64, bi: f64) -> f64 {
+        4.0 * f64::EPSILON * ((ar.abs() + ai.abs()) * (br.abs() + bi.abs())).max(1.0)
+    }
+
+    fn paired_vecs(max: f64, max_pairs: usize) -> impl Strategy<Value = (Vec<f64>, Vec<f64>)> {
+        prop::collection::vec(-max..max, 0..max_pairs)
+            .prop_map(|v| {
+                let even = (v.len() / 2) * 2;
+                v[..even].to_vec()
+            })
+            .prop_flat_map(|a| {
+                let len = a.len();
+                (Just(a), prop::collection::vec(-1000.0f64..1000.0, len))
+            })
+    }
+
+    proptest! {
+        #[test]
+        fn prop_complex_mul_assign_within_rounding_of_reference(
+            (a, b) in paired_vecs(1000.0, 128),
+            conj in any::<bool>(),
+        ) {
+            let mut actual = a.clone();
+            let mut expected = a.clone();
+            if conj {
+                interleaved_complex_mul_assign_runtime::<f64, true>(&mut actual, &b).unwrap();
+                reference_mul::<true>(&mut expected, &b);
+            } else {
+                interleaved_complex_mul_assign_runtime::<f64, false>(&mut actual, &b).unwrap();
+                reference_mul::<false>(&mut expected, &b);
+            }
+            for k in (0..a.len()).step_by(2) {
+                let tol = mul_tolerance_f64(a[k], a[k + 1], b[k], b[k + 1]);
+                prop_assert!(
+                    (actual[k] - expected[k]).abs() <= tol
+                        && (actual[k + 1] - expected[k + 1]).abs() <= tol,
+                    "pair {k}: actual=({}, {}), expected=({}, {}), tol={tol}",
+                    actual[k], actual[k + 1], expected[k], expected[k + 1],
+                );
+            }
+        }
+
+        /// Dot-product error bound: an `n`-pair dot is a sum of `n` complex
+        /// products. Reordering an `n`-term sum and fusing the products gives
+        /// `|err| <= (n + 4)·ε·Σ (|ar|+|ai|)·(|br|+|bi|)` per component.
+        #[test]
+        fn prop_complex_dot_within_rounding_of_reference(
+            (a, b) in paired_vecs(1000.0, 128),
+            conj in any::<bool>(),
+        ) {
+            let (actual, expected) = if conj {
+                (
+                    interleaved_complex_dot_runtime::<f64, true>(&a, &b).unwrap(),
+                    reference_dot::<true>(&a, &b),
+                )
+            } else {
+                (
+                    interleaved_complex_dot_runtime::<f64, false>(&a, &b).unwrap(),
+                    reference_dot::<false>(&a, &b),
+                )
+            };
+            let n = (a.len() / 2) as f64;
+            let mag: f64 = (0..a.len())
+                .step_by(2)
+                .map(|k| (a[k].abs() + a[k + 1].abs()) * (b[k].abs() + b[k + 1].abs()))
+                .sum();
+            let tol = (n + 4.0) * f64::EPSILON * mag.max(1.0);
+            prop_assert!(
+                (actual.0 - expected.0).abs() <= tol && (actual.1 - expected.1).abs() <= tol,
+                "actual=({}, {}), expected=({}, {}), tol={tol}",
+                actual.0, actual.1, expected.0, expected.1,
+            );
+        }
+    }
+}
+
 #[test]
 fn interleaved_complex_mul_assign_rejects_invalid_shapes() {
     let mut odd = [1.0f32, 2.0, 3.0];

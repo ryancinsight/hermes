@@ -83,3 +83,71 @@ where
         Ok(())
     }
 }
+
+impl<'a, T: 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
+    SimdView<'a, T, Arch, Align, Mode, &'a mut [T]>
+where
+    T: Scalar,
+{
+    /// Perform an in-place prefix scan (inclusive or exclusive) using the
+    /// specified operation.
+    ///
+    /// Vectorized via `Arch::scan_vector` with a scalar carry across chunks;
+    /// the scalar tail uses `Op::combine`. Loads and stores at the same offset
+    /// are sequential, so no intra-chunk aliasing hazard exists.
+    #[inline(always)]
+    pub fn prefix_scan_in_place<Op, SMode>(&mut self, _op: Op, _mode: SMode)
+    where
+        Op: ScanOp<T>,
+        SMode: ScanMode,
+    {
+        let data = self.as_slice_mut();
+        let len = data.len();
+        if len == 0 {
+            return;
+        }
+
+        let lane_count = Arch::LANE_COUNT;
+        let simd_len = (len / lane_count) * lane_count;
+        let ptr = data.as_mut_ptr();
+
+        let mut carry = Op::identity();
+
+        unsafe {
+            let load = |p: *const T| {
+                if Align::IS_ALIGNED {
+                    Arch::load_aligned(p)
+                } else {
+                    Arch::load_unaligned(p)
+                }
+            };
+            let store = |p: *mut T, v: Arch::Vector| {
+                if Align::IS_ALIGNED {
+                    Arch::store_aligned(p, v)
+                } else {
+                    Arch::store_unaligned(p, v)
+                }
+            };
+
+            for i in (0..simd_len).step_by(lane_count) {
+                let v = load(ptr.add(i));
+                let (r, next_carry) = Arch::scan_vector::<Op, SMode>(v, carry);
+                store(ptr.add(i), r);
+                carry = next_carry;
+            }
+        }
+
+        if SMode::IS_INCLUSIVE {
+            for x in &mut data[simd_len..] {
+                carry = Op::combine(carry, *x);
+                *x = carry;
+            }
+        } else {
+            for x in &mut data[simd_len..] {
+                let temp = *x;
+                *x = carry;
+                carry = Op::combine(carry, temp);
+            }
+        }
+    }
+}
