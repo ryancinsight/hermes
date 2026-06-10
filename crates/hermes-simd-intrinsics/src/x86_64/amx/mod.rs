@@ -438,5 +438,7 @@ pub trait AmxGemm<TA, TB, TC> {
     );
 }
 
+/// AMX tile GEMM over brain-float-16 inputs (`tdpbf16ps`).
 pub mod bf16;
+/// AMX tile GEMM over signed 8-bit integer inputs (`tdpbssd`).
 pub mod int8;

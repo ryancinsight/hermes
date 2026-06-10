@@ -2,14 +2,18 @@
 
 use hermes_simd_core::bitboard::BitBoardKernel;
 
+/// Portable scalar Kogge-Stone fill (always available reference backend).
 pub mod scalar;
 
+/// AVX2 backend: four flood-fill directions computed per 64-bit lane in parallel.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub mod avx2;
 
+/// AVX-512 backend: eight flood-fill directions in one 512-bit register.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub mod avx512;
 
+/// NEON backend: paired flood-fill directions per 128-bit register.
 #[cfg(target_arch = "aarch64")]
 pub mod neon;
 

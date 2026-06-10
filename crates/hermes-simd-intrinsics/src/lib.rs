@@ -30,6 +30,11 @@ extern crate alloc;
 
 use hermes_simd_core::arch::SimdArch;
 
+/// Implements `SimdKernel<$t>` for `$arch` as a lane-emulated `[T; N]` backend.
+///
+/// Used for the `Scalar` marker and for `(type, arch)` pairs without native
+/// register support; each method is a per-lane loop the optimizer is free to
+/// auto-vectorize.
 #[macro_export]
 macro_rules! impl_emulated_kernel {
     ($arch:ty, $t:ty, $lanes:expr, $cfg:meta) => {

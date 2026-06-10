@@ -3,6 +3,8 @@
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+/// Minimal `no_std`-compatible once-initialization cell used for the lazily
+/// built magic attack tables (spin-based; initialization races run `f` once).
 pub struct OnceLock<T> {
     state: AtomicUsize, // 0 = uninitialized, 1 = initializing, 2 = initialized
     value: UnsafeCell<Option<T>>,
@@ -12,6 +14,7 @@ unsafe impl<T: Send + Sync> Sync for OnceLock<T> {}
 unsafe impl<T: Send> Send for OnceLock<T> {}
 
 impl<T> OnceLock<T> {
+    /// Create an empty, uninitialized cell.
     pub const fn new() -> Self {
         Self {
             state: AtomicUsize::new(0),
@@ -19,6 +22,8 @@ impl<T> OnceLock<T> {
         }
     }
 
+    /// Return the stored value, running `f` exactly once to initialize it;
+    /// concurrent callers spin until initialization completes.
     pub fn get_or_init<F>(&self, f: F) -> &T
     where
         F: FnOnce() -> T,
