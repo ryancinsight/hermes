@@ -1,11 +1,11 @@
 //! Monomorphized SIMD mask register wrapper.
 
-use core::marker::PhantomData;
+use super::vector_reg::Vector;
 use crate::arch::SimdArch;
 use crate::kernel::SimdKernel;
-use crate::scalar::Scalar;
 use crate::mask::BitMask;
-use super::vector_reg::Vector;
+use crate::scalar::Scalar;
+use core::marker::PhantomData;
 
 /// A type-safe, architecture-native SIMD mask type.
 #[repr(transparent)]
@@ -34,7 +34,8 @@ impl<T, Arch> Copy for Mask<T, Arch>
 where
     Arch: SimdArch + SimdKernel<T>,
     T: Scalar,
-{}
+{
+}
 
 impl<T, Arch> core::fmt::Debug for Mask<T, Arch>
 where
@@ -62,7 +63,8 @@ impl<T, Arch> Eq for Mask<T, Arch>
 where
     Arch: SimdArch + SimdKernel<T>,
     T: Scalar,
-{}
+{
+}
 
 impl<T, Arch> Mask<T, Arch>
 where
@@ -106,7 +108,11 @@ where
     #[inline(always)]
     pub fn all(self) -> bool {
         let lanes = <Arch as SimdKernel<T>>::LANE_COUNT;
-        let expected = if lanes >= 64 { u64::MAX } else { (1u64 << lanes) - 1 };
+        let expected = if lanes >= 64 {
+            u64::MAX
+        } else {
+            (1u64 << lanes) - 1
+        };
         unsafe { (self.to_bitmask().0 & expected) == expected }
     }
 
@@ -184,7 +190,11 @@ where
         unsafe {
             let bm = self.to_bitmask();
             let lanes = <Arch as SimdKernel<T>>::LANE_COUNT;
-            let active_mask = if lanes >= 64 { u64::MAX } else { (1u64 << lanes) - 1 };
+            let active_mask = if lanes >= 64 {
+                u64::MAX
+            } else {
+                (1u64 << lanes) - 1
+            };
             Self::from_bitmask(BitMask((!bm.0) & active_mask))
         }
     }

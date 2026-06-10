@@ -1,10 +1,10 @@
-use crate::arch::SimdArch;
 use crate::align::Alignment;
-use crate::kernel::SimdKernel;
+use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
+use crate::kernel::SimdKernel;
+use crate::ops::UnaryOp;
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
-use crate::ops::UnaryOp;
 
 impl<'a, T: 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode, Ref: 'a>
     SimdView<'a, T, Arch, Align, Mode, Ref>

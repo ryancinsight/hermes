@@ -1,23 +1,29 @@
 //! Sparse matrix formats and representations.
 
-pub mod types;
-pub mod view;
+pub mod cow;
 pub mod ops;
 pub mod spmv;
-pub mod cow;
+pub mod types;
+pub mod view;
 
-pub use types::{CsrData, SellPData, BlockedCooData, DenseWithMaskData, SparseShape};
-pub use view::{SparseView, SparseViewShape};
-pub use spmv::SparseSpMv;
-pub use ops::SparseOps;
 pub use cow::{
+    BlockedCooCow,
     // Per-format Cow containers
-    CsrCow, SellPCow, BlockedCooCow, DenseWithMaskCow,
+    CsrCow,
+    DenseWithMaskCow,
+    OwnedBlockedCoo,
+    // Owned heap-backed storage types
+    OwnedCsr,
+    OwnedDenseWithMask,
+    OwnedSellP,
+    SellPCow,
     // Default SparseCow alias (= CsrCow)
     SparseCow,
-    // Owned heap-backed storage types
-    OwnedCsr, OwnedSellP, OwnedBlockedCoo, OwnedDenseWithMask,
 };
+pub use ops::SparseOps;
+pub use spmv::SparseSpMv;
+pub use types::{BlockedCooData, CsrData, DenseWithMaskData, SellPData, SparseShape};
+pub use view::{SparseView, SparseViewShape};
 
 /// Compressed Sparse Row format marker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

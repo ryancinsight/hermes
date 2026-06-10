@@ -11,10 +11,10 @@
 //! - Expand: `_mm512_mask_expand_pd`.
 //! - Gather: `_mm512_i32gather_pd`, `_mm512_mask_i32gather_pd`.
 
+use crate::Avx512;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::*;
 use hermes_simd_core::kernel::SimdKernel;
-use crate::Avx512;
 
 /// Newtype over `__m512d` providing `Send + Sync`.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -228,7 +228,13 @@ impl SimdKernel<f64> for Avx512 {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        Avx512F64Vec(_mm512_mask_i32gather_pd(src.0, mask, indices, base as *const _, 8))
+        Avx512F64Vec(_mm512_mask_i32gather_pd(
+            src.0,
+            mask,
+            indices,
+            base as *const _,
+            8,
+        ))
     }
 
     // -----------------------------------------------------------------------
@@ -241,7 +247,9 @@ impl SimdKernel<f64> for Avx512 {
         debug_assert_eq!(bits.len(), 8);
         let mut m: u8 = 0;
         for (i, &b) in bits.iter().enumerate() {
-            if b { m |= 1 << i; }
+            if b {
+                m |= 1 << i;
+            }
         }
         m
     }
@@ -250,7 +258,11 @@ impl SimdKernel<f64> for Avx512 {
     #[inline]
     unsafe fn leading_k_mask(k: usize) -> Self::Mask {
         let k = k.min(8);
-        if k == 8 { !0u8 } else { (1u8 << k).wrapping_sub(1) }
+        if k == 8 {
+            !0u8
+        } else {
+            (1u8 << k).wrapping_sub(1)
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -259,11 +271,15 @@ impl SimdKernel<f64> for Avx512 {
 
     #[target_feature(enable = "avx512f")]
     #[inline]
-    unsafe fn zero() -> Self::Vector { Avx512F64Vec(_mm512_setzero_pd()) }
+    unsafe fn zero() -> Self::Vector {
+        Avx512F64Vec(_mm512_setzero_pd())
+    }
 
     #[target_feature(enable = "avx512f")]
     #[inline]
-    unsafe fn splat(val: f64) -> Self::Vector { Avx512F64Vec(_mm512_set1_pd(val)) }
+    unsafe fn splat(val: f64) -> Self::Vector {
+        Avx512F64Vec(_mm512_set1_pd(val))
+    }
 
     #[target_feature(enable = "avx512f")]
     #[inline]
@@ -318,47 +334,75 @@ impl SimdKernel<f64> for Avx512 {
     #[inline]
     unsafe fn cmp_eq(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         let m = _mm512_cmp_pd_mask(a.0, b.0, _CMP_EQ_OQ);
-        Avx512F64Vec(_mm512_mask_blend_pd(m, _mm512_setzero_pd(), _mm512_set1_pd(f64::from_bits(0xFFFF_FFFF_FFFF_FFFF))))
+        Avx512F64Vec(_mm512_mask_blend_pd(
+            m,
+            _mm512_setzero_pd(),
+            _mm512_set1_pd(f64::from_bits(0xFFFF_FFFF_FFFF_FFFF)),
+        ))
     }
 
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn cmp_ne(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         let m = _mm512_cmp_pd_mask(a.0, b.0, _CMP_NEQ_OQ);
-        Avx512F64Vec(_mm512_mask_blend_pd(m, _mm512_setzero_pd(), _mm512_set1_pd(f64::from_bits(0xFFFF_FFFF_FFFF_FFFF))))
+        Avx512F64Vec(_mm512_mask_blend_pd(
+            m,
+            _mm512_setzero_pd(),
+            _mm512_set1_pd(f64::from_bits(0xFFFF_FFFF_FFFF_FFFF)),
+        ))
     }
 
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn cmp_lt(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         let m = _mm512_cmp_pd_mask(a.0, b.0, _CMP_LT_OQ);
-        Avx512F64Vec(_mm512_mask_blend_pd(m, _mm512_setzero_pd(), _mm512_set1_pd(f64::from_bits(0xFFFF_FFFF_FFFF_FFFF))))
+        Avx512F64Vec(_mm512_mask_blend_pd(
+            m,
+            _mm512_setzero_pd(),
+            _mm512_set1_pd(f64::from_bits(0xFFFF_FFFF_FFFF_FFFF)),
+        ))
     }
 
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn cmp_le(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         let m = _mm512_cmp_pd_mask(a.0, b.0, _CMP_LE_OQ);
-        Avx512F64Vec(_mm512_mask_blend_pd(m, _mm512_setzero_pd(), _mm512_set1_pd(f64::from_bits(0xFFFF_FFFF_FFFF_FFFF))))
+        Avx512F64Vec(_mm512_mask_blend_pd(
+            m,
+            _mm512_setzero_pd(),
+            _mm512_set1_pd(f64::from_bits(0xFFFF_FFFF_FFFF_FFFF)),
+        ))
     }
 
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn cmp_gt(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         let m = _mm512_cmp_pd_mask(a.0, b.0, _CMP_GT_OQ);
-        Avx512F64Vec(_mm512_mask_blend_pd(m, _mm512_setzero_pd(), _mm512_set1_pd(f64::from_bits(0xFFFF_FFFF_FFFF_FFFF))))
+        Avx512F64Vec(_mm512_mask_blend_pd(
+            m,
+            _mm512_setzero_pd(),
+            _mm512_set1_pd(f64::from_bits(0xFFFF_FFFF_FFFF_FFFF)),
+        ))
     }
 
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn cmp_ge(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         let m = _mm512_cmp_pd_mask(a.0, b.0, _CMP_GE_OQ);
-        Avx512F64Vec(_mm512_mask_blend_pd(m, _mm512_setzero_pd(), _mm512_set1_pd(f64::from_bits(0xFFFF_FFFF_FFFF_FFFF))))
+        Avx512F64Vec(_mm512_mask_blend_pd(
+            m,
+            _mm512_setzero_pd(),
+            _mm512_set1_pd(f64::from_bits(0xFFFF_FFFF_FFFF_FFFF)),
+        ))
     }
 
     #[target_feature(enable = "avx512f")]
     #[inline]
-    unsafe fn blend(mask: Self::Vector, true_val: Self::Vector, false_val: Self::Vector) -> Self::Vector {
+    unsafe fn blend(
+        mask: Self::Vector,
+        true_val: Self::Vector,
+        false_val: Self::Vector,
+    ) -> Self::Vector {
         let m = _mm512_cmp_pd_mask(mask.0, _mm512_setzero_pd(), _CMP_NEQ_OQ);
         Avx512F64Vec(_mm512_mask_blend_pd(m, false_val.0, true_val.0))
     }
@@ -372,6 +416,10 @@ impl SimdKernel<f64> for Avx512 {
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn mask_to_vector(mask: Self::Mask) -> Self::Vector {
-        Avx512F64Vec(_mm512_mask_blend_pd(mask, _mm512_setzero_pd(), _mm512_set1_pd(f64::from_bits(0xFFFF_FFFF_FFFF_FFFF))))
+        Avx512F64Vec(_mm512_mask_blend_pd(
+            mask,
+            _mm512_setzero_pd(),
+            _mm512_set1_pd(f64::from_bits(0xFFFF_FFFF_FFFF_FFFF)),
+        ))
     }
 }

@@ -37,7 +37,11 @@ impl<const N: usize> BitMask<N> {
         // Const assertion: N must fit in u64.
         assert!(N <= 64, "BitMask<N>: N must be <= 64");
         // (1u64 << 64) would overflow; handle that case with u64::MAX.
-        let bits = if N >= 64 { u64::MAX } else { (1u64 << N).wrapping_sub(1) };
+        let bits = if N >= 64 {
+            u64::MAX
+        } else {
+            (1u64 << N).wrapping_sub(1)
+        };
         Self(bits)
     };
 
@@ -58,7 +62,11 @@ impl<const N: usize> BitMask<N> {
     #[inline(always)]
     pub const fn leading_k(k: usize) -> Self {
         let k = if k > N { N } else { k };
-        let bits = if k >= 64 { u64::MAX } else { (1u64 << k).wrapping_sub(1) };
+        let bits = if k >= 64 {
+            u64::MAX
+        } else {
+            (1u64 << k).wrapping_sub(1)
+        };
         Self(bits)
     }
 
@@ -70,7 +78,11 @@ impl<const N: usize> BitMask<N> {
     /// Panics in debug mode if `bits.len() != N`.
     #[inline(always)]
     pub fn from_bools(bits: &[bool]) -> Self {
-        debug_assert_eq!(bits.len(), N, "BitMask::from_bools: slice length must equal N");
+        debug_assert_eq!(
+            bits.len(),
+            N,
+            "BitMask::from_bools: slice length must equal N"
+        );
         let mut m = 0u64;
         // Single pass, no branching beyond the loop iterator.
         for (i, &b) in bits.iter().enumerate().take(N) {
@@ -81,15 +93,21 @@ impl<const N: usize> BitMask<N> {
 
     /// Number of active (set) lanes.
     #[inline(always)]
-    pub fn popcount(self) -> u32 { self.0.count_ones() }
+    pub fn popcount(self) -> u32 {
+        self.0.count_ones()
+    }
 
     /// Returns `true` if all `N` lanes are active.
     #[inline(always)]
-    pub fn is_all_active(self) -> bool { self.0 == Self::ALL_ACTIVE.0 }
+    pub fn is_all_active(self) -> bool {
+        self.0 == Self::ALL_ACTIVE.0
+    }
 
     /// Returns `true` if no lanes are active.
     #[inline(always)]
-    pub fn is_none_active(self) -> bool { self.0 == 0 }
+    pub fn is_none_active(self) -> bool {
+        self.0 == 0
+    }
 
     /// Returns `true` if lane `i` is active.
     ///
@@ -103,13 +121,15 @@ impl<const N: usize> BitMask<N> {
 
     /// Bitwise AND of two masks.
     #[inline(always)]
-    pub fn and(self, other: Self) -> Self { Self(self.0 & other.0) }
+    pub fn and(self, other: Self) -> Self {
+        Self(self.0 & other.0)
+    }
 
     /// Bitwise OR of two masks.
     #[inline(always)]
-    pub fn or(self, other: Self) -> Self { Self(self.0 | other.0) }
-
-
+    pub fn or(self, other: Self) -> Self {
+        Self(self.0 | other.0)
+    }
 
     /// Expand this mask to a `[bool; N]` array.
     ///
@@ -254,25 +274,33 @@ impl<const N: usize> BitMask<N> {
 
 impl<const N: usize> Default for BitMask<N> {
     #[inline(always)]
-    fn default() -> Self { Self::NONE_ACTIVE }
+    fn default() -> Self {
+        Self::NONE_ACTIVE
+    }
 }
 
 impl<const N: usize> core::ops::BitAnd for BitMask<N> {
     type Output = Self;
     #[inline(always)]
-    fn bitand(self, rhs: Self) -> Self { self.and(rhs) }
+    fn bitand(self, rhs: Self) -> Self {
+        self.and(rhs)
+    }
 }
 
 impl<const N: usize> core::ops::BitOr for BitMask<N> {
     type Output = Self;
     #[inline(always)]
-    fn bitor(self, rhs: Self) -> Self { self.or(rhs) }
+    fn bitor(self, rhs: Self) -> Self {
+        self.or(rhs)
+    }
 }
 
 impl<const N: usize> core::ops::Not for BitMask<N> {
     type Output = Self;
     #[inline(always)]
-    fn not(self) -> Self { Self(!self.0 & Self::ALL_ACTIVE.0) }
+    fn not(self) -> Self {
+        Self(!self.0 & Self::ALL_ACTIVE.0)
+    }
 }
 
 #[cfg(test)]

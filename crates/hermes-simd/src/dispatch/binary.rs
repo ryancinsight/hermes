@@ -7,12 +7,12 @@
 //! `(T, Op, Arch)`.
 
 use hermes_simd_core::{
-    view::{SimdView, SimdError},
     align::Unaligned,
+    arch::SimdArch,
     execution::Unmasked,
     kernel::SimdKernel,
     scalar::Scalar,
-    arch::SimdArch,
+    view::{SimdError, SimdView},
     ElementOp,
 };
 use hermes_simd_macros::runtime_dispatch;

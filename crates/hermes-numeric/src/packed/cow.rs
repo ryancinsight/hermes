@@ -1,6 +1,6 @@
-use crate::types::{Bf4, F4};
 use super::slice::{Packable4, Packed4Slice};
 use super::vec::Packed4Vec;
+use crate::types::{Bf4, F4};
 
 /// A Clone-on-Write (CoW) container for packed 4-bit elements.
 ///

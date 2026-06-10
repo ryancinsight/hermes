@@ -90,8 +90,14 @@ pub unsafe fn kogge_stone_rook_neon(slider: u64, occupancy: u64) -> u64 {
         p_right = vandq_u64(p_right, sp_r);
     }
 
-    let final_left = vandq_u64(vshlq_u64(g_left, vreinterpretq_s64_u64(left_shifts)), left_masks[0]);
-    let final_right = vandq_u64(vshlq_u64(g_right, vnegq_s64(vreinterpretq_s64_u64(right_shifts))), right_masks[0]);
+    let final_left = vandq_u64(
+        vshlq_u64(g_left, vreinterpretq_s64_u64(left_shifts)),
+        left_masks[0],
+    );
+    let final_right = vandq_u64(
+        vshlq_u64(g_right, vnegq_s64(vreinterpretq_s64_u64(right_shifts))),
+        right_masks[0],
+    );
 
     let out_l0 = vgetq_lane_u64(final_left, 0);
     let out_l1 = vgetq_lane_u64(final_left, 1);
@@ -190,8 +196,14 @@ pub unsafe fn kogge_stone_bishop_neon(slider: u64, occupancy: u64) -> u64 {
         p_right = vandq_u64(p_right, sp_r);
     }
 
-    let final_left = vandq_u64(vshlq_u64(g_left, vreinterpretq_s64_u64(left_shifts)), left_masks[0]);
-    let final_right = vandq_u64(vshlq_u64(g_right, vnegq_s64(vreinterpretq_s64_u64(right_shifts))), right_masks[0]);
+    let final_left = vandq_u64(
+        vshlq_u64(g_left, vreinterpretq_s64_u64(left_shifts)),
+        left_masks[0],
+    );
+    let final_right = vandq_u64(
+        vshlq_u64(g_right, vnegq_s64(vreinterpretq_s64_u64(right_shifts))),
+        right_masks[0],
+    );
 
     let out_l0 = vgetq_lane_u64(final_left, 0);
     let out_l1 = vgetq_lane_u64(final_left, 1);

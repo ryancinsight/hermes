@@ -19,14 +19,69 @@ crate::impl_emulated_kernel!(crate::Neon, half::bf16, 8, cfg(target_arch = "aarc
 crate::impl_emulated_kernel!(crate::Neon, i8, 16, cfg(target_arch = "aarch64"));
 crate::impl_emulated_kernel!(crate::Neon, i16, 8, cfg(target_arch = "aarch64"));
 crate::impl_emulated_kernel!(crate::Neon, i32, 4, cfg(target_arch = "aarch64"));
-crate::impl_emulated_kernel!(crate::Neon, hermes_numeric::Bf16, 8, cfg(target_arch = "aarch64"));
-crate::impl_emulated_kernel!(crate::Neon, hermes_numeric::I8, 16, cfg(target_arch = "aarch64"));
-crate::impl_emulated_kernel!(crate::Neon, hermes_numeric::I16, 8, cfg(target_arch = "aarch64"));
-crate::impl_emulated_kernel!(crate::Neon, hermes_numeric::I32, 4, cfg(target_arch = "aarch64"));
-crate::impl_emulated_kernel!(crate::Neon, hermes_numeric::F16, 8, cfg(target_arch = "aarch64"));
-crate::impl_emulated_kernel!(crate::Neon, hermes_numeric::F32, 4, cfg(target_arch = "aarch64"));
-crate::impl_emulated_kernel!(crate::Neon, hermes_numeric::F64, 2, cfg(target_arch = "aarch64"));
-crate::impl_emulated_kernel!(crate::Neon, hermes_numeric::Bf8, 16, cfg(target_arch = "aarch64"));
-crate::impl_emulated_kernel!(crate::Neon, hermes_numeric::Bf4, 16, cfg(target_arch = "aarch64"));
-crate::impl_emulated_kernel!(crate::Neon, hermes_numeric::F8, 16, cfg(target_arch = "aarch64"));
-crate::impl_emulated_kernel!(crate::Neon, hermes_numeric::F4, 16, cfg(target_arch = "aarch64"));
+crate::impl_emulated_kernel!(
+    crate::Neon,
+    hermes_numeric::Bf16,
+    8,
+    cfg(target_arch = "aarch64")
+);
+crate::impl_emulated_kernel!(
+    crate::Neon,
+    hermes_numeric::I8,
+    16,
+    cfg(target_arch = "aarch64")
+);
+crate::impl_emulated_kernel!(
+    crate::Neon,
+    hermes_numeric::I16,
+    8,
+    cfg(target_arch = "aarch64")
+);
+crate::impl_emulated_kernel!(
+    crate::Neon,
+    hermes_numeric::I32,
+    4,
+    cfg(target_arch = "aarch64")
+);
+crate::impl_emulated_kernel!(
+    crate::Neon,
+    hermes_numeric::F16,
+    8,
+    cfg(target_arch = "aarch64")
+);
+crate::impl_emulated_kernel!(
+    crate::Neon,
+    hermes_numeric::F32,
+    4,
+    cfg(target_arch = "aarch64")
+);
+crate::impl_emulated_kernel!(
+    crate::Neon,
+    hermes_numeric::F64,
+    2,
+    cfg(target_arch = "aarch64")
+);
+crate::impl_emulated_kernel!(
+    crate::Neon,
+    hermes_numeric::Bf8,
+    16,
+    cfg(target_arch = "aarch64")
+);
+crate::impl_emulated_kernel!(
+    crate::Neon,
+    hermes_numeric::Bf4,
+    16,
+    cfg(target_arch = "aarch64")
+);
+crate::impl_emulated_kernel!(
+    crate::Neon,
+    hermes_numeric::F8,
+    16,
+    cfg(target_arch = "aarch64")
+);
+crate::impl_emulated_kernel!(
+    crate::Neon,
+    hermes_numeric::F4,
+    16,
+    cfg(target_arch = "aarch64")
+);

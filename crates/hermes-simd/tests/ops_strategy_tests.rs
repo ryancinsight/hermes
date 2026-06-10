@@ -3,8 +3,7 @@
 //! `add_assign`/`mul_assign`/`elementwise_mul` produce identical results.
 
 use hermes_simd::{
-    SimdView, Unaligned, Scalar, Unmasked,
-    Add, Sub, Mul, Div, BitAnd, BitOr, BitXor,
+    Add, BitAnd, BitOr, BitXor, Div, Mul, Scalar, SimdView, Sub, Unaligned, Unmasked,
 };
 
 // ---------------------------------------------------------------------------

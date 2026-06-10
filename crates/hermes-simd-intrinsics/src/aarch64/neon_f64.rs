@@ -4,10 +4,10 @@
 //! Gather is emulated via individual lane loads — NEON has no native gather.
 //! Compress/expand are emulated via scalar loops.
 
+use crate::Neon;
 #[cfg(target_arch = "aarch64")]
 use core::arch::aarch64::*;
 use hermes_simd_core::kernel::SimdKernel;
-use crate::Neon;
 
 /// Newtype over `float64x2_t` providing `Send + Sync`.
 #[cfg(target_arch = "aarch64")]
@@ -172,7 +172,7 @@ impl SimdKernel<f64> for Neon {
     #[inline]
     unsafe fn cmp_ne(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         NeonF64Vec(vreinterpretq_f64_u64(vreinterpretq_u64_u32(vmvnq_u32(
-            vreinterpretq_u32_u64(vceqq_f64(a.0, b.0))
+            vreinterpretq_u32_u64(vceqq_f64(a.0, b.0)),
         ))))
     }
 
@@ -202,8 +202,16 @@ impl SimdKernel<f64> for Neon {
 
     #[target_feature(enable = "neon")]
     #[inline]
-    unsafe fn blend(mask: Self::Vector, true_val: Self::Vector, false_val: Self::Vector) -> Self::Vector {
-        NeonF64Vec(vbslq_f64(vreinterpretq_u64_f64(mask.0), true_val.0, false_val.0))
+    unsafe fn blend(
+        mask: Self::Vector,
+        true_val: Self::Vector,
+        false_val: Self::Vector,
+    ) -> Self::Vector {
+        NeonF64Vec(vbslq_f64(
+            vreinterpretq_u64_f64(mask.0),
+            true_val.0,
+            false_val.0,
+        ))
     }
 
     // -----------------------------------------------------------------------
@@ -280,10 +288,18 @@ impl SimdKernel<f64> for Neon {
     unsafe fn compress(src: Self::Vector, mask: Self::Mask) -> Self::Vector {
         let mut arr = [0.0f64; 2];
         vst1q_f64(arr.as_mut_ptr(), src.0);
-        let m = [vgetq_lane_u64(mask.0, 0) != 0, vgetq_lane_u64(mask.0, 1) != 0];
+        let m = [
+            vgetq_lane_u64(mask.0, 0) != 0,
+            vgetq_lane_u64(mask.0, 1) != 0,
+        ];
         let mut out = [0.0f64; 2];
         let mut k = 0usize;
-        for i in 0..2 { if m[i] { out[k] = arr[i]; k += 1; } }
+        for i in 0..2 {
+            if m[i] {
+                out[k] = arr[i];
+                k += 1;
+            }
+        }
         NeonF64Vec(vld1q_f64(out.as_ptr()))
     }
 
@@ -294,9 +310,17 @@ impl SimdKernel<f64> for Neon {
         vst1q_f64(src_arr.as_mut_ptr(), src.0);
         let mut out_arr = [0.0f64; 2];
         vst1q_f64(out_arr.as_mut_ptr(), fill.0);
-        let m = [vgetq_lane_u64(mask.0, 0) != 0, vgetq_lane_u64(mask.0, 1) != 0];
+        let m = [
+            vgetq_lane_u64(mask.0, 0) != 0,
+            vgetq_lane_u64(mask.0, 1) != 0,
+        ];
         let mut k = 0usize;
-        for i in 0..2 { if m[i] { out_arr[i] = src_arr[k]; k += 1; } }
+        for i in 0..2 {
+            if m[i] {
+                out_arr[i] = src_arr[k];
+                k += 1;
+            }
+        }
         NeonF64Vec(vld1q_f64(out_arr.as_ptr()))
     }
 
@@ -307,7 +331,10 @@ impl SimdKernel<f64> for Neon {
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn gather(base: *const f64, indices: Self::IndexVector) -> Self::Vector {
-        let arr = [*base.add(indices[0] as usize), *base.add(indices[1] as usize)];
+        let arr = [
+            *base.add(indices[0] as usize),
+            *base.add(indices[1] as usize),
+        ];
         NeonF64Vec(vld1q_f64(arr.as_ptr()))
     }
 
@@ -321,10 +348,21 @@ impl SimdKernel<f64> for Neon {
     ) -> Self::Vector {
         let mut src_arr = [0.0f64; 2];
         vst1q_f64(src_arr.as_mut_ptr(), src.0);
-        let m = [vgetq_lane_u64(mask.0, 0) != 0, vgetq_lane_u64(mask.0, 1) != 0];
+        let m = [
+            vgetq_lane_u64(mask.0, 0) != 0,
+            vgetq_lane_u64(mask.0, 1) != 0,
+        ];
         let out = [
-            if m[0] { *base.add(indices[0] as usize) } else { src_arr[0] },
-            if m[1] { *base.add(indices[1] as usize) } else { src_arr[1] },
+            if m[0] {
+                *base.add(indices[0] as usize)
+            } else {
+                src_arr[0]
+            },
+            if m[1] {
+                *base.add(indices[1] as usize)
+            } else {
+                src_arr[1]
+            },
         ];
         NeonF64Vec(vld1q_f64(out.as_ptr()))
     }
@@ -357,11 +395,15 @@ impl SimdKernel<f64> for Neon {
 
     #[target_feature(enable = "neon")]
     #[inline]
-    unsafe fn zero() -> Self::Vector { NeonF64Vec(vdupq_n_f64(0.0)) }
+    unsafe fn zero() -> Self::Vector {
+        NeonF64Vec(vdupq_n_f64(0.0))
+    }
 
     #[target_feature(enable = "neon")]
     #[inline]
-    unsafe fn splat(val: f64) -> Self::Vector { NeonF64Vec(vdupq_n_f64(val)) }
+    unsafe fn splat(val: f64) -> Self::Vector {
+        NeonF64Vec(vdupq_n_f64(val))
+    }
 
     #[target_feature(enable = "neon")]
     #[inline]

@@ -1,13 +1,11 @@
 //! Runtime-dispatched sparse matrix-vector multiplication.
 
-use hermes_simd_core::sparse::{
-    CsrData, DenseWithMaskData, SellPData,
-    SparseView, Csr, DenseWithMask, SellP,
-    SparseSpMv,
-};
+use hermes_simd_core::arch::SimdArch;
 use hermes_simd_core::kernel::SimdKernel;
 use hermes_simd_core::scalar::Scalar;
-use hermes_simd_core::arch::SimdArch;
+use hermes_simd_core::sparse::{
+    Csr, CsrData, DenseWithMask, DenseWithMaskData, SellP, SellPData, SparseSpMv, SparseView,
+};
 use hermes_simd_macros::runtime_dispatch;
 
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
@@ -20,8 +18,11 @@ where
 }
 
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
-pub(super) fn dispatch_spmv_dense_masked_kernel<T, A>(data: DenseWithMaskData<'_, T>, x: &[T], y: &mut [T])
-where
+pub(super) fn dispatch_spmv_dense_masked_kernel<T, A>(
+    data: DenseWithMaskData<'_, T>,
+    x: &[T],
+    y: &mut [T],
+) where
     T: Scalar,
     A: SimdArch + SimdKernel<T>,
 {

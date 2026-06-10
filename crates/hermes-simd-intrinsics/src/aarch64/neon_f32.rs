@@ -4,10 +4,10 @@
 //! Gather is emulated via four individual lane loads — NEON has no native gather.
 //! Compress/expand are emulated via scalar loops.
 
+use crate::Neon;
 #[cfg(target_arch = "aarch64")]
 use core::arch::aarch64::*;
 use hermes_simd_core::kernel::SimdKernel;
-use crate::Neon;
 
 /// Newtype over `float32x4_t` providing `Send + Sync`.
 #[cfg(target_arch = "aarch64")]
@@ -201,8 +201,16 @@ impl SimdKernel<f32> for Neon {
 
     #[target_feature(enable = "neon")]
     #[inline]
-    unsafe fn blend(mask: Self::Vector, true_val: Self::Vector, false_val: Self::Vector) -> Self::Vector {
-        NeonF32Vec(vbslq_f32(vreinterpretq_u32_f32(mask.0), true_val.0, false_val.0))
+    unsafe fn blend(
+        mask: Self::Vector,
+        true_val: Self::Vector,
+        false_val: Self::Vector,
+    ) -> Self::Vector {
+        NeonF32Vec(vbslq_f32(
+            vreinterpretq_u32_f32(mask.0),
+            true_val.0,
+            false_val.0,
+        ))
     }
 
     // -----------------------------------------------------------------------
@@ -289,7 +297,12 @@ impl SimdKernel<f32> for Neon {
         ];
         let mut out = [0.0f32; 4];
         let mut k = 0usize;
-        for i in 0..4 { if m[i] { out[k] = arr[i]; k += 1; } }
+        for i in 0..4 {
+            if m[i] {
+                out[k] = arr[i];
+                k += 1;
+            }
+        }
         NeonF32Vec(vld1q_f32(out.as_ptr()))
     }
 
@@ -307,7 +320,12 @@ impl SimdKernel<f32> for Neon {
             vgetq_lane_u32(mask.0, 3) != 0,
         ];
         let mut k = 0usize;
-        for i in 0..4 { if m[i] { out_arr[i] = src_arr[k]; k += 1; } }
+        for i in 0..4 {
+            if m[i] {
+                out_arr[i] = src_arr[k];
+                k += 1;
+            }
+        }
         NeonF32Vec(vld1q_f32(out_arr.as_ptr()))
     }
 
@@ -344,10 +362,26 @@ impl SimdKernel<f32> for Neon {
         let mut src_arr = [0.0f32; 4];
         vst1q_f32(src_arr.as_mut_ptr(), src.0);
         let out = [
-            if m[0] { *base.add(indices[0] as usize) } else { src_arr[0] },
-            if m[1] { *base.add(indices[1] as usize) } else { src_arr[1] },
-            if m[2] { *base.add(indices[2] as usize) } else { src_arr[2] },
-            if m[3] { *base.add(indices[3] as usize) } else { src_arr[3] },
+            if m[0] {
+                *base.add(indices[0] as usize)
+            } else {
+                src_arr[0]
+            },
+            if m[1] {
+                *base.add(indices[1] as usize)
+            } else {
+                src_arr[1]
+            },
+            if m[2] {
+                *base.add(indices[2] as usize)
+            } else {
+                src_arr[2]
+            },
+            if m[3] {
+                *base.add(indices[3] as usize)
+            } else {
+                src_arr[3]
+            },
         ];
         NeonF32Vec(vld1q_f32(out.as_ptr()))
     }
@@ -360,9 +394,7 @@ impl SimdKernel<f32> for Neon {
     #[inline]
     unsafe fn mask_from_bools(bits: &[bool]) -> Self::Mask {
         debug_assert_eq!(bits.len(), 4);
-        let vals: [u32; 4] = core::array::from_fn(|i| {
-            if bits[i] { 0xFFFF_FFFFu32 } else { 0u32 }
-        });
+        let vals: [u32; 4] = core::array::from_fn(|i| if bits[i] { 0xFFFF_FFFFu32 } else { 0u32 });
         NeonF32Mask(vld1q_u32(vals.as_ptr()))
     }
 
@@ -370,9 +402,7 @@ impl SimdKernel<f32> for Neon {
     #[inline]
     unsafe fn leading_k_mask(k: usize) -> Self::Mask {
         let k = k.min(4);
-        let vals: [u32; 4] = core::array::from_fn(|i| {
-            if i < k { 0xFFFF_FFFFu32 } else { 0u32 }
-        });
+        let vals: [u32; 4] = core::array::from_fn(|i| if i < k { 0xFFFF_FFFFu32 } else { 0u32 });
         NeonF32Mask(vld1q_u32(vals.as_ptr()))
     }
 
@@ -382,11 +412,15 @@ impl SimdKernel<f32> for Neon {
 
     #[target_feature(enable = "neon")]
     #[inline]
-    unsafe fn zero() -> Self::Vector { NeonF32Vec(vdupq_n_f32(0.0)) }
+    unsafe fn zero() -> Self::Vector {
+        NeonF32Vec(vdupq_n_f32(0.0))
+    }
 
     #[target_feature(enable = "neon")]
     #[inline]
-    unsafe fn splat(val: f32) -> Self::Vector { NeonF32Vec(vdupq_n_f32(val)) }
+    unsafe fn splat(val: f32) -> Self::Vector {
+        NeonF32Vec(vdupq_n_f32(val))
+    }
 
     #[target_feature(enable = "neon")]
     #[inline]

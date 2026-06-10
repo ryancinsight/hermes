@@ -131,13 +131,16 @@ fn parse_param(value_str: Option<&str>) -> ParamValue {
     }
 }
 
-fn parse_result(est_path: &Path, bench_path: &Path) -> Result<BenchResult, Box<dyn std::error::Error>> {
+fn parse_result(
+    est_path: &Path,
+    bench_path: &Path,
+) -> Result<BenchResult, Box<dyn std::error::Error>> {
     let est_file = fs::File::open(est_path)?;
     let est: Estimates = serde_json::from_reader(est_file)?;
-    
+
     let bench_file = fs::File::open(bench_path)?;
     let bench: Benchmark = serde_json::from_reader(bench_file)?;
-    
+
     let time_ns = if let Some(slope) = est.slope {
         slope.point_estimate
     } else if let Some(mean) = est.mean {
@@ -145,17 +148,17 @@ fn parse_result(est_path: &Path, bench_path: &Path) -> Result<BenchResult, Box<d
     } else {
         return Err("No point estimate found for slope or mean".into());
     };
-    
+
     let mut throughput_kind = None;
     let mut throughput_val = None;
-    
+
     if let Some(tp_val) = bench.throughput {
         if let Some((kind, val)) = get_throughput_val(&tp_val) {
             throughput_kind = Some(kind);
             throughput_val = Some(val);
         }
     }
-    
+
     Ok(BenchResult {
         group_id: bench.group_id,
         function_id: bench.function_id.unwrap_or_else(|| "default".to_string()),
@@ -170,11 +173,11 @@ fn find_criterion_results(dir: &Path, results: &mut Vec<BenchResult>) -> std::io
     if !dir.is_dir() {
         return Ok(());
     }
-    
+
     let is_new_dir = dir.file_name().and_then(|s| s.to_str()) == Some("new");
     let est_path = dir.join("estimates.json");
     let bench_path = dir.join("benchmark.json");
-    
+
     if is_new_dir && est_path.is_file() && bench_path.is_file() {
         if let Ok(bench_res) = parse_result(&est_path, &bench_path) {
             results.push(bench_res);
@@ -195,7 +198,11 @@ fn find_criterion_results(dir: &Path, results: &mut Vec<BenchResult>) -> std::io
 fn get_cpu_info() -> String {
     if let Ok(output) = Command::new("wmic").args(&["cpu", "get", "name"]).output() {
         if let Ok(stdout) = String::from_utf8(output.stdout) {
-            let lines: Vec<&str> = stdout.lines().map(|s| s.trim()).filter(|s| !s.is_empty() && *s != "Name").collect();
+            let lines: Vec<&str> = stdout
+                .lines()
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty() && *s != "Name")
+                .collect();
             if !lines.is_empty() {
                 return lines[0].to_string();
             }
@@ -220,10 +227,16 @@ fn get_cpu_info() -> String {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
-    let parse_only = args.contains(&"--parse-only".to_string()) || args.contains(&"--no-run".to_string());
+    let parse_only =
+        args.contains(&"--parse-only".to_string()) || args.contains(&"--no-run".to_string());
 
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
-    let workspace_root = manifest_dir.parent().unwrap().parent().unwrap().to_path_buf();
+    let workspace_root = manifest_dir
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .to_path_buf();
     let target_dir = match env::var("CARGO_TARGET_DIR") {
         Ok(val) => PathBuf::from(val),
         Err(_) => workspace_root.join("target"),
@@ -241,11 +254,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
     } else {
-        println!("Skipping benchmark run. Parsing existing results from: {:?}", target_criterion);
+        println!(
+            "Skipping benchmark run. Parsing existing results from: {:?}",
+            target_criterion
+        );
     }
 
     if !target_criterion.exists() {
-        eprintln!("Error: Criterion results directory not found at {:?}", target_criterion);
+        eprintln!(
+            "Error: Criterion results directory not found at {:?}",
+            target_criterion
+        );
         std::process::exit(1);
     }
 
@@ -263,7 +282,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let cpu = get_cpu_info();
-    let date_str = chrono::Local::now().format("%Y-%m-%d %H:%M:%S %Z").to_string();
+    let date_str = chrono::Local::now()
+        .format("%Y-%m-%d %H:%M:%S %Z")
+        .to_string();
 
     let mut markdown = String::new();
     markdown.push_str("# Hermes SIMD Benchmark Results\n\n");
@@ -291,13 +312,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // 1. Look for a group-wide baseline (no parameter)
         let mut group_wide_baseline: Option<BenchResult> = None;
         for item in &items {
-            let is_baseline_candidate = item.function_id == "scalar_iter" 
+            let is_baseline_candidate = item.function_id == "scalar_iter"
                 || item.function_id == "dense_sum"
                 || item.function_id == "dense_dot"
                 || item.function_id == "dense_masked"
                 || item.function_id == "dense"
                 || item.function_id == "dispatch";
-            
+
             if is_baseline_candidate && item.value_str.is_none() {
                 if let Some(ref existing) = group_wide_baseline {
                     if existing.function_id != "scalar_iter" && item.function_id == "scalar_iter" {
@@ -314,17 +335,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if group_wide_baseline.is_none() {
             for item in &items {
                 let param_key = item.value_str.clone().unwrap_or_else(|| "none".to_string());
-                let is_baseline_candidate = item.function_id == "scalar_iter" 
+                let is_baseline_candidate = item.function_id == "scalar_iter"
                     || item.function_id == "dense_sum"
                     || item.function_id == "dense_dot"
                     || item.function_id == "dense_masked"
                     || item.function_id == "dense"
                     || item.function_id == "dispatch";
-                
+
                 if is_baseline_candidate {
                     if let Some(existing) = baselines.get(&param_key) {
                         let existing_item: &BenchResult = existing;
-                        if existing_item.function_id != "scalar_iter" && item.function_id == "scalar_iter" {
+                        if existing_item.function_id != "scalar_iter"
+                            && item.function_id == "scalar_iter"
+                        {
                             baselines.insert(param_key, item.clone());
                         }
                     } else {
@@ -338,7 +361,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         if has_params {
             if has_speedup {
-                markdown.push_str("| Function | Parameter | Time | Throughput | Speedup vs Baseline |\n");
+                markdown.push_str(
+                    "| Function | Parameter | Time | Throughput | Speedup vs Baseline |\n",
+                );
                 markdown.push_str("|---|---|---|---|---|\n");
             } else {
                 markdown.push_str("| Function | Parameter | Time | Throughput |\n");

@@ -8,8 +8,7 @@
 //! 4. Pure SWAR utility primitives in `SwarUtils`.
 
 use hermes_simd::{
-    BitBoardView, BitBoardKernel,
-    KoggeStone, Hyperbola, Magic, HybridSwarMagic, SwarUtils,
+    BitBoardKernel, BitBoardView, HybridSwarMagic, Hyperbola, KoggeStone, Magic, SwarUtils,
 };
 
 fn main() {
@@ -72,7 +71,7 @@ fn main() {
     println!("\nBatch attack queries using BitBoardView:");
     let squares = [d3, c3, f3, d6];
     let mut rook_attacks_out = [0u64; 4];
-    
+
     // Create a view over the output array
     let data = [0u64; 4];
     let view = BitBoardView::<Magic, hermes_simd::Scalar>::new(&data);
@@ -81,20 +80,29 @@ fn main() {
     for (i, sq) in squares.iter().enumerate() {
         let rank = sq / 8 + 1;
         let file = (b'a' + (sq % 8)) as char;
-        println!("  Rook attacks from {}{} (sq {}): popcount = {}", file, rank, sq, rook_attacks_out[i].count_ones());
+        println!(
+            "  Rook attacks from {}{} (sq {}): popcount = {}",
+            file,
+            rank,
+            sq,
+            rook_attacks_out[i].count_ones()
+        );
     }
 
     // 4. Pure SWAR primitives
     println!("\nDemonstrating Pure SWAR Primitives (SwarUtils):");
     let val = 0b101100u64; // bits at index 2, 3, 5 (decimal 44)
     println!("  Input value: {:#b} (decimal {})", val, val);
-    
+
     let lsb = SwarUtils::isolate_lsb(val);
     println!("  Isolate LSB: {:#b} (decimal {})", lsb, lsb);
     assert_eq!(lsb, 4);
 
     let cleared_lsb = SwarUtils::clear_lsb(val);
-    println!("  Clear LSB:   {:#b} (decimal {})", cleared_lsb, cleared_lsb);
+    println!(
+        "  Clear LSB:   {:#b} (decimal {})",
+        cleared_lsb, cleared_lsb
+    );
     assert_eq!(cleared_lsb, 40);
 
     let msb = SwarUtils::isolate_msb(val);
@@ -120,7 +128,10 @@ fn main() {
     for b in 0..8 {
         let original_byte = (bytes_val >> (b * 8)) & 0xff;
         let pop_count = (byte_pops >> (b * 8)) & 0xff;
-        println!("    Byte {}: {:#010b} has popcount {}", b, original_byte, pop_count);
+        println!(
+            "    Byte {}: {:#010b} has popcount {}",
+            b, original_byte, pop_count
+        );
     }
 }
 

@@ -18,4 +18,3 @@ pub fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
 pub fn queen_attacks(square: u8, occupancy: u64) -> u64 {
     unsafe { <Magic as BitBoardKernel>::queen_attacks(square, occupancy) }
 }
-

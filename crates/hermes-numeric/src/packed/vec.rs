@@ -1,6 +1,6 @@
-use alloc::vec::Vec;
-use crate::types::{Bf4, F4};
 use super::slice::{Packable4, Packed4Slice, Packed4SliceMut};
+use crate::types::{Bf4, F4};
+use alloc::vec::Vec;
 
 /// A heap-allocated packed vector of 4-bit values, stored 2 per byte.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -171,7 +171,10 @@ impl<'a, T: Packable4> IntoIterator for Packed4Slice<'a, T> {
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        Packed4Iter { view: self, index: 0 }
+        Packed4Iter {
+            view: self,
+            index: 0,
+        }
     }
 }
 
@@ -183,7 +186,10 @@ impl<T: Packable4> IntoIterator for Packed4Vec<T> {
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        Packed4OwnedIter { vec: self, index: 0 }
+        Packed4OwnedIter {
+            vec: self,
+            index: 0,
+        }
     }
 }
 
@@ -251,4 +257,3 @@ impl<T: Packable4> FromIterator<T> for Packed4Vec<T> {
 pub type PackedBf4Vec = Packed4Vec<Bf4>;
 /// Type alias for a heap-allocated packed vector of F4 values.
 pub type PackedF4Vec = Packed4Vec<F4>;
-

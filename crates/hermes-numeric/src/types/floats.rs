@@ -51,11 +51,19 @@ impl Bf8 {
                 f32::from_bits(sign << 24)
             } else {
                 let val = (mant as f32) * (1.0 / 16384.0);
-                if sign != 0 { -val } else { val }
+                if sign != 0 {
+                    -val
+                } else {
+                    val
+                }
             }
         } else if exp == 0x1F {
             if mant == 0 {
-                if sign != 0 { f32::NEG_INFINITY } else { f32::INFINITY }
+                if sign != 0 {
+                    f32::NEG_INFINITY
+                } else {
+                    f32::INFINITY
+                }
             } else {
                 f32::NAN
             }
@@ -114,7 +122,11 @@ impl Bf4 {
                 f32::from_bits(sign << 28)
             } else {
                 let val = (mant as f32) * 0.125;
-                if sign != 0 { -val } else { val }
+                if sign != 0 {
+                    -val
+                } else {
+                    val
+                }
             }
         } else if exp == 3 {
             f32::NAN
@@ -185,7 +197,11 @@ impl F8 {
                 f32::from_bits(sign << 24)
             } else {
                 let val = (mant as f32) * (1.0 / 512.0);
-                if sign != 0 { -val } else { val }
+                if sign != 0 {
+                    -val
+                } else {
+                    val
+                }
             }
         } else if exp == 0x0F {
             f32::NAN

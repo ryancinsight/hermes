@@ -28,7 +28,6 @@ pub trait BitBoardKernel: Send + Sync + 'static {
     }
 }
 
-
 /// A zero-copy newtype family for chess bitboards.
 ///
 /// Parameterized by `Backend` (e.g. `KoggeStone`, `Magic`), `Arch` (SIMD architecture),
@@ -39,8 +38,10 @@ pub struct BitBoardView<'a, Backend, Arch, Ref: 'a = &'a [u64]> {
     _marker: PhantomData<(&'a u64, Backend, Arch, Ref)>,
 }
 
-unsafe impl<'a, Backend, Arch, Ref: 'a> Send for BitBoardView<'a, Backend, Arch, Ref> where Ref: Send {}
-unsafe impl<'a, Backend, Arch, Ref: 'a> Sync for BitBoardView<'a, Backend, Arch, Ref> where Ref: Sync {}
+unsafe impl<'a, Backend, Arch, Ref: 'a> Send for BitBoardView<'a, Backend, Arch, Ref> where Ref: Send
+{}
+unsafe impl<'a, Backend, Arch, Ref: 'a> Sync for BitBoardView<'a, Backend, Arch, Ref> where Ref: Sync
+{}
 
 impl<'a, Backend, Arch> Clone for BitBoardView<'a, Backend, Arch, &'a [u64]> {
     #[inline(always)]
@@ -133,7 +134,6 @@ where
         unsafe { Backend::queen_attacks(square, occupancy) }
     }
 
-
     /// Generate attacks for a batch of squares under a single occupancy bitboard.
     ///
     /// Amortizes loop overhead and permits compiler instruction scheduling / pipelining
@@ -146,7 +146,10 @@ where
         out: &mut [u64],
         is_rook: bool,
     ) {
-        assert!(out.len() >= squares.len(), "Output slice too short for batch attacks");
+        assert!(
+            out.len() >= squares.len(),
+            "Output slice too short for batch attacks"
+        );
 
         let len = squares.len();
         let mut i = 0;

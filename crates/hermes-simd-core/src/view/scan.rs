@@ -1,10 +1,10 @@
-use crate::arch::SimdArch;
 use crate::align::Alignment;
-use crate::kernel::SimdKernel;
+use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
+use crate::kernel::SimdKernel;
+use crate::ops::{ScanMode, ScanOp};
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
-use crate::ops::{ScanOp, ScanMode};
 
 impl<'a, T: 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode, Ref: 'a>
     SimdView<'a, T, Arch, Align, Mode, Ref>
@@ -17,7 +17,12 @@ where
     /// # Errors
     /// Returns `SimdError::InsufficientOutputLength` if `out.len() < self.len()`.
     #[inline(always)]
-    pub fn prefix_scan<Op, SMode>(&self, out: &mut [T], _op: Op, _mode: SMode) -> Result<(), SimdError>
+    pub fn prefix_scan<Op, SMode>(
+        &self,
+        out: &mut [T],
+        _op: Op,
+        _mode: SMode,
+    ) -> Result<(), SimdError>
     where
         Op: ScanOp<T>,
         SMode: ScanMode,
@@ -77,5 +82,4 @@ where
 
         Ok(())
     }
-
 }

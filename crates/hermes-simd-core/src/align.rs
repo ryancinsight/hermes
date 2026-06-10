@@ -38,7 +38,10 @@ pub struct Aligned<const A: usize>;
 
 impl<const A: usize> Aligned<A> {
     const _CHECK_POWER_OF_TWO: () = {
-        assert!(A.is_power_of_two(), "Alignment boundary must be a power of two");
+        assert!(
+            A.is_power_of_two(),
+            "Alignment boundary must be a power of two"
+        );
     };
 }
 
@@ -67,4 +70,3 @@ impl Alignment for Unaligned {
 
 impl<const A: usize> crate::private::Sealed for Aligned<A> {}
 impl crate::private::Sealed for Unaligned {}
-

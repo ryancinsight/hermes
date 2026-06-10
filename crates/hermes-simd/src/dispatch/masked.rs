@@ -1,8 +1,8 @@
 //! Runtime-dispatched masked SIMD operations.
 
-use hermes_simd_core::{view::SimdError, Scalar as ScalarTrait};
-use hermes_simd_core::kernel::SimdKernel;
 use hermes_simd_core::arch::SimdArch;
+use hermes_simd_core::kernel::SimdKernel;
+use hermes_simd_core::{view::SimdError, Scalar as ScalarTrait};
 use hermes_simd_macros::runtime_dispatch;
 
 // ---------------------------------------------------------------------------
@@ -16,7 +16,11 @@ where
     T: ScalarTrait,
     Arch: SimdArch + SimdKernel<T>,
 {
-    assert_eq!(data.len(), bool_mask.len(), "data and mask lengths must match");
+    assert_eq!(
+        data.len(),
+        bool_mask.len(),
+        "data and mask lengths must match"
+    );
     let len = data.len();
     let lane_count = Arch::LANE_COUNT;
     let simd_len = (len / lane_count) * lane_count;
@@ -83,11 +87,7 @@ where
 
 /// Generic masked dot product: sum of `a[i] * b[i]` where `mask[i]`.
 #[inline]
-unsafe fn masked_dot_impl<T, Arch>(
-    a: &[T],
-    b: &[T],
-    bool_mask: &[bool],
-) -> Result<T, SimdError>
+unsafe fn masked_dot_impl<T, Arch>(a: &[T], b: &[T], bool_mask: &[bool]) -> Result<T, SimdError>
 where
     T: ScalarTrait,
     Arch: SimdArch + SimdKernel<T>,
@@ -137,7 +137,11 @@ where
 }
 
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
-pub(super) fn dispatch_masked_dot_kernel<T, A>(a: &[T], b: &[T], mask: &[bool]) -> Result<T, SimdError>
+pub(super) fn dispatch_masked_dot_kernel<T, A>(
+    a: &[T],
+    b: &[T],
+    mask: &[bool],
+) -> Result<T, SimdError>
 where
     T: ScalarTrait,
     A: SimdArch + SimdKernel<T>,

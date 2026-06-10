@@ -15,10 +15,10 @@
 //! Selection is monomorphized per `(T, Arch, Align)`. The `Align` ZST governs
 //! which load instruction is emitted; `Arch` is a ZST erased after codegen.
 
-use crate::arch::SimdArch;
 use crate::align::Alignment;
-use crate::kernel::SimdKernel;
+use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
+use crate::kernel::SimdKernel;
 use crate::scalar::Scalar;
 use crate::vec::AlignedVec;
 use crate::view::{SimdError, SimdView};
@@ -61,7 +61,9 @@ where
 
         let mut out: AlignedVec<T, Align> = AlignedVec::with_capacity(len);
         // SAFETY: every element is written below.
-        unsafe { out.set_len(len); }
+        unsafe {
+            out.set_len(len);
+        }
         let out_slice = out.as_mut_slice();
 
         let lane_count = Arch::LANE_COUNT;
@@ -109,7 +111,9 @@ where
         let len = data.len();
         let mut out: AlignedVec<T, Align> = AlignedVec::with_capacity(len);
         // SAFETY: every element is written in the loop below.
-        unsafe { out.set_len(len); }
+        unsafe {
+            out.set_len(len);
+        }
         let out_slice = out.as_mut_slice();
 
         let lane_count = Arch::LANE_COUNT;

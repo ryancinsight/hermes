@@ -7,7 +7,7 @@
 //! Each tile accumulates into `TILE_M` independent accumulators, allowing the
 //! CPU to exploit out-of-order execution across the FMA latency pipeline.
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use hermes_simd::{dot, tiled_dot, SimdView, Scalar, Unaligned, Unmasked};
+use hermes_simd::{dot, tiled_dot, Scalar, SimdView, Unaligned, Unmasked};
 
 fn bench_tiled_dot(c: &mut Criterion) {
     let mut group = c.benchmark_group("Tiled Dot f32");
@@ -16,10 +16,8 @@ fn bench_tiled_dot(c: &mut Criterion) {
         let a: Vec<f32> = (0..size).map(|i| i as f32 * 0.001).collect();
         let b_vec: Vec<f32> = (0..size).map(|i| (size - i) as f32 * 0.001).collect();
 
-        let view_a =
-            SimdView::<f32, Scalar, Unaligned, Unmasked, &[f32]>::new(&a).unwrap();
-        let view_b =
-            SimdView::<f32, Scalar, Unaligned, Unmasked, &[f32]>::new(&b_vec).unwrap();
+        let view_a = SimdView::<f32, Scalar, Unaligned, Unmasked, &[f32]>::new(&a).unwrap();
+        let view_b = SimdView::<f32, Scalar, Unaligned, Unmasked, &[f32]>::new(&b_vec).unwrap();
 
         group.throughput(Throughput::Elements(size as u64));
 

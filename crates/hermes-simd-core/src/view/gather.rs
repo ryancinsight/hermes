@@ -1,7 +1,7 @@
-use crate::arch::SimdArch;
 use crate::align::Alignment;
-use crate::kernel::SimdKernel;
+use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
+use crate::kernel::SimdKernel;
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
 

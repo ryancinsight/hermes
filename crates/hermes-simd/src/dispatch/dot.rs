@@ -1,12 +1,12 @@
 //! Generic runtime-dispatch dot product kernel.
 
 use hermes_simd_core::{
-    view::{SimdView, SimdError},
     align::Unaligned,
+    arch::SimdArch,
     execution::Unmasked,
     kernel::SimdKernel,
     scalar::Scalar,
-    arch::SimdArch,
+    view::{SimdError, SimdView},
 };
 use hermes_simd_macros::runtime_dispatch;
 

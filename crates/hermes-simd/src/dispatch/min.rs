@@ -1,13 +1,8 @@
 //! Generic runtime-dispatch min-reduction kernel.
 
 use hermes_simd_core::{
-    view::SimdView,
-    align::Unaligned,
-    execution::Unmasked,
-    kernel::SimdKernel,
-    scalar::Scalar,
-    arch::SimdArch,
-    ops::Min,
+    align::Unaligned, arch::SimdArch, execution::Unmasked, kernel::SimdKernel, ops::Min,
+    scalar::Scalar, view::SimdView,
 };
 use hermes_simd_macros::runtime_dispatch;
 

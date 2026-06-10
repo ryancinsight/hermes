@@ -60,22 +60,70 @@ fn test_elementwise_binary_matches_scalar_reference() {
         let mut o64 = vec![0.0f64; n];
 
         elementwise_add::<f32>(&a32, &b32, &mut o32).unwrap();
-        for i in 0..n { assert_eq!(o32[i].to_bits(), (a32[i] + b32[i]).to_bits(), "add f32 n={n} i={i}"); }
+        for i in 0..n {
+            assert_eq!(
+                o32[i].to_bits(),
+                (a32[i] + b32[i]).to_bits(),
+                "add f32 n={n} i={i}"
+            );
+        }
         elementwise_sub::<f32>(&a32, &b32, &mut o32).unwrap();
-        for i in 0..n { assert_eq!(o32[i].to_bits(), (a32[i] - b32[i]).to_bits(), "sub f32 n={n} i={i}"); }
+        for i in 0..n {
+            assert_eq!(
+                o32[i].to_bits(),
+                (a32[i] - b32[i]).to_bits(),
+                "sub f32 n={n} i={i}"
+            );
+        }
         elementwise_mul::<f32>(&a32, &b32, &mut o32).unwrap();
-        for i in 0..n { assert_eq!(o32[i].to_bits(), (a32[i] * b32[i]).to_bits(), "mul f32 n={n} i={i}"); }
+        for i in 0..n {
+            assert_eq!(
+                o32[i].to_bits(),
+                (a32[i] * b32[i]).to_bits(),
+                "mul f32 n={n} i={i}"
+            );
+        }
         elementwise_div::<f32>(&a32, &b32, &mut o32).unwrap();
-        for i in 0..n { assert_eq!(o32[i].to_bits(), (a32[i] / b32[i]).to_bits(), "div f32 n={n} i={i}"); }
+        for i in 0..n {
+            assert_eq!(
+                o32[i].to_bits(),
+                (a32[i] / b32[i]).to_bits(),
+                "div f32 n={n} i={i}"
+            );
+        }
 
         elementwise_add::<f64>(&a64, &b64, &mut o64).unwrap();
-        for i in 0..n { assert_eq!(o64[i].to_bits(), (a64[i] + b64[i]).to_bits(), "add f64 n={n} i={i}"); }
+        for i in 0..n {
+            assert_eq!(
+                o64[i].to_bits(),
+                (a64[i] + b64[i]).to_bits(),
+                "add f64 n={n} i={i}"
+            );
+        }
         elementwise_sub::<f64>(&a64, &b64, &mut o64).unwrap();
-        for i in 0..n { assert_eq!(o64[i].to_bits(), (a64[i] - b64[i]).to_bits(), "sub f64 n={n} i={i}"); }
+        for i in 0..n {
+            assert_eq!(
+                o64[i].to_bits(),
+                (a64[i] - b64[i]).to_bits(),
+                "sub f64 n={n} i={i}"
+            );
+        }
         elementwise_mul::<f64>(&a64, &b64, &mut o64).unwrap();
-        for i in 0..n { assert_eq!(o64[i].to_bits(), (a64[i] * b64[i]).to_bits(), "mul f64 n={n} i={i}"); }
+        for i in 0..n {
+            assert_eq!(
+                o64[i].to_bits(),
+                (a64[i] * b64[i]).to_bits(),
+                "mul f64 n={n} i={i}"
+            );
+        }
         elementwise_div::<f64>(&a64, &b64, &mut o64).unwrap();
-        for i in 0..n { assert_eq!(o64[i].to_bits(), (a64[i] / b64[i]).to_bits(), "div f64 n={n} i={i}"); }
+        for i in 0..n {
+            assert_eq!(
+                o64[i].to_bits(),
+                (a64[i] / b64[i]).to_bits(),
+                "div f64 n={n} i={i}"
+            );
+        }
     }
 }
 
@@ -157,7 +205,7 @@ fn test_generic_masked_ops_f32() {
     let b = [10.0f32, 10.0, 10.0, 10.0];
     let mask = [true, false, true, false];
     let mut out = [0.0f32; 4];
-    
+
     assert!((masked_sum(&a, &mask) - 4.0).abs() < 1e-5);
     assert!((masked_dot(&a, &b, &mask).unwrap() - 40.0).abs() < 1e-5);
     masked_add(&a, &b, &mask, &mut out).unwrap();
@@ -170,7 +218,7 @@ fn test_generic_masked_ops_f64() {
     let b = [10.0f64, 10.0, 10.0, 10.0];
     let mask = [true, false, true, false];
     let mut out = [0.0f64; 4];
-    
+
     assert!((masked_sum(&a, &mask) - 4.0).abs() < 1e-12);
     assert!((masked_dot(&a, &b, &mask).unwrap() - 40.0).abs() < 1e-12);
     masked_add(&a, &b, &mask, &mut out).unwrap();
@@ -191,7 +239,10 @@ fn test_f16_basic_ops() {
 
     let mut mul_out = vec![f16::ZERO; 3];
     elementwise_mul(&a, &b, &mut mul_out).unwrap();
-    assert_eq!(mul_out, vec![f16::from_f32(4.0), f16::from_f32(10.0), f16::from_f32(18.0)]);
+    assert_eq!(
+        mul_out,
+        vec![f16::from_f32(4.0), f16::from_f32(10.0), f16::from_f32(18.0)]
+    );
 
     let mask = [true, false, true];
     assert_eq!(masked_sum(&a, &mask), f16::from_f32(4.0));
@@ -199,7 +250,10 @@ fn test_f16_basic_ops() {
 
     let mut add_out = vec![f16::ZERO; 3];
     masked_add(&a, &b, &mask, &mut add_out).unwrap();
-    assert_eq!(add_out, vec![f16::from_f32(5.0), f16::from_f32(2.0), f16::from_f32(9.0)]);
+    assert_eq!(
+        add_out,
+        vec![f16::from_f32(5.0), f16::from_f32(2.0), f16::from_f32(9.0)]
+    );
 }
 
 #[test]
@@ -226,35 +280,45 @@ fn test_monomorphized_vector_ops() {
     {
         let a = Vector::<f32, Scalar>::splat(2.0f32);
         let b = Vector::<f32, Scalar>::splat(3.0f32);
-        
+
         let c = a + b;
         let d = a * b;
         let e = a - b;
-        
+
         let mut buf = [0.0f32; 4];
-        unsafe { c.store_unaligned(buf.as_mut_ptr()); }
+        unsafe {
+            c.store_unaligned(buf.as_mut_ptr());
+        }
         assert_eq!(buf, [5.0f32; 4]);
-        
-        unsafe { d.store_unaligned(buf.as_mut_ptr()); }
+
+        unsafe {
+            d.store_unaligned(buf.as_mut_ptr());
+        }
         assert_eq!(buf, [6.0f32; 4]);
-        
-        unsafe { e.store_unaligned(buf.as_mut_ptr()); }
+
+        unsafe {
+            e.store_unaligned(buf.as_mut_ptr());
+        }
         assert_eq!(buf, [-1.0f32; 4]);
 
         let mut a_mut = a;
         a_mut += b;
         assert_eq!(a_mut, c);
-        
+
         a_mut *= b;
-        unsafe { a_mut.store_unaligned(buf.as_mut_ptr()); }
+        unsafe {
+            a_mut.store_unaligned(buf.as_mut_ptr());
+        }
         assert_eq!(buf, [15.0f32; 4]);
 
         assert_eq!(c.sum_reduce(), 20.0f32);
-        
+
         let f = Vector::<f32, Scalar>::splat(6.0f32);
         let g = Vector::<f32, Scalar>::splat(2.0f32);
         let h = f / g;
-        unsafe { h.store_unaligned(buf.as_mut_ptr()); }
+        unsafe {
+            h.store_unaligned(buf.as_mut_ptr());
+        }
         assert_eq!(buf, [3.0f32; 4]);
     }
 
@@ -264,35 +328,45 @@ fn test_monomorphized_vector_ops() {
     {
         let a = Vector::<f64, Scalar>::splat(2.0f64);
         let b = Vector::<f64, Scalar>::splat(3.0f64);
-        
+
         let c = a + b;
         let d = a * b;
         let e = a - b;
-        
+
         let mut buf = [0.0f64; 2];
-        unsafe { c.store_unaligned(buf.as_mut_ptr()); }
+        unsafe {
+            c.store_unaligned(buf.as_mut_ptr());
+        }
         assert_eq!(buf, [5.0f64; 2]);
-        
-        unsafe { d.store_unaligned(buf.as_mut_ptr()); }
+
+        unsafe {
+            d.store_unaligned(buf.as_mut_ptr());
+        }
         assert_eq!(buf, [6.0f64; 2]);
-        
-        unsafe { e.store_unaligned(buf.as_mut_ptr()); }
+
+        unsafe {
+            e.store_unaligned(buf.as_mut_ptr());
+        }
         assert_eq!(buf, [-1.0f64; 2]);
 
         let mut a_mut = a;
         a_mut += b;
         assert_eq!(a_mut, c);
-        
+
         a_mut *= b;
-        unsafe { a_mut.store_unaligned(buf.as_mut_ptr()); }
+        unsafe {
+            a_mut.store_unaligned(buf.as_mut_ptr());
+        }
         assert_eq!(buf, [15.0f64; 2]);
 
         assert_eq!(c.sum_reduce(), 10.0f64);
-        
+
         let f = Vector::<f64, Scalar>::splat(6.0f64);
         let g = Vector::<f64, Scalar>::splat(2.0f64);
         let h = f / g;
-        unsafe { h.store_unaligned(buf.as_mut_ptr()); }
+        unsafe {
+            h.store_unaligned(buf.as_mut_ptr());
+        }
         assert_eq!(buf, [3.0f64; 2]);
     }
 
@@ -308,9 +382,13 @@ fn test_monomorphized_vector_ops() {
             let c = a + b;
             let d = a * b;
             let mut buf_f32 = [0.0f32; 8];
-            unsafe { c.store_unaligned(buf_f32.as_mut_ptr()); }
+            unsafe {
+                c.store_unaligned(buf_f32.as_mut_ptr());
+            }
             assert_eq!(buf_f32, [5.0f32; 8]);
-            unsafe { d.store_unaligned(buf_f32.as_mut_ptr()); }
+            unsafe {
+                d.store_unaligned(buf_f32.as_mut_ptr());
+            }
             assert_eq!(buf_f32, [6.0f32; 8]);
             assert_eq!(c.sum_reduce(), 40.0f32);
 
@@ -320,9 +398,13 @@ fn test_monomorphized_vector_ops() {
             let c_f64 = a_f64 + b_f64;
             let d_f64 = a_f64 * b_f64;
             let mut buf_f64 = [0.0f64; 4];
-            unsafe { c_f64.store_unaligned(buf_f64.as_mut_ptr()); }
+            unsafe {
+                c_f64.store_unaligned(buf_f64.as_mut_ptr());
+            }
             assert_eq!(buf_f64, [5.0f64; 4]);
-            unsafe { d_f64.store_unaligned(buf_f64.as_mut_ptr()); }
+            unsafe {
+                d_f64.store_unaligned(buf_f64.as_mut_ptr());
+            }
             assert_eq!(buf_f64, [6.0f64; 4]);
             assert_eq!(c_f64.sum_reduce(), 20.0f64);
         }
@@ -340,9 +422,13 @@ fn test_monomorphized_vector_ops() {
             let c = a + b;
             let d = a * b;
             let mut buf_f32 = [0.0f32; 16];
-            unsafe { c.store_unaligned(buf_f32.as_mut_ptr()); }
+            unsafe {
+                c.store_unaligned(buf_f32.as_mut_ptr());
+            }
             assert_eq!(buf_f32, [5.0f32; 16]);
-            unsafe { d.store_unaligned(buf_f32.as_mut_ptr()); }
+            unsafe {
+                d.store_unaligned(buf_f32.as_mut_ptr());
+            }
             assert_eq!(buf_f32, [6.0f32; 16]);
             assert_eq!(c.sum_reduce(), 80.0f32);
 
@@ -352,9 +438,13 @@ fn test_monomorphized_vector_ops() {
             let c_f64 = a_f64 + b_f64;
             let d_f64 = a_f64 * b_f64;
             let mut buf_f64 = [0.0f64; 8];
-            unsafe { c_f64.store_unaligned(buf_f64.as_mut_ptr()); }
+            unsafe {
+                c_f64.store_unaligned(buf_f64.as_mut_ptr());
+            }
             assert_eq!(buf_f64, [5.0f64; 8]);
-            unsafe { d_f64.store_unaligned(buf_f64.as_mut_ptr()); }
+            unsafe {
+                d_f64.store_unaligned(buf_f64.as_mut_ptr());
+            }
             assert_eq!(buf_f64, [6.0f64; 8]);
             assert_eq!(c_f64.sum_reduce(), 40.0f64);
         }
@@ -371,9 +461,13 @@ fn test_monomorphized_vector_ops() {
         let c = a + b;
         let d = a * b;
         let mut buf_f32 = [0.0f32; 4];
-        unsafe { c.store_unaligned(buf_f32.as_mut_ptr()); }
+        unsafe {
+            c.store_unaligned(buf_f32.as_mut_ptr());
+        }
         assert_eq!(buf_f32, [5.0f32; 4]);
-        unsafe { d.store_unaligned(buf_f32.as_mut_ptr()); }
+        unsafe {
+            d.store_unaligned(buf_f32.as_mut_ptr());
+        }
         assert_eq!(buf_f32, [6.0f32; 4]);
         assert_eq!(c.sum_reduce(), 20.0f32);
 
@@ -383,9 +477,13 @@ fn test_monomorphized_vector_ops() {
         let c_f64 = a_f64 + b_f64;
         let d_f64 = a_f64 * b_f64;
         let mut buf_f64 = [0.0f64; 2];
-        unsafe { c_f64.store_unaligned(buf_f64.as_mut_ptr()); }
+        unsafe {
+            c_f64.store_unaligned(buf_f64.as_mut_ptr());
+        }
         assert_eq!(buf_f64, [5.0f64; 2]);
-        unsafe { d_f64.store_unaligned(buf_f64.as_mut_ptr()); }
+        unsafe {
+            d_f64.store_unaligned(buf_f64.as_mut_ptr());
+        }
         assert_eq!(buf_f64, [6.0f64; 2]);
         assert_eq!(c_f64.sum_reduce(), 10.0f64);
     }
@@ -434,4 +532,3 @@ fn test_new_emulated_types() {
         assert_eq!(dot(&a, &b).unwrap(), 32);
     }
 }
-

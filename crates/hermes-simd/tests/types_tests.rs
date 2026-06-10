@@ -1,7 +1,4 @@
-#![allow(
-    clippy::manual_div_ceil,
-    clippy::needless_range_loop
-)]
+#![allow(clippy::manual_div_ceil, clippy::needless_range_loop)]
 use hermes_simd::*;
 use hermes_simd_core::scalar::NumericElement;
 
@@ -21,9 +18,16 @@ macro_rules! test_f32_ops_for_arch {
         // 1. Division
         let c = a / b;
         let mut buf_res = [0.0f32; $lanes];
-        unsafe { c.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            c.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            assert!((buf_res[i] - (buf_a[i] / 2.0)).abs() < 1e-5, "Div failed at lane {} of {}", i, stringify!($arch));
+            assert!(
+                (buf_res[i] - (buf_a[i] / 2.0)).abs() < 1e-5,
+                "Div failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         // 2. Bitwise operators
@@ -34,53 +38,113 @@ macro_rules! test_f32_ops_for_arch {
         let vec_pat_b = Vector::<f32, $arch>::splat(pattern_b);
 
         let and_res = vec_pat_a & vec_pat_b;
-        unsafe { and_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            and_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let res_bits = buf_res[i].to_bits();
-            assert_eq!(res_bits, 0x5555_5555 & 0x3333_3333, "BitAnd failed at lane {} of {}", i, stringify!($arch));
+            assert_eq!(
+                res_bits,
+                0x5555_5555 & 0x3333_3333,
+                "BitAnd failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let or_res = vec_pat_a | vec_pat_b;
-        unsafe { or_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            or_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let res_bits = buf_res[i].to_bits();
-            assert_eq!(res_bits, 0x5555_5555 | 0x3333_3333, "BitOr failed at lane {} of {}", i, stringify!($arch));
+            assert_eq!(
+                res_bits,
+                0x5555_5555 | 0x3333_3333,
+                "BitOr failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let xor_res = vec_pat_a ^ vec_pat_b;
-        unsafe { xor_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            xor_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let res_bits = buf_res[i].to_bits();
-            assert_eq!(res_bits, 0x5555_5555 ^ 0x3333_3333, "BitXor failed at lane {} of {}", i, stringify!($arch));
+            assert_eq!(
+                res_bits,
+                0x5555_5555 ^ 0x3333_3333,
+                "BitXor failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         // 3. Math (abs, min, max, sqrt)
         let abs_res = a.abs();
-        unsafe { abs_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            abs_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            assert!((buf_res[i] - buf_a[i].abs()).abs() < 1e-5, "Abs failed at lane {} of {}", i, stringify!($arch));
+            assert!(
+                (buf_res[i] - buf_a[i].abs()).abs() < 1e-5,
+                "Abs failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let min_res = a.min(b);
-        unsafe { min_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            min_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            let expected = if buf_a[i] < buf_b[i] { buf_a[i] } else { buf_b[i] };
-            assert!((buf_res[i] - expected).abs() < 1e-5, "Min failed at lane {} of {}", i, stringify!($arch));
+            let expected = if buf_a[i] < buf_b[i] {
+                buf_a[i]
+            } else {
+                buf_b[i]
+            };
+            assert!(
+                (buf_res[i] - expected).abs() < 1e-5,
+                "Min failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let max_res = a.max(b);
-        unsafe { max_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            max_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            let expected = if buf_a[i] > buf_b[i] { buf_a[i] } else { buf_b[i] };
-            assert!((buf_res[i] - expected).abs() < 1e-5, "Max failed at lane {} of {}", i, stringify!($arch));
+            let expected = if buf_a[i] > buf_b[i] {
+                buf_a[i]
+            } else {
+                buf_b[i]
+            };
+            assert!(
+                (buf_res[i] - expected).abs() < 1e-5,
+                "Max failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let non_neg = abs_res;
         let sqrt_res = non_neg.sqrt();
-        unsafe { sqrt_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            sqrt_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let expected = buf_a[i].abs().sqrt();
-            assert!((buf_res[i] - expected).abs() < 1e-5, "Sqrt failed at lane {} of {}", i, stringify!($arch));
+            assert!(
+                (buf_res[i] - expected).abs() < 1e-5,
+                "Sqrt failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         // 4. Comparisons (cmp_eq, cmp_ne, cmp_lt, cmp_le, cmp_gt, cmp_ge)
@@ -88,51 +152,115 @@ macro_rules! test_f32_ops_for_arch {
         let all_ones_u32 = 0xFFFF_FFFFu32;
 
         let eq_res = a.cmp_eq(b);
-        unsafe { eq_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            eq_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let actual_bits = buf_res[i].to_bits();
-            let expected_bits = if buf_a[i] == buf_b[i] { all_ones_u32 } else { 0 };
-            assert_eq!(actual_bits, expected_bits, "CmpEq failed at lane {} of {}", i, stringify!($arch));
+            let expected_bits = if buf_a[i] == buf_b[i] {
+                all_ones_u32
+            } else {
+                0
+            };
+            assert_eq!(
+                actual_bits,
+                expected_bits,
+                "CmpEq failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let ne_res = a.cmp_ne(b);
-        unsafe { ne_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            ne_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let actual_bits = buf_res[i].to_bits();
-            let expected_bits = if buf_a[i] != buf_b[i] { all_ones_u32 } else { 0 };
-            assert_eq!(actual_bits, expected_bits, "CmpNe failed at lane {} of {}", i, stringify!($arch));
+            let expected_bits = if buf_a[i] != buf_b[i] {
+                all_ones_u32
+            } else {
+                0
+            };
+            assert_eq!(
+                actual_bits,
+                expected_bits,
+                "CmpNe failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let lt_res = a.cmp_lt(b);
-        unsafe { lt_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            lt_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let actual_bits = buf_res[i].to_bits();
             let expected_bits = if buf_a[i] < buf_b[i] { all_ones_u32 } else { 0 };
-            assert_eq!(actual_bits, expected_bits, "CmpLt failed at lane {} of {}", i, stringify!($arch));
+            assert_eq!(
+                actual_bits,
+                expected_bits,
+                "CmpLt failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let le_res = a.cmp_le(b);
-        unsafe { le_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            le_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let actual_bits = buf_res[i].to_bits();
-            let expected_bits = if buf_a[i] <= buf_b[i] { all_ones_u32 } else { 0 };
-            assert_eq!(actual_bits, expected_bits, "CmpLe failed at lane {} of {}", i, stringify!($arch));
+            let expected_bits = if buf_a[i] <= buf_b[i] {
+                all_ones_u32
+            } else {
+                0
+            };
+            assert_eq!(
+                actual_bits,
+                expected_bits,
+                "CmpLe failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let gt_res = a.cmp_gt(b);
-        unsafe { gt_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            gt_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let actual_bits = buf_res[i].to_bits();
             let expected_bits = if buf_a[i] > buf_b[i] { all_ones_u32 } else { 0 };
-            assert_eq!(actual_bits, expected_bits, "CmpGt failed at lane {} of {}", i, stringify!($arch));
+            assert_eq!(
+                actual_bits,
+                expected_bits,
+                "CmpGt failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let ge_res = a.cmp_ge(b);
-        unsafe { ge_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            ge_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let actual_bits = buf_res[i].to_bits();
-            let expected_bits = if buf_a[i] >= buf_b[i] { all_ones_u32 } else { 0 };
-            assert_eq!(actual_bits, expected_bits, "CmpGe failed at lane {} of {}", i, stringify!($arch));
+            let expected_bits = if buf_a[i] >= buf_b[i] {
+                all_ones_u32
+            } else {
+                0
+            };
+            assert_eq!(
+                actual_bits,
+                expected_bits,
+                "CmpGe failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         // 5. Blend
@@ -140,10 +268,22 @@ macro_rules! test_f32_ops_for_arch {
         let true_val = Vector::<f32, $arch>::splat(100.0);
         let false_val = Vector::<f32, $arch>::splat(-100.0);
         let blend_res = gt_res.blend(true_val, false_val);
-        unsafe { blend_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            blend_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            let expected = if buf_a[i] > buf_b[i] { 100.0f32 } else { -100.0f32 };
-            assert_eq!(buf_res[i], expected, "Blend failed at lane {} of {}", i, stringify!($arch));
+            let expected = if buf_a[i] > buf_b[i] {
+                100.0f32
+            } else {
+                -100.0f32
+            };
+            assert_eq!(
+                buf_res[i],
+                expected,
+                "Blend failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
     };
 }
@@ -164,9 +304,16 @@ macro_rules! test_f64_ops_for_arch {
         // 1. Division
         let c = a / b;
         let mut buf_res = [0.0f64; $lanes];
-        unsafe { c.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            c.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            assert!((buf_res[i] - (buf_a[i] / 2.0)).abs() < 1e-12, "f64 Div failed at lane {} of {}", i, stringify!($arch));
+            assert!(
+                (buf_res[i] - (buf_a[i] / 2.0)).abs() < 1e-12,
+                "f64 Div failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         // 2. Bitwise operators
@@ -176,114 +323,250 @@ macro_rules! test_f64_ops_for_arch {
         let vec_pat_b = Vector::<f64, $arch>::splat(pattern_b);
 
         let and_res = vec_pat_a & vec_pat_b;
-        unsafe { and_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            and_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let res_bits = buf_res[i].to_bits();
-            assert_eq!(res_bits, 0x5555_5555_5555_5555 & 0x3333_3333_3333_3333, "f64 BitAnd failed at lane {} of {}", i, stringify!($arch));
+            assert_eq!(
+                res_bits,
+                0x5555_5555_5555_5555 & 0x3333_3333_3333_3333,
+                "f64 BitAnd failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let or_res = vec_pat_a | vec_pat_b;
-        unsafe { or_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            or_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let res_bits = buf_res[i].to_bits();
-            assert_eq!(res_bits, 0x5555_5555_5555_5555 | 0x3333_3333_3333_3333, "f64 BitOr failed at lane {} of {}", i, stringify!($arch));
+            assert_eq!(
+                res_bits,
+                0x5555_5555_5555_5555 | 0x3333_3333_3333_3333,
+                "f64 BitOr failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let xor_res = vec_pat_a ^ vec_pat_b;
-        unsafe { xor_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            xor_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let res_bits = buf_res[i].to_bits();
-            assert_eq!(res_bits, 0x5555_5555_5555_5555 ^ 0x3333_3333_3333_3333, "f64 BitXor failed at lane {} of {}", i, stringify!($arch));
+            assert_eq!(
+                res_bits,
+                0x5555_5555_5555_5555 ^ 0x3333_3333_3333_3333,
+                "f64 BitXor failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         // 3. Math
         let abs_res = a.abs();
-        unsafe { abs_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            abs_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            assert!((buf_res[i] - buf_a[i].abs()).abs() < 1e-12, "f64 Abs failed at lane {} of {}", i, stringify!($arch));
+            assert!(
+                (buf_res[i] - buf_a[i].abs()).abs() < 1e-12,
+                "f64 Abs failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let min_res = a.min(b);
-        unsafe { min_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            min_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            let expected = if buf_a[i] < buf_b[i] { buf_a[i] } else { buf_b[i] };
-            assert!((buf_res[i] - expected).abs() < 1e-12, "f64 Min failed at lane {} of {}", i, stringify!($arch));
+            let expected = if buf_a[i] < buf_b[i] {
+                buf_a[i]
+            } else {
+                buf_b[i]
+            };
+            assert!(
+                (buf_res[i] - expected).abs() < 1e-12,
+                "f64 Min failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let max_res = a.max(b);
-        unsafe { max_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            max_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            let expected = if buf_a[i] > buf_b[i] { buf_a[i] } else { buf_b[i] };
-            assert!((buf_res[i] - expected).abs() < 1e-12, "f64 Max failed at lane {} of {}", i, stringify!($arch));
+            let expected = if buf_a[i] > buf_b[i] {
+                buf_a[i]
+            } else {
+                buf_b[i]
+            };
+            assert!(
+                (buf_res[i] - expected).abs() < 1e-12,
+                "f64 Max failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let non_neg = abs_res;
         let sqrt_res = non_neg.sqrt();
-        unsafe { sqrt_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            sqrt_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let expected = buf_a[i].abs().sqrt();
-            assert!((buf_res[i] - expected).abs() < 1e-12, "f64 Sqrt failed at lane {} of {}", i, stringify!($arch));
+            assert!(
+                (buf_res[i] - expected).abs() < 1e-12,
+                "f64 Sqrt failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         // 4. Comparisons
         let all_ones_u64 = 0xFFFF_FFFF_FFFF_FFFFu64;
 
         let eq_res = a.cmp_eq(b);
-        unsafe { eq_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            eq_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let actual_bits = buf_res[i].to_bits();
-            let expected_bits = if buf_a[i] == buf_b[i] { all_ones_u64 } else { 0 };
-            assert_eq!(actual_bits, expected_bits, "f64 CmpEq failed at lane {} of {}", i, stringify!($arch));
+            let expected_bits = if buf_a[i] == buf_b[i] {
+                all_ones_u64
+            } else {
+                0
+            };
+            assert_eq!(
+                actual_bits,
+                expected_bits,
+                "f64 CmpEq failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let ne_res = a.cmp_ne(b);
-        unsafe { ne_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            ne_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let actual_bits = buf_res[i].to_bits();
-            let expected_bits = if buf_a[i] != buf_b[i] { all_ones_u64 } else { 0 };
-            assert_eq!(actual_bits, expected_bits, "f64 CmpNe failed at lane {} of {}", i, stringify!($arch));
+            let expected_bits = if buf_a[i] != buf_b[i] {
+                all_ones_u64
+            } else {
+                0
+            };
+            assert_eq!(
+                actual_bits,
+                expected_bits,
+                "f64 CmpNe failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let lt_res = a.cmp_lt(b);
-        unsafe { lt_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            lt_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let actual_bits = buf_res[i].to_bits();
             let expected_bits = if buf_a[i] < buf_b[i] { all_ones_u64 } else { 0 };
-            assert_eq!(actual_bits, expected_bits, "f64 CmpLt failed at lane {} of {}", i, stringify!($arch));
+            assert_eq!(
+                actual_bits,
+                expected_bits,
+                "f64 CmpLt failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let le_res = a.cmp_le(b);
-        unsafe { le_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            le_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let actual_bits = buf_res[i].to_bits();
-            let expected_bits = if buf_a[i] <= buf_b[i] { all_ones_u64 } else { 0 };
-            assert_eq!(actual_bits, expected_bits, "f64 CmpLe failed at lane {} of {}", i, stringify!($arch));
+            let expected_bits = if buf_a[i] <= buf_b[i] {
+                all_ones_u64
+            } else {
+                0
+            };
+            assert_eq!(
+                actual_bits,
+                expected_bits,
+                "f64 CmpLe failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let gt_res = a.cmp_gt(b);
-        unsafe { gt_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            gt_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let actual_bits = buf_res[i].to_bits();
             let expected_bits = if buf_a[i] > buf_b[i] { all_ones_u64 } else { 0 };
-            assert_eq!(actual_bits, expected_bits, "f64 CmpGt failed at lane {} of {}", i, stringify!($arch));
+            assert_eq!(
+                actual_bits,
+                expected_bits,
+                "f64 CmpGt failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         let ge_res = a.cmp_ge(b);
-        unsafe { ge_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            ge_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
             let actual_bits = buf_res[i].to_bits();
-            let expected_bits = if buf_a[i] >= buf_b[i] { all_ones_u64 } else { 0 };
-            assert_eq!(actual_bits, expected_bits, "f64 CmpGe failed at lane {} of {}", i, stringify!($arch));
+            let expected_bits = if buf_a[i] >= buf_b[i] {
+                all_ones_u64
+            } else {
+                0
+            };
+            assert_eq!(
+                actual_bits,
+                expected_bits,
+                "f64 CmpGe failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
 
         // 5. Blend
         let true_val = Vector::<f64, $arch>::splat(100.0);
         let false_val = Vector::<f64, $arch>::splat(-100.0);
         let blend_res = gt_res.blend(true_val, false_val);
-        unsafe { blend_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            blend_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            let expected = if buf_a[i] > buf_b[i] { 100.0f64 } else { -100.0f64 };
-            assert_eq!(buf_res[i], expected, "f64 Blend failed at lane {} of {}", i, stringify!($arch));
+            let expected = if buf_a[i] > buf_b[i] {
+                100.0f64
+            } else {
+                -100.0f64
+            };
+            assert_eq!(
+                buf_res[i],
+                expected,
+                "f64 Blend failed at lane {} of {}",
+                i,
+                stringify!($arch)
+            );
         }
     };
 }
@@ -294,8 +577,14 @@ macro_rules! test_numeric_ops_for_arch {
         let mut buf_a = [<$t as hermes_simd_core::scalar::NumericElement>::ZERO; $lanes];
         let mut buf_b = [<$t as hermes_simd_core::scalar::NumericElement>::ZERO; $lanes];
         for i in 0..$lanes {
-            buf_a[i] = if i % 2 == 0 { <$t as hermes_simd_core::scalar::NumericElement>::ONE + <$t as hermes_simd_core::scalar::NumericElement>::ONE } else { <$t as hermes_simd_core::scalar::NumericElement>::ONE };
-            buf_b[i] = <$t as hermes_simd_core::scalar::NumericElement>::ONE + <$t as hermes_simd_core::scalar::NumericElement>::ONE;
+            buf_a[i] = if i % 2 == 0 {
+                <$t as hermes_simd_core::scalar::NumericElement>::ONE
+                    + <$t as hermes_simd_core::scalar::NumericElement>::ONE
+            } else {
+                <$t as hermes_simd_core::scalar::NumericElement>::ONE
+            };
+            buf_b[i] = <$t as hermes_simd_core::scalar::NumericElement>::ONE
+                + <$t as hermes_simd_core::scalar::NumericElement>::ONE;
         }
 
         let a = unsafe { Vector::<$t, $arch>::load_unaligned(buf_a.as_ptr()) };
@@ -304,71 +593,168 @@ macro_rules! test_numeric_ops_for_arch {
         // 1. Arithmetic
         let c_add = a + b;
         let mut buf_res = [<$t as hermes_simd_core::scalar::NumericElement>::ZERO; $lanes];
-        unsafe { c_add.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            c_add.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            assert_eq!(buf_res[i], buf_a[i] + buf_b[i], "Add failed for {} at lane {} on {}", stringify!($t), i, stringify!($arch));
+            assert_eq!(
+                buf_res[i],
+                buf_a[i] + buf_b[i],
+                "Add failed for {} at lane {} on {}",
+                stringify!($t),
+                i,
+                stringify!($arch)
+            );
         }
 
         let c_sub = a - b;
-        unsafe { c_sub.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            c_sub.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            assert_eq!(buf_res[i], buf_a[i] - buf_b[i], "Sub failed for {} at lane {} on {}", stringify!($t), i, stringify!($arch));
+            assert_eq!(
+                buf_res[i],
+                buf_a[i] - buf_b[i],
+                "Sub failed for {} at lane {} on {}",
+                stringify!($t),
+                i,
+                stringify!($arch)
+            );
         }
 
         let c_mul = a * b;
-        unsafe { c_mul.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            c_mul.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            assert_eq!(buf_res[i], buf_a[i] * buf_b[i], "Mul failed for {} at lane {} on {}", stringify!($t), i, stringify!($arch));
+            assert_eq!(
+                buf_res[i],
+                buf_a[i] * buf_b[i],
+                "Mul failed for {} at lane {} on {}",
+                stringify!($t),
+                i,
+                stringify!($arch)
+            );
         }
 
         // 2. Bitwise operators
         let and_res = a & b;
-        unsafe { and_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            and_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            assert_eq!(buf_res[i], buf_a[i].bitand(buf_b[i]), "BitAnd failed for {} at lane {} on {}", stringify!($t), i, stringify!($arch));
+            assert_eq!(
+                buf_res[i],
+                buf_a[i].bitand(buf_b[i]),
+                "BitAnd failed for {} at lane {} on {}",
+                stringify!($t),
+                i,
+                stringify!($arch)
+            );
         }
 
         let or_res = a | b;
-        unsafe { or_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            or_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            assert_eq!(buf_res[i], buf_a[i].bitor(buf_b[i]), "BitOr failed for {} at lane {} on {}", stringify!($t), i, stringify!($arch));
+            assert_eq!(
+                buf_res[i],
+                buf_a[i].bitor(buf_b[i]),
+                "BitOr failed for {} at lane {} on {}",
+                stringify!($t),
+                i,
+                stringify!($arch)
+            );
         }
 
         let xor_res = a ^ b;
-        unsafe { xor_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            xor_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            assert_eq!(buf_res[i], buf_a[i].bitxor(buf_b[i]), "BitXor failed for {} at lane {} on {}", stringify!($t), i, stringify!($arch));
+            assert_eq!(
+                buf_res[i],
+                buf_a[i].bitxor(buf_b[i]),
+                "BitXor failed for {} at lane {} on {}",
+                stringify!($t),
+                i,
+                stringify!($arch)
+            );
         }
 
         // 3. Comparisons
         let eq_res = a.cmp_eq(b);
-        unsafe { eq_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            eq_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            let expected = if buf_a[i] == buf_b[i] { <$t as hermes_simd_core::scalar::NumericElement>::ALL_ONES } else { <$t as hermes_simd_core::scalar::NumericElement>::ZERO };
+            let expected = if buf_a[i] == buf_b[i] {
+                <$t as hermes_simd_core::scalar::NumericElement>::ALL_ONES
+            } else {
+                <$t as hermes_simd_core::scalar::NumericElement>::ZERO
+            };
             let actual = buf_res[i];
             let is_ok = (actual.is_nan() && expected.is_nan()) || actual == expected;
-            assert!(is_ok, "CmpEq failed for {} at lane {} on {} (actual: {:?}, expected: {:?})", stringify!($t), i, stringify!($arch), actual, expected);
+            assert!(
+                is_ok,
+                "CmpEq failed for {} at lane {} on {} (actual: {:?}, expected: {:?})",
+                stringify!($t),
+                i,
+                stringify!($arch),
+                actual,
+                expected
+            );
         }
 
         let lt_res = a.cmp_lt(b);
-        unsafe { lt_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            lt_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            let expected = if buf_a[i] < buf_b[i] { <$t as hermes_simd_core::scalar::NumericElement>::ALL_ONES } else { <$t as hermes_simd_core::scalar::NumericElement>::ZERO };
+            let expected = if buf_a[i] < buf_b[i] {
+                <$t as hermes_simd_core::scalar::NumericElement>::ALL_ONES
+            } else {
+                <$t as hermes_simd_core::scalar::NumericElement>::ZERO
+            };
             let actual = buf_res[i];
             let is_ok = (actual.is_nan() && expected.is_nan()) || actual == expected;
-            assert!(is_ok, "CmpLt failed for {} at lane {} on {} (actual: {:?}, expected: {:?})", stringify!($t), i, stringify!($arch), actual, expected);
+            assert!(
+                is_ok,
+                "CmpLt failed for {} at lane {} on {} (actual: {:?}, expected: {:?})",
+                stringify!($t),
+                i,
+                stringify!($arch),
+                actual,
+                expected
+            );
         }
 
         // 4. Blend
-        let true_val = Vector::<$t, $arch>::splat(<$t as hermes_simd_core::scalar::NumericElement>::ONE);
+        let true_val =
+            Vector::<$t, $arch>::splat(<$t as hermes_simd_core::scalar::NumericElement>::ONE);
         let false_val = Vector::<$t, $arch>::zero();
         let blend_res = eq_res.blend(true_val, false_val);
-        unsafe { blend_res.store_unaligned(buf_res.as_mut_ptr()); }
+        unsafe {
+            blend_res.store_unaligned(buf_res.as_mut_ptr());
+        }
         for i in 0..$lanes {
-            let expected = if buf_a[i] == buf_b[i] { <$t as hermes_simd_core::scalar::NumericElement>::ONE } else { <$t as hermes_simd_core::scalar::NumericElement>::ZERO };
+            let expected = if buf_a[i] == buf_b[i] {
+                <$t as hermes_simd_core::scalar::NumericElement>::ONE
+            } else {
+                <$t as hermes_simd_core::scalar::NumericElement>::ZERO
+            };
             let actual = buf_res[i];
             let is_ok = (actual.is_nan() && expected.is_nan()) || actual == expected;
-            assert!(is_ok, "Blend failed for {} at lane {} on {} (actual: {:?}, expected: {:?})", stringify!($t), i, stringify!($arch), actual, expected);
+            assert!(
+                is_ok,
+                "Blend failed for {} at lane {} on {} (actual: {:?}, expected: {:?})",
+                stringify!($t),
+                i,
+                stringify!($arch),
+                actual,
+                expected
+            );
         }
     };
 }
@@ -480,13 +866,16 @@ fn test_new_vector_features() {
     assert_eq!(loaded_v1.to_array(), [50.0, 60.0, 70.0, 80.0]);
 
     let mut out_buf = [0.0f32; 8];
-    let mut view_out = SimdView::<f32, Scalar, Unaligned, Unmasked, &mut [f32]>::new_mut(&mut out_buf).unwrap();
+    let mut view_out =
+        SimdView::<f32, Scalar, Unaligned, Unmasked, &mut [f32]>::new_mut(&mut out_buf).unwrap();
     loaded_v0.store_to_view_chunk(&mut view_out, 1);
     loaded_v1.store_to_view_chunk(&mut view_out, 0);
     assert_eq!(out_buf, [50.0, 60.0, 70.0, 80.0, 10.0, 20.0, 30.0, 40.0]);
 
     // 6. SimdCowExt::transform_vectors
-    let mut cow = SimdCow::<f32, Scalar, Unaligned>::Owned(AlignedVec::from_slice(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]));
+    let mut cow = SimdCow::<f32, Scalar, Unaligned>::Owned(AlignedVec::from_slice(&[
+        1.0, 2.0, 3.0, 4.0, 5.0, 6.0,
+    ]));
     cow.transform_vectors(|v| v * Vector::splat(2.0));
     assert_eq!(&*cow, &[2.0, 4.0, 6.0, 8.0, 10.0, 12.0]);
 }
@@ -513,7 +902,11 @@ fn test_new_wrapper_types_simd_ops() {
     }
     // Bf16
     {
-        let data = [Bf16::from_f32(1.0), Bf16::from_f32(2.0), Bf16::from_f32(3.0)];
+        let data = [
+            Bf16::from_f32(1.0),
+            Bf16::from_f32(2.0),
+            Bf16::from_f32(3.0),
+        ];
         assert_eq!(sum(&data), Bf16::from_f32(6.0));
     }
     // Bf8
@@ -555,8 +948,8 @@ fn test_new_wrapper_types_simd_ops() {
 
 #[test]
 fn test_low_precision_unpacking() {
-    use hermes_numeric::{unpack_bf8_to_bf16, unpack_bf4_to_bf16, unpack_bf4_to_bf16_packed};
-    
+    use hermes_numeric::{unpack_bf4_to_bf16, unpack_bf4_to_bf16_packed, unpack_bf8_to_bf16};
+
     // Bf8 to Bf16
     let bf8_inputs = [
         Bf8::from_f32(0.0),
@@ -566,13 +959,13 @@ fn test_low_precision_unpacking() {
     ];
     let mut bf16_outputs = [Bf16::from_f32(0.0); 4];
     unpack_bf8_to_bf16(&bf8_inputs, &mut bf16_outputs);
-    
+
     // Check values
     assert_eq!(bf16_outputs[0].to_f32(), 0.0);
     assert_eq!(bf16_outputs[1].to_f32(), 1.0);
     assert_eq!(bf16_outputs[2].to_f32(), -2.0);
     assert_eq!(bf16_outputs[3].to_f32(), 1.75);
-    
+
     // Bf4 to Bf16
     let bf4_inputs = [
         Bf4::from_f32(0.0),
@@ -582,7 +975,7 @@ fn test_low_precision_unpacking() {
     ];
     let mut bf16_outputs_bf4 = [Bf16::from_f32(0.0); 4];
     unpack_bf4_to_bf16(&bf4_inputs, &mut bf16_outputs_bf4);
-    
+
     assert_eq!(bf16_outputs_bf4[0].to_f32(), 0.0);
     assert_eq!(bf16_outputs_bf4[1].to_f32(), 1.0);
     assert_eq!(bf16_outputs_bf4[2].to_f32(), -1.0);
@@ -592,17 +985,17 @@ fn test_low_precision_unpacking() {
     let mut packed_bytes = [0u8; 2];
     packed_bytes[0] = Bf4::pack_pair(Bf4::from_f32(1.0), Bf4::from_f32(-1.0));
     packed_bytes[1] = Bf4::pack_pair(Bf4::from_f32(1.5), Bf4::from_f32(0.0));
-    
+
     let mut unpacked_bf16_pairs = [Bf16::from_f32(0.0); 4];
     unpack_bf4_to_bf16_packed(&packed_bytes, &mut unpacked_bf16_pairs);
-    
+
     assert_eq!(unpacked_bf16_pairs[0].to_f32(), 1.0);
     assert_eq!(unpacked_bf16_pairs[1].to_f32(), -1.0);
     assert_eq!(unpacked_bf16_pairs[2].to_f32(), 1.5);
     assert_eq!(unpacked_bf16_pairs[3].to_f32(), 0.0);
 
     // F4 Unpacked
-    use hermes_numeric::{F4, F32, unpack_f4_to_f32, unpack_f4_to_f32_packed};
+    use hermes_numeric::{unpack_f4_to_f32, unpack_f4_to_f32_packed, F32, F4};
     let f4_inputs = [
         F4::from_f32(0.0),
         F4::from_f32(1.0),
@@ -620,7 +1013,7 @@ fn test_low_precision_unpacking() {
     let mut packed_bytes_f4 = [0u8; 2];
     packed_bytes_f4[0] = F4::pack_pair(F4::from_f32(1.0), F4::from_f32(-1.0));
     packed_bytes_f4[1] = F4::pack_pair(F4::from_f32(2.0), F4::from_f32(0.0));
-    
+
     let mut unpacked_f32_pairs = [F32(0.0); 4];
     unpack_f4_to_f32_packed(&packed_bytes_f4, &mut unpacked_f32_pairs);
     assert_eq!(unpacked_f32_pairs[0].0, 1.0);
@@ -631,9 +1024,9 @@ fn test_low_precision_unpacking() {
 
 #[test]
 fn test_numa_topology_and_allocation() {
-    use hermes_simd_core::numa::{NumaTopologyService, verify_numa_locality};
-    use hermes_simd_core::AlignedVec;
     use hermes_simd_core::align::Unaligned;
+    use hermes_simd_core::numa::{verify_numa_locality, NumaTopologyService};
+    use hermes_simd_core::AlignedVec;
 
     let cpu = NumaTopologyService::current_cpu();
     println!("Current CPU: {:?}", cpu);
@@ -656,7 +1049,7 @@ fn test_numa_topology_and_allocation() {
     use hermes_simd_core::numa::{numa_node_count, numa_node_distance};
     let count = numa_node_count();
     assert_eq!(count, total);
-    
+
     // Self distance is always 10
     assert_eq!(numa_node_distance(0, 0), 10);
     // Remote distance is always 20 (or platform specific positive value)
@@ -669,7 +1062,7 @@ fn test_numa_topology_and_allocation() {
 
 #[test]
 fn test_packed_bf4_slice() {
-    use hermes_numeric::{Bf4, Bf16, PackedBf4Slice, PackedBf4SliceMut};
+    use hermes_numeric::{Bf16, Bf4, PackedBf4Slice, PackedBf4SliceMut};
 
     let mut raw_bytes = [0u8; 4];
     {
@@ -710,17 +1103,18 @@ fn test_packed_bf4_slice() {
 #[test]
 fn test_adaptive_dispatcher_and_amx_session() {
     use hermes_simd::AdaptiveDispatcher;
-    
+
     let a = [1.0f32; 100];
     let b = [2.0f32; 100];
-    let decision = AdaptiveDispatcher::select_backend(10, 10, 10, a.as_ptr(), a.len(), b.as_ptr(), b.len());
+    let decision =
+        AdaptiveDispatcher::select_backend(10, 10, 10, a.as_ptr(), a.len(), b.as_ptr(), b.len());
     println!("Selected backend for small matrix: {:?}", decision);
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        use hermes_simd::{AmxSession, AmxBatchSession, AmxConfig, AmxSupport};
+        use hermes_simd::{AmxBatchSession, AmxConfig, AmxSession, AmxSupport};
         let config = AmxConfig::new_uniform(16, 64);
-        
+
         assert!(!AmxSession::is_active());
 
         if <half::bf16 as AmxSupport>::has_amx() {
@@ -744,7 +1138,9 @@ fn test_adaptive_dispatcher_and_amx_session() {
 
 #[test]
 fn test_generic_packed_vector_and_f4_slice() {
-    use hermes_numeric::{F4, F32, PackedF4Slice, PackedF4SliceMut, PackedF4Vec, PackedBf4Vec, Bf4};
+    use hermes_numeric::{
+        Bf4, PackedBf4Vec, PackedF4Slice, PackedF4SliceMut, PackedF4Vec, F32, F4,
+    };
 
     // 1. Test F4 slice operations
     let mut raw_bytes = [0u8; 4];
@@ -811,8 +1207,8 @@ fn test_generic_packed_vector_and_f4_slice() {
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[test]
 fn test_vectorized_packed_unpackers() {
-    use hermes_numeric::{Bf4, F4, Bf16, F32};
-    
+    use hermes_numeric::{Bf16, Bf4, F32, F4};
+
     let n = 67;
     let mut packed_bytes = vec![0u8; (n + 1) / 2];
     for i in 0..packed_bytes.len() {
@@ -820,35 +1216,63 @@ fn test_vectorized_packed_unpackers() {
         let val2 = ((i + 1) % 8) as f32 * -0.5;
         packed_bytes[i] = Bf4::pack_pair(Bf4::from_f32(val1), Bf4::from_f32(val2));
     }
-    
+
     let mut unpacked_bf16 = vec![Bf16::from_f32(0.0); packed_bytes.len() * 2];
     if std::is_x86_feature_detected!("avx512bw") {
-        hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_packed_bf4_to_bf16(&packed_bytes, &mut unpacked_bf16);
-        
+        hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_packed_bf4_to_bf16(
+            &packed_bytes,
+            &mut unpacked_bf16,
+        );
+
         for i in 0..10 {
             let byte = packed_bytes[i / 2];
-            let val = if i % 2 == 0 { byte & 0x0F } else { (byte >> 4) & 0x0F };
+            let val = if i % 2 == 0 {
+                byte & 0x0F
+            } else {
+                (byte >> 4) & 0x0F
+            };
             let expected = Bf4(val).to_f32();
-            println!("unpacked_bf16[{}] = {}, expected = {}", i, unpacked_bf16[i].to_f32(), expected);
+            println!(
+                "unpacked_bf16[{}] = {}, expected = {}",
+                i,
+                unpacked_bf16[i].to_f32(),
+                expected
+            );
         }
 
         for i in 0..n {
             let byte = packed_bytes[i / 2];
-            let val = if i % 2 == 0 { byte & 0x0F } else { (byte >> 4) & 0x0F };
+            let val = if i % 2 == 0 {
+                byte & 0x0F
+            } else {
+                (byte >> 4) & 0x0F
+            };
             let expected = Bf4(val).to_f32();
-            assert_eq!(unpacked_bf16[i].to_f32(), expected, "Bf4 mismatch at index {}", i);
+            assert_eq!(
+                unpacked_bf16[i].to_f32(),
+                expected,
+                "Bf4 mismatch at index {}",
+                i
+            );
         }
     } else {
         println!("Skipping direct AVX-512 unpacked_bf16 test (avx512bw not detected)");
     }
-    
+
     let mut unpacked_f32 = vec![F32(0.0); packed_bytes.len() * 2];
     if std::is_x86_feature_detected!("avx512f") {
-        hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_packed_f4_to_f32(&packed_bytes, &mut unpacked_f32);
-        
+        hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_packed_f4_to_f32(
+            &packed_bytes,
+            &mut unpacked_f32,
+        );
+
         for i in 0..n {
             let byte = packed_bytes[i / 2];
-            let val = if i % 2 == 0 { byte & 0x0F } else { (byte >> 4) & 0x0F };
+            let val = if i % 2 == 0 {
+                byte & 0x0F
+            } else {
+                (byte >> 4) & 0x0F
+            };
             let expected = F4(val).to_f32();
             assert_eq!(unpacked_f32[i].0, expected, "F4 mismatch at index {}", i);
         }
@@ -859,8 +1283,10 @@ fn test_vectorized_packed_unpackers() {
 
 #[test]
 fn test_packed4_cow() {
-    use hermes_numeric::{Bf4, F4, Bf16, F32};
-    use hermes_simd::{Packed4Cow, PackedBf4Cow, PackedF4Cow, Packed4CowExt, Scalar, Unaligned, SimdCow};
+    use hermes_numeric::{Bf16, Bf4, F32, F4};
+    use hermes_simd::{
+        Packed4Cow, Packed4CowExt, PackedBf4Cow, PackedF4Cow, Scalar, SimdCow, Unaligned,
+    };
 
     // 1. Test PackedBf4Cow Borrowed
     let original_bytes = vec![
@@ -883,9 +1309,7 @@ fn test_packed4_cow() {
     assert_eq!(cow.get(0).unwrap().to_f32(), 1.0);
 
     // 3. Test PackedF4Cow and IntoOwned
-    let f4_bytes = vec![
-        F4::pack_pair(F4::from_f32(1.0), F4::from_f32(2.0)),
-    ];
+    let f4_bytes = vec![F4::pack_pair(F4::from_f32(1.0), F4::from_f32(2.0))];
     let cow_f4 = PackedF4Cow::from_packed_slice(&f4_bytes, 2).unwrap();
     let owned_vec = cow_f4.into_owned();
     assert_eq!(owned_vec.len(), 2);
@@ -893,9 +1317,7 @@ fn test_packed4_cow() {
     assert_eq!(owned_vec.get(1).unwrap().to_f32(), 2.0);
 
     // 4. Test Unpacking from PackedBf4Cow to SimdCow of Bf16
-    let orig = vec![
-        Bf4::pack_pair(Bf4::from_f32(1.0), Bf4::from_f32(-1.0)),
-    ];
+    let orig = vec![Bf4::pack_pair(Bf4::from_f32(1.0), Bf4::from_f32(-1.0))];
     let cow_bf4 = PackedBf4Cow::from_packed_slice(&orig, 2).unwrap();
     let simd_cow: SimdCow<'static, Bf16, Scalar, Unaligned> = cow_bf4.unpack_to_cow();
     assert_eq!(simd_cow.len(), 2);
@@ -903,9 +1325,7 @@ fn test_packed4_cow() {
     assert_eq!(simd_cow[1].to_f32(), -1.0);
 
     // 5. Test Unpacking from PackedF4Cow to SimdCow of F32
-    let orig_f4 = vec![
-        F4::pack_pair(F4::from_f32(1.0), F4::from_f32(4.0)),
-    ];
+    let orig_f4 = vec![F4::pack_pair(F4::from_f32(1.0), F4::from_f32(4.0))];
     let cow_f4 = PackedF4Cow::from_packed_slice(&orig_f4, 2).unwrap();
     let simd_cow_f32: SimdCow<'static, F32, Scalar, Unaligned> = cow_f4.unpack_to_cow();
     assert_eq!(simd_cow_f32.len(), 2);
@@ -923,8 +1343,8 @@ fn test_packed4_cow() {
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[test]
 fn test_bf8_and_f8_unpacking() {
-    use hermes_numeric::{Bf8, F8, Bf16, F32, unpack_f8_to_f32};
-    
+    use hermes_numeric::{unpack_f8_to_f32, Bf16, Bf8, F32, F8};
+
     // 1. Test Bf8 to Bf16 unpacking (using AVX-512 when available, via hermes-simd-intrinsics)
     let bf8_inputs = [
         Bf8::from_f32(0.0),
@@ -934,11 +1354,14 @@ fn test_bf8_and_f8_unpacking() {
         Bf8::from_f32(-3.0),
     ];
     let mut bf16_outputs = [Bf16(half::bf16::ZERO); 5];
-    
+
     if std::is_x86_feature_detected!("avx512bw") {
         // Direct hardware routed call
-        hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_bf8_to_bf16(&bf8_inputs, &mut bf16_outputs);
-        
+        hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_bf8_to_bf16(
+            &bf8_inputs,
+            &mut bf16_outputs,
+        );
+
         assert_eq!(bf16_outputs[0].to_f32(), 0.0);
         assert_eq!(bf16_outputs[1].to_f32(), 1.0);
         assert_eq!(bf16_outputs[2].to_f32(), -1.0);
@@ -957,9 +1380,9 @@ fn test_bf8_and_f8_unpacking() {
         F8::from_f32(-4.0),
     ];
     let mut f32_outputs = [F32(0.0); 5];
-    
+
     unpack_f8_to_f32(&f8_inputs, &mut f32_outputs);
-    
+
     assert_eq!(f32_outputs[0].0, 0.0);
     assert_eq!(f32_outputs[1].0, 1.0);
     assert_eq!(f32_outputs[2].0, -1.0);
@@ -969,7 +1392,7 @@ fn test_bf8_and_f8_unpacking() {
 
 #[test]
 fn test_packed_cow_rkyv_serialization() {
-    use hermes_numeric::{Bf4, F4, PackedBf4Cow, PackedF4Cow, Packed4Cow};
+    use hermes_numeric::{Bf4, Packed4Cow, PackedBf4Cow, PackedF4Cow, F4};
     use rkyv::Deserialize;
 
     // 1. PackedBf4Cow test
@@ -984,7 +1407,7 @@ fn test_packed_cow_rkyv_serialization() {
 
     assert_eq!(archived_bf4.len(), 4);
     assert!(!archived_bf4.is_empty());
-    
+
     // Test zero-copy borrow
     let borrowed_bf4 = archived_bf4.as_borrowed().unwrap();
     assert_eq!(borrowed_bf4.len(), 4);
@@ -1000,9 +1423,7 @@ fn test_packed_cow_rkyv_serialization() {
     assert_eq!(deserialized_bf4.get(2).unwrap().to_f32(), 1.5);
 
     // 2. PackedF4Cow test
-    let f4_bytes = vec![
-        F4::pack_pair(F4::from_f32(-1.0), F4::from_f32(2.0)),
-    ];
+    let f4_bytes = vec![F4::pack_pair(F4::from_f32(-1.0), F4::from_f32(2.0))];
     let original_f4_cow = PackedF4Cow::from_packed_slice(&f4_bytes, 2).unwrap();
 
     let bytes_f4 = rkyv::to_bytes::<_, 256>(&original_f4_cow).unwrap();
@@ -1020,18 +1441,18 @@ fn test_packed_cow_rkyv_serialization() {
 #[test]
 fn test_preferred_and_monomorphized_types() {
     use hermes_simd_types::{SimdF32, F32};
-    
+
     let vec_zeros = SimdF32::zero();
     let vec_splat = SimdF32::splat(F32(3.0));
-    
+
     assert_eq!(vec_zeros.extract::<0>().0, 0.0);
     assert_eq!(vec_splat.extract::<0>().0, 3.0);
 }
 
 #[test]
 fn test_simd_view_slicing_and_alignment_transitions() {
-    use hermes_simd::{SimdView, Unaligned, Scalar};
     use hermes_numeric::F32;
+    use hermes_simd::{Scalar, SimdView, Unaligned};
 
     let data = vec![F32(1.0), F32(2.0), F32(3.0), F32(4.0), F32(5.0), F32(6.0)];
     let view: SimdView<'_, F32, Scalar, Unaligned> = SimdView::new(&data).unwrap();
@@ -1057,8 +1478,8 @@ fn test_simd_view_slicing_and_alignment_transitions() {
 
 #[test]
 fn test_simd_cow_slicing_and_alignment_transitions() {
-    use hermes_simd::{SimdCow, Unaligned, Scalar};
     use hermes_numeric::F32;
+    use hermes_simd::{Scalar, SimdCow, Unaligned};
 
     // 1. Borrowed SimdCow
     let data = vec![F32(10.0), F32(20.0), F32(30.0), F32(40.0)];
@@ -1085,8 +1506,8 @@ fn test_simd_cow_slicing_and_alignment_transitions() {
 
 #[test]
 fn test_simd_cow_mutable_views_and_slicing() {
-    use hermes_simd::{SimdCow, Unaligned, Scalar};
     use hermes_numeric::F32;
+    use hermes_simd::{Scalar, SimdCow, Unaligned};
 
     let data = vec![F32(1.0), F32(2.0), F32(3.0), F32(4.0)];
     let mut cow = SimdCow::<F32, Scalar, Unaligned>::borrow_slice(&data).unwrap();
@@ -1121,23 +1542,23 @@ fn test_simd_cow_mutable_views_and_slicing() {
 
 #[test]
 fn test_packed_4bit_zero_copy_slicing() {
-    use hermes_numeric::{Bf4, PackedBf4Slice, PackedBf4SliceMut, PackedBf4Cow, Packed4Cow};
+    use hermes_numeric::{Bf4, Packed4Cow, PackedBf4Cow, PackedBf4Slice, PackedBf4SliceMut};
 
     // Pack: elements are low, high per byte.
     // 0x12 -> low = 2, high = 1
     // 0x34 -> low = 4, high = 3
     let bytes = [0x12, 0x34];
-    
+
     // 1. Packed4Slice sub_slice
     let slice = PackedBf4Slice::new(&bytes, 4).unwrap();
-    
+
     // Even start is allowed (byte-aligned)
     let sub_even = slice.sub_slice(2..4).unwrap();
     assert_eq!(sub_even.len(), 2);
     // index 2 is the low part of 0x34 (value 4), index 3 is high part of 0x34 (value 3)
     assert_eq!(sub_even.get(0).unwrap().0, 4);
     assert_eq!(sub_even.get(1).unwrap().0, 3);
-    
+
     // Odd start is disallowed
     let sub_odd = slice.sub_slice(1..3);
     assert!(sub_odd.is_none());
@@ -1145,13 +1566,13 @@ fn test_packed_4bit_zero_copy_slicing() {
     // 2. Packed4SliceMut sub_slice_mut
     let mut bytes_mut = [0x12, 0x34];
     let slice_mut = PackedBf4SliceMut::new(&mut bytes_mut, 4).unwrap();
-    
+
     // Even start is allowed
     let mut sub_even_mut = slice_mut.sub_slice_mut(2..4).unwrap();
     assert_eq!(sub_even_mut.len(), 2);
     sub_even_mut.set(0, Bf4(9));
     assert_eq!(sub_even_mut.get(0).unwrap().0, 9);
-    
+
     // Odd start is disallowed
     let slice_mut_2 = PackedBf4SliceMut::new(&mut bytes_mut, 4).unwrap();
     assert!(slice_mut_2.sub_slice_mut(1..3).is_none());
@@ -1168,41 +1589,53 @@ fn test_packed_4bit_zero_copy_slicing() {
 }
 
 macro_rules! test_select_ops_for_arch {
-    ($t:ty, $arch:ident, $lanes:expr) => {
-        {
-            let len = $lanes * 2 + 3;
-            let mut data_a = vec![<$t as hermes_simd_core::scalar::NumericElement>::ZERO; len];
-            let mut data_b = vec![<$t as hermes_simd_core::scalar::NumericElement>::ZERO; len];
-            let mut mask = vec![false; len];
+    ($t:ty, $arch:ident, $lanes:expr) => {{
+        let len = $lanes * 2 + 3;
+        let mut data_a = vec![<$t as hermes_simd_core::scalar::NumericElement>::ZERO; len];
+        let mut data_b = vec![<$t as hermes_simd_core::scalar::NumericElement>::ZERO; len];
+        let mut mask = vec![false; len];
 
-            for i in 0..len {
-                data_a[i] = <$t as CastFrom<f64>>::cast_from(i as f64);
-                data_b[i] = <$t as CastFrom<f64>>::cast_from((i + 100) as f64);
-                mask[i] = i % 2 == 0;
-            }
-
-            let view_a = SimdView::<'_, $t, $arch, Unaligned, Unmasked, &[$t]>::new(&data_a).unwrap();
-            let view_b = SimdView::<'_, $t, $arch, Unaligned, Unmasked, &[$t]>::new(&data_b).unwrap();
-            
-            // 1. select
-            let sel_res = view_a.select(&mask, &view_b).unwrap();
-            assert_eq!(sel_res.len(), len);
-            let sel_slice = sel_res.as_slice();
-            for i in 0..len {
-                let expected = if mask[i] { data_a[i] } else { data_b[i] };
-                assert_eq!(sel_slice[i], expected, "select failed for {} at index {} on {}", stringify!($t), i, stringify!($arch));
-            }
-
-            // 2. masked_negate
-            let neg_res = view_a.masked_negate(&mask).unwrap();
-            assert_eq!(neg_res.len(), len);
-            let neg_slice = neg_res.as_slice();
-            for i in 0..len {
-                let expected = if mask[i] { -data_a[i] } else { data_a[i] };
-                assert_eq!(neg_slice[i], expected, "masked_negate failed for {} at index {} on {}", stringify!($t), i, stringify!($arch));
-            }
+        for i in 0..len {
+            data_a[i] = <$t as CastFrom<f64>>::cast_from(i as f64);
+            data_b[i] = <$t as CastFrom<f64>>::cast_from((i + 100) as f64);
+            mask[i] = i % 2 == 0;
         }
-    };
+
+        let view_a = SimdView::<'_, $t, $arch, Unaligned, Unmasked, &[$t]>::new(&data_a).unwrap();
+        let view_b = SimdView::<'_, $t, $arch, Unaligned, Unmasked, &[$t]>::new(&data_b).unwrap();
+
+        // 1. select
+        let sel_res = view_a.select(&mask, &view_b).unwrap();
+        assert_eq!(sel_res.len(), len);
+        let sel_slice = sel_res.as_slice();
+        for i in 0..len {
+            let expected = if mask[i] { data_a[i] } else { data_b[i] };
+            assert_eq!(
+                sel_slice[i],
+                expected,
+                "select failed for {} at index {} on {}",
+                stringify!($t),
+                i,
+                stringify!($arch)
+            );
+        }
+
+        // 2. masked_negate
+        let neg_res = view_a.masked_negate(&mask).unwrap();
+        assert_eq!(neg_res.len(), len);
+        let neg_slice = neg_res.as_slice();
+        for i in 0..len {
+            let expected = if mask[i] { -data_a[i] } else { data_a[i] };
+            assert_eq!(
+                neg_slice[i],
+                expected,
+                "masked_negate failed for {} at index {} on {}",
+                stringify!($t),
+                i,
+                stringify!($arch)
+            );
+        }
+    }};
 }
 
 #[test]
@@ -1251,9 +1684,3 @@ fn test_select_ops_neon() {
     test_select_ops_for_arch!(i16, Neon, 8);
     test_select_ops_for_arch!(i32, Neon, 4);
 }
-
-
-
-
-
-

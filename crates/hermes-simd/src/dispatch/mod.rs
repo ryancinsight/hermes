@@ -4,33 +4,32 @@
 //!
 //! `sum::<f32>(data)` -> `f32::sum(data)` -> `sum::dispatch_sum::<f32>(data)` -> avx2 kernel.
 
-pub mod sum;
-pub mod dot;
-pub mod binary;
-pub mod masked;
-pub mod sparse;
-pub mod gemm;
-pub mod min;
-pub mod max;
-pub mod scale;
-pub mod argmin;
 pub mod argmax;
+pub mod argmin;
+pub mod binary;
 pub mod complex;
+pub mod dot;
+pub mod gemm;
+pub mod masked;
+pub mod max;
+pub mod min;
+pub mod scale;
+pub mod sparse;
+pub mod sum;
 
-use hermes_simd_core::view::SimdError;
-use hermes_simd_core::sparse::{
-    CsrData, BlockedCooData, DenseWithMaskData, SellPData,
-    SparseView, BlockedCoo, SparseSpMv,
-};
 use hermes_simd_core::scalar::Scalar as ScalarTrait;
-use hermes_simd_core::{Add, Sub, Mul, Div};
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[allow(unused_imports)]
-use hermes_simd_intrinsics::{Scalar as ScalarArch, Avx2, Avx512, Neon};
-#[cfg(target_arch = "aarch64")]
-use hermes_simd_intrinsics::{Scalar as ScalarArch, Neon};
+use hermes_simd_core::sparse::{
+    BlockedCoo, BlockedCooData, CsrData, DenseWithMaskData, SellPData, SparseSpMv, SparseView,
+};
+use hermes_simd_core::view::SimdError;
+use hermes_simd_core::{Add, Div, Mul, Sub};
 #[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
 use hermes_simd_intrinsics::Scalar as ScalarArch;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[allow(unused_imports)]
+use hermes_simd_intrinsics::{Avx2, Avx512, Neon, Scalar as ScalarArch};
+#[cfg(target_arch = "aarch64")]
+use hermes_simd_intrinsics::{Neon, Scalar as ScalarArch};
 
 mod private {
     pub trait Sealed {}
@@ -89,7 +88,8 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     /// Computes the dot product of elements matching a boolean mask.
     fn masked_dot(a: &[Self], b: &[Self], mask: &[bool]) -> Result<Self, SimdError>;
     /// Computes the elementwise sum of elements matching a boolean mask.
-    fn masked_add(a: &[Self], b: &[Self], mask: &[bool], out: &mut [Self]) -> Result<(), SimdError>;
+    fn masked_add(a: &[Self], b: &[Self], mask: &[bool], out: &mut [Self])
+        -> Result<(), SimdError>;
     /// Computes sparse SpMV using CSR.
     fn spmv_csr(data: CsrData<'_, Self>, x: &[Self], y: &mut [Self]);
     /// Computes sparse SpMV using Blocked-COO 4x4.
@@ -103,13 +103,26 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     /// Computes sparse SpMV using Sliced ELLPACK (SELL-p) with C = 8.
     fn spmv_sellp8(data: SellPData<'_, Self, 8>, x: &[Self], y: &mut [Self]);
     /// Computes register-blocked tiled GEMM: `c += A * B`.
-    fn tiled_gemm(a: &[Self], b: &[Self], c: &mut [Self], m: usize, n: usize, k: usize) -> Result<(), SimdError>;
+    fn tiled_gemm(
+        a: &[Self],
+        b: &[Self],
+        c: &mut [Self],
+        m: usize,
+        n: usize,
+        k: usize,
+    ) -> Result<(), SimdError>;
     /// Multiplies interleaved complex lanes in-place: `a[k] *= b[k]`
     /// (`a[k] *= conj(b[k])` when `CONJ_B`).
-    fn interleaved_complex_mul_assign<const CONJ_B: bool>(a: &mut [Self], b: &[Self]) -> Result<(), SimdError>;
+    fn interleaved_complex_mul_assign<const CONJ_B: bool>(
+        a: &mut [Self],
+        b: &[Self],
+    ) -> Result<(), SimdError>;
     /// Computes the interleaved complex dot product `(re, im)` of `sum(a[k] * b[k])`
     /// (`sum(a[k] * conj(b[k]))` when `CONJ_B`).
-    fn interleaved_complex_dot<const CONJ_B: bool>(a: &[Self], b: &[Self]) -> Result<(Self, Self), SimdError>;
+    fn interleaved_complex_dot<const CONJ_B: bool>(
+        a: &[Self],
+        b: &[Self],
+    ) -> Result<(Self, Self), SimdError>;
 }
 
 /// x86/x86_64 specialized generic implementation of SimdOps.
@@ -122,19 +135,33 @@ where
     Avx512: hermes_simd_core::kernel::SimdKernel<T>,
 {
     #[inline(always)]
-    fn sum(data: &[Self]) -> Self { sum::dispatch_sum::<Self>(data) }
+    fn sum(data: &[Self]) -> Self {
+        sum::dispatch_sum::<Self>(data)
+    }
     #[inline(always)]
-    fn min(data: &[Self]) -> Self { min::dispatch_min::<Self>(data) }
+    fn min(data: &[Self]) -> Self {
+        min::dispatch_min::<Self>(data)
+    }
     #[inline(always)]
-    fn max(data: &[Self]) -> Self { max::dispatch_max::<Self>(data) }
+    fn max(data: &[Self]) -> Self {
+        max::dispatch_max::<Self>(data)
+    }
     #[inline(always)]
-    fn scale(data: &mut [Self], scalar: Self) { scale::dispatch_scale::<Self>(data, scalar) }
+    fn scale(data: &mut [Self], scalar: Self) {
+        scale::dispatch_scale::<Self>(data, scalar)
+    }
     #[inline(always)]
-    fn argmin(data: &[Self]) -> Option<(usize, Self)> { argmin::dispatch_argmin::<Self>(data) }
+    fn argmin(data: &[Self]) -> Option<(usize, Self)> {
+        argmin::dispatch_argmin::<Self>(data)
+    }
     #[inline(always)]
-    fn argmax(data: &[Self]) -> Option<(usize, Self)> { argmax::dispatch_argmax::<Self>(data) }
+    fn argmax(data: &[Self]) -> Option<(usize, Self)> {
+        argmax::dispatch_argmax::<Self>(data)
+    }
     #[inline(always)]
-    fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError> { dot::dispatch_dot::<Self>(a, b) }
+    fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError> {
+        dot::dispatch_dot::<Self>(a, b)
+    }
     #[inline(always)]
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
         binary::dispatch_elementwise_binary::<Self, Mul>(a, b, out, Mul)
@@ -152,13 +179,20 @@ where
         binary::dispatch_elementwise_binary::<Self, Div>(a, b, out, Div)
     }
     #[inline(always)]
-    fn masked_sum(data: &[Self], mask: &[bool]) -> Self { masked::dispatch_masked_sum::<Self>(data, mask) }
+    fn masked_sum(data: &[Self], mask: &[bool]) -> Self {
+        masked::dispatch_masked_sum::<Self>(data, mask)
+    }
     #[inline(always)]
     fn masked_dot(a: &[Self], b: &[Self], mask: &[bool]) -> Result<Self, SimdError> {
         masked::dispatch_masked_dot::<Self>(a, b, mask)
     }
     #[inline(always)]
-    fn masked_add(a: &[Self], b: &[Self], mask: &[bool], out: &mut [Self]) -> Result<(), SimdError> {
+    fn masked_add(
+        a: &[Self],
+        b: &[Self],
+        mask: &[bool],
+        out: &mut [Self],
+    ) -> Result<(), SimdError> {
         masked::dispatch_masked_add::<Self>(a, b, mask, out)
     }
     #[inline(always)]
@@ -186,15 +220,28 @@ where
         sparse::dispatch_spmv_sellp8::<Self>(data, x, y)
     }
     #[inline(always)]
-    fn tiled_gemm(a: &[Self], b: &[Self], c: &mut [Self], m: usize, n: usize, k: usize) -> Result<(), SimdError> {
+    fn tiled_gemm(
+        a: &[Self],
+        b: &[Self],
+        c: &mut [Self],
+        m: usize,
+        n: usize,
+        k: usize,
+    ) -> Result<(), SimdError> {
         gemm::dispatch_tiled_gemm::<Self>(a, b, c, m, n, k)
     }
     #[inline(always)]
-    fn interleaved_complex_mul_assign<const CONJ_B: bool>(a: &mut [Self], b: &[Self]) -> Result<(), SimdError> {
+    fn interleaved_complex_mul_assign<const CONJ_B: bool>(
+        a: &mut [Self],
+        b: &[Self],
+    ) -> Result<(), SimdError> {
         complex::dispatch_interleaved_complex_mul_assign::<Self, CONJ_B>(a, b)
     }
     #[inline(always)]
-    fn interleaved_complex_dot<const CONJ_B: bool>(a: &[Self], b: &[Self]) -> Result<(Self, Self), SimdError> {
+    fn interleaved_complex_dot<const CONJ_B: bool>(
+        a: &[Self],
+        b: &[Self],
+    ) -> Result<(Self, Self), SimdError> {
         complex::dispatch_interleaved_complex_dot::<Self, CONJ_B>(a, b)
     }
 }
@@ -208,19 +255,33 @@ where
     Neon: hermes_simd_core::kernel::SimdKernel<T>,
 {
     #[inline(always)]
-    fn sum(data: &[Self]) -> Self { sum::dispatch_sum::<Self>(data) }
+    fn sum(data: &[Self]) -> Self {
+        sum::dispatch_sum::<Self>(data)
+    }
     #[inline(always)]
-    fn min(data: &[Self]) -> Self { min::dispatch_min::<Self>(data) }
+    fn min(data: &[Self]) -> Self {
+        min::dispatch_min::<Self>(data)
+    }
     #[inline(always)]
-    fn max(data: &[Self]) -> Self { max::dispatch_max::<Self>(data) }
+    fn max(data: &[Self]) -> Self {
+        max::dispatch_max::<Self>(data)
+    }
     #[inline(always)]
-    fn scale(data: &mut [Self], scalar: Self) { scale::dispatch_scale::<Self>(data, scalar) }
+    fn scale(data: &mut [Self], scalar: Self) {
+        scale::dispatch_scale::<Self>(data, scalar)
+    }
     #[inline(always)]
-    fn argmin(data: &[Self]) -> Option<(usize, Self)> { argmin::dispatch_argmin::<Self>(data) }
+    fn argmin(data: &[Self]) -> Option<(usize, Self)> {
+        argmin::dispatch_argmin::<Self>(data)
+    }
     #[inline(always)]
-    fn argmax(data: &[Self]) -> Option<(usize, Self)> { argmax::dispatch_argmax::<Self>(data) }
+    fn argmax(data: &[Self]) -> Option<(usize, Self)> {
+        argmax::dispatch_argmax::<Self>(data)
+    }
     #[inline(always)]
-    fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError> { dot::dispatch_dot::<Self>(a, b) }
+    fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError> {
+        dot::dispatch_dot::<Self>(a, b)
+    }
     #[inline(always)]
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
         binary::dispatch_elementwise_binary::<Self, Mul>(a, b, out, Mul)
@@ -238,13 +299,20 @@ where
         binary::dispatch_elementwise_binary::<Self, Div>(a, b, out, Div)
     }
     #[inline(always)]
-    fn masked_sum(data: &[Self], mask: &[bool]) -> Self { masked::dispatch_masked_sum::<Self>(data, mask) }
+    fn masked_sum(data: &[Self], mask: &[bool]) -> Self {
+        masked::dispatch_masked_sum::<Self>(data, mask)
+    }
     #[inline(always)]
     fn masked_dot(a: &[Self], b: &[Self], mask: &[bool]) -> Result<Self, SimdError> {
         masked::dispatch_masked_dot::<Self>(a, b, mask)
     }
     #[inline(always)]
-    fn masked_add(a: &[Self], b: &[Self], mask: &[bool], out: &mut [Self]) -> Result<(), SimdError> {
+    fn masked_add(
+        a: &[Self],
+        b: &[Self],
+        mask: &[bool],
+        out: &mut [Self],
+    ) -> Result<(), SimdError> {
         masked::dispatch_masked_add::<Self>(a, b, mask, out)
     }
     #[inline(always)]
@@ -272,15 +340,28 @@ where
         sparse::dispatch_spmv_sellp8::<Self>(data, x, y)
     }
     #[inline(always)]
-    fn tiled_gemm(a: &[Self], b: &[Self], c: &mut [Self], m: usize, n: usize, k: usize) -> Result<(), SimdError> {
+    fn tiled_gemm(
+        a: &[Self],
+        b: &[Self],
+        c: &mut [Self],
+        m: usize,
+        n: usize,
+        k: usize,
+    ) -> Result<(), SimdError> {
         gemm::dispatch_tiled_gemm::<Self>(a, b, c, m, n, k)
     }
     #[inline(always)]
-    fn interleaved_complex_mul_assign<const CONJ_B: bool>(a: &mut [Self], b: &[Self]) -> Result<(), SimdError> {
+    fn interleaved_complex_mul_assign<const CONJ_B: bool>(
+        a: &mut [Self],
+        b: &[Self],
+    ) -> Result<(), SimdError> {
         complex::dispatch_interleaved_complex_mul_assign::<Self, CONJ_B>(a, b)
     }
     #[inline(always)]
-    fn interleaved_complex_dot<const CONJ_B: bool>(a: &[Self], b: &[Self]) -> Result<(Self, Self), SimdError> {
+    fn interleaved_complex_dot<const CONJ_B: bool>(
+        a: &[Self],
+        b: &[Self],
+    ) -> Result<(Self, Self), SimdError> {
         complex::dispatch_interleaved_complex_dot::<Self, CONJ_B>(a, b)
     }
 }
@@ -293,19 +374,33 @@ where
     ScalarArch: hermes_simd_core::kernel::SimdKernel<T>,
 {
     #[inline(always)]
-    fn sum(data: &[Self]) -> Self { sum::dispatch_sum::<Self>(data) }
+    fn sum(data: &[Self]) -> Self {
+        sum::dispatch_sum::<Self>(data)
+    }
     #[inline(always)]
-    fn min(data: &[Self]) -> Self { min::dispatch_min::<Self>(data) }
+    fn min(data: &[Self]) -> Self {
+        min::dispatch_min::<Self>(data)
+    }
     #[inline(always)]
-    fn max(data: &[Self]) -> Self { max::dispatch_max::<Self>(data) }
+    fn max(data: &[Self]) -> Self {
+        max::dispatch_max::<Self>(data)
+    }
     #[inline(always)]
-    fn scale(data: &mut [Self], scalar: Self) { scale::dispatch_scale::<Self>(data, scalar) }
+    fn scale(data: &mut [Self], scalar: Self) {
+        scale::dispatch_scale::<Self>(data, scalar)
+    }
     #[inline(always)]
-    fn argmin(data: &[Self]) -> Option<(usize, Self)> { argmin::dispatch_argmin::<Self>(data) }
+    fn argmin(data: &[Self]) -> Option<(usize, Self)> {
+        argmin::dispatch_argmin::<Self>(data)
+    }
     #[inline(always)]
-    fn argmax(data: &[Self]) -> Option<(usize, Self)> { argmax::dispatch_argmax::<Self>(data) }
+    fn argmax(data: &[Self]) -> Option<(usize, Self)> {
+        argmax::dispatch_argmax::<Self>(data)
+    }
     #[inline(always)]
-    fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError> { dot::dispatch_dot::<Self>(a, b) }
+    fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError> {
+        dot::dispatch_dot::<Self>(a, b)
+    }
     #[inline(always)]
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
         binary::dispatch_elementwise_binary::<Self, Mul>(a, b, out, Mul)
@@ -323,13 +418,20 @@ where
         binary::dispatch_elementwise_binary::<Self, Div>(a, b, out, Div)
     }
     #[inline(always)]
-    fn masked_sum(data: &[Self], mask: &[bool]) -> Self { masked::dispatch_masked_sum::<Self>(data, mask) }
+    fn masked_sum(data: &[Self], mask: &[bool]) -> Self {
+        masked::dispatch_masked_sum::<Self>(data, mask)
+    }
     #[inline(always)]
     fn masked_dot(a: &[Self], b: &[Self], mask: &[bool]) -> Result<Self, SimdError> {
         masked::dispatch_masked_dot::<Self>(a, b, mask)
     }
     #[inline(always)]
-    fn masked_add(a: &[Self], b: &[Self], mask: &[bool], out: &mut [Self]) -> Result<(), SimdError> {
+    fn masked_add(
+        a: &[Self],
+        b: &[Self],
+        mask: &[bool],
+        out: &mut [Self],
+    ) -> Result<(), SimdError> {
         masked::dispatch_masked_add::<Self>(a, b, mask, out)
     }
     #[inline(always)]
@@ -357,50 +459,77 @@ where
         sparse::dispatch_spmv_sellp8::<Self>(data, x, y)
     }
     #[inline(always)]
-    fn tiled_gemm(a: &[Self], b: &[Self], c: &mut [Self], m: usize, n: usize, k: usize) -> Result<(), SimdError> {
+    fn tiled_gemm(
+        a: &[Self],
+        b: &[Self],
+        c: &mut [Self],
+        m: usize,
+        n: usize,
+        k: usize,
+    ) -> Result<(), SimdError> {
         gemm::dispatch_tiled_gemm::<Self>(a, b, c, m, n, k)
     }
     #[inline(always)]
-    fn interleaved_complex_mul_assign<const CONJ_B: bool>(a: &mut [Self], b: &[Self]) -> Result<(), SimdError> {
+    fn interleaved_complex_mul_assign<const CONJ_B: bool>(
+        a: &mut [Self],
+        b: &[Self],
+    ) -> Result<(), SimdError> {
         complex::dispatch_interleaved_complex_mul_assign::<Self, CONJ_B>(a, b)
     }
     #[inline(always)]
-    fn interleaved_complex_dot<const CONJ_B: bool>(a: &[Self], b: &[Self]) -> Result<(Self, Self), SimdError> {
+    fn interleaved_complex_dot<const CONJ_B: bool>(
+        a: &[Self],
+        b: &[Self],
+    ) -> Result<(Self, Self), SimdError> {
         complex::dispatch_interleaved_complex_dot::<Self, CONJ_B>(a, b)
     }
 }
 
 /// Computes the sum of elements in the slice using runtime-dispatched SIMD.
 #[inline(always)]
-pub fn sum<T: SimdOps>(data: &[T]) -> T { T::sum(data) }
+pub fn sum<T: SimdOps>(data: &[T]) -> T {
+    T::sum(data)
+}
 
 /// Computes the minimum element of the slice using runtime-dispatched SIMD.
 ///
 /// Returns `T::MAX_VALUE` for empty slices.
 #[inline(always)]
-pub fn min<T: SimdOps>(data: &[T]) -> T { T::min(data) }
+pub fn min<T: SimdOps>(data: &[T]) -> T {
+    T::min(data)
+}
 
 /// Computes the maximum element of the slice using runtime-dispatched SIMD.
 ///
 /// Returns `T::MIN_VALUE` for empty slices.
 #[inline(always)]
-pub fn max<T: SimdOps>(data: &[T]) -> T { T::max(data) }
+pub fn max<T: SimdOps>(data: &[T]) -> T {
+    T::max(data)
+}
 
 /// Multiplies every element of `data` by `scalar` in-place.
 #[inline(always)]
-pub fn scale<T: SimdOps>(data: &mut [T], scalar: T) { T::scale(data, scalar) }
+pub fn scale<T: SimdOps>(data: &mut [T], scalar: T) {
+    T::scale(data, scalar)
+}
 
 /// Returns `Some((index, value))` of the minimum element, or `None` for empty.
 #[inline(always)]
-pub fn argmin<T: SimdOps>(data: &[T]) -> Option<(usize, T)> { T::argmin(data) }
+pub fn argmin<T: SimdOps>(data: &[T]) -> Option<(usize, T)> {
+    T::argmin(data)
+}
 
 /// Returns `Some((index, value))` of the maximum element, or `None` for empty.
 #[inline(always)]
-pub fn argmax<T: SimdOps>(data: &[T]) -> Option<(usize, T)> { T::argmax(data) }
+pub fn argmax<T: SimdOps>(data: &[T]) -> Option<(usize, T)> {
+    T::argmax(data)
+}
 
 /// Computes the dot product of two slices using runtime-dispatched SIMD.
 #[inline(always)]
-pub fn dot<T: SimdOps>(a: &[T], b: &[T]) -> Result<T, SimdError> { T::dot(a, b) }
+pub fn dot<T: SimdOps>(a: &[T], b: &[T]) -> Result<T, SimdError> {
+    T::dot(a, b)
+}
 
 /// Computes the elementwise multiplication of two slices and writes to `out`.
 #[inline(always)]
@@ -428,7 +557,9 @@ pub fn elementwise_div<T: SimdOps>(a: &[T], b: &[T], out: &mut [T]) -> Result<()
 
 /// Computes the sum of elements matching a boolean mask.
 #[inline(always)]
-pub fn masked_sum<T: SimdOps>(data: &[T], mask: &[bool]) -> T { T::masked_sum(data, mask) }
+pub fn masked_sum<T: SimdOps>(data: &[T], mask: &[bool]) -> T {
+    T::masked_sum(data, mask)
+}
 
 /// Computes the dot product of elements matching a boolean mask.
 #[inline(always)]
@@ -438,7 +569,12 @@ pub fn masked_dot<T: SimdOps>(a: &[T], b: &[T], mask: &[bool]) -> Result<T, Simd
 
 /// Computes the elementwise sum of elements matching a boolean mask.
 #[inline(always)]
-pub fn masked_add<T: SimdOps>(a: &[T], b: &[T], mask: &[bool], out: &mut [T]) -> Result<(), SimdError> {
+pub fn masked_add<T: SimdOps>(
+    a: &[T],
+    b: &[T],
+    mask: &[bool],
+    out: &mut [T],
+) -> Result<(), SimdError> {
     T::masked_add(a, b, mask, out)
 }
 

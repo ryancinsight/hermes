@@ -2,12 +2,12 @@
 
 extern crate alloc;
 
-use core::alloc::Layout;
-use core::ops::{Deref, DerefMut};
-use core::marker::PhantomData;
 use crate::align::Alignment;
-use crate::view::SimdView;
 use crate::numa::NumaAllocator;
+use crate::view::SimdView;
+use core::alloc::Layout;
+use core::marker::PhantomData;
+use core::ops::{Deref, DerefMut};
 
 use alloc::alloc::{alloc, dealloc};
 
@@ -68,7 +68,8 @@ where
         } else {
             core::mem::align_of::<T>()
         };
-        let size = capacity.checked_mul(core::mem::size_of::<T>())
+        let size = capacity
+            .checked_mul(core::mem::size_of::<T>())
             .expect("Capacity overflow");
         let layout = Layout::from_size_align(size, align).unwrap();
 
@@ -113,7 +114,8 @@ where
         } else {
             core::mem::align_of::<T>()
         };
-        let size = capacity.checked_mul(core::mem::size_of::<T>())
+        let size = capacity
+            .checked_mul(core::mem::size_of::<T>())
             .expect("Capacity overflow");
         let layout = Layout::from_size_align(size, align).unwrap();
 
@@ -244,7 +246,9 @@ where
 
     /// Obtains a compile-time safe immutable `SimdView` over the vector's buffer.
     #[inline(always)]
-    pub fn view<'a, Arch>(&'a self) -> SimdView<'a, T, Arch, Align, crate::execution::Unmasked, &'a [T]>
+    pub fn view<'a, Arch>(
+        &'a self,
+    ) -> SimdView<'a, T, Arch, Align, crate::execution::Unmasked, &'a [T]>
     where
         Arch: crate::arch::SimdArch,
     {
@@ -253,7 +257,9 @@ where
 
     /// Obtains a compile-time safe mutable `SimdView` over the vector's buffer.
     #[inline(always)]
-    pub fn view_mut<'a, Arch>(&'a mut self) -> SimdView<'a, T, Arch, Align, crate::execution::Unmasked, &'a mut [T]>
+    pub fn view_mut<'a, Arch>(
+        &'a mut self,
+    ) -> SimdView<'a, T, Arch, Align, crate::execution::Unmasked, &'a mut [T]>
     where
         Arch: crate::arch::SimdArch,
     {
@@ -274,7 +280,8 @@ where
     }
 
     fn layout_for(&self, capacity: usize) -> Layout {
-        let size = capacity.checked_mul(core::mem::size_of::<T>())
+        let size = capacity
+            .checked_mul(core::mem::size_of::<T>())
             .expect("Capacity overflow");
         let align = if Align::IS_ALIGNED {
             Align::ALIGN_BYTES
@@ -356,7 +363,9 @@ impl<T, Align: Alignment> Drop for AlignedVec<T, Align> {
         if core::mem::size_of::<T>() == 0 {
             if self.len > 0 {
                 unsafe {
-                    core::ptr::drop_in_place(core::ptr::slice_from_raw_parts_mut(self.ptr, self.len));
+                    core::ptr::drop_in_place(core::ptr::slice_from_raw_parts_mut(
+                        self.ptr, self.len,
+                    ));
                 }
             }
             return;
@@ -420,7 +429,9 @@ impl<T: core::fmt::Debug, Align: Alignment> core::fmt::Debug for AlignedVec<T, A
     }
 }
 
-impl<T: PartialEq, Align1: Alignment, Align2: Alignment> PartialEq<AlignedVec<T, Align2>> for AlignedVec<T, Align1> {
+impl<T: PartialEq, Align1: Alignment, Align2: Alignment> PartialEq<AlignedVec<T, Align2>>
+    for AlignedVec<T, Align1>
+{
     #[inline]
     fn eq(&self, other: &AlignedVec<T, Align2>) -> bool {
         self.as_slice() == other.as_slice()

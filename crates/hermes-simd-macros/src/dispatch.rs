@@ -8,9 +8,7 @@
 
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
-use syn::{
-    parse::Parser, punctuated::Punctuated, Error, FnArg, Ident, ItemFn, Pat, Result, Token,
-};
+use syn::{parse::Parser, punctuated::Punctuated, Error, FnArg, Ident, ItemFn, Pat, Result, Token};
 
 /// Recognized dispatch targets and their architecture context.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -387,7 +385,12 @@ pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
 
     let x86_targets: Vec<DispatchTarget> = targets
         .iter()
-        .filter(|t| matches!(t, DispatchTarget::Avx512f | DispatchTarget::Avx2 | DispatchTarget::Scalar))
+        .filter(|t| {
+            matches!(
+                t,
+                DispatchTarget::Avx512f | DispatchTarget::Avx2 | DispatchTarget::Scalar
+            )
+        })
         .cloned()
         .collect();
 
@@ -430,7 +433,11 @@ pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
     );
 
     let fallback_dispatcher = generate_dispatcher(
-        &quote!(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64"))),
+        &quote!(not(any(
+            target_arch = "x86",
+            target_arch = "x86_64",
+            target_arch = "aarch64"
+        ))),
         &fallback_targets,
         &dispatch_name,
         inner_name,

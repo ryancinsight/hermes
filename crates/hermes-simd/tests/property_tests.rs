@@ -1,5 +1,5 @@
+use hermes_simd::{dot, elementwise_mul, sum};
 use proptest::prelude::*;
-use hermes_simd::{sum, dot, elementwise_mul};
 
 fn ref_sum<T: std::iter::Sum + Copy>(data: &[T]) -> T {
     data.iter().copied().sum()
@@ -16,10 +16,16 @@ fn ref_elementwise_mul<T: std::ops::Mul<Output = T> + Copy>(a: &[T], b: &[T], ou
 }
 
 fn approx_eq_f32(x: f32, y: f32) -> bool {
-    if x.is_nan() && y.is_nan() { return true; }
-    if x.is_infinite() && y.is_infinite() { return x.is_sign_positive() == y.is_sign_positive(); }
+    if x.is_nan() && y.is_nan() {
+        return true;
+    }
+    if x.is_infinite() && y.is_infinite() {
+        return x.is_sign_positive() == y.is_sign_positive();
+    }
     let abs_diff = (x - y).abs();
-    if abs_diff < 1e-2 { return true; }
+    if abs_diff < 1e-2 {
+        return true;
+    }
     let norm = x.abs().max(y.abs());
     norm > 0.0 && (abs_diff / norm) < 1e-2
 }
@@ -27,19 +33,31 @@ fn approx_eq_f32(x: f32, y: f32) -> bool {
 fn approx_eq_f16(x: half::f16, y: half::f16) -> bool {
     let x_f32 = x.to_f32();
     let y_f32 = y.to_f32();
-    if x_f32.is_nan() && y_f32.is_nan() { return true; }
-    if x_f32.is_infinite() && y_f32.is_infinite() { return x_f32.is_sign_positive() == y_f32.is_sign_positive(); }
+    if x_f32.is_nan() && y_f32.is_nan() {
+        return true;
+    }
+    if x_f32.is_infinite() && y_f32.is_infinite() {
+        return x_f32.is_sign_positive() == y_f32.is_sign_positive();
+    }
     let abs_diff = (x_f32 - y_f32).abs();
-    if abs_diff < 6.0e-1 { return true; }
+    if abs_diff < 6.0e-1 {
+        return true;
+    }
     let norm = x_f32.abs().max(y_f32.abs());
     norm > 0.0 && (abs_diff / norm) < 2.0e-1
 }
 
 fn approx_eq_f64(x: f64, y: f64) -> bool {
-    if x.is_nan() && y.is_nan() { return true; }
-    if x.is_infinite() && y.is_infinite() { return x.is_sign_positive() == y.is_sign_positive(); }
+    if x.is_nan() && y.is_nan() {
+        return true;
+    }
+    if x.is_infinite() && y.is_infinite() {
+        return x.is_sign_positive() == y.is_sign_positive();
+    }
     let abs_diff = (x - y).abs();
-    if abs_diff < 1e-7 { return true; }
+    if abs_diff < 1e-7 {
+        return true;
+    }
     let norm = x.abs().max(y.abs());
     norm > 0.0 && (abs_diff / norm) < 1e-7
 }

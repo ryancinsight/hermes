@@ -9,9 +9,7 @@
 //! Matrix size is fixed at 512x512 to keep benchmark runs short; the relative
 //! throughput differences between formats are representative at larger sizes.
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use hermes_simd::{
-    spmv_csr, spmv_dense_masked, spmv_bcoo4x4, spmv_bcoo8x8,
-};
+use hermes_simd::{spmv_bcoo4x4, spmv_bcoo8x8, spmv_csr, spmv_dense_masked};
 use hermes_simd_core::sparse::{BlockedCooData, CsrData, DenseWithMaskData};
 
 /// Build a CSR matrix with the given sparsity (fraction of zeros) for an `nxn` matrix.
@@ -103,20 +101,16 @@ fn bench_csr_spmv(c: &mut Criterion) {
         let mut y = vec![0.0f32; n];
         let label = format!("sparsity_{:.0}pct", sparsity * 100.0);
         group.throughput(Throughput::Elements(n as u64 * n as u64));
-        group.bench_with_input(
-            BenchmarkId::new("csr", &label),
-            &sparsity,
-            |b, _| {
-                b.iter(|| {
-                    y.fill(0.0);
-                    spmv_csr::<f32>(
-                        CsrData::new(&vals[..], &cols[..], &ptr[..], n, n),
-                        &x,
-                        &mut y,
-                    );
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("csr", &label), &sparsity, |b, _| {
+            b.iter(|| {
+                y.fill(0.0);
+                spmv_csr::<f32>(
+                    CsrData::new(&vals[..], &cols[..], &ptr[..], n, n),
+                    &x,
+                    &mut y,
+                );
+            })
+        });
     }
     group.finish();
 }
@@ -190,5 +184,10 @@ fn bench_bcoo_spmv(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_csr_spmv, bench_dense_masked_spmv, bench_bcoo_spmv);
+criterion_group!(
+    benches,
+    bench_csr_spmv,
+    bench_dense_masked_spmv,
+    bench_bcoo_spmv
+);
 criterion_main!(benches);

@@ -1,26 +1,40 @@
 //! Owned heap-backed sparse storage types.
 
-use alloc::vec::Vec;
 use super::super::{
+    types::{
+        BlockedCooData, BlockedCooMatrix, CsrData, CsrMatrix, DenseWithMaskData,
+        DenseWithMaskMatrix, SellPData, SellPMatrix,
+    },
     SparseShape,
-    types::{CsrMatrix, SellPMatrix, BlockedCooMatrix, DenseWithMaskMatrix,
-             CsrData, SellPData, BlockedCooData, DenseWithMaskData},
 };
+use alloc::vec::Vec;
 
 /// Owned heap-backed CSR storage.
 pub struct OwnedCsr<T> {
-    pub(crate) values:      Vec<T>,
+    pub(crate) values: Vec<T>,
     pub(crate) col_indices: Vec<i32>,
-    pub(crate) row_ptr:     Vec<i32>,
-    pub(crate) nrows:       usize,
-    pub(crate) ncols:       usize,
+    pub(crate) row_ptr: Vec<i32>,
+    pub(crate) nrows: usize,
+    pub(crate) ncols: usize,
 }
 
 impl<T> OwnedCsr<T> {
     /// Construct owned CSR storage.
     #[inline]
-    pub fn new(values: Vec<T>, col_indices: Vec<i32>, row_ptr: Vec<i32>, nrows: usize, ncols: usize) -> Self {
-        Self { values, col_indices, row_ptr, nrows, ncols }
+    pub fn new(
+        values: Vec<T>,
+        col_indices: Vec<i32>,
+        row_ptr: Vec<i32>,
+        nrows: usize,
+        ncols: usize,
+    ) -> Self {
+        Self {
+            values,
+            col_indices,
+            row_ptr,
+            nrows,
+            ncols,
+        }
     }
 
     /// Return a borrowed `CsrData` view over this owned storage.
@@ -37,18 +51,24 @@ impl<T> OwnedCsr<T> {
 }
 
 impl<T> SparseShape for OwnedCsr<T> {
-    #[inline(always)] fn nrows(&self) -> usize { self.nrows }
-    #[inline(always)] fn ncols(&self) -> usize { self.ncols }
+    #[inline(always)]
+    fn nrows(&self) -> usize {
+        self.nrows
+    }
+    #[inline(always)]
+    fn ncols(&self) -> usize {
+        self.ncols
+    }
 }
 
 /// Owned heap-backed SELL-p storage.
 pub struct OwnedSellP<T, const C: usize> {
-    pub(crate) values:          Vec<T>,
-    pub(crate) col_indices:     Vec<i32>,
-    pub(crate) slice_ptr:       Vec<i32>,
+    pub(crate) values: Vec<T>,
+    pub(crate) col_indices: Vec<i32>,
+    pub(crate) slice_ptr: Vec<i32>,
     pub(crate) slice_col_count: Vec<i32>,
-    pub(crate) nrows:           usize,
-    pub(crate) ncols:           usize,
+    pub(crate) nrows: usize,
+    pub(crate) ncols: usize,
 }
 
 impl<T, const C: usize> OwnedSellP<T, C> {
@@ -62,7 +82,14 @@ impl<T, const C: usize> OwnedSellP<T, C> {
         nrows: usize,
         ncols: usize,
     ) -> Self {
-        Self { values, col_indices, slice_ptr, slice_col_count, nrows, ncols }
+        Self {
+            values,
+            col_indices,
+            slice_ptr,
+            slice_col_count,
+            nrows,
+            ncols,
+        }
     }
 
     /// Return a borrowed `SellPData` view over this owned storage.
@@ -80,32 +107,45 @@ impl<T, const C: usize> OwnedSellP<T, C> {
 }
 
 impl<T, const C: usize> SparseShape for OwnedSellP<T, C> {
-    #[inline(always)] fn nrows(&self) -> usize { self.nrows }
-    #[inline(always)] fn ncols(&self) -> usize { self.ncols }
+    #[inline(always)]
+    fn nrows(&self) -> usize {
+        self.nrows
+    }
+    #[inline(always)]
+    fn ncols(&self) -> usize {
+        self.ncols
+    }
 }
 
 /// Owned heap-backed Blocked-COO storage.
 pub struct OwnedBlockedCoo<T, const BM: usize, const BN: usize> {
-    pub(crate) blocks:    Vec<T>,
+    pub(crate) blocks: Vec<T>,
     pub(crate) block_row: Vec<i32>,
     pub(crate) block_col: Vec<i32>,
-    pub(crate) nblocks:   usize,
-    pub(crate) nrows:     usize,
-    pub(crate) ncols:     usize,
+    pub(crate) nblocks: usize,
+    pub(crate) nrows: usize,
+    pub(crate) ncols: usize,
 }
 
 impl<T, const BM: usize, const BN: usize> OwnedBlockedCoo<T, BM, BN> {
     /// Construct owned Blocked-COO storage.
     #[inline]
     pub fn new(
-        blocks:    Vec<T>,
+        blocks: Vec<T>,
         block_row: Vec<i32>,
         block_col: Vec<i32>,
-        nblocks:   usize,
-        nrows:     usize,
-        ncols:     usize,
+        nblocks: usize,
+        nrows: usize,
+        ncols: usize,
     ) -> Self {
-        Self { blocks, block_row, block_col, nblocks, nrows, ncols }
+        Self {
+            blocks,
+            block_row,
+            block_col,
+            nblocks,
+            nrows,
+            ncols,
+        }
     }
 
     /// Return a borrowed `BlockedCooData` view over this owned storage.
@@ -123,23 +163,34 @@ impl<T, const BM: usize, const BN: usize> OwnedBlockedCoo<T, BM, BN> {
 }
 
 impl<T, const BM: usize, const BN: usize> SparseShape for OwnedBlockedCoo<T, BM, BN> {
-    #[inline(always)] fn nrows(&self) -> usize { self.nrows }
-    #[inline(always)] fn ncols(&self) -> usize { self.ncols }
+    #[inline(always)]
+    fn nrows(&self) -> usize {
+        self.nrows
+    }
+    #[inline(always)]
+    fn ncols(&self) -> usize {
+        self.ncols
+    }
 }
 
 /// Owned heap-backed DenseWithMask storage.
 pub struct OwnedDenseWithMask<T> {
     pub(crate) values: Vec<T>,
-    pub(crate) mask:   Vec<bool>,
-    pub(crate) nrows:  usize,
-    pub(crate) ncols:  usize,
+    pub(crate) mask: Vec<bool>,
+    pub(crate) nrows: usize,
+    pub(crate) ncols: usize,
 }
 
 impl<T> OwnedDenseWithMask<T> {
     /// Construct owned DenseWithMask storage.
     #[inline]
     pub fn new(values: Vec<T>, mask: Vec<bool>, nrows: usize, ncols: usize) -> Self {
-        Self { values, mask, nrows, ncols }
+        Self {
+            values,
+            mask,
+            nrows,
+            ncols,
+        }
     }
 
     /// Return a borrowed `DenseWithMaskData` view over this owned storage.
@@ -155,6 +206,12 @@ impl<T> OwnedDenseWithMask<T> {
 }
 
 impl<T> SparseShape for OwnedDenseWithMask<T> {
-    #[inline(always)] fn nrows(&self) -> usize { self.nrows }
-    #[inline(always)] fn ncols(&self) -> usize { self.ncols }
+    #[inline(always)]
+    fn nrows(&self) -> usize {
+        self.nrows
+    }
+    #[inline(always)]
+    fn ncols(&self) -> usize {
+        self.ncols
+    }
 }

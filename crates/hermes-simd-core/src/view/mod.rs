@@ -1,43 +1,43 @@
 //! Safely typed views over slices with static alignment, architecture dispatch, reference typestates, and execution mode.
 
-use core::marker::PhantomData;
-use crate::arch::SimdArch;
 use crate::align::Alignment;
-use crate::kernel::SimdKernel;
+use crate::arch::SimdArch;
 use crate::execution::{ExecutionMode, Unmasked};
-use crate::scalar::Scalar;
 use crate::iter;
+use crate::kernel::SimdKernel;
+use crate::scalar::Scalar;
+use core::marker::PhantomData;
 
+/// Vectorized indirect load (gather) operations.
+pub mod gather;
+/// Lane-masked math and compaction/expansion operations on SIMD views.
+pub mod masked;
 /// Standard elementwise and accumulation operations on SIMD views.
 pub mod ops;
 /// Standard exclusive mutable elementwise operations on SIMD views.
 pub mod ops_mut;
-/// Unary mapping operations on SIMD views.
-pub mod unary;
-/// Lane-masked math and compaction/expansion operations on SIMD views.
-pub mod masked;
 /// Unrolled generic horizontal reductions on SIMD views.
 pub mod reduce;
-/// 2D matrix tile views and operations.
-pub mod tile;
 /// Inclusive/exclusive prefix scans and running min/max.
 pub mod scan;
 /// Lane-wise conditional select and masked-negate.
 pub mod select;
-/// Vectorized indirect load (gather) operations.
-pub mod gather;
+/// 2D matrix tile views and operations.
+pub mod tile;
+/// Unary mapping operations on SIMD views.
+pub mod unary;
 
-pub use tile::{TileView, TileMatrixMultiply};
+pub use tile::{TileMatrixMultiply, TileView};
 
-/// Module containing the generic SIMD vector register wrappers.
-pub mod vector_reg;
-/// Module containing operator overload implementations for SIMD vectors.
-pub mod vector_ops;
 /// Module containing the SIMD mask register wrappers.
 pub mod mask_reg;
+/// Module containing operator overload implementations for SIMD vectors.
+pub mod vector_ops;
+/// Module containing the generic SIMD vector register wrappers.
+pub mod vector_reg;
 
-pub use vector_reg::Vector;
 pub use mask_reg::Mask;
+pub use vector_reg::Vector;
 
 /// Error types for SIMD view operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,7 +57,9 @@ impl core::fmt::Display for SimdError {
         match self {
             Self::LengthMismatch => write!(f, "Operand views have mismatched lengths"),
             Self::InsufficientOutputLength => write!(f, "Output slice has insufficient length"),
-            Self::UnalignedAddress => write!(f, "Memory address does not satisfy alignment constraints"),
+            Self::UnalignedAddress => {
+                write!(f, "Memory address does not satisfy alignment constraints")
+            }
             Self::IndexOutOfBounds => write!(f, "Index is out of bounds of the view"),
         }
     }
@@ -78,7 +80,14 @@ impl std::error::Error for SimdError {}
 ///
 /// Guaranteed to have zero runtime overhead and remains `#[repr(transparent)]`.
 #[repr(transparent)]
-pub struct SimdView<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode = Unmasked, Ref: 'a = &'a [T]> {
+pub struct SimdView<
+    'a,
+    T: 'a,
+    Arch: SimdArch,
+    Align: Alignment,
+    Mode: ExecutionMode = Unmasked,
+    Ref: 'a = &'a [T],
+> {
     ptr: *mut [T],
     _marker: PhantomData<(&'a T, Arch, Align, Mode, Ref)>,
 }
@@ -87,13 +96,15 @@ unsafe impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode, Re
     for SimdView<'a, T, Arch, Align, Mode, Ref>
 where
     Ref: Send,
-{}
+{
+}
 
 unsafe impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode, Ref: 'a> Sync
     for SimdView<'a, T, Arch, Align, Mode, Ref>
 where
     Ref: Sync,
-{}
+{
+}
 
 impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode> Clone
     for SimdView<'a, T, Arch, Align, Mode, &'a [T]>
@@ -106,7 +117,8 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode> Clone
 
 impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode> Copy
     for SimdView<'a, T, Arch, Align, Mode, &'a [T]>
-{}
+{
+}
 
 impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
     SimdView<'a, T, Arch, Align, Mode, &'a [T]>
@@ -196,7 +208,9 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode, Ref: 'a>
     /// Attempts to promote the alignment of this view to boundary `A` bytes.
     /// Returns `Some(SimdView)` if the start pointer is aligned to `A` bytes, otherwise `None`.
     #[inline]
-    pub fn try_into_aligned<const A: usize>(self) -> Option<SimdView<'a, T, Arch, crate::align::Aligned<A>, Mode, Ref>> {
+    pub fn try_into_aligned<const A: usize>(
+        self,
+    ) -> Option<SimdView<'a, T, Arch, crate::align::Aligned<A>, Mode, Ref>> {
         let addr = self.as_slice().as_ptr() as usize;
         if addr % A == 0 {
             Some(SimdView {
@@ -214,7 +228,10 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
 {
     /// Zero-copy sub-slice over a range of indices, returning an unaligned view.
     #[inline]
-    pub fn slice_unaligned(self, range: core::ops::Range<usize>) -> SimdView<'a, T, Arch, crate::align::Unaligned, Mode, &'a [T]> {
+    pub fn slice_unaligned(
+        self,
+        range: core::ops::Range<usize>,
+    ) -> SimdView<'a, T, Arch, crate::align::Unaligned, Mode, &'a [T]> {
         let sub = &self.as_slice()[range];
         SimdView {
             ptr: sub as *const [T] as *mut [T],
@@ -225,7 +242,10 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
     /// Zero-copy sub-slice over a range of indices, returning an aligned view with boundary `A` bytes.
     /// Returns `Some(SimdView)` if the sub-slice satisfies the alignment, otherwise `None`.
     #[inline]
-    pub fn slice_aligned<const A: usize>(self, range: core::ops::Range<usize>) -> Option<SimdView<'a, T, Arch, crate::align::Aligned<A>, Mode, &'a [T]>> {
+    pub fn slice_aligned<const A: usize>(
+        self,
+        range: core::ops::Range<usize>,
+    ) -> Option<SimdView<'a, T, Arch, crate::align::Aligned<A>, Mode, &'a [T]>> {
         let sub = &self.as_slice()[range];
         let addr = sub.as_ptr() as usize;
         if addr % A == 0 {
@@ -244,7 +264,10 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
 {
     /// Zero-copy mutable sub-slice over a range of indices, returning an unaligned view.
     #[inline]
-    pub fn slice_unaligned_mut(mut self, range: core::ops::Range<usize>) -> SimdView<'a, T, Arch, crate::align::Unaligned, Mode, &'a mut [T]> {
+    pub fn slice_unaligned_mut(
+        mut self,
+        range: core::ops::Range<usize>,
+    ) -> SimdView<'a, T, Arch, crate::align::Unaligned, Mode, &'a mut [T]> {
         let sub = &mut self.as_slice_mut()[range];
         SimdView {
             ptr: sub as *mut [T],
@@ -255,7 +278,10 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
     /// Zero-copy mutable sub-slice over a range of indices, returning an aligned view with boundary `A` bytes.
     /// Returns `Some(SimdView)` if the sub-slice satisfies the alignment, otherwise `None`.
     #[inline]
-    pub fn slice_aligned_mut<const A: usize>(mut self, range: core::ops::Range<usize>) -> Option<SimdView<'a, T, Arch, crate::align::Aligned<A>, Mode, &'a mut [T]>> {
+    pub fn slice_aligned_mut<const A: usize>(
+        mut self,
+        range: core::ops::Range<usize>,
+    ) -> Option<SimdView<'a, T, Arch, crate::align::Aligned<A>, Mode, &'a mut [T]>> {
         let sub = &mut self.as_slice_mut()[range];
         let addr = sub.as_ptr() as usize;
         if addr % A == 0 {
@@ -269,8 +295,14 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
     }
 }
 
-impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode, Ref: 'a>
-    SimdView<'a, T, Arch, Align, Mode, Ref>
+impl<
+        'a,
+        T: Scalar + 'a,
+        Arch: SimdArch + SimdKernel<T>,
+        Align: Alignment,
+        Mode: ExecutionMode,
+        Ref: 'a,
+    > SimdView<'a, T, Arch, Align, Mode, Ref>
 {
     /// Return a zero-copy iterator over non-overlapping `LANE_COUNT`-wide sub-views.
     ///
@@ -281,11 +313,7 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
     pub fn simd_chunks(&self) -> iter::SimdChunks<'a, T, Arch, Align, Mode> {
         // SAFETY: self.as_slice() is valid for the lifetime 'a (it derives from our ptr).
         unsafe {
-            iter::SimdChunks::from_raw_parts(
-                self.as_slice().as_ptr(),
-                self.len(),
-                Arch::LANE_COUNT,
-            )
+            iter::SimdChunks::from_raw_parts(self.as_slice().as_ptr(), self.len(), Arch::LANE_COUNT)
         }
     }
 
@@ -323,11 +351,7 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
     pub fn simd_chunks_mut(self) -> iter::SimdChunksMut<'a, T, Arch, Align, Mode> {
         // SAFETY: self.ptr is valid for writes of total elements for lifetime 'a.
         unsafe {
-            iter::SimdChunksMut::from_raw_parts(
-                self.ptr as *mut T,
-                self.len(),
-                Arch::LANE_COUNT,
-            )
+            iter::SimdChunksMut::from_raw_parts(self.ptr as *mut T, self.len(), Arch::LANE_COUNT)
         }
     }
 
@@ -402,7 +426,9 @@ where
 {
     /// Safe cast of the underlying mutable data slice to a mutable slice of another Pod type, returning a new mutable `SimdView`.
     #[inline]
-    pub fn cast_mut<U: bytemuck::Pod>(self) -> Option<SimdView<'a, U, Arch, Align, Mode, &'a mut [U]>> {
+    pub fn cast_mut<U: bytemuck::Pod>(
+        self,
+    ) -> Option<SimdView<'a, U, Arch, Align, Mode, &'a mut [U]>> {
         let casted = bytemuck::try_cast_slice_mut(unsafe { &mut *self.ptr }).ok()?;
         SimdView::new_mut(casted)
     }

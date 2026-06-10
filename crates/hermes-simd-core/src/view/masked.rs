@@ -1,9 +1,9 @@
-use crate::arch::SimdArch;
 use crate::align::Alignment;
-use crate::kernel::SimdKernel;
+use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
-use crate::scalar::Scalar;
+use crate::kernel::SimdKernel;
 use crate::mask::BitMask;
+use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
 
 impl<'a, T: 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode, Ref: 'a>
@@ -13,7 +13,12 @@ where
 {
     /// Add elementwise where mask is active, writing to `out`. Inactive lanes copy from `self`.
     #[inline(always)]
-    pub fn masked_add<ORef, const N: usize>(&self, other: &SimdView<'_, T, Arch, Align, Mode, ORef>, mask: &BitMask<N>, out: &mut [T]) -> Result<(), SimdError>
+    pub fn masked_add<ORef, const N: usize>(
+        &self,
+        other: &SimdView<'_, T, Arch, Align, Mode, ORef>,
+        mask: &BitMask<N>,
+        out: &mut [T],
+    ) -> Result<(), SimdError>
     where
         ORef: 'a,
     {
@@ -67,7 +72,11 @@ where
         let bools = mask.to_bools();
         for i in simd_len..len {
             let lane_idx = i - simd_len;
-            out[i] = if bools[lane_idx] { s_slice[i] + o_slice[i] } else { s_slice[i] };
+            out[i] = if bools[lane_idx] {
+                s_slice[i] + o_slice[i]
+            } else {
+                s_slice[i]
+            };
         }
 
         Ok(())
@@ -75,7 +84,12 @@ where
 
     /// Multiply elementwise where mask is active, writing to `out`. Inactive lanes copy from `self`.
     #[inline(always)]
-    pub fn masked_mul<ORef, const N: usize>(&self, other: &SimdView<'_, T, Arch, Align, Mode, ORef>, mask: &BitMask<N>, out: &mut [T]) -> Result<(), SimdError>
+    pub fn masked_mul<ORef, const N: usize>(
+        &self,
+        other: &SimdView<'_, T, Arch, Align, Mode, ORef>,
+        mask: &BitMask<N>,
+        out: &mut [T],
+    ) -> Result<(), SimdError>
     where
         ORef: 'a,
     {
@@ -129,7 +143,11 @@ where
         let bools = mask.to_bools();
         for i in simd_len..len {
             let lane_idx = i - simd_len;
-            out[i] = if bools[lane_idx] { s_slice[i] * o_slice[i] } else { s_slice[i] };
+            out[i] = if bools[lane_idx] {
+                s_slice[i] * o_slice[i]
+            } else {
+                s_slice[i]
+            };
         }
 
         Ok(())
@@ -137,7 +155,13 @@ where
 
     /// Fused multiply-add where mask is active: `(self * b) + c`, writing to `out`. Inactive lanes copy from `c`.
     #[inline(always)]
-    pub fn masked_fmadd<ORef1, ORef2, const N: usize>(&self, b: &SimdView<'_, T, Arch, Align, Mode, ORef1>, c: &SimdView<'_, T, Arch, Align, Mode, ORef2>, mask: &BitMask<N>, out: &mut [T]) -> Result<(), SimdError>
+    pub fn masked_fmadd<ORef1, ORef2, const N: usize>(
+        &self,
+        b: &SimdView<'_, T, Arch, Align, Mode, ORef1>,
+        c: &SimdView<'_, T, Arch, Align, Mode, ORef2>,
+        mask: &BitMask<N>,
+        out: &mut [T],
+    ) -> Result<(), SimdError>
     where
         ORef1: 'a,
         ORef2: 'a,
@@ -197,7 +221,11 @@ where
         let bools = mask.to_bools();
         for i in simd_len..len {
             let lane_idx = i - simd_len;
-            out[i] = if bools[lane_idx] { a_slice[i].scalar_fmadd(b_slice[i], c_slice[i]) } else { c_slice[i] };
+            out[i] = if bools[lane_idx] {
+                a_slice[i].scalar_fmadd(b_slice[i], c_slice[i])
+            } else {
+                c_slice[i]
+            };
         }
 
         Ok(())
@@ -205,7 +233,11 @@ where
 
     /// Compress: pack elements where `mask` is active contiguously into `out`. Returns the number of elements written.
     #[inline(always)]
-    pub fn compress<const N: usize>(&self, mask: &BitMask<N>, out: &mut [T]) -> Result<usize, SimdError> {
+    pub fn compress<const N: usize>(
+        &self,
+        mask: &BitMask<N>,
+        out: &mut [T],
+    ) -> Result<usize, SimdError> {
         debug_assert_eq!(N, Arch::LANE_COUNT);
         super::check_output_length(self.len(), out.len())?;
 
@@ -258,7 +290,12 @@ where
 
     /// Expand: scatter the active elements of `self` into `out` at mask positions, filling inactive positions with `fill`.
     #[inline(always)]
-    pub fn expand<ORef, const N: usize>(&self, mask: &BitMask<N>, fill: &SimdView<'_, T, Arch, Align, Mode, ORef>, out: &mut [T]) -> Result<(), SimdError>
+    pub fn expand<ORef, const N: usize>(
+        &self,
+        mask: &BitMask<N>,
+        fill: &SimdView<'_, T, Arch, Align, Mode, ORef>,
+        out: &mut [T],
+    ) -> Result<(), SimdError>
     where
         ORef: 'a,
     {

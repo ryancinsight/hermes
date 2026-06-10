@@ -39,9 +39,11 @@ fn bench_dot(c: &mut Criterion) {
         let b = vec![2.0f32; size];
         group.throughput(Throughput::Elements(size as u64));
 
-        group.bench_with_input(BenchmarkId::new("scalar_iter", size), &size, |bencher, _| {
-            bencher.iter(|| scalar_dot(&a, &b))
-        });
+        group.bench_with_input(
+            BenchmarkId::new("scalar_iter", size),
+            &size,
+            |bencher, _| bencher.iter(|| scalar_dot(&a, &b)),
+        );
         group.bench_with_input(BenchmarkId::new("dispatch", size), &size, |bencher, _| {
             bencher.iter(|| dot::<f32>(&a, &b).unwrap())
         });

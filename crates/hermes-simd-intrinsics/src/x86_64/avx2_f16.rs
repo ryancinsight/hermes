@@ -5,9 +5,9 @@
 //! fallback with 16 lanes matching the register size.
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use hermes_simd_core::kernel::SimdKernel;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use crate::Avx2;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+use hermes_simd_core::kernel::SimdKernel;
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 impl SimdKernel<half::f16> for Avx2 {
@@ -74,9 +74,7 @@ impl SimdKernel<half::f16> for Avx2 {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        core::array::from_fn(|i| {
-            if mask[i] { *ptr.add(i) } else { src[i] }
-        })
+        core::array::from_fn(|i| if mask[i] { *ptr.add(i) } else { src[i] })
     }
 
     #[inline(always)]
@@ -95,9 +93,7 @@ impl SimdKernel<half::f16> for Avx2 {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        core::array::from_fn(|i| {
-            if mask[i] { a[i] + b[i] } else { src[i] }
-        })
+        core::array::from_fn(|i| if mask[i] { a[i] + b[i] } else { src[i] })
     }
 
     #[inline(always)]
@@ -107,9 +103,7 @@ impl SimdKernel<half::f16> for Avx2 {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        core::array::from_fn(|i| {
-            if mask[i] { a[i] * b[i] } else { src[i] }
-        })
+        core::array::from_fn(|i| if mask[i] { a[i] * b[i] } else { src[i] })
     }
 
     #[inline(always)]

@@ -85,12 +85,17 @@ macro_rules! impl_emulated_kernel {
 
             #[inline(always)]
             unsafe fn fmadd(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
-                core::array::from_fn(|i| <$t as hermes_simd_core::scalar::NumericElement>::scalar_fmadd(a[i], b[i], c[i]))
+                core::array::from_fn(|i| {
+                    <$t as hermes_simd_core::scalar::NumericElement>::scalar_fmadd(a[i], b[i], c[i])
+                })
             }
 
             #[inline(always)]
             unsafe fn sum_reduce(v: Self::Vector) -> $t {
-                v.iter().copied().fold(<$t as hermes_simd_core::scalar::NumericElement>::ZERO, |acc, x| acc + x)
+                v.iter().copied().fold(
+                    <$t as hermes_simd_core::scalar::NumericElement>::ZERO,
+                    |acc, x| acc + x,
+                )
             }
 
             #[inline(always)]
@@ -99,9 +104,7 @@ macro_rules! impl_emulated_kernel {
                 mask: Self::Mask,
                 src: Self::Vector,
             ) -> Self::Vector {
-                core::array::from_fn(|i| {
-                    if mask[i] { *ptr.add(i) } else { src[i] }
-                })
+                core::array::from_fn(|i| if mask[i] { *ptr.add(i) } else { src[i] })
             }
 
             #[inline(always)]
@@ -120,9 +123,7 @@ macro_rules! impl_emulated_kernel {
                 mask: Self::Mask,
                 src: Self::Vector,
             ) -> Self::Vector {
-                core::array::from_fn(|i| {
-                    if mask[i] { a[i] + b[i] } else { src[i] }
-                })
+                core::array::from_fn(|i| if mask[i] { a[i] + b[i] } else { src[i] })
             }
 
             #[inline(always)]
@@ -132,9 +133,7 @@ macro_rules! impl_emulated_kernel {
                 mask: Self::Mask,
                 src: Self::Vector,
             ) -> Self::Vector {
-                core::array::from_fn(|i| {
-                    if mask[i] { a[i] * b[i] } else { src[i] }
-                })
+                core::array::from_fn(|i| if mask[i] { a[i] * b[i] } else { src[i] })
             }
 
             #[inline(always)]
@@ -146,7 +145,9 @@ macro_rules! impl_emulated_kernel {
             ) -> Self::Vector {
                 core::array::from_fn(|i| {
                     if mask[i] {
-                        <$t as hermes_simd_core::scalar::NumericElement>::scalar_fmadd(a[i], b[i], c[i])
+                        <$t as hermes_simd_core::scalar::NumericElement>::scalar_fmadd(
+                            a[i], b[i], c[i],
+                        )
                     } else {
                         c[i]
                     }
@@ -178,7 +179,11 @@ macro_rules! impl_emulated_kernel {
             }
 
             #[inline(always)]
-            unsafe fn expand(src: Self::Vector, mask: Self::Mask, fill: Self::Vector) -> Self::Vector {
+            unsafe fn expand(
+                src: Self::Vector,
+                mask: Self::Mask,
+                fill: Self::Vector,
+            ) -> Self::Vector {
                 let mut out = fill;
                 let mut k = 0;
                 for i in 0..$lanes {
@@ -257,23 +262,23 @@ macro_rules! impl_emulated_kernel {
     };
 }
 
-pub mod scalar;
-pub mod x86_64;
 pub mod aarch64;
 pub mod bitboard;
+pub mod scalar;
+pub mod x86_64;
 
 // Re-export SVE marker at crate root for ergonomic access.
 pub use aarch64::sve::SveArch;
 
 // Re-export bitboard backend markers.
-pub use bitboard::swar::{Swar, SwarUtils};
-pub use bitboard::kogge_stone::KoggeStone;
-pub use bitboard::hyperbola::Hyperbola;
-pub use bitboard::magic::Magic;
 pub use bitboard::hybrid::HybridSwarMagic;
+pub use bitboard::hyperbola::Hyperbola;
+pub use bitboard::kogge_stone::KoggeStone;
+pub use bitboard::magic::Magic;
+pub use bitboard::swar::{Swar, SwarUtils};
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-pub use x86_64::amx::{AmxBf16, AmxInt8, AmxConfig, AmxSession, AmxBatchSession};
+pub use x86_64::amx::{AmxBatchSession, AmxBf16, AmxConfig, AmxInt8, AmxSession};
 
 // ---------------------------------------------------------------------------
 // ZST Architecture Markers
@@ -294,10 +299,6 @@ pub struct Avx512;
 /// AArch64 NEON instruction set architecture marker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Neon;
-
-
-
-
 
 // ---------------------------------------------------------------------------
 // SimdArch impls
@@ -327,24 +328,13 @@ impl SimdArch for Avx512 {
 impl SimdArch for Neon {
     const NAME: &'static str = "neon";
     const REGISTER_WIDTH_BITS: u32 = 128;
-    const ISA_FAMILY: hermes_simd_core::arch::IsaFamily = hermes_simd_core::arch::IsaFamily::AArch64;
+    const ISA_FAMILY: hermes_simd_core::arch::IsaFamily =
+        hermes_simd_core::arch::IsaFamily::AArch64;
     const FMA_THROUGHPUT_HINT: u32 = 4;
 }
-
-
-
-
 
 impl hermes_simd_core::private::Sealed for Scalar {}
 impl hermes_simd_core::private::Sealed for Avx2 {}
 impl hermes_simd_core::private::Sealed for Avx512 {}
 impl hermes_simd_core::private::Sealed for Neon {}
 impl hermes_simd_core::private::Sealed for SveArch {}
-
-
-
-
-
-
-
-

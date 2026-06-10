@@ -2,10 +2,10 @@
 
 //! Operator overload implementations for the `Vector` register wrapper.
 
+use super::vector_reg::Vector;
 use crate::arch::SimdArch;
 use crate::kernel::SimdKernel;
 use crate::scalar::Scalar;
-use super::vector_reg::Vector;
 
 // -----------------------------------------------------------------------------
 // Operator Overloads
@@ -18,7 +18,9 @@ where
 {
     type Output = Self;
     #[inline(always)]
-    fn add(self, rhs: Self) -> Self { Self::new(unsafe { Arch::add(self.raw, rhs.raw) }) }
+    fn add(self, rhs: Self) -> Self {
+        Self::new(unsafe { Arch::add(self.raw, rhs.raw) })
+    }
 }
 
 impl<T, Arch> core::ops::AddAssign for Vector<T, Arch>
@@ -27,7 +29,9 @@ where
     T: Scalar,
 {
     #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) { self.raw = unsafe { Arch::add(self.raw, rhs.raw) }; }
+    fn add_assign(&mut self, rhs: Self) {
+        self.raw = unsafe { Arch::add(self.raw, rhs.raw) };
+    }
 }
 
 impl<T, Arch> core::ops::Sub for Vector<T, Arch>
@@ -37,7 +41,9 @@ where
 {
     type Output = Self;
     #[inline(always)]
-    fn sub(self, rhs: Self) -> Self { Self::new(unsafe { Arch::sub(self.raw, rhs.raw) }) }
+    fn sub(self, rhs: Self) -> Self {
+        Self::new(unsafe { Arch::sub(self.raw, rhs.raw) })
+    }
 }
 
 impl<T, Arch> core::ops::SubAssign for Vector<T, Arch>
@@ -46,7 +52,9 @@ where
     T: Scalar,
 {
     #[inline(always)]
-    fn sub_assign(&mut self, rhs: Self) { self.raw = unsafe { Arch::sub(self.raw, rhs.raw) }; }
+    fn sub_assign(&mut self, rhs: Self) {
+        self.raw = unsafe { Arch::sub(self.raw, rhs.raw) };
+    }
 }
 
 impl<T, Arch> core::ops::Mul for Vector<T, Arch>
@@ -56,7 +64,9 @@ where
 {
     type Output = Self;
     #[inline(always)]
-    fn mul(self, rhs: Self) -> Self { Self::new(unsafe { Arch::mul(self.raw, rhs.raw) }) }
+    fn mul(self, rhs: Self) -> Self {
+        Self::new(unsafe { Arch::mul(self.raw, rhs.raw) })
+    }
 }
 
 impl<T, Arch> core::ops::MulAssign for Vector<T, Arch>
@@ -65,7 +75,9 @@ where
     T: Scalar,
 {
     #[inline(always)]
-    fn mul_assign(&mut self, rhs: Self) { self.raw = unsafe { Arch::mul(self.raw, rhs.raw) }; }
+    fn mul_assign(&mut self, rhs: Self) {
+        self.raw = unsafe { Arch::mul(self.raw, rhs.raw) };
+    }
 }
 
 impl<T, Arch> core::ops::Div for Vector<T, Arch>
@@ -75,7 +87,9 @@ where
 {
     type Output = Self;
     #[inline(always)]
-    fn div(self, rhs: Self) -> Self { Self::new(unsafe { Arch::div(self.raw, rhs.raw) }) }
+    fn div(self, rhs: Self) -> Self {
+        Self::new(unsafe { Arch::div(self.raw, rhs.raw) })
+    }
 }
 
 impl<T, Arch> core::ops::DivAssign for Vector<T, Arch>
@@ -84,7 +98,9 @@ where
     T: Scalar,
 {
     #[inline(always)]
-    fn div_assign(&mut self, rhs: Self) { self.raw = unsafe { Arch::div(self.raw, rhs.raw) }; }
+    fn div_assign(&mut self, rhs: Self) {
+        self.raw = unsafe { Arch::div(self.raw, rhs.raw) };
+    }
 }
 
 impl<T, Arch> core::ops::BitAnd for Vector<T, Arch>
@@ -94,7 +110,9 @@ where
 {
     type Output = Self;
     #[inline(always)]
-    fn bitand(self, rhs: Self) -> Self { Self::new(unsafe { Arch::bitand(self.raw, rhs.raw) }) }
+    fn bitand(self, rhs: Self) -> Self {
+        Self::new(unsafe { Arch::bitand(self.raw, rhs.raw) })
+    }
 }
 
 impl<T, Arch> core::ops::BitAndAssign for Vector<T, Arch>
@@ -103,7 +121,9 @@ where
     T: Scalar,
 {
     #[inline(always)]
-    fn bitand_assign(&mut self, rhs: Self) { self.raw = unsafe { Arch::bitand(self.raw, rhs.raw) }; }
+    fn bitand_assign(&mut self, rhs: Self) {
+        self.raw = unsafe { Arch::bitand(self.raw, rhs.raw) };
+    }
 }
 
 impl<T, Arch> core::ops::BitOr for Vector<T, Arch>
@@ -113,7 +133,9 @@ where
 {
     type Output = Self;
     #[inline(always)]
-    fn bitor(self, rhs: Self) -> Self { Self::new(unsafe { Arch::bitor(self.raw, rhs.raw) }) }
+    fn bitor(self, rhs: Self) -> Self {
+        Self::new(unsafe { Arch::bitor(self.raw, rhs.raw) })
+    }
 }
 
 impl<T, Arch> core::ops::BitOrAssign for Vector<T, Arch>
@@ -122,7 +144,9 @@ where
     T: Scalar,
 {
     #[inline(always)]
-    fn bitor_assign(&mut self, rhs: Self) { self.raw = unsafe { Arch::bitor(self.raw, rhs.raw) }; }
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.raw = unsafe { Arch::bitor(self.raw, rhs.raw) };
+    }
 }
 
 impl<T, Arch> core::ops::BitXor for Vector<T, Arch>
@@ -132,7 +156,9 @@ where
 {
     type Output = Self;
     #[inline(always)]
-    fn bitxor(self, rhs: Self) -> Self { Self::new(unsafe { Arch::bitxor(self.raw, rhs.raw) }) }
+    fn bitxor(self, rhs: Self) -> Self {
+        Self::new(unsafe { Arch::bitxor(self.raw, rhs.raw) })
+    }
 }
 
 impl<T, Arch> core::ops::BitXorAssign for Vector<T, Arch>
@@ -141,7 +167,9 @@ where
     T: Scalar,
 {
     #[inline(always)]
-    fn bitxor_assign(&mut self, rhs: Self) { self.raw = unsafe { Arch::bitxor(self.raw, rhs.raw) }; }
+    fn bitxor_assign(&mut self, rhs: Self) {
+        self.raw = unsafe { Arch::bitxor(self.raw, rhs.raw) };
+    }
 }
 
 impl<T, Arch> core::ops::Neg for Vector<T, Arch>
@@ -151,7 +179,9 @@ where
 {
     type Output = Self;
     #[inline(always)]
-    fn neg(self) -> Self { Self::new(unsafe { Arch::neg(self.raw) }) }
+    fn neg(self) -> Self {
+        Self::new(unsafe { Arch::neg(self.raw) })
+    }
 }
 
 impl<T, Arch> core::ops::Neg for &Vector<T, Arch>
@@ -161,7 +191,9 @@ where
 {
     type Output = Vector<T, Arch>;
     #[inline(always)]
-    fn neg(self) -> Self::Output { Vector::new(unsafe { Arch::neg(self.raw) }) }
+    fn neg(self) -> Self::Output {
+        Vector::new(unsafe { Arch::neg(self.raw) })
+    }
 }
 
 impl<T, Arch> core::ops::Not for Vector<T, Arch>
@@ -171,7 +203,9 @@ where
 {
     type Output = Self;
     #[inline(always)]
-    fn not(self) -> Self { Self::new(unsafe { Arch::bitnot(self.raw) }) }
+    fn not(self) -> Self {
+        Self::new(unsafe { Arch::bitnot(self.raw) })
+    }
 }
 
 impl<T, Arch> core::ops::Not for &Vector<T, Arch>
@@ -181,7 +215,9 @@ where
 {
     type Output = Vector<T, Arch>;
     #[inline(always)]
-    fn not(self) -> Self::Output { Vector::new(unsafe { Arch::bitnot(self.raw) }) }
+    fn not(self) -> Self::Output {
+        Vector::new(unsafe { Arch::bitnot(self.raw) })
+    }
 }
 
 macro_rules! impl_ref_binary_op {

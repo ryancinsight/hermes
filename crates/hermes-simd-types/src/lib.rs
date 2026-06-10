@@ -5,24 +5,35 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-pub use hermes_simd_core::view::{Vector, Mask};
-pub use hermes_simd_core::scalar::{F16, F32, F64, Bf16, Bf8, Bf4, F8, F4, I8, I16, I32};
-pub use hermes_simd_intrinsics::{Scalar, Avx2, Avx512, Neon};
+pub use hermes_simd_core::scalar::{Bf16, Bf4, Bf8, F16, F32, F4, F64, F8, I16, I32, I8};
+pub use hermes_simd_core::view::{Mask, Vector};
+pub use hermes_simd_intrinsics::{Avx2, Avx512, Neon, Scalar};
 
 // -----------------------------------------------------------------------------
 // Preferred Architecture Typestate Selection
 // -----------------------------------------------------------------------------
 
 /// The optimal target architecture typestate compiled for the current host CPU target.
-#[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), target_feature = "avx512f"))]
+#[cfg(all(
+    any(target_arch = "x86", target_arch = "x86_64"),
+    target_feature = "avx512f"
+))]
 pub type PreferredArch = hermes_simd_intrinsics::Avx512;
 
 /// The optimal target architecture typestate compiled for the current host CPU target.
-#[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), not(target_feature = "avx512f"), target_feature = "avx2"))]
+#[cfg(all(
+    any(target_arch = "x86", target_arch = "x86_64"),
+    not(target_feature = "avx512f"),
+    target_feature = "avx2"
+))]
 pub type PreferredArch = hermes_simd_intrinsics::Avx2;
 
 /// The optimal target architecture typestate compiled for the current host CPU target.
-#[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), not(target_feature = "avx512f"), not(target_feature = "avx2")))]
+#[cfg(all(
+    any(target_arch = "x86", target_arch = "x86_64"),
+    not(target_feature = "avx512f"),
+    not(target_feature = "avx2")
+))]
 pub type PreferredArch = hermes_simd_intrinsics::Scalar;
 
 /// The optimal target architecture typestate compiled for the current host CPU target.

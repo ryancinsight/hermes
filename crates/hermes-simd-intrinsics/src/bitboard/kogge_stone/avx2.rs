@@ -269,14 +269,26 @@ pub unsafe fn kogge_stone_queen_avx2(slider: u64, occupancy: u64) -> u64 {
         p_left_b = _mm256_and_si256(p_left_b, sp_lb);
 
         // Rook right
-        let sg_rr = _mm256_and_si256(_mm256_srlv_epi64(g_right_r, right_shift_amt_r), right_mask_r);
-        let sp_rr = _mm256_and_si256(_mm256_srlv_epi64(p_right_r, right_shift_amt_r), right_mask_r);
+        let sg_rr = _mm256_and_si256(
+            _mm256_srlv_epi64(g_right_r, right_shift_amt_r),
+            right_mask_r,
+        );
+        let sp_rr = _mm256_and_si256(
+            _mm256_srlv_epi64(p_right_r, right_shift_amt_r),
+            right_mask_r,
+        );
         g_right_r = _mm256_or_si256(g_right_r, _mm256_and_si256(sg_rr, p_right_r));
         p_right_r = _mm256_and_si256(p_right_r, sp_rr);
 
         // Bishop right
-        let sg_rb = _mm256_and_si256(_mm256_srlv_epi64(g_right_b, right_shift_amt_b), right_mask_b);
-        let sp_rb = _mm256_and_si256(_mm256_srlv_epi64(p_right_b, right_shift_amt_b), right_mask_b);
+        let sg_rb = _mm256_and_si256(
+            _mm256_srlv_epi64(g_right_b, right_shift_amt_b),
+            right_mask_b,
+        );
+        let sp_rb = _mm256_and_si256(
+            _mm256_srlv_epi64(p_right_b, right_shift_amt_b),
+            right_mask_b,
+        );
         g_right_b = _mm256_or_si256(g_right_b, _mm256_and_si256(sg_rb, p_right_b));
         p_right_b = _mm256_and_si256(p_right_b, sp_rb);
     }
@@ -304,11 +316,17 @@ pub unsafe fn kogge_stone_queen_avx2(slider: u64, occupancy: u64) -> u64 {
         g_left_b = _mm256_or_si256(g_left_b, _mm256_and_si256(sg_lb, p_left_b));
 
         // Rook right
-        let sg_rr = _mm256_and_si256(_mm256_srlv_epi64(g_right_r, right_shift_amt_r), right_mask_r);
+        let sg_rr = _mm256_and_si256(
+            _mm256_srlv_epi64(g_right_r, right_shift_amt_r),
+            right_mask_r,
+        );
         g_right_r = _mm256_or_si256(g_right_r, _mm256_and_si256(sg_rr, p_right_r));
 
         // Bishop right
-        let sg_rb = _mm256_and_si256(_mm256_srlv_epi64(g_right_b, right_shift_amt_b), right_mask_b);
+        let sg_rb = _mm256_and_si256(
+            _mm256_srlv_epi64(g_right_b, right_shift_amt_b),
+            right_mask_b,
+        );
         g_right_b = _mm256_or_si256(g_right_b, _mm256_and_si256(sg_rb, p_right_b));
     }
 

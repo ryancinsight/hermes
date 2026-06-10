@@ -1,8 +1,8 @@
 //! Elementwise operations and value sum/accumulate helpers.
 
-use crate::scalar::Scalar;
+use super::{BlockedCoo, Csr, DenseWithMask, SellP, SparseView};
 use crate::arch::SimdArch;
-use super::{SparseView, Csr, SellP, BlockedCoo, DenseWithMask};
+use crate::scalar::Scalar;
 
 /// Unified trait for elementwise and reduction operations on sparse matrices.
 pub trait SparseOps<T> {
@@ -25,7 +25,7 @@ impl<'a, T: Scalar, Arch: SimdArch> SparseOps<T> for SparseView<'a, T, Csr, Arch
         let d = &self.data;
         for r in 0..d.nrows {
             let start = d.row_ptr[r] as usize;
-            let end   = d.row_ptr[r + 1] as usize;
+            let end = d.row_ptr[r + 1] as usize;
             for j in start..end {
                 let c = d.col_indices[j] as usize;
                 // `dense` is a column-indexed vector (length `ncols`).
@@ -35,7 +35,9 @@ impl<'a, T: Scalar, Arch: SimdArch> SparseOps<T> for SparseView<'a, T, Csr, Arch
     }
 }
 
-impl<'a, T: Scalar, const C: usize, Arch: SimdArch> SparseOps<T> for SparseView<'a, T, SellP<C>, Arch> {
+impl<'a, T: Scalar, const C: usize, Arch: SimdArch> SparseOps<T>
+    for SparseView<'a, T, SellP<C>, Arch>
+{
     #[inline]
     fn sum_values(&self) -> T {
         self.data.values.iter().copied().fold(T::ZERO, |a, b| a + b)
@@ -46,13 +48,13 @@ impl<'a, T: Scalar, const C: usize, Arch: SimdArch> SparseOps<T> for SparseView<
         let d = &self.data;
         let nslices = d.nslices();
         for s in 0..nslices {
-            let col_count    = d.slice_col_count[s] as usize;
+            let col_count = d.slice_col_count[s] as usize;
             let start_offset = d.slice_ptr[s] as usize;
             for col in 0..col_count {
                 for row in 0..C {
                     let idx = start_offset + col * C + row;
-                    let c   = d.col_indices[idx] as usize;
-                    let r   = s * C + row;
+                    let c = d.col_indices[idx] as usize;
+                    let r = s * C + row;
                     if r < d.nrows && c < d.ncols {
                         out_values[idx] = d.values[idx] * dense[r * d.ncols + c];
                     }
@@ -91,7 +93,9 @@ impl<'a, T: Scalar, Arch: SimdArch> SparseOps<T> for SparseView<'a, T, DenseWith
     fn sum_values(&self) -> T {
         let mut s = T::ZERO;
         for i in 0..self.data.values.len() {
-            if self.data.mask[i] { s += self.data.values[i]; }
+            if self.data.mask[i] {
+                s += self.data.values[i];
+            }
         }
         s
     }

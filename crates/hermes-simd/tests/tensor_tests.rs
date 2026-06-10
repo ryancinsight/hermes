@@ -133,8 +133,6 @@ fn test_tensor_matrix_at() {
     assert_eq!(mat1.get([2, 3]).unwrap(), 23.0);
 }
 
-
-
 // ---------------------------------------------------------------------------
 // Histogram via SimdCow::histogram_cow
 // ---------------------------------------------------------------------------
@@ -248,8 +246,7 @@ fn test_transpose_view_zero_copy() {
 
 #[test]
 fn test_col_iter_values() {
-    let data = [1.0f32, 2.0, 3.0,
-                4.0, 5.0, 6.0];
+    let data = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0];
     let t = TensorView::<f32, 2>::new(&data, [2, 3]).unwrap();
     // Column 1: data[1] = 2.0, data[4] = 5.0
     let col: Vec<f32> = t.col_iter(1).unwrap().collect();
@@ -270,9 +267,7 @@ fn test_col_iter_out_of_bounds() {
 #[test]
 fn test_diag_iter_square() {
     // 3×3 identity diagonal = [1, 1, 1]
-    let data = [1.0f32, 0.0, 0.0,
-                0.0, 1.0, 0.0,
-                0.0, 0.0, 1.0];
+    let data = [1.0f32, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
     let t = TensorView::<f32, 2>::new(&data, [3, 3]).unwrap();
     let diag: Vec<f32> = t.diag_iter().collect();
     assert_eq!(diag, vec![1.0, 1.0, 1.0]);
@@ -288,6 +283,3 @@ fn test_diag_iter_rectangular() {
     // diag[1] = data[1*5] = data[5] = 6.0
     assert_eq!(diag, vec![1.0, 6.0]);
 }
-
-
-

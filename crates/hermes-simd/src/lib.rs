@@ -51,97 +51,135 @@
 extern crate alloc;
 
 pub use hermes_simd_core::{
+    align::{Aligned, Alignment, Unaligned},
     arch::SimdArch,
-    align::{Alignment, Aligned, Unaligned},
-    execution::{ExecutionMode, Unmasked, Masked},
-    kernel::SimdKernel,
-    view::{SimdView, SimdError, TileView, TileMatrixMultiply, Vector, Mask},
-    vec::AlignedVec,
-    cow::{SimdCow, ArchivedSimdCow, SimdCowResolver, ArchivedPacked4Cow, Packed4CowResolver},
-    mask::BitMask,
-    bitboard::{BitBoardView, BitBoardKernel},
-    scalar::{FloatElement, Scalar as SimdScalar, CastFrom, CastTo},
-    current_numa_node, refresh_numa_node, verify_numa_locality, NumaBinding, NumaTopologyService, numa_node_count, numa_node_distance,
-    // Operation strategy ZSTs and sealed traits — zero-cost, erased at monomorphization.
-    ReductionOp, ElementOp, UnaryOp,
-    Sum, Dot, Mul, Add, Sub, Div, BitAnd, BitOr, BitXor,
-    // Unary strategy ZSTs
-    Abs, Neg, Sqrt, Clamp,
-    // Scan strategy ZSTs
-    ScanOp, ScanMode, ScanAdd, ScanMul, ScanMin, ScanMax, Inclusive, Exclusive,
-    // Extended strategy ZSTs (v2)
-    FmaAdd, Product,
-    // Chunk iterators
-    iter::{SimdChunks, ZipChunks, ZipChunksMut, SimdChunksMut},
+    bitboard::{BitBoardKernel, BitBoardView},
     // ComputeView extension
-    compute::{ComputeView, ComputeReduce},
+    compute::{ComputeReduce, ComputeView},
+    cow::{ArchivedPacked4Cow, ArchivedSimdCow, Packed4CowResolver, SimdCow, SimdCowResolver},
+    current_numa_node,
+    execution::{ExecutionMode, Masked, Unmasked},
+    // Chunk iterators
+    iter::{SimdChunks, SimdChunksMut, ZipChunks, ZipChunksMut},
+    kernel::SimdKernel,
+    mask::BitMask,
+    numa_node_count,
+    numa_node_distance,
+    refresh_numa_node,
+    scalar::{CastFrom, CastTo, FloatElement, Scalar as SimdScalar},
+    vec::AlignedVec,
+    verify_numa_locality,
+    view::{Mask, SimdError, SimdView, TileMatrixMultiply, TileView, Vector},
+    // Unary strategy ZSTs
+    Abs,
+    Add,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Clamp,
+    Div,
+    Dot,
+    ElementOp,
+    Exclusive,
+    // Extended strategy ZSTs (v2)
+    FmaAdd,
+    Inclusive,
+    Mul,
+    Neg,
+    NumaBinding,
+    NumaTopologyService,
+    Product,
+    // Operation strategy ZSTs and sealed traits — zero-cost, erased at monomorphization.
+    ReductionOp,
+    ScanAdd,
+    ScanMax,
+    ScanMin,
+    ScanMode,
+    ScanMul,
+    // Scan strategy ZSTs
+    ScanOp,
+    Sqrt,
+    Sub,
+    Sum,
+    UnaryOp,
 };
 
 // Re-export sparse types
 pub use hermes_simd_core::sparse::{
-    SparseFormat, SparseView, SparseSpMv, SparseOps,
-    Csr, SellP, BlockedCoo, DenseWithMask,
-    CsrData, SellPData, BlockedCooData, DenseWithMaskData,
-    // Clone-on-Write sparse containers
-    SparseCow, CsrCow, SellPCow, BlockedCooCow, DenseWithMaskCow,
+    BlockedCoo,
+    BlockedCooCow,
+    BlockedCooData,
+    Csr,
+    CsrCow,
+    CsrData,
+    DenseWithMask,
+    DenseWithMaskCow,
+    DenseWithMaskData,
+    OwnedBlockedCoo,
     // Owned heap-backed sparse storage types
-    OwnedCsr, OwnedSellP, OwnedBlockedCoo, OwnedDenseWithMask,
+    OwnedCsr,
+    OwnedDenseWithMask,
+    OwnedSellP,
+    SellP,
+    SellPCow,
+    SellPData,
+    // Clone-on-Write sparse containers
+    SparseCow,
+    SparseFormat,
+    SparseOps,
+    SparseSpMv,
+    SparseView,
 };
 
 // Re-export tiling
-pub use hermes_simd_core::tiling::{tiled_dot, TilingPolicy, TilingStrategy, tiled_gemv};
+pub use hermes_simd_core::tiling::{tiled_dot, tiled_gemv, TilingPolicy, TilingStrategy};
 
 // Re-export tensor views
-pub use hermes_simd_core::tensor::{
-    TensorView, TensorCow, TensorError, RowMajor, ColMajor,
-};
+pub use hermes_simd_core::tensor::{ColMajor, RowMajor, TensorCow, TensorError, TensorView};
 
 // Re-export concrete ZST architecture markers
 pub use hermes_simd_intrinsics::{
-    Scalar, Avx2, Avx512, Neon,
-    Swar, KoggeStone, Hyperbola, Magic, HybridSwarMagic, SwarUtils,
+    Avx2, Avx512, HybridSwarMagic, Hyperbola, KoggeStone, Magic, Neon, Scalar, Swar, SwarUtils,
 };
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-pub use hermes_simd_intrinsics::{AmxBf16, AmxInt8, AmxConfig, AmxSession, AmxBatchSession};
+pub use hermes_simd_intrinsics::{AmxBatchSession, AmxBf16, AmxConfig, AmxInt8, AmxSession};
 
 pub use hermes_numeric::{
-    F16, F32, F64, Bf16, Bf8, Bf4, F8, F4, I8, I16, I32,
-    Packable4, Packed4Slice, Packed4SliceMut,
-    PackedBf4Slice, PackedBf4SliceMut, PackedF4Slice, PackedF4SliceMut,
-    Packed4Vec, Packed4Iter, PackedBf4Vec, PackedF4Vec,
-    Packed4Cow, PackedBf4Cow, PackedF4Cow,
+    Bf16, Bf4, Bf8, Packable4, Packed4Cow, Packed4Iter, Packed4Slice, Packed4SliceMut, Packed4Vec,
+    PackedBf4Cow, PackedBf4Slice, PackedBf4SliceMut, PackedBf4Vec, PackedF4Cow, PackedF4Slice,
+    PackedF4SliceMut, PackedF4Vec, F16, F32, F4, F64, F8, I16, I32, I8,
 };
 
 // Re-export monomorphized vector register types and PreferredArch
 pub use hermes_simd_types::{
-    PreferredArch,
-    VectorF32, VectorF64, VectorF16, VectorBf16, VectorBf8, VectorBf4, VectorF8, VectorF4, VectorI8, VectorI16, VectorI32,
-    MaskF32, MaskF64, MaskF16, MaskBf16, MaskBf8, MaskBf4, MaskF8, MaskF4, MaskI8, MaskI16, MaskI32,
-    SimdF32, SimdF64, SimdF16, SimdBf16, SimdBf8, SimdBf4, SimdF8, SimdF4, SimdI8, SimdI16, SimdI32,
-    SimdMaskF32, SimdMaskF64, SimdMaskF16, SimdMaskBf16, SimdMaskBf8, SimdMaskBf4, SimdMaskF8, SimdMaskF4, SimdMaskI8, SimdMaskI16, SimdMaskI32,
-    ScalarF32, ScalarF64, ScalarF16, ScalarBf16, ScalarBf8, ScalarBf4, ScalarF8, ScalarF4, ScalarI8, ScalarI16, ScalarI32,
-    ScalarMaskF32, ScalarMaskF64,
+    MaskBf16, MaskBf4, MaskBf8, MaskF16, MaskF32, MaskF4, MaskF64, MaskF8, MaskI16, MaskI32,
+    MaskI8, PreferredArch, ScalarBf16, ScalarBf4, ScalarBf8, ScalarF16, ScalarF32, ScalarF4,
+    ScalarF64, ScalarF8, ScalarI16, ScalarI32, ScalarI8, ScalarMaskF32, ScalarMaskF64, SimdBf16,
+    SimdBf4, SimdBf8, SimdF16, SimdF32, SimdF4, SimdF64, SimdF8, SimdI16, SimdI32, SimdI8,
+    SimdMaskBf16, SimdMaskBf4, SimdMaskBf8, SimdMaskF16, SimdMaskF32, SimdMaskF4, SimdMaskF64,
+    SimdMaskF8, SimdMaskI16, SimdMaskI32, SimdMaskI8, VectorBf16, VectorBf4, VectorBf8, VectorF16,
+    VectorF32, VectorF4, VectorF64, VectorF8, VectorI16, VectorI32, VectorI8,
 };
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub use hermes_simd_types::{
-    Avx2F32, Avx2F64, Avx2F16, Avx2Bf16, Avx2Bf8, Avx2Bf4, Avx2F8, Avx2F4, Avx2I8, Avx2I16, Avx2I32,
-    Avx2MaskF32, Avx2MaskF64, Avx2MaskF16, Avx2MaskBf16,
-    Avx512F32, Avx512F64, Avx512F16, Avx512Bf16, Avx512Bf8, Avx512Bf4, Avx512F8, Avx512F4, Avx512I8, Avx512I16, Avx512I32,
-    Avx512MaskF32, Avx512MaskF64, Avx512MaskF16, Avx512MaskBf16,
+    Avx2Bf16, Avx2Bf4, Avx2Bf8, Avx2F16, Avx2F32, Avx2F4, Avx2F64, Avx2F8, Avx2I16, Avx2I32,
+    Avx2I8, Avx2MaskBf16, Avx2MaskF16, Avx2MaskF32, Avx2MaskF64, Avx512Bf16, Avx512Bf4, Avx512Bf8,
+    Avx512F16, Avx512F32, Avx512F4, Avx512F64, Avx512F8, Avx512I16, Avx512I32, Avx512I8,
+    Avx512MaskBf16, Avx512MaskF16, Avx512MaskF32, Avx512MaskF64,
 };
 
 #[cfg(target_arch = "aarch64")]
 pub use hermes_simd_types::{
-    NeonF32, NeonF64, NeonF16, NeonBf16, NeonBf8, NeonBf4, NeonF8, NeonF4, NeonI8, NeonI16, NeonI32,
-    NeonMaskF32, NeonMaskF64, NeonMaskF16, NeonMaskBf16,
+    NeonBf16, NeonBf4, NeonBf8, NeonF16, NeonF32, NeonF4, NeonF64, NeonF8, NeonI16, NeonI32,
+    NeonI8, NeonMaskBf16, NeonMaskF16, NeonMaskF32, NeonMaskF64,
 };
 
-/// Runtime CPU feature detection utilities.
-pub mod cpu;
 /// Chess board attack generation kernels using bitboards and SWAR.
 pub mod attacks;
+/// Runtime CPU feature detection utilities.
+pub mod cpu;
 /// Dynamic dispatcher choosing optimal backends based on hardware/layout.
 pub mod dispatcher;
 
@@ -151,43 +189,43 @@ pub mod tile_matmul;
 /// Runtime-dispatched SIMD abstractions and dynamic facade.
 pub mod dispatch;
 
+pub use attacks::{bishop_attacks, queen_attacks, rook_attacks};
 pub use cpu::{AmxSupport, Avx512Support};
-pub use attacks::{rook_attacks, bishop_attacks, queen_attacks};
-pub use tile_matmul::{TiledGemm, gemm, dispatch_tile_matmul, unpack_int4};
 pub use dispatcher::{AdaptiveDispatcher, DispatchDecision};
+pub use tile_matmul::{dispatch_tile_matmul, gemm, unpack_int4, TiledGemm};
 
 // Re-export the generic dispatch operations. These monomorphize at call sites:
 // calling `sum::<f32>(data)` produces the f32 specialization.
 pub use dispatch::{
-    // Core trait — sealed; implemented for f32 and f64.
-    SimdOps,
-    // Generic free functions — the primary public API.
-    sum,
-    min,
-    max,
-    scale,
-    argmin,
     argmax,
+    argmin,
     dot,
-    elementwise_mul,
     elementwise_add,
-    elementwise_sub,
     elementwise_div,
+    elementwise_mul,
+    elementwise_sub,
     interleaved_complex_dot,
     interleaved_complex_dot_runtime,
     interleaved_complex_mul_assign,
     interleaved_complex_mul_assign_runtime,
-    masked_sum,
-    masked_dot,
     masked_add,
-    tiled_gemm,
-    // Sparse operations — generic entry points.
-    spmv_csr,
+    masked_dot,
+    masked_sum,
+    max,
+    min,
+    scale,
     spmv_bcoo4x4,
     spmv_bcoo8x8,
+    // Sparse operations — generic entry points.
+    spmv_csr,
     spmv_dense_masked,
     spmv_sellp4,
     spmv_sellp8,
+    // Generic free functions — the primary public API.
+    sum,
+    tiled_gemm,
+    // Core trait — sealed; implemented for f32 and f64.
+    SimdOps,
 };
 
 /// Target-specific, runtime-dispatched SIMD view wrapper.
@@ -213,7 +251,9 @@ where
 /// Dispatches a shared slice into the best matching `DispatchedView` based on runtime CPU feature detection.
 #[inline]
 #[allow(unreachable_code)]
-pub fn dispatch_view<'a, T, Align>(data: &'a [T]) -> Option<DispatchedView<'a, T, Align, Unmasked, &'a [T]>>
+pub fn dispatch_view<'a, T, Align>(
+    data: &'a [T],
+) -> Option<DispatchedView<'a, T, Align, Unmasked, &'a [T]>>
 where
     T: FloatElement,
     Align: Alignment,
@@ -223,19 +263,23 @@ where
         #[cfg(feature = "std")]
         {
             if std::is_x86_feature_detected!("avx512f") {
-                return SimdView::<T, Avx512, Align, Unmasked, &'a [T]>::new(data).map(DispatchedView::Avx512);
+                return SimdView::<T, Avx512, Align, Unmasked, &'a [T]>::new(data)
+                    .map(DispatchedView::Avx512);
             }
             if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
-                return SimdView::<T, Avx2, Align, Unmasked, &'a [T]>::new(data).map(DispatchedView::Avx2);
+                return SimdView::<T, Avx2, Align, Unmasked, &'a [T]>::new(data)
+                    .map(DispatchedView::Avx2);
             }
         }
         #[cfg(not(feature = "std"))]
         {
             if cfg!(target_feature = "avx512f") {
-                return SimdView::<T, Avx512, Align, Unmasked, &'a [T]>::new(data).map(DispatchedView::Avx512);
+                return SimdView::<T, Avx512, Align, Unmasked, &'a [T]>::new(data)
+                    .map(DispatchedView::Avx512);
             }
             if cfg!(target_feature = "avx2") && cfg!(target_feature = "fma") {
-                return SimdView::<T, Avx2, Align, Unmasked, &'a [T]>::new(data).map(DispatchedView::Avx2);
+                return SimdView::<T, Avx2, Align, Unmasked, &'a [T]>::new(data)
+                    .map(DispatchedView::Avx2);
             }
         }
     }
@@ -249,7 +293,9 @@ where
 /// Dispatches a mutable slice into the best matching `DispatchedView` based on runtime CPU feature detection.
 #[inline]
 #[allow(unreachable_code)]
-pub fn dispatch_view_mut<'a, T, Align>(data: &'a mut [T]) -> Option<DispatchedView<'a, T, Align, Unmasked, &'a mut [T]>>
+pub fn dispatch_view_mut<'a, T, Align>(
+    data: &'a mut [T],
+) -> Option<DispatchedView<'a, T, Align, Unmasked, &'a mut [T]>>
 where
     T: FloatElement,
     Align: Alignment,
@@ -259,25 +305,30 @@ where
         #[cfg(feature = "std")]
         {
             if std::is_x86_feature_detected!("avx512f") {
-                return SimdView::<T, Avx512, Align, Unmasked, &'a mut [T]>::new_mut(data).map(DispatchedView::Avx512);
+                return SimdView::<T, Avx512, Align, Unmasked, &'a mut [T]>::new_mut(data)
+                    .map(DispatchedView::Avx512);
             }
             if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
-                return SimdView::<T, Avx2, Align, Unmasked, &'a mut [T]>::new_mut(data).map(DispatchedView::Avx2);
+                return SimdView::<T, Avx2, Align, Unmasked, &'a mut [T]>::new_mut(data)
+                    .map(DispatchedView::Avx2);
             }
         }
         #[cfg(not(feature = "std"))]
         {
             if cfg!(target_feature = "avx512f") {
-                return SimdView::<T, Avx512, Align, Unmasked, &'a mut [T]>::new_mut(data).map(DispatchedView::Avx512);
+                return SimdView::<T, Avx512, Align, Unmasked, &'a mut [T]>::new_mut(data)
+                    .map(DispatchedView::Avx512);
             }
             if cfg!(target_feature = "avx2") && cfg!(target_feature = "fma") {
-                return SimdView::<T, Avx2, Align, Unmasked, &'a mut [T]>::new_mut(data).map(DispatchedView::Avx2);
+                return SimdView::<T, Avx2, Align, Unmasked, &'a mut [T]>::new_mut(data)
+                    .map(DispatchedView::Avx2);
             }
         }
     }
     #[cfg(target_arch = "aarch64")]
     {
-        return SimdView::<T, Neon, Align, Unmasked, &'a mut [T]>::new_mut(data).map(DispatchedView::Neon);
+        return SimdView::<T, Neon, Align, Unmasked, &'a mut [T]>::new_mut(data)
+            .map(DispatchedView::Neon);
     }
     SimdView::<T, Scalar, Align, Unmasked, &'a mut [T]>::new_mut(data).map(DispatchedView::Scalar)
 }
@@ -365,7 +416,9 @@ impl HardwareUnpack for Bf4 {
     fn hardware_unpack(packed: &[u8], unpacked: &mut [Bf16]) {
         #[cfg(target_arch = "x86_64")]
         {
-            hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_packed_bf4_to_bf16(packed, unpacked);
+            hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_packed_bf4_to_bf16(
+                packed, unpacked,
+            );
         }
         #[cfg(not(target_arch = "x86_64"))]
         {
@@ -379,7 +432,9 @@ impl HardwareUnpack for F4 {
     fn hardware_unpack(packed: &[u8], unpacked: &mut [F32]) {
         #[cfg(target_arch = "x86_64")]
         {
-            hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_packed_f4_to_f32(packed, unpacked);
+            hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_packed_f4_to_f32(
+                packed, unpacked,
+            );
         }
         #[cfg(not(target_arch = "x86_64"))]
         {
@@ -403,7 +458,10 @@ impl<'a, T: Packable4 + HardwareUnpack> Packed4CowExt<'a, T> for Packed4Cow<'a, 
         let view = self.as_view();
         let n = view.len().min(dest.len());
         let even_len = (n / 2) * 2;
-        T::hardware_unpack(&view.as_packed_slice()[..even_len / 2], &mut dest[..even_len]);
+        T::hardware_unpack(
+            &view.as_packed_slice()[..even_len / 2],
+            &mut dest[..even_len],
+        );
         if n % 2 != 0 {
             if let Some(b) = view.get(n - 1) {
                 dest[n - 1] = T::unpack_single(b);

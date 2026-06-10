@@ -12,6 +12,7 @@
 //! `fma_cow` implements `out[i] = a[i] * b[i] + c[i]` using `Arch::fmadd` in the
 //! SIMD region and `T::scalar_fmadd` in the scalar tail.
 
+use super::SimdCow;
 use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::kernel::SimdKernel;
@@ -19,7 +20,6 @@ use crate::ops::UnaryOp;
 use crate::scalar::Scalar;
 use crate::vec::AlignedVec;
 use crate::view::SimdError;
-use super::SimdCow;
 
 // ---------------------------------------------------------------------------
 // map_cow — generic unary op
@@ -44,24 +44,32 @@ where
     #[inline]
     pub fn map_cow<Op: UnaryOp<T>>(&self, op: Op) -> SimdCow<'static, T, Arch, Align> {
         let data = self.as_ref();
-        let len  = data.len();
+        let len = data.len();
         let mut out: AlignedVec<T, Align> = AlignedVec::with_capacity(len);
         // SAFETY: every element written in the loop below.
-        unsafe { out.set_len(len); }
+        unsafe {
+            out.set_len(len);
+        }
 
         let lane_count = Arch::LANE_COUNT;
-        let simd_len   = (len / lane_count) * lane_count;
-        let ptr_in  = data.as_ptr();
+        let simd_len = (len / lane_count) * lane_count;
+        let ptr_in = data.as_ptr();
         let ptr_out = out.as_mut_ptr();
 
         unsafe {
             let load = |p: *const T| -> Arch::Vector {
-                if Align::IS_ALIGNED { Arch::load_aligned(p) }
-                else                 { Arch::load_unaligned(p) }
+                if Align::IS_ALIGNED {
+                    Arch::load_aligned(p)
+                } else {
+                    Arch::load_unaligned(p)
+                }
             };
             let store = |p: *mut T, v: Arch::Vector| {
-                if Align::IS_ALIGNED { Arch::store_aligned(p, v); }
-                else                 { Arch::store_unaligned(p, v); }
+                if Align::IS_ALIGNED {
+                    Arch::store_aligned(p, v);
+                } else {
+                    Arch::store_unaligned(p, v);
+                }
             };
             let mut i = 0usize;
             while i < simd_len {
@@ -79,7 +87,6 @@ where
 
         SimdCow::Owned(out)
     }
-
 
     /// Fused multiply-add: `out[i] = self[i] * b[i] + c[i]`.
     ///
@@ -101,10 +108,12 @@ where
         }
 
         let mut out: AlignedVec<T, Align> = AlignedVec::with_capacity(len);
-        unsafe { out.set_len(len); }
+        unsafe {
+            out.set_len(len);
+        }
 
         let lane_count = Arch::LANE_COUNT;
-        let simd_len   = (len / lane_count) * lane_count;
+        let simd_len = (len / lane_count) * lane_count;
         let ptr_a = data_a.as_ptr();
         let ptr_b = data_b.as_ptr();
         let ptr_c = data_c.as_ptr();
@@ -112,12 +121,18 @@ where
 
         unsafe {
             let load = |p: *const T| -> Arch::Vector {
-                if Align::IS_ALIGNED { Arch::load_aligned(p) }
-                else                 { Arch::load_unaligned(p) }
+                if Align::IS_ALIGNED {
+                    Arch::load_aligned(p)
+                } else {
+                    Arch::load_unaligned(p)
+                }
             };
             let store = |p: *mut T, v: Arch::Vector| {
-                if Align::IS_ALIGNED { Arch::store_aligned(p, v); }
-                else                 { Arch::store_unaligned(p, v); }
+                if Align::IS_ALIGNED {
+                    Arch::store_aligned(p, v);
+                } else {
+                    Arch::store_unaligned(p, v);
+                }
             };
             let mut i = 0usize;
             while i < simd_len {

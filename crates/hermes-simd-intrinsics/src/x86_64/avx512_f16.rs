@@ -4,9 +4,9 @@
 //! with 32 lanes on AVX-512 when native FP16 instructions are not present/compiled.
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use hermes_simd_core::kernel::SimdKernel;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use crate::Avx512;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+use hermes_simd_core::kernel::SimdKernel;
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 impl SimdKernel<half::f16> for Avx512 {
@@ -73,9 +73,7 @@ impl SimdKernel<half::f16> for Avx512 {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        core::array::from_fn(|i| {
-            if mask[i] { *ptr.add(i) } else { src[i] }
-        })
+        core::array::from_fn(|i| if mask[i] { *ptr.add(i) } else { src[i] })
     }
 
     #[inline(always)]
@@ -94,9 +92,7 @@ impl SimdKernel<half::f16> for Avx512 {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        core::array::from_fn(|i| {
-            if mask[i] { a[i] + b[i] } else { src[i] }
-        })
+        core::array::from_fn(|i| if mask[i] { a[i] + b[i] } else { src[i] })
     }
 
     #[inline(always)]
@@ -106,9 +102,7 @@ impl SimdKernel<half::f16> for Avx512 {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        core::array::from_fn(|i| {
-            if mask[i] { a[i] * b[i] } else { src[i] }
-        })
+        core::array::from_fn(|i| if mask[i] { a[i] * b[i] } else { src[i] })
     }
 
     #[inline(always)]

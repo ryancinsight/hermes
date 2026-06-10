@@ -2,13 +2,13 @@
 
 //! Operator overload implementations for Clone-on-Write SIMD containers.
 
+use super::SimdCow;
 use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::kernel::SimdKernel;
 use crate::ops::ElementOp;
 use crate::scalar::Scalar;
 use crate::vec::AlignedVec;
-use super::SimdCow;
 
 // ---------------------------------------------------------------------------
 // Operator Overloads with Allocation Reuse
@@ -64,7 +64,8 @@ fn binary_lhs_inplace<T, Arch, Align, Op>(
 macro_rules! impl_binary_op {
     ($op_trait:ident, $op_method:ident, $op_strategy:ty, $op_val:expr, $is_commutative:expr) => {
         // 1. SimdCow + SimdCow
-        impl<'a, 'b, T, Arch, Align> core::ops::$op_trait<SimdCow<'b, T, Arch, Align>> for SimdCow<'a, T, Arch, Align>
+        impl<'a, 'b, T, Arch, Align> core::ops::$op_trait<SimdCow<'b, T, Arch, Align>>
+            for SimdCow<'a, T, Arch, Align>
         where
             T: Scalar,
             Arch: SimdArch + SimdKernel<T>,
@@ -78,7 +79,9 @@ macro_rules! impl_binary_op {
                 match (self, rhs) {
                     (SimdCow::Owned(lhs_vec), rhs) => {
                         let mut lhs_cow = SimdCow::Owned(lhs_vec);
-                        lhs_cow.transform_in_place(&rhs, $op_val).expect("SIMD length mismatch");
+                        lhs_cow
+                            .transform_in_place(&rhs, $op_val)
+                            .expect("SIMD length mismatch");
                         match lhs_cow {
                             SimdCow::Owned(v) => SimdCow::Owned(v),
                             _ => unreachable!(),
@@ -87,25 +90,30 @@ macro_rules! impl_binary_op {
                     (lhs, SimdCow::Owned(mut rhs_vec)) => {
                         if $is_commutative {
                             let mut rhs_cow = SimdCow::Owned(rhs_vec);
-                            rhs_cow.transform_in_place(&lhs, $op_val).expect("SIMD length mismatch");
+                            rhs_cow
+                                .transform_in_place(&lhs, $op_val)
+                                .expect("SIMD length mismatch");
                             match rhs_cow {
                                 rhs_cow @ SimdCow::Owned(_) => rhs_cow,
                                 _ => unreachable!(),
                             }
                         } else {
-                            binary_lhs_inplace::<T, Arch, Align, $op_strategy>(&lhs, &mut rhs_vec, $op_val);
+                            binary_lhs_inplace::<T, Arch, Align, $op_strategy>(
+                                &lhs,
+                                &mut rhs_vec,
+                                $op_val,
+                            );
                             SimdCow::Owned(rhs_vec)
                         }
                     }
-                    (lhs, rhs) => {
-                        lhs.zip_cow(&rhs, $op_val).expect("SIMD length mismatch")
-                    }
+                    (lhs, rhs) => lhs.zip_cow(&rhs, $op_val).expect("SIMD length mismatch"),
                 }
             }
         }
 
         // 2. SimdCow + &SimdCow
-        impl<'a, 'b, T, Arch, Align> core::ops::$op_trait<&'b SimdCow<'b, T, Arch, Align>> for SimdCow<'a, T, Arch, Align>
+        impl<'a, 'b, T, Arch, Align> core::ops::$op_trait<&'b SimdCow<'b, T, Arch, Align>>
+            for SimdCow<'a, T, Arch, Align>
         where
             T: Scalar,
             Arch: SimdArch + SimdKernel<T>,
@@ -119,21 +127,22 @@ macro_rules! impl_binary_op {
                 match self {
                     SimdCow::Owned(lhs_vec) => {
                         let mut lhs_cow = SimdCow::Owned(lhs_vec);
-                        lhs_cow.transform_in_place(rhs, $op_val).expect("SIMD length mismatch");
+                        lhs_cow
+                            .transform_in_place(rhs, $op_val)
+                            .expect("SIMD length mismatch");
                         match lhs_cow {
                             SimdCow::Owned(v) => SimdCow::Owned(v),
                             _ => unreachable!(),
                         }
                     }
-                    lhs => {
-                        lhs.zip_cow(rhs, $op_val).expect("SIMD length mismatch")
-                    }
+                    lhs => lhs.zip_cow(rhs, $op_val).expect("SIMD length mismatch"),
                 }
             }
         }
 
         // 3. &SimdCow + SimdCow
-        impl<'a, 'b, T, Arch, Align> core::ops::$op_trait<SimdCow<'b, T, Arch, Align>> for &'a SimdCow<'a, T, Arch, Align>
+        impl<'a, 'b, T, Arch, Align> core::ops::$op_trait<SimdCow<'b, T, Arch, Align>>
+            for &'a SimdCow<'a, T, Arch, Align>
         where
             T: Scalar,
             Arch: SimdArch + SimdKernel<T>,
@@ -147,25 +156,30 @@ macro_rules! impl_binary_op {
                     SimdCow::Owned(mut rhs_vec) => {
                         if $is_commutative {
                             let mut rhs_cow = SimdCow::Owned(rhs_vec);
-                            rhs_cow.transform_in_place(self, $op_val).expect("SIMD length mismatch");
+                            rhs_cow
+                                .transform_in_place(self, $op_val)
+                                .expect("SIMD length mismatch");
                             match rhs_cow {
                                 rhs_cow @ SimdCow::Owned(_) => rhs_cow,
                                 _ => unreachable!(),
                             }
                         } else {
-                            binary_lhs_inplace::<T, Arch, Align, $op_strategy>(self, &mut rhs_vec, $op_val);
+                            binary_lhs_inplace::<T, Arch, Align, $op_strategy>(
+                                self,
+                                &mut rhs_vec,
+                                $op_val,
+                            );
                             SimdCow::Owned(rhs_vec)
                         }
                     }
-                    rhs => {
-                        self.zip_cow(&rhs, $op_val).expect("SIMD length mismatch")
-                    }
+                    rhs => self.zip_cow(&rhs, $op_val).expect("SIMD length mismatch"),
                 }
             }
         }
 
         // 4. &SimdCow + &SimdCow
-        impl<'a, 'b, T, Arch, Align> core::ops::$op_trait<&'b SimdCow<'b, T, Arch, Align>> for &'a SimdCow<'a, T, Arch, Align>
+        impl<'a, 'b, T, Arch, Align> core::ops::$op_trait<&'b SimdCow<'b, T, Arch, Align>>
+            for &'a SimdCow<'a, T, Arch, Align>
         where
             T: Scalar,
             Arch: SimdArch + SimdKernel<T>,
@@ -184,7 +198,8 @@ macro_rules! impl_binary_op {
 macro_rules! impl_assign_op {
     ($op_trait:ident, $op_method:ident, $op_strategy:ty, $op_val:expr) => {
         // SimdCow += SimdCow
-        impl<'a, 'b, T, Arch, Align> core::ops::$op_trait<SimdCow<'b, T, Arch, Align>> for SimdCow<'a, T, Arch, Align>
+        impl<'a, 'b, T, Arch, Align> core::ops::$op_trait<SimdCow<'b, T, Arch, Align>>
+            for SimdCow<'a, T, Arch, Align>
         where
             'b: 'a,
             T: Scalar,
@@ -193,12 +208,14 @@ macro_rules! impl_assign_op {
         {
             #[inline]
             fn $op_method(&mut self, rhs: SimdCow<'b, T, Arch, Align>) {
-                self.transform_in_place(&rhs, $op_val).expect("SIMD length mismatch");
+                self.transform_in_place(&rhs, $op_val)
+                    .expect("SIMD length mismatch");
             }
         }
 
         // SimdCow += &SimdCow
-        impl<'a, 'b, T, Arch, Align> core::ops::$op_trait<&'b SimdCow<'b, T, Arch, Align>> for SimdCow<'a, T, Arch, Align>
+        impl<'a, 'b, T, Arch, Align> core::ops::$op_trait<&'b SimdCow<'b, T, Arch, Align>>
+            for SimdCow<'a, T, Arch, Align>
         where
             'b: 'a,
             T: Scalar,
@@ -207,7 +224,8 @@ macro_rules! impl_assign_op {
         {
             #[inline]
             fn $op_method(&mut self, rhs: &'b SimdCow<'b, T, Arch, Align>) {
-                self.transform_in_place(rhs, $op_val).expect("SIMD length mismatch");
+                self.transform_in_place(rhs, $op_val)
+                    .expect("SIMD length mismatch");
             }
         }
     };
@@ -225,6 +243,21 @@ impl_assign_op!(AddAssign, add_assign, crate::ops::Add, crate::ops::Add);
 impl_assign_op!(SubAssign, sub_assign, crate::ops::Sub, crate::ops::Sub);
 impl_assign_op!(MulAssign, mul_assign, crate::ops::Mul, crate::ops::Mul);
 impl_assign_op!(DivAssign, div_assign, crate::ops::Div, crate::ops::Div);
-impl_assign_op!(BitAndAssign, bitand_assign, crate::ops::BitAnd, crate::ops::BitAnd);
-impl_assign_op!(BitOrAssign, bitor_assign, crate::ops::BitOr, crate::ops::BitOr);
-impl_assign_op!(BitXorAssign, bitxor_assign, crate::ops::BitXor, crate::ops::BitXor);
+impl_assign_op!(
+    BitAndAssign,
+    bitand_assign,
+    crate::ops::BitAnd,
+    crate::ops::BitAnd
+);
+impl_assign_op!(
+    BitOrAssign,
+    bitor_assign,
+    crate::ops::BitOr,
+    crate::ops::BitOr
+);
+impl_assign_op!(
+    BitXorAssign,
+    bitxor_assign,
+    crate::ops::BitXor,
+    crate::ops::BitXor
+);

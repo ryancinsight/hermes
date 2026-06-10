@@ -5,10 +5,10 @@
 //! Compress/expand are emulated via scalar loops — AVX2 has no native
 //! `vcompress` instruction (that requires AVX-512F).
 
+use crate::Avx2;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::*;
 use hermes_simd_core::kernel::SimdKernel;
-use crate::Avx2;
 
 /// Newtype over `__m256` so `Send + Sync` can be implemented on the wrapper.
 ///
@@ -247,7 +247,10 @@ impl SimdKernel<f32> for Avx2 {
         let mut out = [0.0f32; 8];
         let mut k = 0usize;
         for i in 0..8usize {
-            if (mask_bits >> i) & 1 != 0 { out[k] = arr[i]; k += 1; }
+            if (mask_bits >> i) & 1 != 0 {
+                out[k] = arr[i];
+                k += 1;
+            }
         }
         Avx2F32Vec(_mm256_loadu_ps(out.as_ptr()))
     }
@@ -262,7 +265,10 @@ impl SimdKernel<f32> for Avx2 {
         _mm256_storeu_ps(out_arr.as_mut_ptr(), fill.0);
         let mut k = 0usize;
         for i in 0..8usize {
-            if (mask_bits >> i) & 1 != 0 { out_arr[i] = src_arr[k]; k += 1; }
+            if (mask_bits >> i) & 1 != 0 {
+                out_arr[i] = src_arr[k];
+                k += 1;
+            }
         }
         Avx2F32Vec(_mm256_loadu_ps(out_arr.as_ptr()))
     }
@@ -299,7 +305,11 @@ impl SimdKernel<f32> for Avx2 {
         debug_assert_eq!(bits.len(), 8);
         // Active lane: all-ones bit pattern (sign bit set for blendv).
         let vals: [f32; 8] = core::array::from_fn(|i| {
-            if bits[i] { f32::from_bits(0xFFFF_FFFF) } else { 0.0f32 }
+            if bits[i] {
+                f32::from_bits(0xFFFF_FFFF)
+            } else {
+                0.0f32
+            }
         });
         Avx2F32Mask(_mm256_loadu_ps(vals.as_ptr()))
     }
@@ -309,7 +319,11 @@ impl SimdKernel<f32> for Avx2 {
     unsafe fn leading_k_mask(k: usize) -> Self::Mask {
         let k = k.min(8);
         let vals: [f32; 8] = core::array::from_fn(|i| {
-            if i < k { f32::from_bits(0xFFFF_FFFF) } else { 0.0f32 }
+            if i < k {
+                f32::from_bits(0xFFFF_FFFF)
+            } else {
+                0.0f32
+            }
         });
         Avx2F32Mask(_mm256_loadu_ps(vals.as_ptr()))
     }
@@ -320,11 +334,15 @@ impl SimdKernel<f32> for Avx2 {
 
     #[target_feature(enable = "avx2")]
     #[inline]
-    unsafe fn zero() -> Self::Vector { Avx2F32Vec(_mm256_setzero_ps()) }
+    unsafe fn zero() -> Self::Vector {
+        Avx2F32Vec(_mm256_setzero_ps())
+    }
 
     #[target_feature(enable = "avx2")]
     #[inline]
-    unsafe fn splat(val: f32) -> Self::Vector { Avx2F32Vec(_mm256_set1_ps(val)) }
+    unsafe fn splat(val: f32) -> Self::Vector {
+        Avx2F32Vec(_mm256_set1_ps(val))
+    }
 
     #[target_feature(enable = "avx2")]
     #[inline]
@@ -413,7 +431,11 @@ impl SimdKernel<f32> for Avx2 {
 
     #[target_feature(enable = "avx2")]
     #[inline]
-    unsafe fn blend(mask: Self::Vector, true_val: Self::Vector, false_val: Self::Vector) -> Self::Vector {
+    unsafe fn blend(
+        mask: Self::Vector,
+        true_val: Self::Vector,
+        false_val: Self::Vector,
+    ) -> Self::Vector {
         Avx2F32Vec(_mm256_blendv_ps(false_val.0, true_val.0, mask.0))
     }
 

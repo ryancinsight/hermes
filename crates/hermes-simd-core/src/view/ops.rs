@@ -1,10 +1,10 @@
-use crate::arch::SimdArch;
 use crate::align::Alignment;
-use crate::kernel::SimdKernel;
+use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
+use crate::kernel::SimdKernel;
+use crate::ops::ElementOp;
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
-use crate::ops::ElementOp;
 
 impl<'a, T: 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode, Ref: 'a>
     SimdView<'a, T, Arch, Align, Mode, Ref>
@@ -98,7 +98,10 @@ where
     /// # Errors
     /// Returns `SimdError::LengthMismatch` if the view lengths are not identical.
     #[inline(always)]
-    pub fn dot<ORef>(&self, other: &SimdView<'_, T, Arch, Align, Mode, ORef>) -> Result<T, SimdError>
+    pub fn dot<ORef>(
+        &self,
+        other: &SimdView<'_, T, Arch, Align, Mode, ORef>,
+    ) -> Result<T, SimdError>
     where
         ORef: 'a,
     {
@@ -216,7 +219,11 @@ where
     /// Returns `SimdError::LengthMismatch` if operand lengths do not match, or
     /// `SimdError::InsufficientOutputLength` if the output slice is smaller than the input view.
     #[inline(always)]
-    pub fn elementwise_mul<ORef>(&self, other: &SimdView<'_, T, Arch, Align, Mode, ORef>, out: &mut [T]) -> Result<(), SimdError>
+    pub fn elementwise_mul<ORef>(
+        &self,
+        other: &SimdView<'_, T, Arch, Align, Mode, ORef>,
+        out: &mut [T],
+    ) -> Result<(), SimdError>
     where
         ORef: 'a,
     {
@@ -280,7 +287,12 @@ where
     /// Returns `SimdError::LengthMismatch` if operand lengths do not match, or
     /// `SimdError::InsufficientOutputLength` if `out.len() < self.len()`.
     #[inline(always)]
-    pub fn zip_into<ORef, Op>(&self, other: &SimdView<'_, T, Arch, Align, Mode, ORef>, out: &mut [T], op: Op) -> Result<(), SimdError>
+    pub fn zip_into<ORef, Op>(
+        &self,
+        other: &SimdView<'_, T, Arch, Align, Mode, ORef>,
+        out: &mut [T],
+        op: Op,
+    ) -> Result<(), SimdError>
     where
         ORef: 'a,
         Op: ElementOp<T>,
@@ -351,7 +363,9 @@ where
         let len = self.len();
         let mut out = crate::vec::AlignedVec::with_capacity(len);
         // SAFETY: we write all `len` elements below via `zip_into`.
-        unsafe { out.set_len(len); }
+        unsafe {
+            out.set_len(len);
+        }
         self.zip_into(other, out.as_mut_slice(), op)?;
         Ok(out)
     }

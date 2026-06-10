@@ -11,21 +11,37 @@ const FILE_A: u64 = 0x0101010101010101;
 const FILE_H: u64 = 0x8080808080808080;
 
 #[inline(always)]
-fn shift_n(v: u64) -> u64 { v << 8 }
+fn shift_n(v: u64) -> u64 {
+    v << 8
+}
 #[inline(always)]
-fn shift_s(v: u64) -> u64 { v >> 8 }
+fn shift_s(v: u64) -> u64 {
+    v >> 8
+}
 #[inline(always)]
-fn shift_e(v: u64) -> u64 { (v << 1) & !FILE_A }
+fn shift_e(v: u64) -> u64 {
+    (v << 1) & !FILE_A
+}
 #[inline(always)]
-fn shift_w(v: u64) -> u64 { (v >> 1) & !FILE_H }
+fn shift_w(v: u64) -> u64 {
+    (v >> 1) & !FILE_H
+}
 #[inline(always)]
-fn shift_ne(v: u64) -> u64 { (v << 9) & !FILE_A }
+fn shift_ne(v: u64) -> u64 {
+    (v << 9) & !FILE_A
+}
 #[inline(always)]
-fn shift_nw(v: u64) -> u64 { (v << 7) & !FILE_H }
+fn shift_nw(v: u64) -> u64 {
+    (v << 7) & !FILE_H
+}
 #[inline(always)]
-fn shift_se(v: u64) -> u64 { (v >> 7) & !FILE_A }
+fn shift_se(v: u64) -> u64 {
+    (v >> 7) & !FILE_A
+}
 #[inline(always)]
-fn shift_sw(v: u64) -> u64 { (v >> 9) & !FILE_H }
+fn shift_sw(v: u64) -> u64 {
+    (v >> 9) & !FILE_H
+}
 
 /// Generate sliding attacks using pure SWAR propagation loop in a single direction.
 #[inline(always)]
@@ -191,4 +207,3 @@ impl SwarUtils {
         res
     }
 }
-

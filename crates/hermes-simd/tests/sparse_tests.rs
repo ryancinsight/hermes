@@ -42,10 +42,7 @@ fn test_spmv_dense_masked() {
 fn test_blocked_coo_4x4_spmv() {
     // 4x4 identity matrix as one 4x4 block
     let block: Vec<f32> = vec![
-        1.0, 0.0, 0.0, 0.0,
-        0.0, 1.0, 0.0, 0.0,
-        0.0, 0.0, 1.0, 0.0,
-        0.0, 0.0, 0.0, 1.0,
+        1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
     ];
     let block_row = [0i32];
     let block_col = [0i32];
@@ -62,13 +59,20 @@ fn test_sellp_spmv_correctness() {
     let col_indices = [0i32, 1, 2, 3];
     let slice_ptr = [0i32, 4];
     let slice_col_count = [1i32];
-    let data = SellPData::new(&values[..], &col_indices[..], &slice_ptr[..], &slice_col_count[..], 4, 4);
+    let data = SellPData::new(
+        &values[..],
+        &col_indices[..],
+        &slice_ptr[..],
+        &slice_col_count[..],
+        4,
+        4,
+    );
     let x = [10.0f32, 10.0, 10.0, 10.0];
     let mut y = [0.0f32; 4];
-    
+
     let view = SparseView::<f32, SellP<4>, Scalar>::from_sellp4(data);
     view.spmv(&x, &mut y);
-    
+
     assert_eq!(y, [10.0, 20.0, 30.0, 40.0]);
 }
 
@@ -78,10 +82,17 @@ fn test_sellp_spmv_dispatch() {
     let col_indices = [0i32, 1, 2, 3];
     let slice_ptr = [0i32, 4];
     let slice_col_count = [1i32];
-    let data = SellPData::new(&values[..], &col_indices[..], &slice_ptr[..], &slice_col_count[..], 4, 4);
+    let data = SellPData::new(
+        &values[..],
+        &col_indices[..],
+        &slice_ptr[..],
+        &slice_col_count[..],
+        4,
+        4,
+    );
     let x = [10.0f32, 10.0, 10.0, 10.0];
     let mut y = [0.0f32; 4];
-    
+
     spmv_sellp4::<f32>(data.clone(), &x, &mut y);
     assert_eq!(y, [10.0, 20.0, 30.0, 40.0]);
 
@@ -326,10 +337,7 @@ fn test_dense_masked_cow_sum_values() {
 #[test]
 fn test_bcoo_cow_borrowed_spmv() {
     let block: Vec<f32> = vec![
-        1.0, 0.0, 0.0, 0.0,
-        0.0, 1.0, 0.0, 0.0,
-        0.0, 0.0, 1.0, 0.0,
-        0.0, 0.0, 0.0, 1.0,
+        1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
     ];
     let block_row = [0i32];
     let block_col = [0i32];
@@ -347,10 +355,7 @@ fn test_bcoo_cow_borrowed_spmv() {
 fn test_bcoo_cow_owned_spmv() {
     let cow: BlockedCooCow<f32, 4, 4, Scalar> = BlockedCooCow::from_vecs(
         vec![
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-            0.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ],
         vec![0i32],
         vec![0i32],
@@ -368,10 +373,7 @@ fn test_bcoo_cow_owned_spmv() {
 #[test]
 fn test_bcoo_cow_to_owned_promotes() {
     let block: Vec<f32> = vec![
-        2.0, 0.0, 0.0, 0.0,
-        0.0, 2.0, 0.0, 0.0,
-        0.0, 0.0, 2.0, 0.0,
-        0.0, 0.0, 0.0, 2.0,
+        2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0,
     ];
     let block_row = [0i32];
     let block_col = [0i32];

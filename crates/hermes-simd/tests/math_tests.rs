@@ -4,7 +4,7 @@
 //! All tests run against the `Scalar` arch (lane=1) for portability.
 //! The scalar fallback is the authoritative correctness reference.
 
-use hermes_simd::{SimdCow, Unaligned, Scalar};
+use hermes_simd::{Scalar, SimdCow, Unaligned};
 
 type Cow<'a, T> = SimdCow<'a, T, Scalar, Unaligned>;
 
@@ -194,7 +194,7 @@ fn test_math_fn_zero_runtime_state() {
     use core::mem::size_of;
     // The broadcast_op helper is generic — verify no strategy type adds state.
     // Clamp<T> is the only stateful UnaryOp; all ElementOp ZSTs are size 0.
-    use hermes_simd::{Add, Sub, Mul, Div};
+    use hermes_simd::{Add, Div, Mul, Sub};
     assert_eq!(size_of::<Add>(), 0);
     assert_eq!(size_of::<Sub>(), 0);
     assert_eq!(size_of::<Mul>(), 0);

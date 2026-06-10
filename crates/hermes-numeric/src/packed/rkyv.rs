@@ -2,9 +2,9 @@
 
 #![allow(clippy::let_unit_value, clippy::unit_arg)]
 
+use crate::packed::cow::Packed4Cow;
 use crate::packed::slice::{Packable4, Packed4Slice};
 use crate::packed::vec::Packed4Vec;
-use crate::packed::cow::Packed4Cow;
 use rkyv::Deserialize;
 
 #[repr(C)]
@@ -53,7 +53,8 @@ where
     #[inline]
     fn serialize(&self, serializer: &mut S) -> Result<Self::Resolver, S::Error> {
         let view = self.as_view();
-        let data_resolver = rkyv::vec::ArchivedVec::serialize_from_slice(view.as_packed_slice(), serializer)?;
+        let data_resolver =
+            rkyv::vec::ArchivedVec::serialize_from_slice(view.as_packed_slice(), serializer)?;
         let len_resolver = view.len().serialize(serializer)?;
         Ok(Packed4CowResolver {
             data_resolver,
@@ -143,7 +144,8 @@ where
 {
     #[inline]
     fn serialize(&self, serializer: &mut S) -> Result<Self::Resolver, S::Error> {
-        let data_resolver = rkyv::vec::ArchivedVec::serialize_from_slice(self.as_packed_slice(), serializer)?;
+        let data_resolver =
+            rkyv::vec::ArchivedVec::serialize_from_slice(self.as_packed_slice(), serializer)?;
         let len_resolver = self.len.serialize(serializer)?;
         Ok(Packed4VecResolver {
             data_resolver,

@@ -1,6 +1,6 @@
 //! Intel AMX (Advanced Matrix Extensions) backend for BF16 and INT8 matrix multiplication.
 
-use hermes_simd_core::arch::{SimdArch, IsaFamily};
+use hermes_simd_core::arch::{IsaFamily, SimdArch};
 
 /// x86/x86_64 AMX BF16 matrix multiply backend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,11 +100,16 @@ impl AmxConfig {
         cols_b[2] = c_c_bytes;
 
         // Auxiliary registers for register blocking
-        rows[3] = r_c; cols_b[3] = c_c_bytes;
-        rows[4] = r_c; cols_b[4] = c_c_bytes;
-        rows[5] = r_c; cols_b[5] = c_c_bytes;
-        rows[6] = r_b; cols_b[6] = c_b_bytes;
-        rows[7] = r_b; cols_b[7] = c_b_bytes;
+        rows[3] = r_c;
+        cols_b[3] = c_c_bytes;
+        rows[4] = r_c;
+        cols_b[4] = c_c_bytes;
+        rows[5] = r_c;
+        cols_b[5] = c_c_bytes;
+        rows[6] = r_b;
+        cols_b[6] = c_b_bytes;
+        rows[7] = r_b;
+        cols_b[7] = c_b_bytes;
 
         Self::new_custom(rows, cols_b)
     }
@@ -124,7 +129,9 @@ pub(crate) struct DummyThreadLocal<T> {
 #[cfg(not(feature = "std"))]
 impl<T> DummyThreadLocal<T> {
     const fn new(val: T) -> Self {
-        Self { cell: core::cell::Cell::new(val) }
+        Self {
+            cell: core::cell::Cell::new(val),
+        }
     }
     #[inline(always)]
     fn with<R, F: FnOnce(&core::cell::Cell<T>) -> R>(&self, f: F) -> R {
@@ -140,7 +147,6 @@ pub(crate) static ACTIVE_CONFIG: DummyThreadLocal<Option<AmxConfig>> = DummyThre
 
 #[cfg(not(feature = "std"))]
 pub(crate) static SESSION_DEPTH: DummyThreadLocal<usize> = DummyThreadLocal::new(0);
-
 
 /// A session guard that manages AMX tile configuration lifecycle on the current thread.
 pub struct AmxSession {
@@ -164,12 +170,16 @@ impl AmxSession {
         });
 
         if depth == 0 {
-            unsafe { raw::ldtilecfg(config); }
+            unsafe {
+                raw::ldtilecfg(config);
+            }
             ACTIVE_CONFIG.with(|c| c.set(Some(*config)));
         } else {
             let active = ACTIVE_CONFIG.with(|c| c.get());
             if active != Some(*config) {
-                unsafe { raw::ldtilecfg(config); }
+                unsafe {
+                    raw::ldtilecfg(config);
+                }
                 ACTIVE_CONFIG.with(|c| c.set(Some(*config)));
             }
         }
@@ -179,7 +189,9 @@ impl AmxSession {
     /// Context switch mitigation: release tile registers explicitly.
     #[inline]
     pub fn release() {
-        unsafe { raw::tilerelease(); }
+        unsafe {
+            raw::tilerelease();
+        }
         ACTIVE_CONFIG.with(|c| c.set(None));
         SESSION_DEPTH.with(|d| d.set(0));
     }
@@ -199,7 +211,9 @@ impl Drop for AmxSession {
         });
 
         if depth == 0 {
-            unsafe { raw::tilerelease(); }
+            unsafe {
+                raw::tilerelease();
+            }
             ACTIVE_CONFIG.with(|c| c.set(None));
         }
     }
@@ -215,7 +229,9 @@ impl AmxBatchSession {
     /// Begin a new AMX batch computation.
     #[inline]
     pub fn begin(config: &AmxConfig) -> Self {
-        unsafe { raw::ldtilecfg(config); }
+        unsafe {
+            raw::ldtilecfg(config);
+        }
         ACTIVE_CONFIG.with(|c| c.set(Some(*config)));
         Self
     }
@@ -224,12 +240,13 @@ impl AmxBatchSession {
 impl Drop for AmxBatchSession {
     #[inline]
     fn drop(&mut self) {
-        unsafe { raw::tilerelease(); }
+        unsafe {
+            raw::tilerelease();
+        }
         ACTIVE_CONFIG.with(|c| c.set(None));
         SESSION_DEPTH.with(|d| d.set(0));
     }
 }
-
 
 /// AMX instruction wrappers using inline assembly.
 pub mod raw {
@@ -293,14 +310,30 @@ pub mod raw {
         #[cfg(target_arch = "x86_64")]
         {
             match tile {
-                0 => core::arch::asm!("tileloadd tmm0, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride),
-                1 => core::arch::asm!("tileloadd tmm1, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride),
-                2 => core::arch::asm!("tileloadd tmm2, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride),
-                3 => core::arch::asm!("tileloadd tmm3, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride),
-                4 => core::arch::asm!("tileloadd tmm4, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride),
-                5 => core::arch::asm!("tileloadd tmm5, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride),
-                6 => core::arch::asm!("tileloadd tmm6, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride),
-                7 => core::arch::asm!("tileloadd tmm7, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride),
+                0 => {
+                    core::arch::asm!("tileloadd tmm0, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride)
+                }
+                1 => {
+                    core::arch::asm!("tileloadd tmm1, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride)
+                }
+                2 => {
+                    core::arch::asm!("tileloadd tmm2, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride)
+                }
+                3 => {
+                    core::arch::asm!("tileloadd tmm3, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride)
+                }
+                4 => {
+                    core::arch::asm!("tileloadd tmm4, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride)
+                }
+                5 => {
+                    core::arch::asm!("tileloadd tmm5, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride)
+                }
+                6 => {
+                    core::arch::asm!("tileloadd tmm6, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride)
+                }
+                7 => {
+                    core::arch::asm!("tileloadd tmm7, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride)
+                }
                 _ => {}
             }
         }
@@ -312,14 +345,30 @@ pub mod raw {
         #[cfg(target_arch = "x86_64")]
         {
             match tile {
-                0 => core::arch::asm!("tilestored [{base} + {stride}], tmm0", base = in(reg) base, stride = in(reg) stride),
-                1 => core::arch::asm!("tilestored [{base} + {stride}], tmm1", base = in(reg) base, stride = in(reg) stride),
-                2 => core::arch::asm!("tilestored [{base} + {stride}], tmm2", base = in(reg) base, stride = in(reg) stride),
-                3 => core::arch::asm!("tilestored [{base} + {stride}], tmm3", base = in(reg) base, stride = in(reg) stride),
-                4 => core::arch::asm!("tilestored [{base} + {stride}], tmm4", base = in(reg) base, stride = in(reg) stride),
-                5 => core::arch::asm!("tilestored [{base} + {stride}], tmm5", base = in(reg) base, stride = in(reg) stride),
-                6 => core::arch::asm!("tilestored [{base} + {stride}], tmm6", base = in(reg) base, stride = in(reg) stride),
-                7 => core::arch::asm!("tilestored [{base} + {stride}], tmm7", base = in(reg) base, stride = in(reg) stride),
+                0 => {
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm0", base = in(reg) base, stride = in(reg) stride)
+                }
+                1 => {
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm1", base = in(reg) base, stride = in(reg) stride)
+                }
+                2 => {
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm2", base = in(reg) base, stride = in(reg) stride)
+                }
+                3 => {
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm3", base = in(reg) base, stride = in(reg) stride)
+                }
+                4 => {
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm4", base = in(reg) base, stride = in(reg) stride)
+                }
+                5 => {
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm5", base = in(reg) base, stride = in(reg) stride)
+                }
+                6 => {
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm6", base = in(reg) base, stride = in(reg) stride)
+                }
+                7 => {
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm7", base = in(reg) base, stride = in(reg) stride)
+                }
                 _ => {}
             }
         }
@@ -377,10 +426,15 @@ pub trait AmxGemm<TA, TB, TC> {
     /// # Safety
     /// - Pointers must be valid and aligned as per backend requirements.
     unsafe fn amx_gemm(
-        m: usize, n: usize, k: usize,
-        a: *const TA, a_stride: usize,
-        b: *const TB, b_stride: usize,
-        c: *mut TC, c_stride: usize,
+        m: usize,
+        n: usize,
+        k: usize,
+        a: *const TA,
+        a_stride: usize,
+        b: *const TB,
+        b_stride: usize,
+        c: *mut TC,
+        c_stride: usize,
     );
 }
 

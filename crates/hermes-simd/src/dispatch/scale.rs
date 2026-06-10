@@ -4,11 +4,7 @@
 //! then multiplies each chunk of `data` by it, covering the scalar tail
 //! element-by-element.
 
-use hermes_simd_core::{
-    kernel::SimdKernel,
-    scalar::Scalar,
-    arch::SimdArch,
-};
+use hermes_simd_core::{arch::SimdArch, kernel::SimdKernel, scalar::Scalar};
 use hermes_simd_macros::runtime_dispatch;
 
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]

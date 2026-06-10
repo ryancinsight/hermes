@@ -1,5 +1,5 @@
-use crate::traits::{private, NumericElement, FloatElement};
-use crate::types::{F16, F32, F64, Bf16, Bf8, Bf4, F8, F4, I8, I16, I32};
+use crate::traits::{private, FloatElement, NumericElement};
+use crate::types::{Bf16, Bf4, Bf8, F16, F32, F4, F64, F8, I16, I32, I8};
 
 macro_rules! impl_numeric_element {
     (
@@ -37,27 +37,48 @@ macro_rules! impl_numeric_element {
             const SIGN_MASK: Self = $sign_mask;
 
             #[inline(always)]
-            fn abs(self) -> Self { $abs(self) }
+            fn abs(self) -> Self {
+                $abs(self)
+            }
             #[inline(always)]
-            fn scalar_fmadd(self, b: Self, c: Self) -> Self { $fmadd(self, b, c) }
+            fn scalar_fmadd(self, b: Self, c: Self) -> Self {
+                $fmadd(self, b, c)
+            }
             #[inline(always)]
-            fn sqrt(self) -> Self { $sqrt(self) }
+            fn sqrt(self) -> Self {
+                $sqrt(self)
+            }
             #[inline(always)]
-            fn is_finite(self) -> bool { $finite(self) }
+            fn is_finite(self) -> bool {
+                $finite(self)
+            }
             #[inline(always)]
-            fn is_nan(self) -> bool { $nan_check(self) }
+            fn is_nan(self) -> bool {
+                $nan_check(self)
+            }
             #[inline(always)]
-            fn to_f64(self) -> f64 { $to_f64(self) }
+            fn to_f64(self) -> f64 {
+                $to_f64(self)
+            }
             #[inline(always)]
-            fn bitand(self, rhs: Self) -> Self { $and(self, rhs) }
+            fn bitand(self, rhs: Self) -> Self {
+                $and(self, rhs)
+            }
             #[inline(always)]
-            fn bitor(self, rhs: Self) -> Self { $or(self, rhs) }
+            fn bitor(self, rhs: Self) -> Self {
+                $or(self, rhs)
+            }
             #[inline(always)]
-            fn bitxor(self, rhs: Self) -> Self { $xor(self, rhs) }
+            fn bitxor(self, rhs: Self) -> Self {
+                $xor(self, rhs)
+            }
         }
 
         const _: () = {
-            assert!(core::mem::size_of::<$t>() == $width, "Byte width assertion failed");
+            assert!(
+                core::mem::size_of::<$t>() == $width,
+                "Byte width assertion failed"
+            );
         };
     };
 }
@@ -74,7 +95,9 @@ impl_numeric_element!(
     F16(half::f16::from_bits(0xFFFF)),
     F16(half::f16::from_bits(0x8000)), // sign bit
     |x: F16| x.0.to_f32() as f64,
-    |x: F16, b: F16, c: F16| F16(half::f16::from_f32(x.0.to_f32().scalar_fmadd(b.0.to_f32(), c.0.to_f32()))),
+    |x: F16, b: F16, c: F16| F16(half::f16::from_f32(
+        x.0.to_f32().scalar_fmadd(b.0.to_f32(), c.0.to_f32())
+    )),
     |x: F16| F16(half::f16::from_f32(x.0.to_f32().abs())),
     |x: F16| F16(half::f16::from_f32(x.0.to_f32().sqrt())),
     |x: F16| x.0.is_finite(),
@@ -140,7 +163,9 @@ impl_numeric_element!(
     Bf16(half::bf16::from_bits(0xFFFF)),
     Bf16(half::bf16::from_bits(0x8000)), // sign bit
     |x: Bf16| x.0.to_f32() as f64,
-    |x: Bf16, b: Bf16, c: Bf16| Bf16(half::bf16::from_f32(x.0.to_f32().scalar_fmadd(b.0.to_f32(), c.0.to_f32()))),
+    |x: Bf16, b: Bf16, c: Bf16| Bf16(half::bf16::from_f32(
+        x.0.to_f32().scalar_fmadd(b.0.to_f32(), c.0.to_f32())
+    )),
     |x: Bf16| Bf16(half::bf16::from_f32(x.0.to_f32().abs())),
     |x: Bf16| Bf16(half::bf16::from_f32(x.0.to_f32().sqrt())),
     |x: Bf16| x.0.is_finite(),
@@ -177,13 +202,49 @@ macro_rules! impl_numeric_for_byte_float {
 }
 
 // Bf8: 1.4.3 format — sign bit is bit 7 (0x80)
-impl_numeric_for_byte_float!(Bf8, Bf8(0), Bf8(0x3C), Bf8(0x7F), Bf8(0x7C), Bf8(0xFC), Bf8(0x7C), Bf8(0x80));
+impl_numeric_for_byte_float!(
+    Bf8,
+    Bf8(0),
+    Bf8(0x3C),
+    Bf8(0x7F),
+    Bf8(0x7C),
+    Bf8(0xFC),
+    Bf8(0x7C),
+    Bf8(0x80)
+);
 // Bf4: 4-bit packed in u8 — sign bit is bit 3 (0x08)
-impl_numeric_for_byte_float!(Bf4, Bf4(0), Bf4(0x02), Bf4(0x07), Bf4(0x06), Bf4(0x86), Bf4(0x06), Bf4(0x08));
+impl_numeric_for_byte_float!(
+    Bf4,
+    Bf4(0),
+    Bf4(0x02),
+    Bf4(0x07),
+    Bf4(0x06),
+    Bf4(0x86),
+    Bf4(0x06),
+    Bf4(0x08)
+);
 // F8: 1.4.3 format — sign bit is bit 7 (0x80)
-impl_numeric_for_byte_float!(F8, F8(0), F8(0x38), F8(0x7F), F8(0x77), F8(0xF7), F8(0x77), F8(0x80));
+impl_numeric_for_byte_float!(
+    F8,
+    F8(0),
+    F8(0x38),
+    F8(0x7F),
+    F8(0x77),
+    F8(0xF7),
+    F8(0x77),
+    F8(0x80)
+);
 // F4: 4-bit packed in u8 — sign bit is bit 3 (0x08)
-impl_numeric_for_byte_float!(F4, F4(0), F4(0x03), F4(0x07), F4(0x06), F4(0x86), F4(0x06), F4(0x08));
+impl_numeric_for_byte_float!(
+    F4,
+    F4(0),
+    F4(0x03),
+    F4(0x07),
+    F4(0x06),
+    F4(0x86),
+    F4(0x06),
+    F4(0x08)
+);
 
 impl_numeric_element!(
     I8,
@@ -255,20 +316,48 @@ macro_rules! impl_float_element {
     ($t:ident, $from_f32:expr, $from_f64:expr, $to_f32:expr) => {
         impl FloatElement for $t {
             #[inline(always)]
-            fn from_f32(val: f32) -> Self { $from_f32(val) }
+            fn from_f32(val: f32) -> Self {
+                $from_f32(val)
+            }
             #[inline(always)]
-            fn from_f64(val: f64) -> Self { $from_f64(val) }
+            fn from_f64(val: f64) -> Self {
+                $from_f64(val)
+            }
             #[inline(always)]
-            fn to_f32(self) -> f32 { $to_f32(self) }
+            fn to_f32(self) -> f32 {
+                $to_f32(self)
+            }
         }
     };
 }
 
-impl_float_element!(F16, |val| F16(half::f16::from_f32(val)), |val| F16(half::f16::from_f64(val)), |x: F16| x.0.to_f32());
+impl_float_element!(
+    F16,
+    |val| F16(half::f16::from_f32(val)),
+    |val| F16(half::f16::from_f64(val)),
+    |x: F16| x.0.to_f32()
+);
 impl_float_element!(F32, F32, |val| F32(val as f32), |x: F32| x.0);
 impl_float_element!(F64, |val| F64(val as f64), F64, |x: F64| x.0 as f32);
-impl_float_element!(Bf16, |val| Bf16(half::bf16::from_f32(val)), |val| Bf16(half::bf16::from_f64(val)), |x: Bf16| x.0.to_f32());
-impl_float_element!(Bf8, Bf8::from_f32, |val| Bf8::from_f32(val as f32), |x: Bf8| x.to_f32());
-impl_float_element!(Bf4, Bf4::from_f32, |val| Bf4::from_f32(val as f32), |x: Bf4| x.to_f32());
-impl_float_element!(F8, F8::from_f32, |val| F8::from_f32(val as f32), |x: F8| x.to_f32());
-impl_float_element!(F4, F4::from_f32, |val| F4::from_f32(val as f32), |x: F4| x.to_f32());
+impl_float_element!(
+    Bf16,
+    |val| Bf16(half::bf16::from_f32(val)),
+    |val| Bf16(half::bf16::from_f64(val)),
+    |x: Bf16| x.0.to_f32()
+);
+impl_float_element!(
+    Bf8,
+    Bf8::from_f32,
+    |val| Bf8::from_f32(val as f32),
+    |x: Bf8| x.to_f32()
+);
+impl_float_element!(
+    Bf4,
+    Bf4::from_f32,
+    |val| Bf4::from_f32(val as f32),
+    |x: Bf4| x.to_f32()
+);
+impl_float_element!(F8, F8::from_f32, |val| F8::from_f32(val as f32), |x: F8| x
+    .to_f32());
+impl_float_element!(F4, F4::from_f32, |val| F4::from_f32(val as f32), |x: F4| x
+    .to_f32());

@@ -3,8 +3,8 @@
 //! All SIMD operations degenerate to element-wise scalar loops using the `half` crate.
 //! This is the universal fallback for f16 when no hardware SIMD feature is active.
 
-use hermes_simd_core::kernel::SimdKernel;
 use crate::Scalar;
+use hermes_simd_core::kernel::SimdKernel;
 
 impl SimdKernel<half::f16> for Scalar {
     type Vector = [half::f16; 8];
@@ -74,9 +74,7 @@ impl SimdKernel<half::f16> for Scalar {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        core::array::from_fn(|i| {
-            if mask[i] { *ptr.add(i) } else { src[i] }
-        })
+        core::array::from_fn(|i| if mask[i] { *ptr.add(i) } else { src[i] })
     }
 
     #[inline(always)]
@@ -99,9 +97,7 @@ impl SimdKernel<half::f16> for Scalar {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        core::array::from_fn(|i| {
-            if mask[i] { a[i] + b[i] } else { src[i] }
-        })
+        core::array::from_fn(|i| if mask[i] { a[i] + b[i] } else { src[i] })
     }
 
     #[inline(always)]
@@ -111,9 +107,7 @@ impl SimdKernel<half::f16> for Scalar {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        core::array::from_fn(|i| {
-            if mask[i] { a[i] * b[i] } else { src[i] }
-        })
+        core::array::from_fn(|i| if mask[i] { a[i] * b[i] } else { src[i] })
     }
 
     #[inline(always)]

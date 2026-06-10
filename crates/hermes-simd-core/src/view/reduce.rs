@@ -1,9 +1,9 @@
-use crate::arch::SimdArch;
 use crate::align::Alignment;
-use crate::kernel::SimdKernel;
+use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
-use crate::scalar::Scalar;
+use crate::kernel::SimdKernel;
 use crate::ops::ReductionOp;
+use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
 
 impl<'a, T: 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode, Ref: 'a>
@@ -136,16 +136,13 @@ where
             };
 
             let mut acc0 = pair(pa, pb);
-            let mut acc1 =
-                pair(unsafe { pa.add(lane_count) }, unsafe { pb.add(lane_count) });
-            let mut acc2 = pair(
-                unsafe { pa.add(lane_count * 2) },
-                unsafe { pb.add(lane_count * 2) },
-            );
-            let mut acc3 = pair(
-                unsafe { pa.add(lane_count * 3) },
-                unsafe { pb.add(lane_count * 3) },
-            );
+            let mut acc1 = pair(unsafe { pa.add(lane_count) }, unsafe { pb.add(lane_count) });
+            let mut acc2 = pair(unsafe { pa.add(lane_count * 2) }, unsafe {
+                pb.add(lane_count * 2)
+            });
+            let mut acc3 = pair(unsafe { pa.add(lane_count * 3) }, unsafe {
+                pb.add(lane_count * 3)
+            });
             pa = unsafe { pa.add(chunk_size) };
             pb = unsafe { pb.add(chunk_size) };
             i = chunk_size;
@@ -201,8 +198,14 @@ where
     }
 }
 
-impl<'a, T: 'a, Arch: crate::arch::SimdArch + crate::kernel::SimdKernel<T>, Align: crate::align::Alignment, Mode: crate::execution::ExecutionMode, Ref: 'a>
-    SimdView<'a, T, Arch, Align, Mode, Ref>
+impl<
+        'a,
+        T: 'a,
+        Arch: crate::arch::SimdArch + crate::kernel::SimdKernel<T>,
+        Align: crate::align::Alignment,
+        Mode: crate::execution::ExecutionMode,
+        Ref: 'a,
+    > SimdView<'a, T, Arch, Align, Mode, Ref>
 where
     T: crate::scalar::Scalar + crate::scalar::NumericElement,
 {
@@ -217,7 +220,8 @@ where
             return None;
         }
         let min_val = self.reduce(crate::ops::Min);
-        let idx = data.iter()
+        let idx = data
+            .iter()
             .position(|x| x.partial_cmp(&min_val) == Some(core::cmp::Ordering::Equal))?;
         Some((idx, min_val))
     }
@@ -233,7 +237,8 @@ where
             return None;
         }
         let max_val = self.reduce(crate::ops::Max);
-        let idx = data.iter()
+        let idx = data
+            .iter()
             .position(|x| x.partial_cmp(&max_val) == Some(core::cmp::Ordering::Equal))?;
         Some((idx, max_val))
     }

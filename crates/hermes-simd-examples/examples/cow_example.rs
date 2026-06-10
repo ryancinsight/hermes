@@ -1,4 +1,4 @@
-use hermes_simd::{AlignedVec, SimdCow, SimdView, Scalar, Aligned, Unaligned};
+use hermes_simd::{Aligned, AlignedVec, Scalar, SimdCow, SimdView, Unaligned};
 
 fn main() {
     println!("--- Clone-on-Write SIMD Container Example ---");
@@ -25,7 +25,10 @@ fn main() {
         SimdCow::owned(vec)
     };
 
-    println!("Aligned Cow state: Owned vector, len = {}", aligned_cow.len());
+    println!(
+        "Aligned Cow state: Owned vector, len = {}",
+        aligned_cow.len()
+    );
 
     // Now let's perform in-place mutation using SimdViewMut!
     let mut vec_b = AlignedVec::<f32, Aligned<32>>::with_capacity(8);

@@ -1,13 +1,8 @@
 //! Generic runtime-dispatch max-reduction kernel.
 
 use hermes_simd_core::{
-    view::SimdView,
-    align::Unaligned,
-    execution::Unmasked,
-    kernel::SimdKernel,
-    scalar::Scalar,
-    arch::SimdArch,
-    ops::Max,
+    align::Unaligned, arch::SimdArch, execution::Unmasked, kernel::SimdKernel, ops::Max,
+    scalar::Scalar, view::SimdView,
 };
 use hermes_simd_macros::runtime_dispatch;
 

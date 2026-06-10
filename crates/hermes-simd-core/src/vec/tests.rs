@@ -61,7 +61,8 @@ fn test_aligned_vec_rkyv() {
     assert_eq!(archived.elements[1], 20);
     assert_eq!(archived.elements[2], 30);
 
-    let deserialized: AlignedVec<i32, Unaligned> = archived.deserialize(&mut ::rkyv::Infallible).unwrap();
+    let deserialized: AlignedVec<i32, Unaligned> =
+        archived.deserialize(&mut ::rkyv::Infallible).unwrap();
     assert_eq!(deserialized.len(), 3);
     assert_eq!(deserialized[0], 10);
     assert_eq!(deserialized[1], 20);

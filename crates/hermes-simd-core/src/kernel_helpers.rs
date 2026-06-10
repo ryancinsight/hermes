@@ -4,7 +4,11 @@ use crate::kernel::SimdKernel;
 use crate::scalar::Scalar;
 
 #[inline(always)]
-pub unsafe fn generic_binary_op<T, Arch, F>(a: Arch::Vector, b: Arch::Vector, mut op: F) -> Arch::Vector
+pub unsafe fn generic_binary_op<T, Arch, F>(
+    a: Arch::Vector,
+    b: Arch::Vector,
+    mut op: F,
+) -> Arch::Vector
 where
     T: Scalar,
     Arch: SimdKernel<T>,

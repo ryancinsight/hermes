@@ -13,14 +13,14 @@
 //! - `normalize` — returns a unit-length owned `SimdCow<'static, T, Arch, Align>`.
 //!   Empty or zero-norm vectors return `zeros(self.len())` rather than NaN / division by zero.
 
+use super::SimdCow;
 use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::kernel::SimdKernel;
 use crate::ops::{Dot, Sub};
-use crate::scalar::{Scalar, FloatElement};
+use crate::scalar::{FloatElement, Scalar};
 use crate::vec::AlignedVec;
 use crate::view::SimdError;
-use super::SimdCow;
 
 extern crate alloc;
 
@@ -39,9 +39,12 @@ where
     /// One allocation. No second `SimdCow` allocation.
     #[inline]
     pub fn add_scalar_cow(&self, rhs: T) -> SimdCow<'static, T, Arch, Align> {
-        broadcast_op::<T, Arch, Align>(self, rhs, |a, b| a + b, |va, vsplat| unsafe {
-            Arch::add(va, vsplat)
-        })
+        broadcast_op::<T, Arch, Align>(
+            self,
+            rhs,
+            |a, b| a + b,
+            |va, vsplat| unsafe { Arch::add(va, vsplat) },
+        )
     }
 
     /// Subtract scalar `rhs` from every element: `out[i] = self[i] - rhs`.
@@ -49,9 +52,12 @@ where
     /// One allocation.
     #[inline]
     pub fn sub_scalar_cow(&self, rhs: T) -> SimdCow<'static, T, Arch, Align> {
-        broadcast_op::<T, Arch, Align>(self, rhs, |a, b| a - b, |va, vsplat| unsafe {
-            Arch::sub(va, vsplat)
-        })
+        broadcast_op::<T, Arch, Align>(
+            self,
+            rhs,
+            |a, b| a - b,
+            |va, vsplat| unsafe { Arch::sub(va, vsplat) },
+        )
     }
 
     /// Multiply every element by scalar `rhs`: `out[i] = self[i] * rhs`.
@@ -59,9 +65,12 @@ where
     /// One allocation. For in-place scaling use [`SimdCow::scale_in_place`].
     #[inline]
     pub fn mul_scalar_cow(&self, rhs: T) -> SimdCow<'static, T, Arch, Align> {
-        broadcast_op::<T, Arch, Align>(self, rhs, |a, b| a * b, |va, vsplat| unsafe {
-            Arch::mul(va, vsplat)
-        })
+        broadcast_op::<T, Arch, Align>(
+            self,
+            rhs,
+            |a, b| a * b,
+            |va, vsplat| unsafe { Arch::mul(va, vsplat) },
+        )
     }
 
     /// Elementwise division by scalar `rhs`: `out[i] = self[i] / rhs`.
@@ -69,9 +78,12 @@ where
     /// One allocation.
     #[inline]
     pub fn div_scalar_cow(&self, rhs: T) -> SimdCow<'static, T, Arch, Align> {
-        broadcast_op::<T, Arch, Align>(self, rhs, |a, b| a / b, |va, vsplat| unsafe {
-            Arch::div(va, vsplat)
-        })
+        broadcast_op::<T, Arch, Align>(
+            self,
+            rhs,
+            |a, b| a / b,
+            |va, vsplat| unsafe { Arch::div(va, vsplat) },
+        )
     }
 
     /// Elementwise division: `out[i] = self[i] / other[i]`.
@@ -205,7 +217,9 @@ where
     let len = data.len();
     let mut out: AlignedVec<T, Align> = AlignedVec::with_capacity(len);
     // SAFETY: every element written below.
-    unsafe { out.set_len(len); }
+    unsafe {
+        out.set_len(len);
+    }
 
     let lane_count = Arch::LANE_COUNT;
     let simd_len = (len / lane_count) * lane_count;
@@ -215,10 +229,18 @@ where
     unsafe {
         let vsplat = Arch::splat(rhs);
         let load = |p: *const T| -> Arch::Vector {
-            if Align::IS_ALIGNED { Arch::load_aligned(p) } else { Arch::load_unaligned(p) }
+            if Align::IS_ALIGNED {
+                Arch::load_aligned(p)
+            } else {
+                Arch::load_unaligned(p)
+            }
         };
         let store = |p: *mut T, v: Arch::Vector| {
-            if Align::IS_ALIGNED { Arch::store_aligned(p, v); } else { Arch::store_unaligned(p, v); }
+            if Align::IS_ALIGNED {
+                Arch::store_aligned(p, v);
+            } else {
+                Arch::store_unaligned(p, v);
+            }
         };
         let mut i = 0usize;
         while i < simd_len {

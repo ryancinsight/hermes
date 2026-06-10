@@ -2,8 +2,8 @@
 
 //! Zero-copy serialization support for aligned vectors using `rkyv`.
 
-use crate::align::Alignment;
 use super::AlignedVec;
+use crate::align::Alignment;
 
 #[repr(transparent)]
 /// Archived representation of an `AlignedVec` used by `rkyv` zero-copy serialization.
@@ -27,7 +27,12 @@ where
     #[inline]
     unsafe fn resolve(&self, pos: usize, resolver: Self::Resolver, out: *mut Self::Archived) {
         let out_elements = core::ptr::addr_of_mut!((*out).elements);
-        rkyv::vec::ArchivedVec::resolve_from_slice(self.as_slice(), pos, resolver.elements_resolver, out_elements);
+        rkyv::vec::ArchivedVec::resolve_from_slice(
+            self.as_slice(),
+            pos,
+            resolver.elements_resolver,
+            out_elements,
+        );
     }
 }
 
@@ -40,7 +45,8 @@ where
 {
     #[inline]
     fn serialize(&self, serializer: &mut S) -> Result<Self::Resolver, S::Error> {
-        let elements_resolver = rkyv::vec::ArchivedVec::serialize_from_slice(self.as_slice(), serializer)?;
+        let elements_resolver =
+            rkyv::vec::ArchivedVec::serialize_from_slice(self.as_slice(), serializer)?;
         Ok(AlignedVecResolver { elements_resolver })
     }
 }

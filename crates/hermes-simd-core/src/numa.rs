@@ -56,7 +56,7 @@ impl NumaAllocator for MnemosyneNumaAllocator {
             const MEM_COMMIT: u32 = 0x00001000;
             const MEM_RESERVE: u32 = 0x00002000;
             const PAGE_READWRITE: u32 = 0x04;
-            
+
             let ptr = VirtualAllocExNuma(
                 GetCurrentProcess(),
                 core::ptr::null_mut(),
@@ -98,7 +98,12 @@ impl NumaAllocator for MnemosyneNumaAllocator {
                 ) -> i32;
             }
             const MEM_RELEASE: u32 = 0x00008000;
-            let res = VirtualFreeEx(GetCurrentProcess(), ptr as *mut core::ffi::c_void, 0, MEM_RELEASE);
+            let res = VirtualFreeEx(
+                GetCurrentProcess(),
+                ptr as *mut core::ffi::c_void,
+                0,
+                MEM_RELEASE,
+            );
             if res == 0 {
                 alloc::alloc::dealloc(ptr, layout);
             }
@@ -194,7 +199,11 @@ impl NumaTopologyService {
                 fn sched_getcpu() -> i32;
             }
             let cpu = unsafe { sched_getcpu() };
-            if cpu >= 0 { Some(cpu as u32) } else { None }
+            if cpu >= 0 {
+                Some(cpu as u32)
+            } else {
+                None
+            }
         }
         #[cfg(target_os = "windows")]
         {
@@ -222,7 +231,11 @@ impl NumaTopologyService {
                 fn numa_num_configured_nodes() -> i32;
             }
             let count = unsafe { numa_num_configured_nodes() };
-            if count > 0 { count as u32 } else { 1 }
+            if count > 0 {
+                count as u32
+            } else {
+                1
+            }
         }
         #[cfg(target_os = "windows")]
         {
@@ -280,7 +293,8 @@ pub fn verify_numa_locality(ptr: *const u8, size: usize, expected_node: u32) -> 
             &mut info,
             core::mem::size_of::<MemoryBasicInformation>(),
         );
-        if res_size > 0 && info.state == 0x1000 { // MEM_COMMIT
+        if res_size > 0 && info.state == 0x1000 {
+            // MEM_COMMIT
             let owner_ptr = (segment_ptr + 8) as *const *const c_void;
             let owner = *owner_ptr;
             if !owner.is_null() {
@@ -329,7 +343,15 @@ pub fn verify_numa_locality(ptr: *const u8, size: usize, expected_node: u32) -> 
             pages[i] = (start_page + i * page_size) as *mut core::ffi::c_void;
         }
         let mut status = alloc::vec![0i32; pages_count];
-        if move_pages(0, pages_count, pages.as_ptr(), core::ptr::null(), status.as_mut_ptr(), 0) >= 0 {
+        if move_pages(
+            0,
+            pages_count,
+            pages.as_ptr(),
+            core::ptr::null(),
+            status.as_mut_ptr(),
+            0,
+        ) >= 0
+        {
             return status.iter().all(|&node| node == expected_node as i32);
         }
     }
@@ -378,7 +400,10 @@ impl NumaBinding {
         {
             extern "system" {
                 fn GetCurrentThread() -> *mut core::ffi::c_void;
-                fn SetThreadAffinityMask(hThread: *mut core::ffi::c_void, dwThreadAffinityMask: usize) -> usize;
+                fn SetThreadAffinityMask(
+                    hThread: *mut core::ffi::c_void,
+                    dwThreadAffinityMask: usize,
+                ) -> usize;
                 fn GetNumaNodeProcessorMask(node: u8, processor_mask: *mut u64) -> i32;
             }
             unsafe {
@@ -421,7 +446,10 @@ impl Drop for NumaBinding {
             if self.old_mask != 0 {
                 extern "system" {
                     fn GetCurrentThread() -> *mut core::ffi::c_void;
-                    fn SetThreadAffinityMask(hThread: *mut core::ffi::c_void, dwThreadAffinityMask: usize) -> usize;
+                    fn SetThreadAffinityMask(
+                        hThread: *mut core::ffi::c_void,
+                        dwThreadAffinityMask: usize,
+                    ) -> usize;
                 }
                 unsafe {
                     SetThreadAffinityMask(GetCurrentThread(), self.old_mask);

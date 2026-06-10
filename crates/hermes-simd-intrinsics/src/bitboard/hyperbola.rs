@@ -93,15 +93,15 @@ fn antidiagonal_ray(square: u8) -> u64 {
 pub fn hyperbola_quintessence(square: u8, occupancy: u64, ray_mask: u64) -> u64 {
     let slider = 1u64 << square;
     let o = occupancy & ray_mask;
-    
+
     // Forward attacks
     let forward = o.wrapping_sub(slider.wrapping_mul(2)) ^ o;
-    
+
     // Backward attacks (requires bit-reversal)
     let o_rev = o.reverse_bits();
     let slider_rev = slider.reverse_bits();
     let backward = o_rev.wrapping_sub(slider_rev.wrapping_mul(2)) ^ o_rev;
-    
+
     // Combine and mask to the ray (excluding the slider itself)
     ((forward & ray_mask) | (backward.reverse_bits() & ray_mask)) & !slider
 }

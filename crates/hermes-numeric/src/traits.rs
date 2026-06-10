@@ -69,7 +69,11 @@ pub trait NumericElement:
     where
         Self: PartialOrd,
     {
-        if self <= other { self } else { other }
+        if self <= other {
+            self
+        } else {
+            other
+        }
     }
 
     /// Elementwise maximum: returns `self` if `self >= other`, else `other`.
@@ -81,7 +85,11 @@ pub trait NumericElement:
     where
         Self: PartialOrd,
     {
-        if self >= other { self } else { other }
+        if self >= other {
+            self
+        } else {
+            other
+        }
     }
 
     /// The minimum representable finite value (negative infinity or `i32::MIN`).
@@ -124,5 +132,3 @@ pub trait CastTo: Copy {
 }
 
 impl<T: Copy> CastTo for T {}
-
-

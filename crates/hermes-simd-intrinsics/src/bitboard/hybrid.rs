@@ -1,8 +1,8 @@
 //! Hybrid sliding attack generation using SWAR ray-casts and Magic lookups.
 
-use hermes_simd_core::bitboard::BitBoardKernel;
 use super::magic::Magic;
 use super::swar::Swar;
+use hermes_simd_core::bitboard::BitBoardKernel;
 
 /// ZST marker for hybrid SWAR and Magic Bitboards backend.
 ///

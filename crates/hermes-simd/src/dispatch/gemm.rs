@@ -1,12 +1,12 @@
 //! Generic runtime-dispatch tiled GEMM kernel.
 
 use hermes_simd_core::{
-    view::{SimdView, SimdError},
     align::Unaligned,
+    arch::SimdArch,
     execution::Unmasked,
     kernel::SimdKernel,
     scalar::Scalar,
-    arch::SimdArch,
+    view::{SimdError, SimdView},
 };
 use hermes_simd_macros::runtime_dispatch;
 
@@ -29,24 +29,36 @@ where
     ) {
         (Some(v1), Some(v2)) => {
             use hermes_simd_core::tiling::{TilingPolicy, TilingStrategy};
-            
+
             let decision = crate::dispatcher::AdaptiveDispatcher::select_backend(
-                m, n, k,
-                a.as_ptr(), a.len(),
-                b.as_ptr(), b.len(),
+                m,
+                n,
+                k,
+                a.as_ptr(),
+                a.len(),
+                b.as_ptr(),
+                b.len(),
             );
 
             match decision {
                 crate::dispatcher::DispatchDecision::Scalar => {
-                    <TilingPolicy<1, 1> as TilingStrategy<T, A, Unaligned>>::gemm(&v1, &v2, c, m, n, k)
+                    <TilingPolicy<1, 1> as TilingStrategy<T, A, Unaligned>>::gemm(
+                        &v1, &v2, c, m, n, k,
+                    )
                 }
                 _ => {
                     if A::LANE_COUNT > 8 {
-                        <TilingPolicy<6, 4> as TilingStrategy<T, A, Unaligned>>::gemm(&v1, &v2, c, m, n, k)
+                        <TilingPolicy<6, 4> as TilingStrategy<T, A, Unaligned>>::gemm(
+                            &v1, &v2, c, m, n, k,
+                        )
                     } else if A::LANE_COUNT > 1 {
-                        <TilingPolicy<3, 4> as TilingStrategy<T, A, Unaligned>>::gemm(&v1, &v2, c, m, n, k)
+                        <TilingPolicy<3, 4> as TilingStrategy<T, A, Unaligned>>::gemm(
+                            &v1, &v2, c, m, n, k,
+                        )
                     } else {
-                        <TilingPolicy<1, 1> as TilingStrategy<T, A, Unaligned>>::gemm(&v1, &v2, c, m, n, k)
+                        <TilingPolicy<1, 1> as TilingStrategy<T, A, Unaligned>>::gemm(
+                            &v1, &v2, c, m, n, k,
+                        )
                     }
                 }
             }

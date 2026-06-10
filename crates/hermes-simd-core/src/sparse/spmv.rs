@@ -1,12 +1,9 @@
 //! Sparse matrix-vector multiplication (SpMV) kernels.
 
-use crate::scalar::Scalar;
+use super::{BlockedCoo, Csr, DenseWithMask, SellP, SellPData, SparseView};
 use crate::arch::SimdArch;
 use crate::kernel::SimdKernel;
-use super::{
-    SparseView, Csr, SellP, BlockedCoo, DenseWithMask,
-    SellPData,
-};
+use crate::scalar::Scalar;
 
 /// Unified trait for sparse matrix-vector multiplication.
 pub trait SparseSpMv<T> {
@@ -35,8 +32,20 @@ pub(crate) unsafe fn build_index_vector<T: Scalar, Arch: SimdKernel<T>>(
 
 #[inline(never)]
 fn validate_spmv_sizes(x_len: usize, y_len: usize, ncols: usize, nrows: usize, format_name: &str) {
-    assert!(x_len >= ncols, "x too short for {} ncols (got {}, expected >= {})", format_name, x_len, ncols);
-    assert!(y_len >= nrows, "y too short for {} nrows (got {}, expected >= {})", format_name, y_len, nrows);
+    assert!(
+        x_len >= ncols,
+        "x too short for {} ncols (got {}, expected >= {})",
+        format_name,
+        x_len,
+        ncols
+    );
+    assert!(
+        y_len >= nrows,
+        "y too short for {} nrows (got {}, expected >= {})",
+        format_name,
+        y_len,
+        nrows
+    );
 }
 
 impl<'a, T, Arch> SparseSpMv<T> for SparseView<'a, T, Csr, Arch>
@@ -52,17 +61,19 @@ where
         let lane_count = Arch::LANE_COUNT;
 
         for r in 0..data.nrows {
-            let start   = data.row_ptr[r] as usize;
-            let end     = data.row_ptr[r + 1] as usize;
+            let start = data.row_ptr[r] as usize;
+            let end = data.row_ptr[r + 1] as usize;
             let row_nnz = end - start;
 
-            if row_nnz == 0 { continue; }
+            if row_nnz == 0 {
+                continue;
+            }
 
             let vals = &data.values[start..end];
             let cols = &data.col_indices[start..end];
 
             let simd_len = (row_nnz / lane_count) * lane_count;
-            
+
             // Accumulate in vector registers first to avoid horizontal reductions in the inner loop.
             let mut acc_vec0 = unsafe { Arch::zero() };
             let mut acc_vec1 = unsafe { Arch::zero() };
@@ -79,19 +90,25 @@ where
                 acc_vec0 = unsafe { Arch::fmadd(x_vec0, v_vec0, acc_vec0) };
 
                 // 1
-                let idx1 = unsafe { build_index_vector::<T, Arch>(&cols[j + lane_count..j + lane_count * 2]) };
+                let idx1 = unsafe {
+                    build_index_vector::<T, Arch>(&cols[j + lane_count..j + lane_count * 2])
+                };
                 let x_vec1 = unsafe { Arch::gather(x.as_ptr(), idx1) };
                 let v_vec1 = unsafe { Arch::load_unaligned(vals[j + lane_count..].as_ptr()) };
                 acc_vec1 = unsafe { Arch::fmadd(x_vec1, v_vec1, acc_vec1) };
 
                 // 2
-                let idx2 = unsafe { build_index_vector::<T, Arch>(&cols[j + lane_count * 2..j + lane_count * 3]) };
+                let idx2 = unsafe {
+                    build_index_vector::<T, Arch>(&cols[j + lane_count * 2..j + lane_count * 3])
+                };
                 let x_vec2 = unsafe { Arch::gather(x.as_ptr(), idx2) };
                 let v_vec2 = unsafe { Arch::load_unaligned(vals[j + lane_count * 2..].as_ptr()) };
                 acc_vec2 = unsafe { Arch::fmadd(x_vec2, v_vec2, acc_vec2) };
 
                 // 3
-                let idx3 = unsafe { build_index_vector::<T, Arch>(&cols[j + lane_count * 3..j + lane_count * 4]) };
+                let idx3 = unsafe {
+                    build_index_vector::<T, Arch>(&cols[j + lane_count * 3..j + lane_count * 4])
+                };
                 let x_vec3 = unsafe { Arch::gather(x.as_ptr(), idx3) };
                 let v_vec3 = unsafe { Arch::load_unaligned(vals[j + lane_count * 3..].as_ptr()) };
                 acc_vec3 = unsafe { Arch::fmadd(x_vec3, v_vec3, acc_vec3) };
@@ -99,10 +116,11 @@ where
                 j += lane_count * 4;
             }
 
-            let mut acc_vec = unsafe { Arch::add(Arch::add(acc_vec0, acc_vec1), Arch::add(acc_vec2, acc_vec3)) };
+            let mut acc_vec =
+                unsafe { Arch::add(Arch::add(acc_vec0, acc_vec1), Arch::add(acc_vec2, acc_vec3)) };
 
             while j < simd_len {
-                let idx   = unsafe { build_index_vector::<T, Arch>(&cols[j..j + lane_count]) };
+                let idx = unsafe { build_index_vector::<T, Arch>(&cols[j..j + lane_count]) };
                 let x_vec = unsafe { Arch::gather(x.as_ptr(), idx) };
                 let v_vec = unsafe { Arch::load_unaligned(vals[j..].as_ptr()) };
                 acc_vec = unsafe { Arch::fmadd(x_vec, v_vec, acc_vec) };
@@ -135,8 +153,8 @@ where
 
         for r in 0..data.nrows {
             let row_offset = r * data.ncols;
-            let vals       = &data.values[row_offset..row_offset + data.ncols];
-            let mask_bits  = &data.mask[row_offset..row_offset + data.ncols];
+            let vals = &data.values[row_offset..row_offset + data.ncols];
+            let mask_bits = &data.mask[row_offset..row_offset + data.ncols];
 
             let simd_len = (data.ncols / lane_count) * lane_count;
 
@@ -152,38 +170,53 @@ where
 
                 // 0
                 let msk0 = unsafe { Arch::mask_from_bools(&mask_bits[j..j + lane_count]) };
-                let v_vec0 = unsafe { Arch::masked_load_unaligned(vals[j..].as_ptr(), msk0, zero_vec) };
+                let v_vec0 =
+                    unsafe { Arch::masked_load_unaligned(vals[j..].as_ptr(), msk0, zero_vec) };
                 let x_vec0 = unsafe { Arch::load_unaligned(x[j..].as_ptr()) };
                 acc_vec0 = unsafe { Arch::masked_fmadd(v_vec0, x_vec0, acc_vec0, msk0) };
 
                 // 1
-                let msk1 = unsafe { Arch::mask_from_bools(&mask_bits[j + lane_count..j + lane_count * 2]) };
-                let v_vec1 = unsafe { Arch::masked_load_unaligned(vals[j + lane_count..].as_ptr(), msk1, zero_vec) };
+                let msk1 = unsafe {
+                    Arch::mask_from_bools(&mask_bits[j + lane_count..j + lane_count * 2])
+                };
+                let v_vec1 = unsafe {
+                    Arch::masked_load_unaligned(vals[j + lane_count..].as_ptr(), msk1, zero_vec)
+                };
                 let x_vec1 = unsafe { Arch::load_unaligned(x[j + lane_count..].as_ptr()) };
                 acc_vec1 = unsafe { Arch::masked_fmadd(v_vec1, x_vec1, acc_vec1, msk1) };
 
                 // 2
-                let msk2 = unsafe { Arch::mask_from_bools(&mask_bits[j + lane_count * 2..j + lane_count * 3]) };
-                let v_vec2 = unsafe { Arch::masked_load_unaligned(vals[j + lane_count * 2..].as_ptr(), msk2, zero_vec) };
+                let msk2 = unsafe {
+                    Arch::mask_from_bools(&mask_bits[j + lane_count * 2..j + lane_count * 3])
+                };
+                let v_vec2 = unsafe {
+                    Arch::masked_load_unaligned(vals[j + lane_count * 2..].as_ptr(), msk2, zero_vec)
+                };
                 let x_vec2 = unsafe { Arch::load_unaligned(x[j + lane_count * 2..].as_ptr()) };
                 acc_vec2 = unsafe { Arch::masked_fmadd(v_vec2, x_vec2, acc_vec2, msk2) };
 
                 // 3
-                let msk3 = unsafe { Arch::mask_from_bools(&mask_bits[j + lane_count * 3..j + lane_count * 4]) };
-                let v_vec3 = unsafe { Arch::masked_load_unaligned(vals[j + lane_count * 3..].as_ptr(), msk3, zero_vec) };
+                let msk3 = unsafe {
+                    Arch::mask_from_bools(&mask_bits[j + lane_count * 3..j + lane_count * 4])
+                };
+                let v_vec3 = unsafe {
+                    Arch::masked_load_unaligned(vals[j + lane_count * 3..].as_ptr(), msk3, zero_vec)
+                };
                 let x_vec3 = unsafe { Arch::load_unaligned(x[j + lane_count * 3..].as_ptr()) };
                 acc_vec3 = unsafe { Arch::masked_fmadd(v_vec3, x_vec3, acc_vec3, msk3) };
 
                 j += lane_count * 4;
             }
 
-            let mut acc_vec = unsafe { Arch::add(Arch::add(acc_vec0, acc_vec1), Arch::add(acc_vec2, acc_vec3)) };
+            let mut acc_vec =
+                unsafe { Arch::add(Arch::add(acc_vec0, acc_vec1), Arch::add(acc_vec2, acc_vec3)) };
 
             while j < simd_len {
-                let msk      = unsafe { Arch::mask_from_bools(&mask_bits[j..j + lane_count]) };
+                let msk = unsafe { Arch::mask_from_bools(&mask_bits[j..j + lane_count]) };
                 let zero_vec = unsafe { Arch::zero() };
-                let v_vec    = unsafe { Arch::masked_load_unaligned(vals[j..].as_ptr(), msk, zero_vec) };
-                let x_vec    = unsafe { Arch::load_unaligned(x[j..].as_ptr()) };
+                let v_vec =
+                    unsafe { Arch::masked_load_unaligned(vals[j..].as_ptr(), msk, zero_vec) };
+                let x_vec = unsafe { Arch::load_unaligned(x[j..].as_ptr()) };
                 acc_vec = unsafe { Arch::masked_fmadd(v_vec, x_vec, acc_vec, msk) };
                 j += lane_count;
             }
@@ -191,7 +224,9 @@ where
             let mut acc = unsafe { Arch::sum_reduce(acc_vec) };
 
             while j < data.ncols {
-                if mask_bits[j] { acc += vals[j] * x[j]; }
+                if mask_bits[j] {
+                    acc += vals[j] * x[j];
+                }
                 j += 1;
             }
 
@@ -216,8 +251,8 @@ where
 
         if BN == lane_count {
             for b in 0..data.nblocks {
-                let br    = data.block_row[b] as usize;
-                let bc    = data.block_col[b] as usize;
+                let br = data.block_row[b] as usize;
+                let bc = data.block_col[b] as usize;
                 let block = &data.blocks[b * block_size..(b + 1) * block_size];
 
                 let x_vec = unsafe { Arch::load_unaligned(x.as_ptr().add(bc)) };
@@ -231,8 +266,8 @@ where
             }
         } else if BN == lane_count * 2 {
             for b in 0..data.nblocks {
-                let br    = data.block_row[b] as usize;
-                let bc    = data.block_col[b] as usize;
+                let br = data.block_row[b] as usize;
+                let bc = data.block_col[b] as usize;
                 let block = &data.blocks[b * block_size..(b + 1) * block_size];
 
                 let x_vec0 = unsafe { Arch::load_unaligned(x.as_ptr().add(bc)) };
@@ -241,7 +276,8 @@ where
                 for i in 0..BM {
                     let offset = i * BN;
                     let b_vec0 = unsafe { Arch::load_unaligned(block.as_ptr().add(offset)) };
-                    let b_vec1 = unsafe { Arch::load_unaligned(block.as_ptr().add(offset + lane_count)) };
+                    let b_vec1 =
+                        unsafe { Arch::load_unaligned(block.as_ptr().add(offset + lane_count)) };
                     let prod0 = unsafe { Arch::mul(b_vec0, x_vec0) };
                     let prod1 = unsafe { Arch::mul(b_vec1, x_vec1) };
                     let sum_vec = unsafe { Arch::add(prod0, prod1) };
@@ -251,13 +287,13 @@ where
             }
         } else {
             for b in 0..data.nblocks {
-                let br    = data.block_row[b] as usize;
-                let bc    = data.block_col[b] as usize;
+                let br = data.block_row[b] as usize;
+                let bc = data.block_col[b] as usize;
                 let block = &data.blocks[b * block_size..(b + 1) * block_size];
 
                 for i in 0..BM {
                     let block_row_data = &block[i * BN..(i + 1) * BN];
-                    let x_slice        = &x[bc..bc + BN];
+                    let x_slice = &x[bc..bc + BN];
                     let mut s = T::ZERO;
                     for k in 0..BN {
                         s += block_row_data[k] * x_slice[k];
@@ -269,24 +305,21 @@ where
     }
 }
 
-fn sellp_spmv_scalar<T, const C: usize>(
-    data: &SellPData<'_, T, C>,
-    x: &[T],
-    y: &mut [T],
-) where
+fn sellp_spmv_scalar<T, const C: usize>(data: &SellPData<'_, T, C>, x: &[T], y: &mut [T])
+where
     T: Scalar,
 {
     let nslices = data.nslices();
     for s in 0..nslices {
-        let col_count    = data.slice_col_count[s] as usize;
+        let col_count = data.slice_col_count[s] as usize;
         let start_offset = data.slice_ptr[s] as usize;
 
         let mut row_acc = [T::ZERO; C];
 
         for col in 0..col_count {
             for row in 0..C {
-                let idx   = start_offset + col * C + row;
-                let val   = data.values[idx];
+                let idx = start_offset + col * C + row;
+                let val = data.values[idx];
                 let c_idx = data.col_indices[idx] as usize;
                 if c_idx < x.len() {
                     row_acc[row] += val * x[c_idx];
@@ -313,7 +346,7 @@ unsafe fn sellp_spmv_vectorized<T, const C: usize, Arch>(
 {
     let nslices = data.nslices();
     for s in 0..nslices {
-        let col_count    = data.slice_col_count[s] as usize;
+        let col_count = data.slice_col_count[s] as usize;
         let start_offset = data.slice_ptr[s] as usize;
 
         let mut acc0 = Arch::zero();
@@ -328,28 +361,28 @@ unsafe fn sellp_spmv_vectorized<T, const C: usize, Arch>(
             let offset = start_offset + col * C;
             let val_vec = Arch::load_unaligned(data.values[offset..].as_ptr());
             let idx_vec = build_index_vector::<T, Arch>(&data.col_indices[offset..offset + C]);
-            let x_vec   = Arch::gather(x.as_ptr(), idx_vec);
+            let x_vec = Arch::gather(x.as_ptr(), idx_vec);
             acc0 = Arch::fmadd(val_vec, x_vec, acc0);
 
             // Unroll 1
             let offset = start_offset + (col + 1) * C;
             let val_vec = Arch::load_unaligned(data.values[offset..].as_ptr());
             let idx_vec = build_index_vector::<T, Arch>(&data.col_indices[offset..offset + C]);
-            let x_vec   = Arch::gather(x.as_ptr(), idx_vec);
+            let x_vec = Arch::gather(x.as_ptr(), idx_vec);
             acc1 = Arch::fmadd(val_vec, x_vec, acc1);
 
             // Unroll 2
             let offset = start_offset + (col + 2) * C;
             let val_vec = Arch::load_unaligned(data.values[offset..].as_ptr());
             let idx_vec = build_index_vector::<T, Arch>(&data.col_indices[offset..offset + C]);
-            let x_vec   = Arch::gather(x.as_ptr(), idx_vec);
+            let x_vec = Arch::gather(x.as_ptr(), idx_vec);
             acc2 = Arch::fmadd(val_vec, x_vec, acc2);
 
             // Unroll 3
             let offset = start_offset + (col + 3) * C;
             let val_vec = Arch::load_unaligned(data.values[offset..].as_ptr());
             let idx_vec = build_index_vector::<T, Arch>(&data.col_indices[offset..offset + C]);
-            let x_vec   = Arch::gather(x.as_ptr(), idx_vec);
+            let x_vec = Arch::gather(x.as_ptr(), idx_vec);
             acc3 = Arch::fmadd(val_vec, x_vec, acc3);
 
             col += 4;
@@ -361,7 +394,7 @@ unsafe fn sellp_spmv_vectorized<T, const C: usize, Arch>(
             let offset = start_offset + col * C;
             let val_vec = Arch::load_unaligned(data.values[offset..].as_ptr());
             let idx_vec = build_index_vector::<T, Arch>(&data.col_indices[offset..offset + C]);
-            let x_vec   = Arch::gather(x.as_ptr(), idx_vec);
+            let x_vec = Arch::gather(x.as_ptr(), idx_vec);
             acc = Arch::fmadd(val_vec, x_vec, acc);
             col += 1;
         }

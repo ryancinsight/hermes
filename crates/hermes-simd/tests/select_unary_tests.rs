@@ -3,9 +3,8 @@
 //! ZST strategy correctness.
 
 use hermes_simd::{
-    SimdView, SimdCow, Unaligned, Unmasked, Scalar,
-    ScanAdd, ScanMin, ScanMax, Inclusive, Exclusive,
-    Abs, Neg, Sqrt, Clamp,
+    Abs, Clamp, Exclusive, Inclusive, Neg, Scalar, ScanAdd, ScanMax, ScanMin, SimdCow, SimdView,
+    Sqrt, Unaligned, Unmasked,
 };
 
 type View<'a, T> = SimdView<'a, T, Scalar, Unaligned, Unmasked, &'a [T]>;
@@ -233,24 +232,24 @@ fn test_prefix_scan_max_unary_correctness() {
 #[test]
 fn test_map_cow_abs_f32() {
     let data = [-1.0f32, 2.0, -3.0, 4.0];
-    let cow  = Cow::<f32>::borrow_slice(&data).unwrap();
-    let out  = cow.map_cow(Abs);
+    let cow = Cow::<f32>::borrow_slice(&data).unwrap();
+    let out = cow.map_cow(Abs);
     assert_eq!(&*out, &[1.0f32, 2.0, 3.0, 4.0]);
 }
 
 #[test]
 fn test_map_cow_neg_f32() {
     let data = [1.0f32, -2.0, 3.0, -4.0];
-    let cow  = Cow::<f32>::borrow_slice(&data).unwrap();
-    let out  = cow.map_cow(Neg);
+    let cow = Cow::<f32>::borrow_slice(&data).unwrap();
+    let out = cow.map_cow(Neg);
     assert_eq!(&*out, &[-1.0f32, 2.0, -3.0, 4.0]);
 }
 
 #[test]
 fn test_map_cow_sqrt_f32() {
     let data = [4.0f32, 9.0, 16.0, 25.0];
-    let cow  = Cow::<f32>::borrow_slice(&data).unwrap();
-    let out  = cow.map_cow(Sqrt);
+    let cow = Cow::<f32>::borrow_slice(&data).unwrap();
+    let out = cow.map_cow(Sqrt);
     let expected = [2.0f32, 3.0, 4.0, 5.0];
     for (a, b) in out.iter().zip(expected.iter()) {
         assert!((a - b).abs() < 1e-5, "got={a}, expected={b}");
@@ -260,8 +259,8 @@ fn test_map_cow_sqrt_f32() {
 #[test]
 fn test_map_cow_returns_owned() {
     let data = [1.0f32, 2.0, 3.0];
-    let cow  = Cow::<f32>::borrow_slice(&data).unwrap();
-    let out  = cow.map_cow(Abs);
+    let cow = Cow::<f32>::borrow_slice(&data).unwrap();
+    let out = cow.map_cow(Abs);
     assert!(matches!(out, SimdCow::Owned(_)));
 }
 

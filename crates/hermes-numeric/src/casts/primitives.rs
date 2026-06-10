@@ -1,5 +1,5 @@
 use crate::traits::{CastFrom, FloatElement, NumericElement};
-use crate::types::{F16, F32, F64, Bf16, Bf8, Bf4, F8, F4, I8, I16, I32};
+use crate::types::{Bf16, Bf4, Bf8, F16, F32, F4, F64, F8, I16, I32, I8};
 
 // Implement CastFrom between all primitives
 macro_rules! impl_cast_primitive_between {
@@ -13,12 +13,20 @@ macro_rules! impl_cast_primitive_between {
     };
 }
 
-impl_cast_primitive_between!(i8, i8); impl_cast_primitive_between!(i8, i16); impl_cast_primitive_between!(i8, i32);
-impl_cast_primitive_between!(i16, i8); impl_cast_primitive_between!(i16, i16); impl_cast_primitive_between!(i16, i32);
-impl_cast_primitive_between!(i32, i8); impl_cast_primitive_between!(i32, i16); impl_cast_primitive_between!(i32, i32);
+impl_cast_primitive_between!(i8, i8);
+impl_cast_primitive_between!(i8, i16);
+impl_cast_primitive_between!(i8, i32);
+impl_cast_primitive_between!(i16, i8);
+impl_cast_primitive_between!(i16, i16);
+impl_cast_primitive_between!(i16, i32);
+impl_cast_primitive_between!(i32, i8);
+impl_cast_primitive_between!(i32, i16);
+impl_cast_primitive_between!(i32, i32);
 
-impl_cast_primitive_between!(f32, f32); impl_cast_primitive_between!(f32, f64);
-impl_cast_primitive_between!(f64, f32); impl_cast_primitive_between!(f64, f64);
+impl_cast_primitive_between!(f32, f32);
+impl_cast_primitive_between!(f32, f64);
+impl_cast_primitive_between!(f64, f32);
+impl_cast_primitive_between!(f64, f64);
 
 macro_rules! impl_cast_primitive_float_int {
     ($src:ty, $dst:ty) => {
@@ -30,33 +38,120 @@ macro_rules! impl_cast_primitive_float_int {
         }
     };
 }
-impl_cast_primitive_float_int!(f32, i8); impl_cast_primitive_float_int!(f32, i16); impl_cast_primitive_float_int!(f32, i32);
-impl_cast_primitive_float_int!(f64, i8); impl_cast_primitive_float_int!(f64, i16); impl_cast_primitive_float_int!(f64, i32);
-impl_cast_primitive_float_int!(i8, f32); impl_cast_primitive_float_int!(i8, f64);
-impl_cast_primitive_float_int!(i16, f32); impl_cast_primitive_float_int!(i16, f64);
-impl_cast_primitive_float_int!(i32, f32); impl_cast_primitive_float_int!(i32, f64);
+impl_cast_primitive_float_int!(f32, i8);
+impl_cast_primitive_float_int!(f32, i16);
+impl_cast_primitive_float_int!(f32, i32);
+impl_cast_primitive_float_int!(f64, i8);
+impl_cast_primitive_float_int!(f64, i16);
+impl_cast_primitive_float_int!(f64, i32);
+impl_cast_primitive_float_int!(i8, f32);
+impl_cast_primitive_float_int!(i8, f64);
+impl_cast_primitive_float_int!(i16, f32);
+impl_cast_primitive_float_int!(i16, f64);
+impl_cast_primitive_float_int!(i32, f32);
+impl_cast_primitive_float_int!(i32, f64);
 
 // Implement CastFrom for half types
-impl CastFrom<half::f16> for half::f16 { #[inline(always)] fn cast_from(val: half::f16) -> Self { val } }
-impl CastFrom<half::f16> for half::bf16 { #[inline(always)] fn cast_from(val: half::f16) -> Self { half::bf16::from_f32(val.to_f32()) } }
-impl CastFrom<half::f16> for f32 { #[inline(always)] fn cast_from(val: half::f16) -> Self { val.to_f32() } }
-impl CastFrom<half::f16> for f64 { #[inline(always)] fn cast_from(val: half::f16) -> Self { val.to_f64() } }
-impl CastFrom<half::f16> for i8 { #[inline(always)] fn cast_from(val: half::f16) -> Self { val.to_f32() as i8 } }
-impl CastFrom<half::f16> for i16 { #[inline(always)] fn cast_from(val: half::f16) -> Self { val.to_f32() as i16 } }
-impl CastFrom<half::f16> for i32 { #[inline(always)] fn cast_from(val: half::f16) -> Self { val.to_f32() as i32 } }
+impl CastFrom<half::f16> for half::f16 {
+    #[inline(always)]
+    fn cast_from(val: half::f16) -> Self {
+        val
+    }
+}
+impl CastFrom<half::f16> for half::bf16 {
+    #[inline(always)]
+    fn cast_from(val: half::f16) -> Self {
+        half::bf16::from_f32(val.to_f32())
+    }
+}
+impl CastFrom<half::f16> for f32 {
+    #[inline(always)]
+    fn cast_from(val: half::f16) -> Self {
+        val.to_f32()
+    }
+}
+impl CastFrom<half::f16> for f64 {
+    #[inline(always)]
+    fn cast_from(val: half::f16) -> Self {
+        val.to_f64()
+    }
+}
+impl CastFrom<half::f16> for i8 {
+    #[inline(always)]
+    fn cast_from(val: half::f16) -> Self {
+        val.to_f32() as i8
+    }
+}
+impl CastFrom<half::f16> for i16 {
+    #[inline(always)]
+    fn cast_from(val: half::f16) -> Self {
+        val.to_f32() as i16
+    }
+}
+impl CastFrom<half::f16> for i32 {
+    #[inline(always)]
+    fn cast_from(val: half::f16) -> Self {
+        val.to_f32() as i32
+    }
+}
 
-impl CastFrom<half::bf16> for half::f16 { #[inline(always)] fn cast_from(val: half::bf16) -> Self { half::f16::from_f32(val.to_f32()) } }
-impl CastFrom<half::bf16> for half::bf16 { #[inline(always)] fn cast_from(val: half::bf16) -> Self { val } }
-impl CastFrom<half::bf16> for f32 { #[inline(always)] fn cast_from(val: half::bf16) -> Self { val.to_f32() } }
-impl CastFrom<half::bf16> for f64 { #[inline(always)] fn cast_from(val: half::bf16) -> Self { val.to_f32() as f64 } }
-impl CastFrom<half::bf16> for i8 { #[inline(always)] fn cast_from(val: half::bf16) -> Self { val.to_f32() as i8 } }
-impl CastFrom<half::bf16> for i16 { #[inline(always)] fn cast_from(val: half::bf16) -> Self { val.to_f32() as i16 } }
-impl CastFrom<half::bf16> for i32 { #[inline(always)] fn cast_from(val: half::bf16) -> Self { val.to_f32() as i32 } }
+impl CastFrom<half::bf16> for half::f16 {
+    #[inline(always)]
+    fn cast_from(val: half::bf16) -> Self {
+        half::f16::from_f32(val.to_f32())
+    }
+}
+impl CastFrom<half::bf16> for half::bf16 {
+    #[inline(always)]
+    fn cast_from(val: half::bf16) -> Self {
+        val
+    }
+}
+impl CastFrom<half::bf16> for f32 {
+    #[inline(always)]
+    fn cast_from(val: half::bf16) -> Self {
+        val.to_f32()
+    }
+}
+impl CastFrom<half::bf16> for f64 {
+    #[inline(always)]
+    fn cast_from(val: half::bf16) -> Self {
+        val.to_f32() as f64
+    }
+}
+impl CastFrom<half::bf16> for i8 {
+    #[inline(always)]
+    fn cast_from(val: half::bf16) -> Self {
+        val.to_f32() as i8
+    }
+}
+impl CastFrom<half::bf16> for i16 {
+    #[inline(always)]
+    fn cast_from(val: half::bf16) -> Self {
+        val.to_f32() as i16
+    }
+}
+impl CastFrom<half::bf16> for i32 {
+    #[inline(always)]
+    fn cast_from(val: half::bf16) -> Self {
+        val.to_f32() as i32
+    }
+}
 
 macro_rules! impl_cast_from_primitive_to_half {
     ($src:ty) => {
-        impl CastFrom<$src> for half::f16 { #[inline(always)] fn cast_from(val: $src) -> Self { half::f16::from_f32(val as f32) } }
-        impl CastFrom<$src> for half::bf16 { #[inline(always)] fn cast_from(val: $src) -> Self { half::bf16::from_f32(val as f32) } }
+        impl CastFrom<$src> for half::f16 {
+            #[inline(always)]
+            fn cast_from(val: $src) -> Self {
+                half::f16::from_f32(val as f32)
+            }
+        }
+        impl CastFrom<$src> for half::bf16 {
+            #[inline(always)]
+            fn cast_from(val: $src) -> Self {
+                half::bf16::from_f32(val as f32)
+            }
+        }
     };
 }
 impl_cast_from_primitive_to_half!(f32);
@@ -149,14 +244,30 @@ macro_rules! impl_float_to_int {
         }
     };
 }
-impl_float_to_int!(F16, I8); impl_float_to_int!(F16, I16); impl_float_to_int!(F16, I32);
-impl_float_to_int!(F32, I8); impl_float_to_int!(F32, I16); impl_float_to_int!(F32, I32);
-impl_float_to_int!(F64, I8); impl_float_to_int!(F64, I16); impl_float_to_int!(F64, I32);
-impl_float_to_int!(Bf16, I8); impl_float_to_int!(Bf16, I16); impl_float_to_int!(Bf16, I32);
-impl_float_to_int!(Bf8, I8); impl_float_to_int!(Bf8, I16); impl_float_to_int!(Bf8, I32);
-impl_float_to_int!(Bf4, I8); impl_float_to_int!(Bf4, I16); impl_float_to_int!(Bf4, I32);
-impl_float_to_int!(F8, I8); impl_float_to_int!(F8, I16); impl_float_to_int!(F8, I32);
-impl_float_to_int!(F4, I8); impl_float_to_int!(F4, I16); impl_float_to_int!(F4, I32);
+impl_float_to_int!(F16, I8);
+impl_float_to_int!(F16, I16);
+impl_float_to_int!(F16, I32);
+impl_float_to_int!(F32, I8);
+impl_float_to_int!(F32, I16);
+impl_float_to_int!(F32, I32);
+impl_float_to_int!(F64, I8);
+impl_float_to_int!(F64, I16);
+impl_float_to_int!(F64, I32);
+impl_float_to_int!(Bf16, I8);
+impl_float_to_int!(Bf16, I16);
+impl_float_to_int!(Bf16, I32);
+impl_float_to_int!(Bf8, I8);
+impl_float_to_int!(Bf8, I16);
+impl_float_to_int!(Bf8, I32);
+impl_float_to_int!(Bf4, I8);
+impl_float_to_int!(Bf4, I16);
+impl_float_to_int!(Bf4, I32);
+impl_float_to_int!(F8, I8);
+impl_float_to_int!(F8, I16);
+impl_float_to_int!(F8, I32);
+impl_float_to_int!(F4, I8);
+impl_float_to_int!(F4, I16);
+impl_float_to_int!(F4, I32);
 
 // Int-to-Float wrapper casts
 macro_rules! impl_int_to_float {
@@ -169,6 +280,27 @@ macro_rules! impl_int_to_float {
         }
     };
 }
-impl_int_to_float!(I8, F16); impl_int_to_float!(I8, F32); impl_int_to_float!(I8, F64); impl_int_to_float!(I8, Bf16); impl_int_to_float!(I8, Bf8); impl_int_to_float!(I8, Bf4); impl_int_to_float!(I8, F8); impl_int_to_float!(I8, F4);
-impl_int_to_float!(I16, F16); impl_int_to_float!(I16, F32); impl_int_to_float!(I16, F64); impl_int_to_float!(I16, Bf16); impl_int_to_float!(I16, Bf8); impl_int_to_float!(I16, Bf4); impl_int_to_float!(I16, F8); impl_int_to_float!(I16, F4);
-impl_int_to_float!(I32, F16); impl_int_to_float!(I32, F32); impl_int_to_float!(I32, F64); impl_int_to_float!(I32, Bf16); impl_int_to_float!(I32, Bf8); impl_int_to_float!(I32, Bf4); impl_int_to_float!(I32, F8); impl_int_to_float!(I32, F4);
+impl_int_to_float!(I8, F16);
+impl_int_to_float!(I8, F32);
+impl_int_to_float!(I8, F64);
+impl_int_to_float!(I8, Bf16);
+impl_int_to_float!(I8, Bf8);
+impl_int_to_float!(I8, Bf4);
+impl_int_to_float!(I8, F8);
+impl_int_to_float!(I8, F4);
+impl_int_to_float!(I16, F16);
+impl_int_to_float!(I16, F32);
+impl_int_to_float!(I16, F64);
+impl_int_to_float!(I16, Bf16);
+impl_int_to_float!(I16, Bf8);
+impl_int_to_float!(I16, Bf4);
+impl_int_to_float!(I16, F8);
+impl_int_to_float!(I16, F4);
+impl_int_to_float!(I32, F16);
+impl_int_to_float!(I32, F32);
+impl_int_to_float!(I32, F64);
+impl_int_to_float!(I32, Bf16);
+impl_int_to_float!(I32, Bf8);
+impl_int_to_float!(I32, Bf4);
+impl_int_to_float!(I32, F8);
+impl_int_to_float!(I32, F4);

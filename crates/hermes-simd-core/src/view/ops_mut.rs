@@ -10,12 +10,12 @@
 //! kernel. This yields a single authoritative SIMD loop body that is monomorphized per
 //! `(T, Arch, Align, Op)` — not duplicated for each binary operation.
 
-use crate::arch::SimdArch;
 use crate::align::Alignment;
-use crate::kernel::SimdKernel;
+use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
+use crate::kernel::SimdKernel;
+use crate::ops::{Add, ElementOp, Mul};
 use crate::scalar::Scalar;
-use crate::ops::{Add, Mul, ElementOp};
 use crate::view::{SimdError, SimdView};
 
 impl<'a, T: 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
@@ -61,13 +61,25 @@ where
             // Alignment-dependent load/store closures. The `Align::IS_ALIGNED` branch is
             // a compile-time constant: DCE removes the unused arm at every monomorphization.
             let load_self = |p: *const T| {
-                if Align::IS_ALIGNED { Arch::load_aligned(p) } else { Arch::load_unaligned(p) }
+                if Align::IS_ALIGNED {
+                    Arch::load_aligned(p)
+                } else {
+                    Arch::load_unaligned(p)
+                }
             };
             let load_other = |p: *const T| {
-                if Align::IS_ALIGNED { Arch::load_aligned(p) } else { Arch::load_unaligned(p) }
+                if Align::IS_ALIGNED {
+                    Arch::load_aligned(p)
+                } else {
+                    Arch::load_unaligned(p)
+                }
             };
             let store = |p: *mut T, v: Arch::Vector| {
-                if Align::IS_ALIGNED { Arch::store_aligned(p, v); } else { Arch::store_unaligned(p, v); }
+                if Align::IS_ALIGNED {
+                    Arch::store_aligned(p, v);
+                } else {
+                    Arch::store_unaligned(p, v);
+                }
             };
 
             for i in (0..simd_len).step_by(lane_count) {

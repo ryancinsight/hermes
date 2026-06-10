@@ -3,12 +3,8 @@
 //! Returns `None` for empty slices, `Some((index, value))` for the first minimum element.
 
 use hermes_simd_core::{
+    align::Unaligned, arch::SimdArch, execution::Unmasked, kernel::SimdKernel, scalar::Scalar,
     view::SimdView,
-    align::Unaligned,
-    execution::Unmasked,
-    kernel::SimdKernel,
-    scalar::Scalar,
-    arch::SimdArch,
 };
 use hermes_simd_macros::runtime_dispatch;
 

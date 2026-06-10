@@ -30,13 +30,25 @@ pub(crate) fn validate_gemm_sizes(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn tile_loop_generic<TA, TB, TC, Arch, const M: usize, const N: usize, const K: usize>(
-    m: usize, n: usize, k: usize,
-    a: *const TA, a_stride: usize,
-    b: *const TB, b_stride: usize,
-    c: *mut TC, c_stride: usize,
-)
-where
+pub(crate) unsafe fn tile_loop_generic<
+    TA,
+    TB,
+    TC,
+    Arch,
+    const M: usize,
+    const N: usize,
+    const K: usize,
+>(
+    m: usize,
+    n: usize,
+    k: usize,
+    a: *const TA,
+    a_stride: usize,
+    b: *const TB,
+    b_stride: usize,
+    c: *mut TC,
+    c_stride: usize,
+) where
     Arch: hermes_simd_core::view::TileMatrixMultiply<TA, TB, TC, Arch, Arch, M, N, K>,
 {
     let mut i = 0;
@@ -46,9 +58,12 @@ where
             let mut kk = 0;
             while kk + K <= k {
                 Arch::tile_matmul(
-                    c.add(i * c_stride + j), c_stride,
-                    a.add(i * a_stride + kk), a_stride,
-                    b.add(kk * b_stride + j), b_stride,
+                    c.add(i * c_stride + j),
+                    c_stride,
+                    a.add(i * a_stride + kk),
+                    a_stride,
+                    b.add(kk * b_stride + j),
+                    b_stride,
                 );
                 kk += K;
             }
@@ -65,10 +80,15 @@ pub trait TiledGemm<TA, TB, TC> {
     /// # Safety
     /// - Pointers must be valid and slices must have matching dimensions.
     unsafe fn gemm(
-        m: usize, n: usize, k: usize,
-        a: &[TA], a_stride: usize,
-        b: &[TB], b_stride: usize,
-        c: &mut [TC], c_stride: usize,
+        m: usize,
+        n: usize,
+        k: usize,
+        a: &[TA],
+        a_stride: usize,
+        b: &[TB],
+        b_stride: usize,
+        c: &mut [TC],
+        c_stride: usize,
     ) -> Result<(), SimdError>;
 
     /// Dynamically dispatches tile matrix multiplication for a single tile of shape MxNxK.
@@ -76,9 +96,12 @@ pub trait TiledGemm<TA, TB, TC> {
     /// # Safety
     /// - Pointers must be valid and aligned as per the chosen backend requirements.
     unsafe fn dispatch_tile_matmul(
-        c: *mut TC, c_stride: usize,
-        a: *const TA, a_stride: usize,
-        b: *const TB, b_stride: usize,
+        c: *mut TC,
+        c_stride: usize,
+        a: *const TA,
+        a_stride: usize,
+        b: *const TB,
+        b_stride: usize,
     );
 }
 
@@ -90,10 +113,15 @@ pub trait TiledGemm<TA, TB, TC> {
 /// - Pointers must be valid and slices must have matching dimensions.
 #[inline]
 pub unsafe fn gemm<TA, TB, TC>(
-    m: usize, n: usize, k: usize,
-    a: &[TA], a_stride: usize,
-    b: &[TB], b_stride: usize,
-    c: &mut [TC], c_stride: usize,
+    m: usize,
+    n: usize,
+    k: usize,
+    a: &[TA],
+    a_stride: usize,
+    b: &[TB],
+    b_stride: usize,
+    c: &mut [TC],
+    c_stride: usize,
 ) -> Result<(), SimdError>
 where
     (TA, TB, TC): TiledGemm<TA, TB, TC>,
@@ -107,12 +135,16 @@ where
 /// - Pointers must be valid and aligned as per the chosen backend requirements.
 #[inline]
 pub unsafe fn dispatch_tile_matmul<TA, TB, TC>(
-    c: *mut TC, c_stride: usize,
-    a: *const TA, a_stride: usize,
-    b: *const TB, b_stride: usize,
-)
-where
+    c: *mut TC,
+    c_stride: usize,
+    a: *const TA,
+    a_stride: usize,
+    b: *const TB,
+    b_stride: usize,
+) where
     (TA, TB, TC): TiledGemm<TA, TB, TC>,
 {
-    <(TA, TB, TC) as TiledGemm<TA, TB, TC>>::dispatch_tile_matmul(c, c_stride, a, a_stride, b, b_stride)
+    <(TA, TB, TC) as TiledGemm<TA, TB, TC>>::dispatch_tile_matmul(
+        c, c_stride, a, a_stride, b, b_stride,
+    )
 }

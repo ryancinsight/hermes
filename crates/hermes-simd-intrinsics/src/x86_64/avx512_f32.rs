@@ -9,10 +9,10 @@
 //! - Gather: `_mm512_i32gather_ps`, `_mm512_mask_i32gather_ps`.
 //! - Mask register: `__mmask16` (16-bit integer).
 
+use crate::Avx512;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::*;
 use hermes_simd_core::kernel::SimdKernel;
-use crate::Avx512;
 
 /// Newtype over `__m512` providing `Send + Sync`.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -231,7 +231,13 @@ impl SimdKernel<f32> for Avx512 {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        Avx512F32Vec(_mm512_mask_i32gather_ps(src.0, mask, indices, base as *const _, 4))
+        Avx512F32Vec(_mm512_mask_i32gather_ps(
+            src.0,
+            mask,
+            indices,
+            base as *const _,
+            4,
+        ))
     }
 
     // -----------------------------------------------------------------------
@@ -245,7 +251,9 @@ impl SimdKernel<f32> for Avx512 {
         debug_assert_eq!(bits.len(), 16);
         let mut m: u16 = 0;
         for (i, &b) in bits.iter().enumerate() {
-            if b { m |= 1 << i; }
+            if b {
+                m |= 1 << i;
+            }
         }
         m
     }
@@ -255,7 +263,11 @@ impl SimdKernel<f32> for Avx512 {
     #[inline]
     unsafe fn leading_k_mask(k: usize) -> Self::Mask {
         let k = k.min(16);
-        if k == 16 { !0u16 } else { (1u16 << k).wrapping_sub(1) }
+        if k == 16 {
+            !0u16
+        } else {
+            (1u16 << k).wrapping_sub(1)
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -264,11 +276,15 @@ impl SimdKernel<f32> for Avx512 {
 
     #[target_feature(enable = "avx512f")]
     #[inline]
-    unsafe fn zero() -> Self::Vector { Avx512F32Vec(_mm512_setzero_ps()) }
+    unsafe fn zero() -> Self::Vector {
+        Avx512F32Vec(_mm512_setzero_ps())
+    }
 
     #[target_feature(enable = "avx512f")]
     #[inline]
-    unsafe fn splat(val: f32) -> Self::Vector { Avx512F32Vec(_mm512_set1_ps(val)) }
+    unsafe fn splat(val: f32) -> Self::Vector {
+        Avx512F32Vec(_mm512_set1_ps(val))
+    }
 
     #[target_feature(enable = "avx512f")]
     #[inline]
@@ -323,47 +339,75 @@ impl SimdKernel<f32> for Avx512 {
     #[inline]
     unsafe fn cmp_eq(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         let m = _mm512_cmp_ps_mask(a.0, b.0, _CMP_EQ_OQ);
-        Avx512F32Vec(_mm512_mask_blend_ps(m, _mm512_setzero_ps(), _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF))))
+        Avx512F32Vec(_mm512_mask_blend_ps(
+            m,
+            _mm512_setzero_ps(),
+            _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF)),
+        ))
     }
 
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn cmp_ne(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         let m = _mm512_cmp_ps_mask(a.0, b.0, _CMP_NEQ_OQ);
-        Avx512F32Vec(_mm512_mask_blend_ps(m, _mm512_setzero_ps(), _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF))))
+        Avx512F32Vec(_mm512_mask_blend_ps(
+            m,
+            _mm512_setzero_ps(),
+            _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF)),
+        ))
     }
 
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn cmp_lt(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         let m = _mm512_cmp_ps_mask(a.0, b.0, _CMP_LT_OQ);
-        Avx512F32Vec(_mm512_mask_blend_ps(m, _mm512_setzero_ps(), _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF))))
+        Avx512F32Vec(_mm512_mask_blend_ps(
+            m,
+            _mm512_setzero_ps(),
+            _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF)),
+        ))
     }
 
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn cmp_le(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         let m = _mm512_cmp_ps_mask(a.0, b.0, _CMP_LE_OQ);
-        Avx512F32Vec(_mm512_mask_blend_ps(m, _mm512_setzero_ps(), _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF))))
+        Avx512F32Vec(_mm512_mask_blend_ps(
+            m,
+            _mm512_setzero_ps(),
+            _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF)),
+        ))
     }
 
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn cmp_gt(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         let m = _mm512_cmp_ps_mask(a.0, b.0, _CMP_GT_OQ);
-        Avx512F32Vec(_mm512_mask_blend_ps(m, _mm512_setzero_ps(), _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF))))
+        Avx512F32Vec(_mm512_mask_blend_ps(
+            m,
+            _mm512_setzero_ps(),
+            _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF)),
+        ))
     }
 
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn cmp_ge(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         let m = _mm512_cmp_ps_mask(a.0, b.0, _CMP_GE_OQ);
-        Avx512F32Vec(_mm512_mask_blend_ps(m, _mm512_setzero_ps(), _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF))))
+        Avx512F32Vec(_mm512_mask_blend_ps(
+            m,
+            _mm512_setzero_ps(),
+            _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF)),
+        ))
     }
 
     #[target_feature(enable = "avx512f")]
     #[inline]
-    unsafe fn blend(mask: Self::Vector, true_val: Self::Vector, false_val: Self::Vector) -> Self::Vector {
+    unsafe fn blend(
+        mask: Self::Vector,
+        true_val: Self::Vector,
+        false_val: Self::Vector,
+    ) -> Self::Vector {
         let m = _mm512_cmp_ps_mask(mask.0, _mm512_setzero_ps(), _CMP_NEQ_OQ);
         Avx512F32Vec(_mm512_mask_blend_ps(m, false_val.0, true_val.0))
     }
@@ -377,6 +421,10 @@ impl SimdKernel<f32> for Avx512 {
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn mask_to_vector(mask: Self::Mask) -> Self::Vector {
-        Avx512F32Vec(_mm512_mask_blend_ps(mask, _mm512_setzero_ps(), _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF))))
+        Avx512F32Vec(_mm512_mask_blend_ps(
+            mask,
+            _mm512_setzero_ps(),
+            _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF)),
+        ))
     }
 }

@@ -44,8 +44,18 @@ macro_rules! test_masked_ops_for_type {
                         }
                     }
 
-                    assert_eq!(written, expected.len(), "Compress written length mismatch for len {}", len);
-                    assert_eq!(&out[..written], &expected[..], "Compress content mismatch for len {}", len);
+                    assert_eq!(
+                        written,
+                        expected.len(),
+                        "Compress written length mismatch for len {}",
+                        len
+                    );
+                    assert_eq!(
+                        &out[..written],
+                        &expected[..],
+                        "Compress content mismatch for len {}",
+                        len
+                    );
                 }
             }
         }
@@ -107,7 +117,11 @@ macro_rules! test_masked_ops_for_type {
                         }
                     }
 
-                    assert_eq!(out, expected, "Expand content mismatch for len {} and pop {}", len, pop);
+                    assert_eq!(
+                        out, expected,
+                        "Expand content mismatch for len {} and pop {}",
+                        len, pop
+                    );
 
                     // Verify that if src is too short, we get LengthMismatch
                     if required_src_len > 0 {
@@ -129,17 +143,23 @@ macro_rules! test_masked_ops_for_type {
                 idx_arr[i] = (i * 3) as i32;
             }
 
-            let indices: <$arch as SimdKernel<$t>>::IndexVector = unsafe {
-                core::ptr::read_unaligned(idx_arr.as_ptr() as *const _)
-            };
+            let indices: <$arch as SimdKernel<$t>>::IndexVector =
+                unsafe { core::ptr::read_unaligned(idx_arr.as_ptr() as *const _) };
 
             // Gather
             let vec_res = unsafe { <$arch as SimdKernel<$t>>::gather(base_data.as_ptr(), indices) };
             let mut res_arr = [<$t as hermes_simd_core::scalar::NumericElement>::ZERO; $lanes];
-            unsafe { <$arch as SimdKernel<$t>>::store_unaligned(res_arr.as_mut_ptr(), vec_res); }
+            unsafe {
+                <$arch as SimdKernel<$t>>::store_unaligned(res_arr.as_mut_ptr(), vec_res);
+            }
 
             for i in 0..$lanes {
-                assert_eq!(res_arr[i], base_data[(i * 3) as usize], "Gather mismatch at index {}", i);
+                assert_eq!(
+                    res_arr[i],
+                    base_data[(i * 3) as usize],
+                    "Gather mismatch at index {}",
+                    i
+                );
             }
 
             // Gather masked
@@ -156,16 +176,30 @@ macro_rules! test_masked_ops_for_type {
                     base_data.as_ptr(),
                     indices,
                     native_mask,
-                    fill_vec
+                    fill_vec,
                 )
             };
 
-            let mut res_arr_masked = [<$t as hermes_simd_core::scalar::NumericElement>::ZERO; $lanes];
-            unsafe { <$arch as SimdKernel<$t>>::store_unaligned(res_arr_masked.as_mut_ptr(), vec_res_masked); }
+            let mut res_arr_masked =
+                [<$t as hermes_simd_core::scalar::NumericElement>::ZERO; $lanes];
+            unsafe {
+                <$arch as SimdKernel<$t>>::store_unaligned(
+                    res_arr_masked.as_mut_ptr(),
+                    vec_res_masked,
+                );
+            }
 
             for i in 0..$lanes {
-                let expected = if mask_bools[i] { base_data[(i * 3) as usize] } else { fill_val };
-                assert_eq!(res_arr_masked[i], expected, "Gather masked mismatch at index {}", i);
+                let expected = if mask_bools[i] {
+                    base_data[(i * 3) as usize]
+                } else {
+                    fill_val
+                };
+                assert_eq!(
+                    res_arr_masked[i], expected,
+                    "Gather masked mismatch at index {}",
+                    i
+                );
             }
         }
     };

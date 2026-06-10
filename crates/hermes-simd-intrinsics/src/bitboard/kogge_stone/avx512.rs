@@ -1,7 +1,7 @@
 use super::{east_mask, west_mask};
 
 /// Computes Rook attacks using Kogge-Stone vectorized with AVX-512.
-/// 
+///
 /// # Safety
 /// Caller must ensure that the host CPU supports AVX-512 Foundation features.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -18,7 +18,16 @@ pub unsafe fn kogge_stone_rook_avx512(slider: u64, occupancy: u64) -> u64 {
     let right_shifts = _mm512_set_epi64(0, 0, 1, 8, 0, 0, 0, 0);
 
     let mut g = _mm512_set1_epi64(slider as i64);
-    let mut p = _mm512_set_epi64(0, 0, p_scalar as i64, p_scalar as i64, 0, 0, p_scalar as i64, p_scalar as i64);
+    let mut p = _mm512_set_epi64(
+        0,
+        0,
+        p_scalar as i64,
+        p_scalar as i64,
+        0,
+        0,
+        p_scalar as i64,
+        p_scalar as i64,
+    );
 
     let left_mask_1 = east_mask(1) as i64;
     let left_mask_2 = east_mask(2) as i64;
@@ -103,7 +112,7 @@ pub unsafe fn kogge_stone_rook_avx512(slider: u64, occupancy: u64) -> u64 {
 }
 
 /// Computes Bishop attacks using Kogge-Stone vectorized with AVX-512.
-/// 
+///
 /// # Safety
 /// Caller must ensure that the host CPU supports AVX-512 Foundation features.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -120,7 +129,16 @@ pub unsafe fn kogge_stone_bishop_avx512(slider: u64, occupancy: u64) -> u64 {
     let right_shifts = _mm512_set_epi64(0, 0, 9, 7, 0, 0, 0, 0);
 
     let mut g = _mm512_set1_epi64(slider as i64);
-    let mut p = _mm512_set_epi64(0, 0, p_scalar as i64, p_scalar as i64, 0, 0, p_scalar as i64, p_scalar as i64);
+    let mut p = _mm512_set_epi64(
+        0,
+        0,
+        p_scalar as i64,
+        p_scalar as i64,
+        0,
+        0,
+        p_scalar as i64,
+        p_scalar as i64,
+    );
 
     let east_mask_1 = east_mask(1) as i64;
     let east_mask_2 = east_mask(2) as i64;
@@ -130,9 +148,36 @@ pub unsafe fn kogge_stone_bishop_avx512(slider: u64, occupancy: u64) -> u64 {
     let west_mask_4 = west_mask(4) as i64;
 
     let masks = [
-        _mm512_set_epi64(0, 0, west_mask_1, east_mask_1, 0, 0, west_mask_1, east_mask_1),
-        _mm512_set_epi64(0, 0, west_mask_2, east_mask_2, 0, 0, west_mask_2, east_mask_2),
-        _mm512_set_epi64(0, 0, west_mask_4, east_mask_4, 0, 0, west_mask_4, east_mask_4),
+        _mm512_set_epi64(
+            0,
+            0,
+            west_mask_1,
+            east_mask_1,
+            0,
+            0,
+            west_mask_1,
+            east_mask_1,
+        ),
+        _mm512_set_epi64(
+            0,
+            0,
+            west_mask_2,
+            east_mask_2,
+            0,
+            0,
+            west_mask_2,
+            east_mask_2,
+        ),
+        _mm512_set_epi64(
+            0,
+            0,
+            west_mask_4,
+            east_mask_4,
+            0,
+            0,
+            west_mask_4,
+            east_mask_4,
+        ),
     ];
 
     // Step 0
@@ -205,7 +250,7 @@ pub unsafe fn kogge_stone_bishop_avx512(slider: u64, occupancy: u64) -> u64 {
 }
 
 /// Computes Queen attacks using Kogge-Stone vectorized with AVX-512 (all 8 directions in parallel).
-/// 
+///
 /// # Safety
 /// Caller must ensure that the host CPU supports AVX-512 Foundation features.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -233,16 +278,34 @@ pub unsafe fn kogge_stone_queen_avx512(slider: u64, occupancy: u64) -> u64 {
 
     let masks = [
         _mm512_set_epi64(
-            west_mask_1, east_mask_1, west_mask_1, -1,
-            west_mask_1, east_mask_1, east_mask_1, -1,
+            west_mask_1,
+            east_mask_1,
+            west_mask_1,
+            -1,
+            west_mask_1,
+            east_mask_1,
+            east_mask_1,
+            -1,
         ),
         _mm512_set_epi64(
-            west_mask_2, east_mask_2, west_mask_2, -1,
-            west_mask_2, east_mask_2, east_mask_2, -1,
+            west_mask_2,
+            east_mask_2,
+            west_mask_2,
+            -1,
+            west_mask_2,
+            east_mask_2,
+            east_mask_2,
+            -1,
         ),
         _mm512_set_epi64(
-            west_mask_4, east_mask_4, west_mask_4, -1,
-            west_mask_4, east_mask_4, east_mask_4, -1,
+            west_mask_4,
+            east_mask_4,
+            west_mask_4,
+            -1,
+            west_mask_4,
+            east_mask_4,
+            east_mask_4,
+            -1,
         ),
     ];
 

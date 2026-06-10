@@ -12,11 +12,11 @@
 #[cfg(test)]
 mod tests {
     use hermes_simd_core::{
-        ops::{Min, Max, Sum, Dot, ReductionOp},
-        scalar::{Scalar, NumericElement},
-        view::SimdView,
         align::Unaligned,
         execution::Unmasked,
+        ops::{Dot, Max, Min, ReductionOp, Sum},
+        scalar::{NumericElement, Scalar},
+        view::SimdView,
     };
     use hermes_simd_intrinsics::Scalar as ScalarArch;
 
@@ -71,7 +71,10 @@ mod tests {
 
     #[test]
     fn test_max_identity_and_combine() {
-        assert_eq!(<Max as ReductionOp<f32>>::identity_scalar(), f32::NEG_INFINITY);
+        assert_eq!(
+            <Max as ReductionOp<f32>>::identity_scalar(),
+            f32::NEG_INFINITY
+        );
         assert_eq!(<Max as ReductionOp<f32>>::scalar_combine(2.0, 3.0), 3.0_f32);
         assert_eq!(<Max as ReductionOp<f32>>::scalar_combine(3.0, 2.0), 3.0_f32);
     }
@@ -179,5 +182,4 @@ mod tests {
         assert_eq!(chunk_count * lane + ra.len(), a.len());
         assert_eq!(chunk_count * lane + rb.len(), b.len());
     }
-
 }

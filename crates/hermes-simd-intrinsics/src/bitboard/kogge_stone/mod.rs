@@ -113,7 +113,7 @@ impl BitBoardKernel for KoggeStone {
     #[allow(unreachable_code)]
     unsafe fn rook_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
-        
+
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
             #[cfg(feature = "std")]
@@ -135,12 +135,12 @@ impl BitBoardKernel for KoggeStone {
                 }
             }
         }
-        
+
         #[cfg(target_arch = "aarch64")]
         {
             return neon::kogge_stone_rook_neon(slider, occupancy);
         }
-        
+
         scalar::kogge_stone_rook(slider, occupancy)
     }
 
@@ -148,7 +148,7 @@ impl BitBoardKernel for KoggeStone {
     #[allow(unreachable_code)]
     unsafe fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
-        
+
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
             #[cfg(feature = "std")]
@@ -170,12 +170,12 @@ impl BitBoardKernel for KoggeStone {
                 }
             }
         }
-        
+
         #[cfg(target_arch = "aarch64")]
         {
             return neon::kogge_stone_bishop_neon(slider, occupancy);
         }
-        
+
         scalar::kogge_stone_bishop(slider, occupancy)
     }
 
@@ -183,7 +183,7 @@ impl BitBoardKernel for KoggeStone {
     #[allow(unreachable_code)]
     unsafe fn queen_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
-        
+
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
             #[cfg(feature = "std")]
@@ -205,13 +205,12 @@ impl BitBoardKernel for KoggeStone {
                 }
             }
         }
-        
+
         #[cfg(target_arch = "aarch64")]
         {
             return neon::kogge_stone_queen_neon(slider, occupancy);
         }
-        
+
         scalar::kogge_stone_queen(slider, occupancy)
     }
 }
-

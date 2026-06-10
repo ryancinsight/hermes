@@ -1,9 +1,9 @@
 //! Dynamic runtime dispatch choosing the optimal execution backend.
 
 #[cfg(target_arch = "x86_64")]
-use hermes_simd_core::numa::{NumaTopologyService, verify_numa_locality};
-#[cfg(target_arch = "x86_64")]
 use crate::cpu::{AmxSupport, Avx512Support};
+#[cfg(target_arch = "x86_64")]
+use hermes_simd_core::numa::{verify_numa_locality, NumaTopologyService};
 
 /// Dynamic hardware and layout configuration dispatcher.
 pub struct AdaptiveDispatcher;
@@ -43,7 +43,7 @@ impl AdaptiveDispatcher {
             let min_ops = if is_session_active { 2048 } else { 16384 };
 
             let total_ops = m * n * k;
-            
+
             // Matrix dimension bounds check: only run AMX if dimensions exceed block size thresholds
             // to mitigate high context configuration/switch overheads.
             let is_too_small = (m < 16) || (n < 16) || (k < 32);
@@ -54,16 +54,25 @@ impl AdaptiveDispatcher {
                 let total_nodes = NumaTopologyService::total_nodes();
                 if total_nodes > 1 {
                     if let Some(curr_node) = NumaTopologyService::current_node() {
-                        let a_local = verify_numa_locality(a_ptr as *const u8, a_len * core::mem::size_of::<T>(), curr_node);
-                        let b_local = verify_numa_locality(b_ptr as *const u8, b_len * core::mem::size_of::<T>(), curr_node);
-                        
+                        let a_local = verify_numa_locality(
+                            a_ptr as *const u8,
+                            a_len * core::mem::size_of::<T>(),
+                            curr_node,
+                        );
+                        let b_local = verify_numa_locality(
+                            b_ptr as *const u8,
+                            b_len * core::mem::size_of::<T>(),
+                            curr_node,
+                        );
+
                         if a_local && b_local {
                             return DispatchDecision::Amx;
                         } else {
                             // Cross-socket access detected: warn once in debug build, re-route to AVX-512 if available
                             #[cfg(all(debug_assertions, feature = "std"))]
                             {
-                                static WARNED: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+                                static WARNED: core::sync::atomic::AtomicBool =
+                                    core::sync::atomic::AtomicBool::new(false);
                                 if !WARNED.swap(true, core::sync::atomic::Ordering::Relaxed) {
                                     std::eprintln!(
                                         "WARNING [hermes-simd]: Cross-node NUMA memory access detected. \

@@ -3,8 +3,8 @@
 //! All SIMD operations degenerate to element-wise scalar loops. This is the
 //! universal fallback when no hardware SIMD feature is detected.
 
-use hermes_simd_core::kernel::SimdKernel;
 use crate::Scalar;
+use hermes_simd_core::kernel::SimdKernel;
 
 impl SimdKernel<f64> for Scalar {
     type Vector = [f64; 2];
@@ -70,15 +70,19 @@ impl SimdKernel<f64> for Scalar {
         src: Self::Vector,
     ) -> Self::Vector {
         [
-            if mask[0] { *ptr }        else { src[0] },
+            if mask[0] { *ptr } else { src[0] },
             if mask[1] { *ptr.add(1) } else { src[1] },
         ]
     }
 
     #[inline(always)]
     unsafe fn masked_store_unaligned(ptr: *mut f64, mask: Self::Mask, val: Self::Vector) {
-        if mask[0] { *ptr        = val[0]; }
-        if mask[1] { *ptr.add(1) = val[1]; }
+        if mask[0] {
+            *ptr = val[0];
+        }
+        if mask[1] {
+            *ptr.add(1) = val[1];
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -119,16 +123,28 @@ impl SimdKernel<f64> for Scalar {
         mask: Self::Mask,
     ) -> Self::Vector {
         [
-            if mask[0] { a[0].mul_add(b[0], c[0]) } else { c[0] },
-            if mask[1] { a[1].mul_add(b[1], c[1]) } else { c[1] },
+            if mask[0] {
+                a[0].mul_add(b[0], c[0])
+            } else {
+                c[0]
+            },
+            if mask[1] {
+                a[1].mul_add(b[1], c[1])
+            } else {
+                c[1]
+            },
         ]
     }
 
     #[inline(always)]
     unsafe fn masked_sum_reduce(v: Self::Vector, mask: Self::Mask) -> f64 {
         let mut s = 0.0f64;
-        if mask[0] { s += v[0]; }
-        if mask[1] { s += v[1]; }
+        if mask[0] {
+            s += v[0];
+        }
+        if mask[1] {
+            s += v[1];
+        }
         s
     }
 
@@ -141,7 +157,10 @@ impl SimdKernel<f64> for Scalar {
         let mut out = [0.0f64; 2];
         let mut k = 0usize;
         for i in 0..2 {
-            if mask[i] { out[k] = src[i]; k += 1; }
+            if mask[i] {
+                out[k] = src[i];
+                k += 1;
+            }
         }
         out
     }
@@ -151,7 +170,10 @@ impl SimdKernel<f64> for Scalar {
         let mut out = fill;
         let mut k = 0usize;
         for i in 0..2 {
-            if mask[i] { out[i] = src[k]; k += 1; }
+            if mask[i] {
+                out[i] = src[k];
+                k += 1;
+            }
         }
         out
     }
@@ -162,7 +184,10 @@ impl SimdKernel<f64> for Scalar {
 
     #[inline(always)]
     unsafe fn gather(base: *const f64, indices: Self::IndexVector) -> Self::Vector {
-        [*base.add(indices[0] as usize), *base.add(indices[1] as usize)]
+        [
+            *base.add(indices[0] as usize),
+            *base.add(indices[1] as usize),
+        ]
     }
 
     #[inline(always)]
@@ -173,8 +198,16 @@ impl SimdKernel<f64> for Scalar {
         src: Self::Vector,
     ) -> Self::Vector {
         [
-            if mask[0] { *base.add(indices[0] as usize) } else { src[0] },
-            if mask[1] { *base.add(indices[1] as usize) } else { src[1] },
+            if mask[0] {
+                *base.add(indices[0] as usize)
+            } else {
+                src[0]
+            },
+            if mask[1] {
+                *base.add(indices[1] as usize)
+            } else {
+                src[1]
+            },
         ]
     }
 
@@ -198,10 +231,14 @@ impl SimdKernel<f64> for Scalar {
     // -----------------------------------------------------------------------
 
     #[inline(always)]
-    unsafe fn zero() -> Self::Vector { [0.0f64; 2] }
+    unsafe fn zero() -> Self::Vector {
+        [0.0f64; 2]
+    }
 
     #[inline(always)]
-    unsafe fn splat(val: f64) -> Self::Vector { [val; 2] }
+    unsafe fn splat(val: f64) -> Self::Vector {
+        [val; 2]
+    }
 
     #[inline(always)]
     unsafe fn mask_to_bitmask(mask: Self::Mask) -> u64 {
@@ -217,8 +254,16 @@ impl SimdKernel<f64> for Scalar {
     #[inline(always)]
     unsafe fn mask_to_vector(mask: Self::Mask) -> Self::Vector {
         [
-            if mask[0] { f64::from_bits(0xFFFF_FFFF_FFFF_FFFF) } else { 0.0f64 },
-            if mask[1] { f64::from_bits(0xFFFF_FFFF_FFFF_FFFF) } else { 0.0f64 },
+            if mask[0] {
+                f64::from_bits(0xFFFF_FFFF_FFFF_FFFF)
+            } else {
+                0.0f64
+            },
+            if mask[1] {
+                f64::from_bits(0xFFFF_FFFF_FFFF_FFFF)
+            } else {
+                0.0f64
+            },
         ]
     }
 }

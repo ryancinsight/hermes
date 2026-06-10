@@ -30,8 +30,9 @@ pub struct SveArch;
 
 impl SimdArch for SveArch {
     const NAME: &'static str = "sve";
-    const REGISTER_WIDTH_BITS: u32 = 0;  // SVE is variable-width; 0 = runtime-determined
-    const ISA_FAMILY: hermes_simd_core::arch::IsaFamily = hermes_simd_core::arch::IsaFamily::AArch64;
+    const REGISTER_WIDTH_BITS: u32 = 0; // SVE is variable-width; 0 = runtime-determined
+    const ISA_FAMILY: hermes_simd_core::arch::IsaFamily =
+        hermes_simd_core::arch::IsaFamily::AArch64;
     const FMA_THROUGHPUT_HINT: u32 = 4;
 }
 

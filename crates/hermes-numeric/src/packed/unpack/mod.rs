@@ -11,5 +11,5 @@ mod conv;
 pub mod unsafe_intrinsics;
 
 mod dispatch;
-pub use dispatch::*;
 pub(crate) use conv::bf4_to_bf16_bits;
+pub use dispatch::*;

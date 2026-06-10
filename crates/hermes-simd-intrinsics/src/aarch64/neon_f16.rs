@@ -4,9 +4,9 @@
 //! with 8 lanes on NEON when native FP16 arithmetic instructions are not present/compiled.
 
 #[cfg(target_arch = "aarch64")]
-use hermes_simd_core::kernel::SimdKernel;
-#[cfg(target_arch = "aarch64")]
 use crate::Neon;
+#[cfg(target_arch = "aarch64")]
+use hermes_simd_core::kernel::SimdKernel;
 
 #[cfg(target_arch = "aarch64")]
 impl SimdKernel<half::f16> for Neon {
@@ -73,9 +73,7 @@ impl SimdKernel<half::f16> for Neon {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        core::array::from_fn(|i| {
-            if mask[i] { *ptr.add(i) } else { src[i] }
-        })
+        core::array::from_fn(|i| if mask[i] { *ptr.add(i) } else { src[i] })
     }
 
     #[inline(always)]
@@ -94,9 +92,7 @@ impl SimdKernel<half::f16> for Neon {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        core::array::from_fn(|i| {
-            if mask[i] { a[i] + b[i] } else { src[i] }
-        })
+        core::array::from_fn(|i| if mask[i] { a[i] + b[i] } else { src[i] })
     }
 
     #[inline(always)]
@@ -106,9 +102,7 @@ impl SimdKernel<half::f16> for Neon {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        core::array::from_fn(|i| {
-            if mask[i] { a[i] * b[i] } else { src[i] }
-        })
+        core::array::from_fn(|i| if mask[i] { a[i] * b[i] } else { src[i] })
     }
 
     #[inline(always)]

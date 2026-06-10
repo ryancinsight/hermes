@@ -1,4 +1,4 @@
-use hermes_simd::{sum, dot, SimdView, Scalar, Unaligned};
+use hermes_simd::{dot, sum, Scalar, SimdView, Unaligned};
 
 fn main() {
     let a = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
@@ -10,7 +10,6 @@ fn main() {
 
     let dynamic_dot = dot::<f32>(&a, &b).unwrap();
     println!("Dot product (a . b): {}", dynamic_dot);
-
 
     println!("\n--- Static Compile-Time Dispatch (Scalar fallback) ---");
     let view_a = SimdView::<f32, Scalar, Unaligned>::new(&a).unwrap();

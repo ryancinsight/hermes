@@ -1,8 +1,8 @@
 mod floats;
 mod ints;
 
-pub use floats::{F16, F32, F64, Bf16, Bf8, Bf4, F8, F4};
-pub use ints::{I8, I16, I32};
+pub use floats::{Bf16, Bf4, Bf8, F16, F32, F4, F64, F8};
+pub use ints::{I16, I32, I8};
 
 // Bytemuck implementations
 unsafe impl bytemuck::Zeroable for F16 {}

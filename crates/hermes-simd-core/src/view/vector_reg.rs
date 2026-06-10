@@ -1,11 +1,11 @@
 //! Monomorphized SIMD vector register wrapper.
 
-use core::marker::PhantomData;
+use super::mask_reg::Mask;
 use crate::arch::SimdArch;
 use crate::kernel::SimdKernel;
-use crate::scalar::{Scalar, CastFrom};
 use crate::mask::BitMask;
-use super::mask_reg::Mask;
+use crate::scalar::{CastFrom, Scalar};
+use core::marker::PhantomData;
 
 /// A monomorphized vector register type wrapping the architecture-native raw register.
 #[repr(transparent)]
@@ -34,7 +34,8 @@ impl<T, Arch> Copy for Vector<T, Arch>
 where
     Arch: SimdArch + SimdKernel<T>,
     T: Scalar,
-{}
+{
+}
 
 impl<T, Arch> core::fmt::Debug for Vector<T, Arch>
 where
@@ -43,7 +44,10 @@ where
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let lane_count = Arch::LANE_COUNT;
-        assert!(lane_count <= 128, "LANE_COUNT exceeds maximum debug buffer size of 128");
+        assert!(
+            lane_count <= 128,
+            "LANE_COUNT exceeds maximum debug buffer size of 128"
+        );
         let mut buf = [unsafe { core::mem::zeroed::<T>() }; 128];
         unsafe {
             Arch::store_unaligned(buf.as_mut_ptr(), self.raw);
@@ -75,7 +79,8 @@ impl<T, Arch> Eq for Vector<T, Arch>
 where
     Arch: SimdArch + SimdKernel<T>,
     T: Scalar + Eq,
-{}
+{
+}
 
 impl<T, Arch> Vector<T, Arch>
 where
@@ -223,7 +228,9 @@ where
     pub fn to_array<const N: usize>(self) -> [T; N] {
         let _ = AssertLaneCount::<T, Arch, N>::OK;
         let mut arr = [T::ZERO; N];
-        unsafe { self.store_unaligned(arr.as_mut_ptr()); }
+        unsafe {
+            self.store_unaligned(arr.as_mut_ptr());
+        }
         arr
     }
 
@@ -232,7 +239,9 @@ where
     pub fn to_bitmask(self) -> BitMask<64> {
         let mut buf = [T::ZERO; 128];
         let lanes = <Arch as SimdKernel<T>>::LANE_COUNT;
-        unsafe { self.store_unaligned(buf.as_mut_ptr()); }
+        unsafe {
+            self.store_unaligned(buf.as_mut_ptr());
+        }
         let mut m = 0u64;
         for i in 0..lanes {
             if buf[i].to_f64() != 0.0 || buf[i].is_nan() {
@@ -335,7 +344,10 @@ where
     {
         let offset = chunk_idx * Arch::LANE_COUNT;
         let slice = view.as_slice();
-        assert!(offset + Arch::LANE_COUNT <= slice.len(), "Chunk index out of bounds");
+        assert!(
+            offset + Arch::LANE_COUNT <= slice.len(),
+            "Chunk index out of bounds"
+        );
         unsafe {
             if Align::IS_ALIGNED {
                 Self::load_aligned(slice.as_ptr().add(offset))
@@ -351,14 +363,16 @@ where
         self,
         view: &mut super::SimdView<'a, T, Arch, Align, Mode, &'a mut [T]>,
         chunk_idx: usize,
-    )
-    where
+    ) where
         Align: crate::align::Alignment,
         Mode: crate::execution::ExecutionMode,
     {
         let offset = chunk_idx * Arch::LANE_COUNT;
         let slice = view.as_slice_mut();
-        assert!(offset + Arch::LANE_COUNT <= slice.len(), "Chunk index out of bounds");
+        assert!(
+            offset + Arch::LANE_COUNT <= slice.len(),
+            "Chunk index out of bounds"
+        );
         unsafe {
             if Align::IS_ALIGNED {
                 self.store_aligned(slice.as_mut_ptr().add(offset));
@@ -376,7 +390,10 @@ where
     T: Scalar,
 {
     const OK: () = {
-        assert!(I < <Arch as SimdKernel<T>>::LANE_COUNT, "Lane index out of bounds");
+        assert!(
+            I < <Arch as SimdKernel<T>>::LANE_COUNT,
+            "Lane index out of bounds"
+        );
     };
 }
 
@@ -402,7 +419,9 @@ where
     T: Scalar,
 {
     const OK: () = {
-        assert!(N == Arch::LANE_COUNT, "Array size must match Vector lane count");
+        assert!(
+            N == Arch::LANE_COUNT,
+            "Array size must match Vector lane count"
+        );
     };
 }
-

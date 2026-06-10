@@ -1,10 +1,10 @@
 //! Zero-copy serialization support for Clone-on-Write SIMD containers using `rkyv`.
 
+use super::SimdCow;
 use crate::align::Alignment;
 use crate::arch::SimdArch;
-use crate::view::SimdView;
 use crate::vec::AlignedVec;
-use super::SimdCow;
+use crate::view::SimdView;
 
 #[repr(transparent)]
 /// Archived representation of a `SimdCow` used by `rkyv` zero-copy serialization.
@@ -29,7 +29,12 @@ where
     #[inline]
     unsafe fn resolve(&self, pos: usize, resolver: Self::Resolver, out: *mut Self::Archived) {
         let out_elements = core::ptr::addr_of_mut!((*out).elements);
-        rkyv::vec::ArchivedVec::resolve_from_slice(&self[..], pos, resolver.elements_resolver, out_elements);
+        rkyv::vec::ArchivedVec::resolve_from_slice(
+            &self[..],
+            pos,
+            resolver.elements_resolver,
+            out_elements,
+        );
     }
 }
 
@@ -43,12 +48,14 @@ where
 {
     #[inline]
     fn serialize(&self, serializer: &mut S) -> Result<Self::Resolver, S::Error> {
-        let elements_resolver = rkyv::vec::ArchivedVec::serialize_from_slice(&self[..], serializer)?;
+        let elements_resolver =
+            rkyv::vec::ArchivedVec::serialize_from_slice(&self[..], serializer)?;
         Ok(SimdCowResolver { elements_resolver })
     }
 }
 
-impl<T, Arch, Align, D> rkyv::Deserialize<SimdCow<'static, T, Arch, Align>, D> for ArchivedSimdCow<T>
+impl<T, Arch, Align, D> rkyv::Deserialize<SimdCow<'static, T, Arch, Align>, D>
+    for ArchivedSimdCow<T>
 where
     T: rkyv::Archive,
     T: rkyv::Deserialize<T, D>,
@@ -57,7 +64,10 @@ where
     D: rkyv::Fallible + ?Sized,
 {
     #[inline]
-    fn deserialize(&self, deserializer: &mut D) -> Result<SimdCow<'static, T, Arch, Align>, D::Error> {
+    fn deserialize(
+        &self,
+        deserializer: &mut D,
+    ) -> Result<SimdCow<'static, T, Arch, Align>, D::Error> {
         let slice = self.elements.as_slice();
         let mut v = AlignedVec::with_capacity(slice.len());
         for x in slice {

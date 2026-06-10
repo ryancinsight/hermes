@@ -3,14 +3,10 @@
 //! select/masked_negate, gather, zip_transform, and ZipChunks.
 
 use hermes_simd::{
-    SimdView, Unaligned, Unmasked, Scalar,
-    Abs, Neg, Sqrt, Clamp,
-    ScanAdd, ScanMul, ScanMin, ScanMax, Inclusive, Exclusive,
-    min, max, scale, argmin, argmax,
+    argmax, argmin, max, min, scale, Abs, Clamp, Exclusive, Inclusive, Neg, Scalar, ScanAdd,
+    ScanMax, ScanMin, ScanMul, SimdView, Sqrt, Unaligned, Unmasked,
 };
-use hermes_simd_core::{
-    ops::{Min, Max, Sum},
-};
+use hermes_simd_core::ops::{Max, Min, Sum};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -144,7 +140,10 @@ fn test_view_argmax() {
 fn test_dispatch_scale() {
     let mut data = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0];
     scale(&mut data, 2.0);
-    assert_eq!(&data, &[2.0f32, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0]);
+    assert_eq!(
+        &data,
+        &[2.0f32, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0]
+    );
 }
 
 #[test]
