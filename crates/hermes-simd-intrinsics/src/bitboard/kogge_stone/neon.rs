@@ -1,5 +1,10 @@
 use super::{east_mask, west_mask};
 
+/// Rook sliding attacks via NEON Kogge-Stone fill: orthogonal directions
+/// flood in parallel across 128-bit registers.
+///
+/// # Safety
+/// NEON is mandatory on aarch64; no additional caller requirements.
 #[cfg(target_arch = "aarch64")]
 #[allow(unused_assignments)]
 pub unsafe fn kogge_stone_rook_neon(slider: u64, occupancy: u64) -> u64 {
@@ -107,6 +112,11 @@ pub unsafe fn kogge_stone_rook_neon(slider: u64, occupancy: u64) -> u64 {
     out_l0 | out_l1 | out_r0 | out_r1
 }
 
+/// Bishop sliding attacks via NEON Kogge-Stone fill: diagonal directions
+/// flood in parallel across 128-bit registers.
+///
+/// # Safety
+/// NEON is mandatory on aarch64; no additional caller requirements.
 #[cfg(target_arch = "aarch64")]
 #[allow(unused_assignments)]
 pub unsafe fn kogge_stone_bishop_neon(slider: u64, occupancy: u64) -> u64 {
@@ -213,6 +223,10 @@ pub unsafe fn kogge_stone_bishop_neon(slider: u64, occupancy: u64) -> u64 {
     out_l0 | out_l1 | out_r0 | out_r1
 }
 
+/// Queen sliding attacks: union of the rook and bishop NEON fills.
+///
+/// # Safety
+/// NEON is mandatory on aarch64; no additional caller requirements.
 #[cfg(target_arch = "aarch64")]
 pub unsafe fn kogge_stone_queen_neon(slider: u64, occupancy: u64) -> u64 {
     kogge_stone_rook_neon(slider, occupancy) | kogge_stone_bishop_neon(slider, occupancy)
