@@ -17,6 +17,7 @@
 //! - `portable-simd` — wraps nightly `std::simd`.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![warn(missing_docs)]
 #![allow(
     clippy::needless_range_loop,
     clippy::missing_safety_doc,

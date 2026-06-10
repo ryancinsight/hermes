@@ -4,6 +4,7 @@
 //! and explicit aliases for each hardware backend.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![deny(missing_docs)]
 
 pub use hermes_simd_core::scalar::{Bf16, Bf4, Bf8, F16, F32, F4, F64, F8, I16, I32, I8};
 pub use hermes_simd_core::view::{Mask, Vector};
