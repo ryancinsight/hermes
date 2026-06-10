@@ -26,6 +26,13 @@ pub trait InterleavedComplexLane: Scalar {
         a: &mut [Self],
         b: &[Self],
     ) -> Result<(), SimdError>;
+
+    /// Computes an interleaved complex dot product, selecting the fastest
+    /// available provider implementation for this lane type.
+    fn interleaved_complex_dot_runtime<const CONJ_B: bool>(
+        a: &[Self],
+        b: &[Self],
+    ) -> Result<(Self, Self), SimdError>;
 }
 
 impl InterleavedComplexLane for f64 {
@@ -55,6 +62,14 @@ impl InterleavedComplexLane for f64 {
 
         interleaved_complex_mul_assign::<f64, PreferredArch, CONJ_B>(a, b)
     }
+
+    #[inline]
+    fn interleaved_complex_dot_runtime<const CONJ_B: bool>(
+        a: &[Self],
+        b: &[Self],
+    ) -> Result<(Self, Self), SimdError> {
+        interleaved_complex_dot::<f64, PreferredArch, CONJ_B>(a, b)
+    }
 }
 
 impl InterleavedComplexLane for f32 {
@@ -83,6 +98,14 @@ impl InterleavedComplexLane for f32 {
         }
 
         interleaved_complex_mul_assign::<f32, PreferredArch, CONJ_B>(a, b)
+    }
+
+    #[inline]
+    fn interleaved_complex_dot_runtime<const CONJ_B: bool>(
+        a: &[Self],
+        b: &[Self],
+    ) -> Result<(Self, Self), SimdError> {
+        interleaved_complex_dot::<f32, PreferredArch, CONJ_B>(a, b)
     }
 }
 
@@ -152,6 +175,67 @@ where
     Ok(())
 }
 
+/// Computes an interleaved complex dot product using architecture `A`.
+///
+/// Inputs must have identical even lengths in `[re0, im0, re1, im1, ...]`
+/// primitive lane order. The returned tuple is `(re, im)` for
+/// `sum(a[k] * b[k])`; when `CONJ_B` is true, the operation is
+/// `sum(a[k] * conj(b[k]))`.
+#[inline]
+pub fn interleaved_complex_dot<T, A, const CONJ_B: bool>(
+    a: &[T],
+    b: &[T],
+) -> Result<(T, T), SimdError>
+where
+    T: Scalar,
+    A: SimdArch + SimdKernel<T>,
+{
+    if a.len() != b.len() || (a.len() & 1) != 0 {
+        return Err(SimdError::LengthMismatch);
+    }
+
+    let lanes = A::LANE_COUNT;
+    assert!(
+        lanes <= MAX_STACK_LANES,
+        "SIMD lane count exceeds stack buffer"
+    );
+    let pair_lanes = lanes & !1;
+    let mut offset = 0usize;
+    let mut re = T::ZERO;
+    let mut im = T::ZERO;
+
+    while pair_lanes > 0 && offset + lanes <= a.len() {
+        let mut ax = [T::ZERO; MAX_STACK_LANES];
+        let mut bx = [T::ZERO; MAX_STACK_LANES];
+        // SAFETY: offset + lanes <= len was checked above; `a` and `b` are
+        // valid for reads of `lanes` primitive values.
+        unsafe {
+            A::store_unaligned(ax.as_mut_ptr(), A::load_unaligned(a.as_ptr().add(offset)));
+            A::store_unaligned(bx.as_mut_ptr(), A::load_unaligned(b.as_ptr().add(offset)));
+        }
+
+        let mut lane = 0usize;
+        while lane < pair_lanes {
+            let (prod_re, prod_im) =
+                mul_pair::<T, CONJ_B>(ax[lane], ax[lane + 1], bx[lane], bx[lane + 1]);
+            re = re + prod_re;
+            im = im + prod_im;
+            lane += 2;
+        }
+        offset += pair_lanes;
+    }
+
+    let mut lane = offset;
+    while lane < a.len() {
+        let (prod_re, prod_im) = mul_pair::<T, CONJ_B>(a[lane], a[lane + 1], b[lane], b[lane + 1]);
+        re = re + prod_re;
+        im = im + prod_im;
+        lane += 2;
+    }
+
+    Ok((re, im))
+}
+
 /// Multiplies interleaved complex values in-place using Hermes runtime provider selection.
 ///
 /// This is the high-level provider API for callers that know the lane type but
@@ -166,6 +250,21 @@ where
     T: InterleavedComplexLane,
 {
     T::interleaved_complex_mul_assign_runtime::<CONJ_B>(a, b)
+}
+
+/// Computes an interleaved complex dot product using Hermes runtime provider selection.
+///
+/// Shape requirements and complex lane ordering are identical to
+/// [`interleaved_complex_dot`].
+#[inline]
+pub fn interleaved_complex_dot_runtime<T, const CONJ_B: bool>(
+    a: &[T],
+    b: &[T],
+) -> Result<(T, T), SimdError>
+where
+    T: InterleavedComplexLane,
+{
+    T::interleaved_complex_dot_runtime::<CONJ_B>(a, b)
 }
 
 #[cfg(target_arch = "x86_64")]

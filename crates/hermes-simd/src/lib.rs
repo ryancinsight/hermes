@@ -173,6 +173,8 @@ pub use dispatch::{
     elementwise_add,
     elementwise_sub,
     elementwise_div,
+    interleaved_complex_dot,
+    interleaved_complex_dot_runtime,
     interleaved_complex_mul_assign,
     interleaved_complex_mul_assign_runtime,
     masked_sum,

@@ -1,5 +1,6 @@
 use hermes_simd::{
-    interleaved_complex_mul_assign, interleaved_complex_mul_assign_runtime, PreferredArch, Scalar,
+    interleaved_complex_dot, interleaved_complex_dot_runtime, interleaved_complex_mul_assign,
+    interleaved_complex_mul_assign_runtime, PreferredArch, Scalar,
 };
 
 fn reference_mul<const CONJ_B: bool>(a: &mut [f64], b: &[f64]) {
@@ -11,6 +12,20 @@ fn reference_mul<const CONJ_B: bool>(a: &mut [f64], b: &[f64]) {
         x[0] = ar * br - ai * bi;
         x[1] = ar * bi + ai * br;
     }
+}
+
+fn reference_dot<const CONJ_B: bool>(a: &[f64], b: &[f64]) -> (f64, f64) {
+    let mut re = 0.0;
+    let mut im = 0.0;
+    for (x, y) in a.chunks_exact(2).zip(b.chunks_exact(2)) {
+        let ar = x[0];
+        let ai = x[1];
+        let br = y[0];
+        let bi = if CONJ_B { -y[1] } else { y[1] };
+        re += ar * br - ai * bi;
+        im += ar * bi + ai * br;
+    }
+    (re, im)
 }
 
 #[test]
@@ -87,6 +102,41 @@ fn interleaved_complex_mul_assign_runtime_matches_provider_architecture() {
 }
 
 #[test]
+fn interleaved_complex_dot_f64_matches_scalar_reference() {
+    for &complex_len in &[0usize, 1, 2, 3, 4, 7, 8, 17, 64] {
+        let lhs: Vec<f64> = (0..complex_len * 2)
+            .map(|i| (i as f64 * 0.25) - 3.0)
+            .collect();
+        let rhs: Vec<f64> = (0..complex_len * 2)
+            .map(|i| (i as f64 % 5.0) - 2.0)
+            .collect();
+        let expected = reference_dot::<false>(&lhs, &rhs);
+
+        let actual = interleaved_complex_dot::<f64, PreferredArch, false>(&lhs, &rhs).unwrap();
+
+        assert_eq!(actual.0, expected.0, "complex_len={complex_len}");
+        assert_eq!(actual.1, expected.1, "complex_len={complex_len}");
+    }
+}
+
+#[test]
+fn interleaved_complex_dot_conjugated_runtime_matches_provider_architecture() {
+    for &complex_len in &[1usize, 2, 5, 16, 65] {
+        let lhs: Vec<f64> = (0..complex_len * 2)
+            .map(|i| (i as f64 * 0.375) - 4.0)
+            .collect();
+        let rhs: Vec<f64> = (0..complex_len * 2)
+            .map(|i| (i as f64 % 11.0) - 5.0)
+            .collect();
+
+        let runtime = interleaved_complex_dot_runtime::<f64, true>(&lhs, &rhs).unwrap();
+        let expected = interleaved_complex_dot::<f64, PreferredArch, true>(&lhs, &rhs).unwrap();
+
+        assert_eq!(runtime, expected, "complex_len={complex_len}");
+    }
+}
+
+#[test]
 fn interleaved_complex_mul_assign_rejects_invalid_shapes() {
     let mut odd = [1.0f32, 2.0, 3.0];
     assert!(interleaved_complex_mul_assign::<f32, PreferredArch, false>(
@@ -97,4 +147,5 @@ fn interleaved_complex_mul_assign_rejects_invalid_shapes() {
 
     let mut lhs = [1.0f32, 2.0];
     assert!(interleaved_complex_mul_assign::<f32, PreferredArch, false>(&mut lhs, &[1.0]).is_err());
+    assert!(interleaved_complex_dot::<f32, PreferredArch, false>(&lhs, &[1.0]).is_err());
 }

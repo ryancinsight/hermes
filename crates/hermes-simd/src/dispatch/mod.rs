@@ -478,6 +478,23 @@ where
     complex::interleaved_complex_mul_assign::<T, A, CONJ_B>(a, b)
 }
 
+/// Computes an interleaved complex dot product using a monomorphized SIMD architecture.
+///
+/// Inputs are primitive lane slices in `[re0, im0, re1, im1, ...]` order. The
+/// result is `(re, im)` for `sum(a[i] * b[i])`; when `CONJ_B` is true, the
+/// operation is `sum(a[i] * conj(b[i]))`.
+#[inline]
+pub fn interleaved_complex_dot<T, A, const CONJ_B: bool>(
+    a: &[T],
+    b: &[T],
+) -> Result<(T, T), SimdError>
+where
+    T: ScalarTrait,
+    A: hermes_simd_core::arch::SimdArch + hermes_simd_core::kernel::SimdKernel<T>,
+{
+    complex::interleaved_complex_dot::<T, A, CONJ_B>(a, b)
+}
+
 /// Multiplies interleaved complex values in-place using Hermes runtime provider selection.
 #[inline]
 pub fn interleaved_complex_mul_assign_runtime<T, const CONJ_B: bool>(
@@ -488,4 +505,16 @@ where
     T: complex::InterleavedComplexLane,
 {
     complex::interleaved_complex_mul_assign_runtime::<T, CONJ_B>(a, b)
+}
+
+/// Computes an interleaved complex dot product using Hermes runtime provider selection.
+#[inline]
+pub fn interleaved_complex_dot_runtime<T, const CONJ_B: bool>(
+    a: &[T],
+    b: &[T],
+) -> Result<(T, T), SimdError>
+where
+    T: complex::InterleavedComplexLane,
+{
+    complex::interleaved_complex_dot_runtime::<T, CONJ_B>(a, b)
 }
