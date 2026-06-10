@@ -477,3 +477,15 @@ where
 {
     complex::interleaved_complex_mul_assign::<T, A, CONJ_B>(a, b)
 }
+
+/// Multiplies interleaved complex values in-place using Hermes runtime provider selection.
+#[inline]
+pub fn interleaved_complex_mul_assign_runtime<T, const CONJ_B: bool>(
+    a: &mut [T],
+    b: &[T],
+) -> Result<(), SimdError>
+where
+    T: complex::InterleavedComplexLane,
+{
+    complex::interleaved_complex_mul_assign_runtime::<T, CONJ_B>(a, b)
+}

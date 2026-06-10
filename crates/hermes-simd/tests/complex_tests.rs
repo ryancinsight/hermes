@@ -1,4 +1,6 @@
-use hermes_simd::{interleaved_complex_mul_assign, PreferredArch, Scalar};
+use hermes_simd::{
+    interleaved_complex_mul_assign, interleaved_complex_mul_assign_runtime, PreferredArch, Scalar,
+};
 
 fn reference_mul<const CONJ_B: bool>(a: &mut [f64], b: &[f64]) {
     for (x, y) in a.chunks_exact_mut(2).zip(b.chunks_exact(2)) {
@@ -64,6 +66,24 @@ fn interleaved_complex_mul_assign_scalar_architecture_matches_preferred() {
     interleaved_complex_mul_assign::<f64, Scalar, true>(&mut scalar, &rhs).unwrap();
 
     assert_eq!(preferred, scalar);
+}
+
+#[test]
+fn interleaved_complex_mul_assign_runtime_matches_provider_architecture() {
+    for &complex_len in &[1usize, 2, 5, 16, 65] {
+        let rhs: Vec<f64> = (0..complex_len * 2)
+            .map(|i| (i as f64 % 11.0) - 5.0)
+            .collect();
+        let mut runtime: Vec<f64> = (0..complex_len * 2)
+            .map(|i| (i as f64 * 0.375) - 4.0)
+            .collect();
+        let mut expected = runtime.clone();
+
+        interleaved_complex_mul_assign_runtime::<f64, false>(&mut runtime, &rhs).unwrap();
+        interleaved_complex_mul_assign::<f64, PreferredArch, false>(&mut expected, &rhs).unwrap();
+
+        assert_eq!(runtime, expected, "complex_len={complex_len}");
+    }
 }
 
 #[test]
