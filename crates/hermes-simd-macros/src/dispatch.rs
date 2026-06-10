@@ -172,10 +172,13 @@ fn generate_dispatcher(
             }
         };
 
-        // Runtime detection arm (requires std)
+        // Runtime detection arm. `is_x86_feature_detected!` requires std, so
+        // the arm is additionally gated on the consuming crate's `std`
+        // feature; no_std builds keep the compile-time cfg! arms and the
+        // scalar fallback only.
         let rt_arm = match target {
             DispatchTarget::Avx512f => quote! {
-                #[cfg(#arch_cfg)]
+                #[cfg(all(#arch_cfg, feature = "std"))]
                 {
                     if std::is_x86_feature_detected!("avx512f") {
                         return unsafe { #helper_name #helper_turbofish(#(#call_args),*) };
@@ -183,7 +186,7 @@ fn generate_dispatcher(
                 }
             },
             DispatchTarget::Avx2 => quote! {
-                #[cfg(#arch_cfg)]
+                #[cfg(all(#arch_cfg, feature = "std"))]
                 {
                     if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
                         return unsafe { #helper_name #helper_turbofish(#(#call_args),*) };

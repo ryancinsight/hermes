@@ -1,5 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 
 //! Foundational numeric types, traits, and mixed-precision helpers for the hermes ecosystem.
 //! Single Source of Truth (SSOT) for all numeric representations.

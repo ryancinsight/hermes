@@ -19,7 +19,7 @@
 //! | [`tensor`] | N-D tensor views, GEMM, softmax, LayerNorm, Attention |
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 #![allow(
     clippy::needless_range_loop,
     clippy::let_unit_value,

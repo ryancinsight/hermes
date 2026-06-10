@@ -309,6 +309,9 @@ mod rkyv_tests {
     use super::*;
 
     #[test]
+    // rkyv 0.7 archived access violates Stacked Borrows inside the dependency;
+    // see vec/tests.rs for the same exclusion rationale.
+    #[cfg_attr(miri, ignore)]
     fn test_bitmask_rkyv() {
         use rkyv::Deserialize;
 

@@ -39,7 +39,7 @@
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 #![allow(
     unused_unsafe,
     clippy::too_many_arguments,
