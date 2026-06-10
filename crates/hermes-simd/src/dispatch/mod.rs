@@ -13,6 +13,7 @@ pub mod gemm;
 pub mod masked;
 pub mod max;
 pub mod min;
+pub mod modular;
 pub mod scale;
 pub mod sparse;
 pub mod sum;
@@ -553,6 +554,17 @@ pub fn elementwise_sub<T: SimdOps>(a: &[T], b: &[T], out: &mut [T]) -> Result<()
 #[inline(always)]
 pub fn elementwise_div<T: SimdOps>(a: &[T], b: &[T], out: &mut [T]) -> Result<(), SimdError> {
     T::elementwise_div(a, b, out)
+}
+
+/// Executes one exact modular radix-2 NTT butterfly stage over `u64` residues.
+#[inline]
+pub fn ntt_butterfly_stage_u64(
+    data: &mut [u64],
+    stage_len: usize,
+    twiddles: &[u64],
+    modulus: u64,
+) -> Result<(), SimdError> {
+    modular::ntt_butterfly_stage_u64(data, stage_len, twiddles, modulus)
 }
 
 /// Computes the sum of elements matching a boolean mask.

@@ -211,6 +211,7 @@ pub use dispatch::{
     masked_sum,
     max,
     min,
+    ntt_butterfly_stage_u64,
     scale,
     spmv_bcoo4x4,
     spmv_bcoo8x8,
