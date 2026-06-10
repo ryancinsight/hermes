@@ -212,6 +212,72 @@ fn interleaved_complex_runtime_conjugated_reduced_precision_lane_matches_scalar(
     }
 }
 
+/// Reduced-precision lanes (`f16`, `bf16`).
+///
+/// Elementwise multiply: every compiled backend for these types is
+/// lane-emulated with the identical per-lane operation sequence (product,
+/// product, subtract/add in native `T` semantics), so the runtime dispatch
+/// path and the `Scalar` backend must agree bitwise — `assert_eq!` is exact.
+///
+/// Dot: backends accumulate with different lane counts and unroll groupings,
+/// which reorders the low-precision sum; the comparison uses the analytical
+/// reordering bound `(n + 8)·ε_T·Σ (|ar|+|ai|)·(|br|+|bi|)` per component,
+/// with `ε_f16 = 2⁻¹⁰` and `ε_bf16 = 2⁻⁷`.
+mod reduced_precision_lanes {
+    use super::*;
+
+    macro_rules! check_lane_type {
+        ($t:ty, $from:expr, $eps:expr) => {
+            for &complex_len in &[1usize, 2, 3, 4, 8, 9, 17, 33] {
+                let a: Vec<$t> = (0..complex_len * 2)
+                    .map(|i| $from((i as f32 * 0.37) - 3.1))
+                    .collect();
+                let b: Vec<$t> = (0..complex_len * 2)
+                    .map(|i| $from(((i % 13) as f32 * 0.71) - 4.2))
+                    .collect();
+
+                let mut runtime = a.clone();
+                let mut scalar = a.clone();
+                interleaved_complex_mul_assign_runtime::<$t, false>(&mut runtime, &b).unwrap();
+                interleaved_complex_mul_assign::<$t, Scalar, false>(&mut scalar, &b).unwrap();
+                assert_eq!(runtime, scalar, "mul complex_len={complex_len}");
+
+                let mut runtime_conj = a.clone();
+                let mut scalar_conj = a.clone();
+                interleaved_complex_mul_assign_runtime::<$t, true>(&mut runtime_conj, &b).unwrap();
+                interleaved_complex_mul_assign::<$t, Scalar, true>(&mut scalar_conj, &b).unwrap();
+                assert_eq!(runtime_conj, scalar_conj, "conj mul complex_len={complex_len}");
+
+                let dot_runtime = interleaved_complex_dot_runtime::<$t, true>(&a, &b).unwrap();
+                let dot_scalar = interleaved_complex_dot::<$t, Scalar, true>(&a, &b).unwrap();
+                let mag: f32 = (0..a.len())
+                    .step_by(2)
+                    .map(|k| {
+                        (a[k].to_f32().abs() + a[k + 1].to_f32().abs())
+                            * (b[k].to_f32().abs() + b[k + 1].to_f32().abs())
+                    })
+                    .sum();
+                let tol = (complex_len as f32 + 8.0) * $eps * mag.max(1.0);
+                assert!(
+                    (dot_runtime.0.to_f32() - dot_scalar.0.to_f32()).abs() <= tol
+                        && (dot_runtime.1.to_f32() - dot_scalar.1.to_f32()).abs() <= tol,
+                    "dot complex_len={complex_len}: runtime={dot_runtime:?}, scalar={dot_scalar:?}, tol={tol}",
+                );
+            }
+        };
+    }
+
+    #[test]
+    fn interleaved_complex_half_lane_runtime_matches_scalar_backend() {
+        check_lane_type!(half::f16, half::f16::from_f32, 2.0f32.powi(-10));
+    }
+
+    #[test]
+    fn interleaved_complex_brain_lane_runtime_matches_scalar_backend() {
+        check_lane_type!(half::bf16, half::bf16::from_f32, 2.0f32.powi(-7));
+    }
+}
+
 mod complex_properties {
     use super::*;
     use proptest::prelude::*;

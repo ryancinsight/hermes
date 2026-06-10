@@ -16,23 +16,23 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
 
 ## P0 — Release engineering for 0.2.0 <a id="p0"></a>
 
-- [ ] **[patch] CI pipeline** (highest risk reducer): GitHub Actions running
+- [x] **[patch] CI pipeline** (delivered 0.2.0; AVX-512 runner still open) (highest risk reducer): GitHub Actions running
       fmt → clippy `-D warnings` → `cargo test --workspace` → doc build →
       `cargo check --target aarch64-unknown-linux-gnu`. Add an ARM runner
       (or QEMU) job to runtime-validate the NEON complex/dense paths, and an
       AVX-512-capable runner if available for the `Avx512` differential tests.
-- [ ] **[patch] Toolchain pin + supply chain**: `rust-toolchain.toml`, declared
+- [x] **[patch] Toolchain pin + supply chain** (delivered 0.2.0; cargo-audit covered by cargo-deny in CI): `rust-toolchain.toml`, declared
       MSRV, `cargo audit` + `cargo deny check` in CI.
-- [ ] **[minor] 0.2.0 release**: CHANGELOG sections (Added/Changed/Breaking —
+- [x] **[minor] 0.2.0 release** (semver-checks scoped per crate; see checklist): CHANGELOG sections (Added/Changed/Breaking —
       includes `InterleavedComplexLane` removal and per-format sparse-Cow type
       removal), `cargo-semver-checks` run, version bump committed atomically.
 
 ## P1 — Correctness hardening <a id="p1"></a>
 
-- [ ] **[patch] Reduced-precision complex coverage**: property/differential
+- [x] **[patch] Reduced-precision complex coverage** (delivered 0.2.0): property/differential
       tests for `f16`/`bf16` interleaved complex kernels (currently exercised
       only via emulated defaults, asserted only for f32/f64).
-- [ ] **[patch] Mask/gather/compress property suite**: proptest invariants —
+- [x] **[patch] Mask/gather/compress property suite** (delivered 0.2.0): proptest invariants —
       `compress`∘`expand` identity under fixed mask, `mask_to_bitmask` ∘
       `mask_from_bitmask` round-trip, gather with permuted indices vs scalar
       reference, `leading_k_mask` boundary cases (k=0, k=LANE_COUNT, k>LANE_COUNT).

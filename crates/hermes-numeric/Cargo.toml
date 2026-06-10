@@ -2,6 +2,7 @@
 name = "hermes-numeric"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 description = "Foundational Single Source of Truth (SSOT) for all numeric types and abstractions in the hermes ecosystem"
 

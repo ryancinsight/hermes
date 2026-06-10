@@ -2,6 +2,7 @@
 name = "hermes-simd-types"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 description = "Monomorphized vector register types for the hermes-simd workspace"
 

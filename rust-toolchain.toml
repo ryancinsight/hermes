@@ -1,0 +1,6 @@
+# Pinned toolchain for reproducible builds and CI.
+# MSRV (workspace `rust-version`) matches this pin; verified empirically by
+# building and testing the full workspace on 1.95.0.
+[toolchain]
+channel = "1.95.0"
+components = ["rustfmt", "clippy"]

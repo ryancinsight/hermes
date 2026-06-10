@@ -2,7 +2,7 @@
 
 All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; versioning: SemVer 2.0.0 (pre-1.0: minor releases may break, documented under **Breaking**).
 
-## [Unreleased] — targeting 0.2.0
+## [0.2.0] — 2026-06-10
 
 ### Added
 - Interleaved complex kernels (`interleaved_complex_dot`, `interleaved_complex_mul_assign`, runtime variants) over `[re, im, ...]` primitive slices, generic over `T: Scalar` and architecture with `const CONJ_B` conjugation (ADR-004).
@@ -10,8 +10,12 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - `CowFormat` trait and generic `SparseCow<'a, T, F, Arch>` clone-on-write sparse container.
 - `SimdView::prefix_scan_in_place` (vectorized, single authoritative scan implementation).
 - `SimdOps::interleaved_complex_mul_assign` / `interleaved_complex_dot` trait methods.
-- Property-test suites: complex kernels with analytically derived rounding tolerances; differential AVX2/AVX-512-vs-Scalar tests on dyadic-exact inputs.
+- Property-test suites: complex kernels with analytically derived rounding tolerances; differential AVX2/AVX-512-vs-Scalar tests on dyadic-exact inputs; `f16`/`bf16` complex differential tests (bitwise for elementwise multiply, reordering-bound for dot); kernel-level mask/compress/expand/gather/`leading_k_mask` invariants per backend.
 - `complex_dot` example with throughput comparison.
+- CI pipeline (GitHub Actions): fmt, clippy `-D warnings`, tests on x86_64 and aarch64 (runtime NEON validation), warning-clean docs, aarch64 cross-compile check, `cargo-deny` supply-chain gate.
+- `rust-toolchain.toml` pin (1.95.0) and workspace MSRV declaration (`rust-version = "1.95"`, verified by full build + test on 1.95.0).
+- `deny.toml`: permissive-license allowlist, yanked-crate denial, source restrictions.
+- PM artifacts: `backlog.md`, `checklist.md`, this changelog; README refreshed to the current architecture.
 
 ### Changed
 - Complex kernel runtime dispatch unified onto `#[runtime_dispatch]` (replaces per-type `OnceLock` feature caching).

@@ -1,38 +1,43 @@
 # Checklist — active sprint
 
-**Target version: 0.2.0** · Strategy: [backlog.md](backlog.md) · Phase: Closure (release engineering)
-
-Each item lists its observable completion condition.
+**Target version: 0.2.0** · Strategy: [backlog.md](backlog.md) · Phase: Closure (release)
 
 ## Sprint scope: ship 0.2.0 with CI
 
-- [ ] [patch] Add `.github/workflows/ci.yml`
-      → green run on push: fmt-check, clippy `-D warnings`, `cargo test --workspace`,
-        `cargo doc --no-deps` warning-clean, aarch64 cross-check. ([backlog → P0](backlog.md#p0))
-- [ ] [patch] Add `rust-toolchain.toml` + MSRV in workspace manifest
-      → `cargo +<pinned> test --workspace` green; MSRV documented in README.
-- [ ] [patch] Add `cargo audit` / `cargo deny` config and CI step
-      → both report no violations or each exception is documented in `deny.toml`.
-- [ ] [patch] f16/bf16 interleaved-complex differential tests
-      → property tests vs scalar reference with analytically derived tolerance
-        pass for both types, both conjugation variants. ([backlog → P1](backlog.md#p1))
-- [ ] [patch] Mask/gather/compress proptest suite
-      → round-trip and reference invariants pass on all compiled backends.
-- [ ] [minor] CHANGELOG 0.2.0 section + `cargo-semver-checks` + version bump
-      → Cargo.toml `0.2.0` == checklist target; Breaking subsection lists
-        `InterleavedComplexLane` and per-format sparse-Cow type removals;
-        tag `v0.2.0` created only after all items above are green.
-
-## Done this cycle (2026-06-10)
-
-- [x] README updated to current architecture (crates, complex kernels, Cow
-      containers, verification policy, PM artifact links).
-- [x] backlog.md / checklist.md / CHANGELOG.md initialized.
+- [x] [patch] `.github/workflows/ci.yml`: fmt-check, clippy `-D warnings`,
+      `cargo test --workspace` (x86_64 + native aarch64 runner), warning-clean
+      docs, aarch64 cross-check, cargo-deny. → first green run pending push.
+- [x] [patch] `rust-toolchain.toml` (1.95.0) + `rust-version = "1.95"` in the
+      workspace manifest, inherited by all members. MSRV verified empirically:
+      full workspace build + 295-test pass on rustc 1.95.0.
+- [x] [patch] `deny.toml` (advisories/licenses/bans/sources) + CI job.
+      Local `cargo audit` blocked by an outdated local advisory parser
+      (CVSS 4.0); CI cargo-deny is the authoritative gate.
+- [x] [patch] `f16`/`bf16` interleaved-complex differential tests — bitwise
+      equality for elementwise multiply (lane-emulated backends share the op
+      sequence); dot compared under the analytical reordering bound
+      `(n+8)·ε_T·Σ magnitudes`.
+- [x] [patch] Kernel property suite (`kernel_property_tests.rs`): bitmask
+      round-trip, compress∘expand identity, gather vs scalar reference,
+      `leading_k_mask` boundaries — per backend, feature-gated.
+- [x] [minor] Version bump 0.1.0 → 0.2.0; CHANGELOG 0.2.0 section dated;
+      `cargo-semver-checks` pass on hermes-simd and hermes-simd-core vs the
+      previous rev (196 checks each, no regression).
+- [ ] [minor] Tag `v0.2.0` → created only after the first CI run on main is
+      observed green.
 
 ## Residual risks
 
-- AVX-512 and AMX paths: compile-verified, differential tests self-skip on
-  unsupported hosts — runtime validation requires capable CI hardware (P0).
-- NEON: compile-verified for aarch64-unknown-linux-gnu; no runtime run yet.
-- `panic = "abort"` in release profile: incompatible with `cargo test --release`
-  harness on some setups; CI should test the dev profile or override.
+- AVX-512 and AMX paths: differential tests self-skip on unsupported hosts;
+  no AVX-512 CI runner yet ([backlog → P0](backlog.md#p0)).
+- `cargo-semver-checks --workspace` cannot doc-build `hermes-numeric` under
+  its feature-combination probing (rkyv `size_*` feature requirement);
+  per-crate scoped runs are the working procedure.
+- `panic = "abort"` in the release profile: CI tests the dev profile.
+
+## Next sprint candidates (from [backlog](backlog.md))
+
+- [patch] `cargo miri` over hermes-simd-core pointer logic (P1).
+- [patch] no_std / feature-matrix CI job (P1).
+- [minor] Criterion baselines + regression thresholds (P2).
+- [minor] SpMV scalability sweep (P2).

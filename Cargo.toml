@@ -12,11 +12,12 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Ryan Clanton <ryanclanton@outlook.com>"]
 description = "High-performance, zero-overhead SIMD abstraction library"
 license = "MIT OR Apache-2.0"
+rust-version = "1.95"
 
 [workspace.dependencies]
 half = { version = "2.3", default-features = false }
