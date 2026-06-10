@@ -8,7 +8,7 @@ Tactical breakdown of the active items lives in [checklist.md](checklist.md).
 
 hermes is the Atlas **SIMD SSOT** (data-parallel lanes), replacing std::simd / packed_simd
 and hand-rolled intrinsics. Scope boundary: hermes owns SIMD only; thread-level **MIMD**
-is moirai's domain, GPU is wgpu/cuda-oxide via coeus/apollo. Work to make hermes the
+is moirai's domain, GPU is the `hephaestus` substrate (wgpu + CUDA) via coeus/apollo. Work to make hermes the
 complete SIMD substrate for leto-ops/coeus hot kernels:
 - [ ] [minor] Stage C1: dedicated AVX-512 / AMX CI runners (currently self-skip on
   unsupported hosts), `no_std` feature matrix, committed criterion baselines.
@@ -16,8 +16,8 @@ complete SIMD substrate for leto-ops/coeus hot kernels:
 - [ ] [minor] Stage C2: expand op/dtype coverage on demand from leto-ops/coeus
   (gather/scatter variants, additional reductions/scans, complex precisions) so every
   leto/coeus CPU hot kernel has a hermes path rather than a scalar fallback.
-- [ ] [patch] Document the SIMD(hermes) vs MIMD(moirai) vs GPU(wgpu/cuda-oxide) boundary
-  in README so consumers compose the three deliberately.
+- [ ] [patch] Document the SIMD(hermes) vs MIMD(moirai) vs GPU(hephaestus: wgpu + CUDA)
+  boundary in README so consumers compose the three deliberately.
 
 ## Stage assessment (2026-06-10)
 
