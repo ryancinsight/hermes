@@ -12,6 +12,7 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - `SimdOps::interleaved_complex_mul_assign` / `interleaved_complex_dot` trait methods.
 - Property-test suites: complex kernels with analytically derived rounding tolerances; differential AVX2/AVX-512-vs-Scalar tests on dyadic-exact inputs; `f16`/`bf16` complex differential tests (bitwise for elementwise multiply, reordering-bound for dot); kernel-level mask/compress/expand/gather/`leading_k_mask` invariants per backend.
 - `complex_dot` example with throughput comparison.
+- Exact NTT butterfly stage kernel (`dispatch/modular.rs`) with integration tests.
 - CI pipeline (GitHub Actions): fmt, clippy `-D warnings`, tests on x86_64 and aarch64 (runtime NEON validation), warning-clean docs, aarch64 cross-compile check, `cargo-deny` supply-chain gate.
 - `rust-toolchain.toml` pin (1.95.0) and workspace MSRV declaration (`rust-version = "1.95"`, verified by full build + test on 1.95.0).
 - `deny.toml`: permissive-license allowlist, yanked-crate denial, source restrictions.

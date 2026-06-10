@@ -3,6 +3,7 @@ name = "hermes-simd"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
 authors.workspace = true
 description.workspace = true
 
@@ -26,6 +27,8 @@ harness = false
 
 [features]
 default = ["std"]
+# Linux NUMA node placement via libnuma (links -lnuma); off by default.
+libnuma = ["hermes-simd-core/libnuma"]
 std = [
     "hermes-simd-core/std",
     "hermes-simd-intrinsics/std",

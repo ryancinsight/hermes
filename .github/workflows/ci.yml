@@ -62,6 +62,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      # The cargo-deny container image ships its own toolchain and trips over
+      # rust-toolchain.toml; install the pinned toolchain + cargo-deny instead.
+      - uses: dtolnay/rust-toolchain@master
         with:
-          command: check
+          toolchain: 1.95.0
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+      - name: cargo deny check
+        run: cargo deny check

@@ -3,6 +3,16 @@
 //! Provides explicit node placement capabilities for Windows (VirtualAllocExNuma)
 //! and Linux (numa_alloc_onnode) architectures with standard allocator fallback paths,
 //! alongside thread affinity pinning and memory residency verification.
+//!
+//! # `libnuma` feature
+//!
+//! The Linux node-placement paths call into `libnuma` and therefore require
+//! linking `-lnuma`. They are gated behind the off-by-default `libnuma` cargo
+//! feature so plain Linux builds carry no shared-library dependency; without
+//! the feature every API degrades to the documented portable fallback
+//! (standard allocator, single-node topology, fixed remote distance).
+//! Linux paths that only need libc (`sched_getcpu`, `mincore`, `move_pages`)
+//! remain active unconditionally.
 
 use core::alloc::Layout;
 
@@ -26,9 +36,10 @@ pub struct MnemosyneNumaAllocator;
 
 impl NumaAllocator for MnemosyneNumaAllocator {
     unsafe fn alloc_on_node(&self, layout: Layout, node: u32) -> *mut u8 {
-        #[cfg(target_os = "linux")]
+        #[cfg(all(target_os = "linux", feature = "libnuma"))]
         {
             // On Linux we can use numa_alloc_onnode.
+            #[link(name = "numa")]
             extern "C" {
                 fn numa_alloc_onnode(size: usize, node: i32) -> *mut u8;
             }
@@ -71,7 +82,7 @@ impl NumaAllocator for MnemosyneNumaAllocator {
                 ptr as *mut u8
             }
         }
-        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+        #[cfg(not(any(all(target_os = "linux", feature = "libnuma"), target_os = "windows")))]
         {
             let _ = node;
             alloc::alloc::alloc(layout)
@@ -79,8 +90,9 @@ impl NumaAllocator for MnemosyneNumaAllocator {
     }
 
     unsafe fn dealloc_on_node(&self, ptr: *mut u8, layout: Layout, _node: u32) {
-        #[cfg(target_os = "linux")]
+        #[cfg(all(target_os = "linux", feature = "libnuma"))]
         {
+            #[link(name = "numa")]
             extern "C" {
                 fn numa_free(ptr: *mut u8, size: usize);
             }
@@ -108,7 +120,7 @@ impl NumaAllocator for MnemosyneNumaAllocator {
                 alloc::alloc::dealloc(ptr, layout);
             }
         }
-        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+        #[cfg(not(any(all(target_os = "linux", feature = "libnuma"), target_os = "windows")))]
         {
             let _ = _node;
             alloc::alloc::dealloc(ptr, layout);
@@ -118,8 +130,9 @@ impl NumaAllocator for MnemosyneNumaAllocator {
 
 /// Returns the index of the NUMA node the current thread is executing on.
 pub fn current_numa_node() -> Option<u32> {
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", feature = "libnuma"))]
     {
+        #[link(name = "numa")]
         extern "C" {
             fn sched_getcpu() -> i32;
             fn numa_node_of_cpu(cpu: i32) -> i32;
@@ -151,7 +164,7 @@ pub fn current_numa_node() -> Option<u32> {
             }
         }
     }
-    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    #[cfg(not(any(all(target_os = "linux", feature = "libnuma"), target_os = "windows")))]
     {
         None
     }
@@ -173,8 +186,9 @@ pub fn numa_node_distance(node_a: u32, node_b: u32) -> u32 {
     if node_a == node_b {
         return 10;
     }
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", feature = "libnuma"))]
     {
+        #[link(name = "numa")]
         extern "C" {
             fn numa_distance(node1: i32, node2: i32) -> i32;
         }
@@ -225,8 +239,9 @@ impl NumaTopologyService {
 
     /// Get total number of NUMA nodes in the system.
     pub fn total_nodes() -> u32 {
-        #[cfg(target_os = "linux")]
+        #[cfg(all(target_os = "linux", feature = "libnuma"))]
         {
+            #[link(name = "numa")]
             extern "C" {
                 fn numa_num_configured_nodes() -> i32;
             }
@@ -249,7 +264,7 @@ impl NumaTopologyService {
                 1
             }
         }
-        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+        #[cfg(not(any(all(target_os = "linux", feature = "libnuma"), target_os = "windows")))]
         {
             1
         }
@@ -367,7 +382,7 @@ pub fn verify_numa_locality(ptr: *const u8, size: usize, expected_node: u32) -> 
 
 /// RAII scope guard that binds the current thread to a specific NUMA node.
 pub struct NumaBinding {
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", feature = "libnuma"))]
     old_mask: *mut core::ffi::c_void,
     #[cfg(target_os = "windows")]
     old_mask: usize,
@@ -376,8 +391,9 @@ pub struct NumaBinding {
 impl NumaBinding {
     /// Bind the current thread to the specified NUMA node.
     pub fn bind(node: u32) -> Self {
-        #[cfg(target_os = "linux")]
+        #[cfg(all(target_os = "linux", feature = "libnuma"))]
         {
+            #[link(name = "numa")]
             extern "C" {
                 fn numa_allocate_nodemask() -> *mut core::ffi::c_void;
                 fn numa_bitmask_setbit(mask: *mut core::ffi::c_void, bit: u32);
@@ -417,7 +433,7 @@ impl NumaBinding {
                 }
             }
         }
-        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+        #[cfg(not(any(all(target_os = "linux", feature = "libnuma"), target_os = "windows")))]
         {
             let _ = node;
             Self {}
@@ -425,12 +441,13 @@ impl NumaBinding {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(any(all(target_os = "linux", feature = "libnuma"), target_os = "windows"))]
 impl Drop for NumaBinding {
     fn drop(&mut self) {
-        #[cfg(target_os = "linux")]
+        #[cfg(all(target_os = "linux", feature = "libnuma"))]
         {
             if !self.old_mask.is_null() {
+                #[link(name = "numa")]
                 extern "C" {
                     fn numa_bind(mask: *mut core::ffi::c_void);
                     fn numa_bitmask_free(mask: *mut core::ffi::c_void);
