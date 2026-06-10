@@ -9,7 +9,7 @@ pub mod neon_f32;
 #[cfg(target_arch = "aarch64")]
 pub mod neon_f64;
 
-/// SVE stub is always compiled so downstream crates can reference [`SveArch`]
+/// SVE stub is always compiled so downstream crates can reference [`SveArch`](sve::SveArch)
 /// without a target-arch guard. All methods `unimplemented!()` unless
 /// `+sve` is enabled and real intrinsics are substituted.
 pub mod sve;

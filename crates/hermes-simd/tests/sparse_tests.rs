@@ -134,7 +134,7 @@ fn make_csr_3x3_identity() -> (Vec<f32>, Vec<i32>, Vec<i32>) {
 fn test_csr_cow_borrowed_is_zero_alloc() {
     let (vals, cols, row_ptr) = make_csr_3x3_identity();
     let data = CsrData::new(&vals, &cols, &row_ptr, 3, 3);
-    let cow: SparseCow<f32, Scalar> = SparseCow::borrowed(data);
+    let cow: SparseCow<f32, Csr, Scalar> = SparseCow::borrowed(data);
 
     // Borrowed variant: no allocation, dimensions correct.
     assert!(cow.is_borrowed());
@@ -147,7 +147,7 @@ fn test_csr_cow_borrowed_is_zero_alloc() {
 fn test_csr_cow_spmv_borrowed() {
     let (vals, cols, row_ptr) = make_csr_3x3_identity();
     let data = CsrData::new(&vals, &cols, &row_ptr, 3, 3);
-    let cow: SparseCow<f32, Scalar> = SparseCow::borrowed(data);
+    let cow: SparseCow<f32, Csr, Scalar> = SparseCow::borrowed(data);
 
     let x = [2.0f32, 3.0, 5.0];
     let mut y = [0.0f32; 3];
@@ -158,7 +158,7 @@ fn test_csr_cow_spmv_borrowed() {
 #[test]
 fn test_csr_cow_spmv_owned() {
     let (vals, cols, row_ptr) = make_csr_3x3_identity();
-    let cow: SparseCow<f32, Scalar> = SparseCow::from_vecs(vals, cols, row_ptr, 3, 3);
+    let cow = SparseCow::<f32, Csr, Scalar>::from_vecs(vals, cols, row_ptr, 3, 3);
 
     assert!(cow.is_owned());
 
@@ -172,7 +172,7 @@ fn test_csr_cow_spmv_owned() {
 fn test_csr_cow_to_owned_promotes_borrowed() {
     let (vals, cols, row_ptr) = make_csr_3x3_identity();
     let data = CsrData::new(&vals, &cols, &row_ptr, 3, 3);
-    let mut cow: SparseCow<f32, Scalar> = SparseCow::borrowed(data);
+    let mut cow: SparseCow<f32, Csr, Scalar> = SparseCow::borrowed(data);
 
     assert!(cow.is_borrowed());
     cow.to_owned();
@@ -188,7 +188,7 @@ fn test_csr_cow_to_owned_promotes_borrowed() {
 #[test]
 fn test_csr_cow_to_owned_noop_when_already_owned() {
     let (vals, cols, row_ptr) = make_csr_3x3_identity();
-    let mut cow: SparseCow<f32, Scalar> = SparseCow::from_vecs(vals, cols, row_ptr, 3, 3);
+    let mut cow = SparseCow::<f32, Csr, Scalar>::from_vecs(vals, cols, row_ptr, 3, 3);
     assert!(cow.is_owned());
     cow.to_owned(); // must not panic or reallocate
     assert!(cow.is_owned());
@@ -198,7 +198,7 @@ fn test_csr_cow_to_owned_noop_when_already_owned() {
 fn test_csr_cow_sum_values_borrowed() {
     let (vals, cols, row_ptr) = make_csr_3x3_identity();
     let data = CsrData::new(&vals, &cols, &row_ptr, 3, 3);
-    let cow: SparseCow<f32, Scalar> = SparseCow::borrowed(data);
+    let cow: SparseCow<f32, Csr, Scalar> = SparseCow::borrowed(data);
     // 3x1.0 = 3.0
     let s = cow.sum_values();
     assert!((s - 3.0f32).abs() < 1e-6);
@@ -209,7 +209,7 @@ fn test_csr_cow_sum_values_owned() {
     let vals = vec![2.0f32, 5.0, 1.0];
     let cols = vec![0i32, 1, 2];
     let row_ptr = vec![0i32, 1, 2, 3];
-    let cow: SparseCow<f32, Scalar> = SparseCow::from_vecs(vals, cols, row_ptr, 3, 3);
+    let cow = SparseCow::<f32, Csr, Scalar>::from_vecs(vals, cols, row_ptr, 3, 3);
     let s = cow.sum_values();
     assert!((s - 8.0f32).abs() < 1e-6);
 }
@@ -219,7 +219,7 @@ fn test_csr_cow_elementwise_mul_dense() {
     let vals = vec![2.0f32, 3.0, 4.0];
     let cols = vec![0i32, 1, 2];
     let row_ptr = vec![0i32, 1, 2, 3];
-    let cow: SparseCow<f32, Scalar> = SparseCow::from_vecs(vals, cols, row_ptr, 3, 3);
+    let cow = SparseCow::<f32, Csr, Scalar>::from_vecs(vals, cols, row_ptr, 3, 3);
     // Dense: col 0 → 10, col 1 → 20, col 2 → 30
     let dense = [10.0f32, 20.0, 30.0];
     let mut out = [0.0f32; 3];
@@ -241,7 +241,7 @@ fn test_sellp_cow_borrowed_spmv() {
     let slice_ptr = [0i32, 4];
     let slice_col_count = [1i32];
     let data = SellPData::new(&values, &col_indices, &slice_ptr, &slice_col_count, 4, 4);
-    let cow: SellPCow<f32, 4, Scalar> = SellPCow::borrowed(data);
+    let cow: SparseCow<f32, SellP<4>, Scalar> = SparseCow::borrowed(data);
 
     assert!(cow.is_borrowed());
     let x = [10.0f32; 4];
@@ -252,7 +252,7 @@ fn test_sellp_cow_borrowed_spmv() {
 
 #[test]
 fn test_sellp_cow_owned_spmv() {
-    let cow: SellPCow<f32, 4, Scalar> = SellPCow::from_vecs(
+    let cow = SparseCow::<f32, SellP<4>, Scalar>::from_vecs(
         vec![1.0f32, 2.0, 3.0, 4.0],
         vec![0i32, 1, 2, 3],
         vec![0i32, 4],
@@ -274,7 +274,7 @@ fn test_sellp_cow_to_owned_promotes() {
     let slice_ptr = [0i32, 4];
     let slice_col_count = [1i32];
     let data = SellPData::new(&values, &col_indices, &slice_ptr, &slice_col_count, 4, 4);
-    let mut cow: SellPCow<f32, 4, Scalar> = SellPCow::borrowed(data);
+    let mut cow: SparseCow<f32, SellP<4>, Scalar> = SparseCow::borrowed(data);
     assert!(cow.is_borrowed());
     cow.to_owned();
     assert!(cow.is_owned());
@@ -294,7 +294,7 @@ fn test_dense_masked_cow_borrowed_spmv() {
     let values = [1.0f32, 0.0, 0.0, 1.0]; // 2x2 identity
     let mask = [true, false, false, true];
     let data = DenseWithMaskData::new(&values, &mask, 2, 2);
-    let cow: DenseWithMaskCow<f32, Scalar> = DenseWithMaskCow::borrowed(data);
+    let cow: SparseCow<f32, DenseWithMask, Scalar> = SparseCow::borrowed(data);
 
     assert!(cow.is_borrowed());
     let x = [6.0f32, 9.0];
@@ -305,7 +305,7 @@ fn test_dense_masked_cow_borrowed_spmv() {
 
 #[test]
 fn test_dense_masked_cow_owned_spmv() {
-    let cow: DenseWithMaskCow<f32, Scalar> = DenseWithMaskCow::from_vecs(
+    let cow = SparseCow::<f32, DenseWithMask, Scalar>::from_vecs(
         vec![1.0f32, 0.0, 0.0, 1.0],
         vec![true, false, false, true],
         2,
@@ -320,7 +320,7 @@ fn test_dense_masked_cow_owned_spmv() {
 
 #[test]
 fn test_dense_masked_cow_sum_values() {
-    let cow: DenseWithMaskCow<f32, Scalar> = DenseWithMaskCow::from_vecs(
+    let cow = SparseCow::<f32, DenseWithMask, Scalar>::from_vecs(
         vec![3.0f32, 0.0, 0.0, 5.0],
         vec![true, false, false, true],
         2,
@@ -342,7 +342,7 @@ fn test_bcoo_cow_borrowed_spmv() {
     let block_row = [0i32];
     let block_col = [0i32];
     let data = BlockedCooData::new(&block, &block_row, &block_col, 1, 4, 4);
-    let cow: BlockedCooCow<f32, 4, 4, Scalar> = BlockedCooCow::borrowed(data);
+    let cow: SparseCow<f32, BlockedCoo<4, 4>, Scalar> = SparseCow::borrowed(data);
 
     assert!(cow.is_borrowed());
     let x = [1.0f32, 2.0, 3.0, 4.0];
@@ -353,7 +353,7 @@ fn test_bcoo_cow_borrowed_spmv() {
 
 #[test]
 fn test_bcoo_cow_owned_spmv() {
-    let cow: BlockedCooCow<f32, 4, 4, Scalar> = BlockedCooCow::from_vecs(
+    let cow = SparseCow::<f32, BlockedCoo<4, 4>, Scalar>::from_vecs(
         vec![
             1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ],
@@ -378,7 +378,7 @@ fn test_bcoo_cow_to_owned_promotes() {
     let block_row = [0i32];
     let block_col = [0i32];
     let data = BlockedCooData::new(&block, &block_row, &block_col, 1, 4, 4);
-    let mut cow: BlockedCooCow<f32, 4, 4, Scalar> = BlockedCooCow::borrowed(data);
+    let mut cow: SparseCow<f32, BlockedCoo<4, 4>, Scalar> = SparseCow::borrowed(data);
     assert!(cow.is_borrowed());
     cow.to_owned();
     assert!(cow.is_owned());

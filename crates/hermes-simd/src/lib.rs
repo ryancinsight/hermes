@@ -107,13 +107,12 @@ pub use hermes_simd_core::{
 // Re-export sparse types
 pub use hermes_simd_core::sparse::{
     BlockedCoo,
-    BlockedCooCow,
     BlockedCooData,
+    // Format-to-owned-storage mapping for Cow containers
+    CowFormat,
     Csr,
-    CsrCow,
     CsrData,
     DenseWithMask,
-    DenseWithMaskCow,
     DenseWithMaskData,
     OwnedBlockedCoo,
     // Owned heap-backed sparse storage types
@@ -121,9 +120,8 @@ pub use hermes_simd_core::sparse::{
     OwnedDenseWithMask,
     OwnedSellP,
     SellP,
-    SellPCow,
     SellPData,
-    // Clone-on-Write sparse containers
+    // Generic Clone-on-Write sparse container
     SparseCow,
     SparseFormat,
     SparseOps,

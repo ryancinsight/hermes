@@ -1,4 +1,4 @@
-//! Zero-copy SIMD chunk iterators over [`SimdView`].
+//! Zero-copy SIMD chunk iterators over [`SimdView`](crate::view::SimdView).
 //!
 //! # Design
 //!

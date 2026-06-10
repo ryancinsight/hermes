@@ -106,6 +106,51 @@ impl SimdKernel<f32> for Neon {
         NeonF32Vec(vfmaq_f32(c.0, a.0, b.0))
     }
 
+    /// `vrev64q_f32` swaps 32-bit lanes within each 64-bit doubleword.
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn swap_adjacent(v: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vrev64q_f32(v.0))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn dup_even(v: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vtrn1q_f32(v.0, v.0))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn dup_odd(v: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vtrn2q_f32(v.0, v.0))
+    }
+
+    /// NEON has no alternating-FMA instruction; sign-flip the even lanes of
+    /// `c` (one XOR) then fuse with `vfmaq_f32`, which is rounding-identical
+    /// to a native `fmaddsub`.
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn fmaddsub(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
+        const EVEN_SIGN: [u32; 4] = [0x8000_0000, 0, 0x8000_0000, 0];
+        let flipped = vreinterpretq_f32_u32(veorq_u32(
+            vreinterpretq_u32_f32(c.0),
+            vld1q_u32(EVEN_SIGN.as_ptr()),
+        ));
+        NeonF32Vec(vfmaq_f32(flipped, a.0, b.0))
+    }
+
+    /// Sign-flips the odd lanes of `c` then fuses; see [`Self::fmaddsub`].
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn fmsubadd(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
+        const ODD_SIGN: [u32; 4] = [0, 0x8000_0000, 0, 0x8000_0000];
+        let flipped = vreinterpretq_f32_u32(veorq_u32(
+            vreinterpretq_u32_f32(c.0),
+            vld1q_u32(ODD_SIGN.as_ptr()),
+        ));
+        NeonF32Vec(vfmaq_f32(flipped, a.0, b.0))
+    }
+
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn sum_reduce(v: Self::Vector) -> f32 {

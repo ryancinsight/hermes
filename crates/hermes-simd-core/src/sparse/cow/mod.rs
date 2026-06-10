@@ -1,50 +1,155 @@
 //! Clone-on-Write sparse matrix containers.
+//!
+//! One generic [`SparseCow`] covers every sparse format: the [`CowFormat`]
+//! trait maps a format marker to its heap-owned storage and the two
+//! conversions (re-borrow owned as a view, clone a view into owned). Adding a
+//! new sparse format requires one `CowFormat` impl — the container, its
+//! accessors, and the `SparseSpMv` / `SparseOps` forwarding are inherited.
 
 use super::{
     ops::SparseOps,
     spmv::SparseSpMv,
-    types::{BlockedCooData, CsrData, DenseWithMaskData, SellPData},
-    BlockedCoo, Csr, DenseWithMask, SellP, SparseView,
+    types::{BlockedCooData, CsrData, DenseWithMaskData, SellPData, SparseShape},
+    BlockedCoo, Csr, DenseWithMask, SellP, SparseFormat, SparseView,
 };
 use crate::arch::SimdArch;
-use crate::kernel::SimdKernel;
 use crate::scalar::Scalar;
 use alloc::vec::Vec;
 
 pub mod owned;
 pub use owned::{OwnedBlockedCoo, OwnedCsr, OwnedDenseWithMask, OwnedSellP};
 
-/// Clone-on-Write CSR sparse matrix.
-pub enum CsrCow<'a, T, Arch: SimdArch> {
-    /// Zero-copy borrowed CSR view.
-    Borrowed(SparseView<'a, T, Csr, Arch>),
-    /// Owned heap-backed CSR storage.
-    Owned(OwnedCsr<T>),
+/// Maps a sparse format marker to its owned storage and Cow conversions.
+///
+/// Sealed transitively through [`SparseFormat`].
+pub trait CowFormat: SparseFormat {
+    /// Heap-owned storage for this format.
+    type Owned<T>: SparseShape + Send + Sync
+    where
+        T: Send + Sync;
+
+    /// Re-borrow owned storage as the format's view storage (zero-copy).
+    fn as_storage<T: Send + Sync>(owned: &Self::Owned<T>) -> Self::Storage<'_, T>;
+
+    /// Clone a borrowed view storage into owned storage (one allocation set).
+    fn to_owned_storage<T: Clone + Send + Sync>(storage: &Self::Storage<'_, T>) -> Self::Owned<T>;
 }
 
-impl<'a, T, Arch: SimdArch> CsrCow<'a, T, Arch> {
-    /// Wrap a borrowed CSR view (zero allocation).
+impl CowFormat for Csr {
+    type Owned<T>
+        = OwnedCsr<T>
+    where
+        T: Send + Sync;
+
     #[inline(always)]
-    pub fn borrowed(data: CsrData<'a, T>) -> Self {
-        Self::Borrowed(SparseView::from_csr(data))
+    fn as_storage<T: Send + Sync>(owned: &Self::Owned<T>) -> CsrData<'_, T> {
+        owned.as_view()
     }
 
-    /// Wrap an owned CSR (heap-allocated).
-    #[inline(always)]
-    pub fn owned(storage: OwnedCsr<T>) -> Self {
-        Self::Owned(storage)
-    }
-
-    /// Build an owned `CsrCow` from raw vectors.
     #[inline]
-    pub fn from_vecs(
-        values: Vec<T>,
-        col_indices: Vec<i32>,
-        row_ptr: Vec<i32>,
-        nrows: usize,
-        ncols: usize,
-    ) -> Self {
-        Self::Owned(OwnedCsr::new(values, col_indices, row_ptr, nrows, ncols))
+    fn to_owned_storage<T: Clone + Send + Sync>(d: &CsrData<'_, T>) -> OwnedCsr<T> {
+        OwnedCsr::new(
+            d.values.to_vec(),
+            d.col_indices.to_vec(),
+            d.row_ptr.to_vec(),
+            d.nrows,
+            d.ncols,
+        )
+    }
+}
+
+impl<const C: usize> CowFormat for SellP<C> {
+    type Owned<T>
+        = OwnedSellP<T, C>
+    where
+        T: Send + Sync;
+
+    #[inline(always)]
+    fn as_storage<T: Send + Sync>(owned: &Self::Owned<T>) -> SellPData<'_, T, C> {
+        owned.as_view()
+    }
+
+    #[inline]
+    fn to_owned_storage<T: Clone + Send + Sync>(d: &SellPData<'_, T, C>) -> OwnedSellP<T, C> {
+        OwnedSellP::new(
+            d.values.to_vec(),
+            d.col_indices.to_vec(),
+            d.slice_ptr.to_vec(),
+            d.slice_col_count.to_vec(),
+            d.nrows,
+            d.ncols,
+        )
+    }
+}
+
+impl<const BM: usize, const BN: usize> CowFormat for BlockedCoo<BM, BN> {
+    type Owned<T>
+        = OwnedBlockedCoo<T, BM, BN>
+    where
+        T: Send + Sync;
+
+    #[inline(always)]
+    fn as_storage<T: Send + Sync>(owned: &Self::Owned<T>) -> BlockedCooData<'_, T, BM, BN> {
+        owned.as_view()
+    }
+
+    #[inline]
+    fn to_owned_storage<T: Clone + Send + Sync>(
+        d: &BlockedCooData<'_, T, BM, BN>,
+    ) -> OwnedBlockedCoo<T, BM, BN> {
+        OwnedBlockedCoo::new(
+            d.blocks.to_vec(),
+            d.block_row.to_vec(),
+            d.block_col.to_vec(),
+            d.nblocks,
+            d.nrows,
+            d.ncols,
+        )
+    }
+}
+
+impl CowFormat for DenseWithMask {
+    type Owned<T>
+        = OwnedDenseWithMask<T>
+    where
+        T: Send + Sync;
+
+    #[inline(always)]
+    fn as_storage<T: Send + Sync>(owned: &Self::Owned<T>) -> DenseWithMaskData<'_, T> {
+        owned.as_view()
+    }
+
+    #[inline]
+    fn to_owned_storage<T: Clone + Send + Sync>(
+        d: &DenseWithMaskData<'_, T>,
+    ) -> OwnedDenseWithMask<T> {
+        OwnedDenseWithMask::new(d.values.to_vec(), d.mask.to_vec(), d.nrows, d.ncols)
+    }
+}
+
+/// Clone-on-Write sparse matrix, generic over the storage format `F`.
+///
+/// `Borrowed` wraps a zero-copy [`SparseView`]; `Owned` holds heap-backed
+/// storage. Reads never allocate; [`SparseCow::to_owned`] promotes exactly
+/// once.
+pub enum SparseCow<'a, T: Send + Sync, F: CowFormat, Arch: SimdArch> {
+    /// Zero-copy borrowed view.
+    Borrowed(SparseView<'a, T, F, Arch>),
+    /// Owned heap-backed storage.
+    Owned(F::Owned<T>),
+}
+
+impl<'a, T: Send + Sync, F: CowFormat, Arch: SimdArch> SparseCow<'a, T, F, Arch> {
+    /// Wrap borrowed view storage (zero allocation).
+    #[inline(always)]
+    pub fn borrowed(data: F::Storage<'a, T>) -> Self {
+        Self::Borrowed(SparseView::new(data))
+    }
+
+    /// Wrap owned storage (already heap-allocated).
+    #[inline(always)]
+    pub fn owned(storage: F::Owned<T>) -> Self {
+        Self::Owned(storage)
     }
 
     /// Number of rows.
@@ -52,7 +157,7 @@ impl<'a, T, Arch: SimdArch> CsrCow<'a, T, Arch> {
     pub fn nrows(&self) -> usize {
         match self {
             Self::Borrowed(v) => v.nrows(),
-            Self::Owned(o) => o.nrows,
+            Self::Owned(o) => o.nrows(),
         }
     }
 
@@ -61,7 +166,7 @@ impl<'a, T, Arch: SimdArch> CsrCow<'a, T, Arch> {
     pub fn ncols(&self) -> usize {
         match self {
             Self::Borrowed(v) => v.ncols(),
-            Self::Owned(o) => o.ncols,
+            Self::Owned(o) => o.ncols(),
         }
     }
 
@@ -78,75 +183,76 @@ impl<'a, T, Arch: SimdArch> CsrCow<'a, T, Arch> {
     }
 
     /// Promote to owned, cloning from the borrowed view if needed.
+    ///
+    /// Idempotent: an already-owned container is left untouched.
     #[inline]
     pub fn to_owned(&mut self)
     where
         T: Clone,
     {
         if let Self::Borrowed(v) = self {
-            let d = v.csr_data();
-            let owned = OwnedCsr::new(
-                d.values.to_vec(),
-                d.col_indices.to_vec(),
-                d.row_ptr.to_vec(),
-                d.nrows,
-                d.ncols,
-            );
-            *self = Self::Owned(owned);
+            *self = Self::Owned(F::to_owned_storage(v.storage()));
         }
     }
 }
 
-impl<'a, T: Scalar, Arch: SimdArch + SimdKernel<T>> SparseSpMv<T> for CsrCow<'a, T, Arch> {
+impl<'a, T, F, Arch> SparseSpMv<T> for SparseCow<'a, T, F, Arch>
+where
+    T: Scalar,
+    F: CowFormat,
+    Arch: SimdArch,
+    for<'b> SparseView<'b, T, F, Arch>: SparseSpMv<T>,
+{
     #[inline]
     fn spmv(&self, x: &[T], y: &mut [T]) {
         match self {
             Self::Borrowed(v) => v.spmv(x, y),
-            Self::Owned(o) => SparseView::<T, Csr, Arch>::from_csr(o.as_view()).spmv(x, y),
+            Self::Owned(o) => SparseView::<T, F, Arch>::new(F::as_storage(o)).spmv(x, y),
         }
     }
 }
 
-impl<'a, T: Scalar, Arch: SimdArch> SparseOps<T> for CsrCow<'a, T, Arch> {
+impl<'a, T, F, Arch> SparseOps<T> for SparseCow<'a, T, F, Arch>
+where
+    T: Scalar,
+    F: CowFormat,
+    Arch: SimdArch,
+    for<'b> SparseView<'b, T, F, Arch>: SparseOps<T>,
+{
     #[inline]
     fn sum_values(&self) -> T {
         match self {
             Self::Borrowed(v) => v.sum_values(),
-            Self::Owned(o) => SparseView::<T, Csr, Arch>::from_csr(o.as_view()).sum_values(),
+            Self::Owned(o) => SparseView::<T, F, Arch>::new(F::as_storage(o)).sum_values(),
         }
     }
+
     #[inline]
     fn elementwise_mul_dense(&self, dense: &[T], out_values: &mut [T]) {
         match self {
             Self::Borrowed(v) => v.elementwise_mul_dense(dense, out_values),
-            Self::Owned(o) => SparseView::<T, Csr, Arch>::from_csr(o.as_view())
+            Self::Owned(o) => SparseView::<T, F, Arch>::new(F::as_storage(o))
                 .elementwise_mul_dense(dense, out_values),
         }
     }
 }
 
-/// Clone-on-Write SELL-p sparse matrix.
-pub enum SellPCow<'a, T, const C: usize, Arch: SimdArch> {
-    /// Zero-copy borrowed SELL-p view.
-    Borrowed(SparseView<'a, T, SellP<C>, Arch>),
-    /// Owned heap-backed SELL-p storage.
-    Owned(OwnedSellP<T, C>),
+impl<'a, T: Send + Sync, Arch: SimdArch> SparseCow<'a, T, Csr, Arch> {
+    /// Build an owned CSR Cow from raw vectors.
+    #[inline]
+    pub fn from_vecs(
+        values: Vec<T>,
+        col_indices: Vec<i32>,
+        row_ptr: Vec<i32>,
+        nrows: usize,
+        ncols: usize,
+    ) -> Self {
+        Self::Owned(OwnedCsr::new(values, col_indices, row_ptr, nrows, ncols))
+    }
 }
 
-impl<'a, T, const C: usize, Arch: SimdArch> SellPCow<'a, T, C, Arch> {
-    /// Wrap a borrowed SELL-p view (zero allocation).
-    #[inline(always)]
-    pub fn borrowed(data: SellPData<'a, T, C>) -> Self {
-        Self::Borrowed(SparseView::from_sellp(data))
-    }
-
-    /// Wrap an owned SELL-p (heap-allocated).
-    #[inline(always)]
-    pub fn owned(storage: OwnedSellP<T, C>) -> Self {
-        Self::Owned(storage)
-    }
-
-    /// Build an owned `SellPCow` from raw vectors.
+impl<'a, T: Send + Sync, const C: usize, Arch: SimdArch> SparseCow<'a, T, SellP<C>, Arch> {
+    /// Build an owned SELL-p Cow from raw vectors.
     #[inline]
     pub fn from_vecs(
         values: Vec<T>,
@@ -165,110 +271,12 @@ impl<'a, T, const C: usize, Arch: SimdArch> SellPCow<'a, T, C, Arch> {
             ncols,
         ))
     }
-
-    /// Number of rows.
-    #[inline(always)]
-    pub fn nrows(&self) -> usize {
-        match self {
-            Self::Borrowed(v) => v.nrows(),
-            Self::Owned(o) => o.nrows,
-        }
-    }
-
-    /// Number of columns.
-    #[inline(always)]
-    pub fn ncols(&self) -> usize {
-        match self {
-            Self::Borrowed(v) => v.ncols(),
-            Self::Owned(o) => o.ncols,
-        }
-    }
-
-    /// Returns `true` if this holds a borrowed view.
-    #[inline(always)]
-    pub fn is_borrowed(&self) -> bool {
-        matches!(self, Self::Borrowed(_))
-    }
-
-    /// Returns `true` if this holds heap-owned data.
-    #[inline(always)]
-    pub fn is_owned(&self) -> bool {
-        matches!(self, Self::Owned(_))
-    }
-
-    /// Promote to owned, cloning from the borrowed view if needed.
-    #[inline]
-    pub fn to_owned(&mut self)
-    where
-        T: Clone,
-    {
-        if let Self::Borrowed(v) = self {
-            let d = &v.data;
-            let owned = OwnedSellP::new(
-                d.values.to_vec(),
-                d.col_indices.to_vec(),
-                d.slice_ptr.to_vec(),
-                d.slice_col_count.to_vec(),
-                d.nrows,
-                d.ncols,
-            );
-            *self = Self::Owned(owned);
-        }
-    }
 }
 
-impl<'a, T: Scalar, const C: usize, Arch: SimdArch + SimdKernel<T>> SparseSpMv<T>
-    for SellPCow<'a, T, C, Arch>
+impl<'a, T: Send + Sync, const BM: usize, const BN: usize, Arch: SimdArch>
+    SparseCow<'a, T, BlockedCoo<BM, BN>, Arch>
 {
-    #[inline]
-    fn spmv(&self, x: &[T], y: &mut [T]) {
-        match self {
-            Self::Borrowed(v) => v.spmv(x, y),
-            Self::Owned(o) => SparseView::<T, SellP<C>, Arch>::from_sellp(o.as_view()).spmv(x, y),
-        }
-    }
-}
-
-impl<'a, T: Scalar, const C: usize, Arch: SimdArch> SparseOps<T> for SellPCow<'a, T, C, Arch> {
-    #[inline]
-    fn sum_values(&self) -> T {
-        match self {
-            Self::Borrowed(v) => v.sum_values(),
-            Self::Owned(o) => SparseView::<T, SellP<C>, Arch>::from_sellp(o.as_view()).sum_values(),
-        }
-    }
-    #[inline]
-    fn elementwise_mul_dense(&self, dense: &[T], out_values: &mut [T]) {
-        match self {
-            Self::Borrowed(v) => v.elementwise_mul_dense(dense, out_values),
-            Self::Owned(o) => SparseView::<T, SellP<C>, Arch>::from_sellp(o.as_view())
-                .elementwise_mul_dense(dense, out_values),
-        }
-    }
-}
-
-/// Clone-on-Write Blocked-COO sparse matrix.
-pub enum BlockedCooCow<'a, T, const BM: usize, const BN: usize, Arch: SimdArch> {
-    /// Zero-copy borrowed Blocked-COO view.
-    Borrowed(SparseView<'a, T, BlockedCoo<BM, BN>, Arch>),
-    /// Owned heap-backed Blocked-COO storage.
-    Owned(OwnedBlockedCoo<T, BM, BN>),
-}
-
-impl<'a, T, const BM: usize, const BN: usize, Arch: SimdArch> BlockedCooCow<'a, T, BM, BN, Arch> {
-    /// Wrap a borrowed Blocked-COO view (zero allocation).
-    #[inline(always)]
-    pub fn borrowed(data: BlockedCooData<'a, T, BM, BN>) -> Self {
-        Self::Borrowed(SparseView::from_blocked_coo(data))
-    }
-
-    /// Wrap an owned Blocked-COO (heap-allocated).
-    #[inline(always)]
-    pub fn owned(storage: OwnedBlockedCoo<T, BM, BN>) -> Self {
-        Self::Owned(storage)
-    }
-
-    /// Build an owned `BlockedCooCow` from raw vectors.
+    /// Build an owned Blocked-COO Cow from raw vectors.
     #[inline]
     pub fn from_vecs(
         blocks: Vec<T>,
@@ -282,207 +290,12 @@ impl<'a, T, const BM: usize, const BN: usize, Arch: SimdArch> BlockedCooCow<'a, 
             blocks, block_row, block_col, nblocks, nrows, ncols,
         ))
     }
-
-    /// Number of rows.
-    #[inline(always)]
-    pub fn nrows(&self) -> usize {
-        match self {
-            Self::Borrowed(v) => v.nrows(),
-            Self::Owned(o) => o.nrows,
-        }
-    }
-
-    /// Number of columns.
-    #[inline(always)]
-    pub fn ncols(&self) -> usize {
-        match self {
-            Self::Borrowed(v) => v.ncols(),
-            Self::Owned(o) => o.ncols,
-        }
-    }
-
-    /// Returns `true` if this holds a borrowed view.
-    #[inline(always)]
-    pub fn is_borrowed(&self) -> bool {
-        matches!(self, Self::Borrowed(_))
-    }
-
-    /// Returns `true` if this holds heap-owned data.
-    #[inline(always)]
-    pub fn is_owned(&self) -> bool {
-        matches!(self, Self::Owned(_))
-    }
-
-    /// Promote to owned, cloning from the borrowed view if needed.
-    #[inline]
-    pub fn to_owned(&mut self)
-    where
-        T: Clone,
-    {
-        if let Self::Borrowed(v) = self {
-            let d = &v.data;
-            let owned = OwnedBlockedCoo::new(
-                d.blocks.to_vec(),
-                d.block_row.to_vec(),
-                d.block_col.to_vec(),
-                d.nblocks,
-                d.nrows,
-                d.ncols,
-            );
-            *self = Self::Owned(owned);
-        }
-    }
 }
 
-impl<'a, T: Scalar, const BM: usize, const BN: usize, Arch: SimdArch + SimdKernel<T>> SparseSpMv<T>
-    for BlockedCooCow<'a, T, BM, BN, Arch>
-{
-    #[inline]
-    fn spmv(&self, x: &[T], y: &mut [T]) {
-        match self {
-            Self::Borrowed(v) => v.spmv(x, y),
-            Self::Owned(o) => {
-                SparseView::<T, BlockedCoo<BM, BN>, Arch>::from_blocked_coo(o.as_view()).spmv(x, y)
-            }
-        }
-    }
-}
-
-impl<'a, T: Scalar, const BM: usize, const BN: usize, Arch: SimdArch> SparseOps<T>
-    for BlockedCooCow<'a, T, BM, BN, Arch>
-{
-    #[inline]
-    fn sum_values(&self) -> T {
-        match self {
-            Self::Borrowed(v) => v.sum_values(),
-            Self::Owned(o) => {
-                SparseView::<T, BlockedCoo<BM, BN>, Arch>::from_blocked_coo(o.as_view())
-                    .sum_values()
-            }
-        }
-    }
-    #[inline]
-    fn elementwise_mul_dense(&self, dense: &[T], out_values: &mut [T]) {
-        match self {
-            Self::Borrowed(v) => v.elementwise_mul_dense(dense, out_values),
-            Self::Owned(o) => {
-                SparseView::<T, BlockedCoo<BM, BN>, Arch>::from_blocked_coo(o.as_view())
-                    .elementwise_mul_dense(dense, out_values)
-            }
-        }
-    }
-}
-
-/// Clone-on-Write DenseWithMask sparse matrix.
-pub enum DenseWithMaskCow<'a, T, Arch: SimdArch> {
-    /// Zero-copy borrowed DenseWithMask view.
-    Borrowed(SparseView<'a, T, DenseWithMask, Arch>),
-    /// Owned heap-backed DenseWithMask storage.
-    Owned(OwnedDenseWithMask<T>),
-}
-
-impl<'a, T, Arch: SimdArch> DenseWithMaskCow<'a, T, Arch> {
-    /// Wrap a borrowed DenseWithMask view (zero allocation).
-    #[inline(always)]
-    pub fn borrowed(data: DenseWithMaskData<'a, T>) -> Self {
-        Self::Borrowed(SparseView::from_dense_with_mask(data))
-    }
-
-    /// Wrap an owned DenseWithMask (heap-allocated).
-    #[inline(always)]
-    pub fn owned(storage: OwnedDenseWithMask<T>) -> Self {
-        Self::Owned(storage)
-    }
-
-    /// Build an owned `DenseWithMaskCow` from raw vectors.
+impl<'a, T: Send + Sync, Arch: SimdArch> SparseCow<'a, T, DenseWithMask, Arch> {
+    /// Build an owned DenseWithMask Cow from raw vectors.
     #[inline]
     pub fn from_vecs(values: Vec<T>, mask: Vec<bool>, nrows: usize, ncols: usize) -> Self {
         Self::Owned(OwnedDenseWithMask::new(values, mask, nrows, ncols))
     }
-
-    /// Number of rows.
-    #[inline(always)]
-    pub fn nrows(&self) -> usize {
-        match self {
-            Self::Borrowed(v) => v.nrows(),
-            Self::Owned(o) => o.nrows,
-        }
-    }
-
-    /// Number of columns.
-    #[inline(always)]
-    pub fn ncols(&self) -> usize {
-        match self {
-            Self::Borrowed(v) => v.ncols(),
-            Self::Owned(o) => o.ncols,
-        }
-    }
-
-    /// Returns `true` if this holds a borrowed view.
-    #[inline(always)]
-    pub fn is_borrowed(&self) -> bool {
-        matches!(self, Self::Borrowed(_))
-    }
-
-    /// Returns `true` if this holds heap-owned data.
-    #[inline(always)]
-    pub fn is_owned(&self) -> bool {
-        matches!(self, Self::Owned(_))
-    }
-
-    /// Promote to owned, cloning from the borrowed view if needed.
-    #[inline]
-    pub fn to_owned(&mut self)
-    where
-        T: Clone,
-    {
-        if let Self::Borrowed(v) = self {
-            let d = &v.data;
-            let owned =
-                OwnedDenseWithMask::new(d.values.to_vec(), d.mask.to_vec(), d.nrows, d.ncols);
-            *self = Self::Owned(owned);
-        }
-    }
 }
-
-impl<'a, T: Scalar, Arch: SimdArch + SimdKernel<T>> SparseSpMv<T>
-    for DenseWithMaskCow<'a, T, Arch>
-{
-    #[inline]
-    fn spmv(&self, x: &[T], y: &mut [T]) {
-        match self {
-            Self::Borrowed(v) => v.spmv(x, y),
-            Self::Owned(o) => {
-                SparseView::<T, DenseWithMask, Arch>::from_dense_with_mask(o.as_view()).spmv(x, y)
-            }
-        }
-    }
-}
-
-impl<'a, T: Scalar, Arch: SimdArch> SparseOps<T> for DenseWithMaskCow<'a, T, Arch> {
-    #[inline]
-    fn sum_values(&self) -> T {
-        match self {
-            Self::Borrowed(v) => v.sum_values(),
-            Self::Owned(o) => {
-                SparseView::<T, DenseWithMask, Arch>::from_dense_with_mask(o.as_view()).sum_values()
-            }
-        }
-    }
-    #[inline]
-    fn elementwise_mul_dense(&self, dense: &[T], out_values: &mut [T]) {
-        match self {
-            Self::Borrowed(v) => v.elementwise_mul_dense(dense, out_values),
-            Self::Owned(o) => {
-                SparseView::<T, DenseWithMask, Arch>::from_dense_with_mask(o.as_view())
-                    .elementwise_mul_dense(dense, out_values)
-            }
-        }
-    }
-}
-
-/// Type alias: `SparseCow` defaults to the CSR Clone-on-Write container.
-///
-/// For other formats, use [`CsrCow`], [`SellPCow`], [`BlockedCooCow`], or
-/// [`DenseWithMaskCow`] directly.
-pub type SparseCow<'a, T, Arch> = CsrCow<'a, T, Arch>;

@@ -37,7 +37,7 @@ pub trait NumericElement:
     /// IEEE 754 sign-bit mask: only the most-significant bit is set.
     ///
     /// XOR-ing any value with this mask negates it (flips the sign bit).
-    /// Used by the default [`crate::kernel::SimdKernel::neg`] implementation to
+    /// Used by the default `SimdKernel::neg` implementation (hermes-simd-core) to
     /// avoid subtraction, which is not universally available across SIMD backends.
     const SIGN_MASK: Self;
 

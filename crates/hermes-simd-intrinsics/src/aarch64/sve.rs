@@ -2,8 +2,8 @@
 //!
 //! SVE provides hardware predicate registers and scalable vector widths
 //! (128–2048 bits in 128-bit increments, determined at runtime via the
-//! `rdvl` instruction). This module provides the [`SveArch`] ZST marker
-//! and skeleton [`SimdKernel`] implementations.
+//! `rdvl` instruction). This module provides the `SveArch` ZST marker
+//! and skeleton `SimdKernel` implementations.
 //!
 //! Full SVE intrinsic implementations require the `+sve` target feature and
 //! nightly compiler support for `core::arch::aarch64::svfloat32_t` etc.

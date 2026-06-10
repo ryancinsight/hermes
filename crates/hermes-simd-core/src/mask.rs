@@ -145,7 +145,8 @@ impl<const N: usize> BitMask<N> {
 impl<const N: usize> BitMask<N> {
     /// Convert this `BitMask<N>` to the native hardware mask type for `Arch`.
     ///
-    /// Delegates to [`SimdKernel::mask_from_bitmask`] using the inner `u64` value.
+    /// Delegates to [`SimdKernel::mask_from_bitmask`](crate::kernel::SimdKernel::mask_from_bitmask)
+    /// using the inner `u64` value.
     /// Zero runtime cost: the compiler inlines this into a single instruction on
     /// AVX-512 (`KMOV`), a vector comparison + blend mask on AVX2, or a bool-array
     /// copy on scalar backends.

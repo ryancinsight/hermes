@@ -15,7 +15,7 @@ mod tests {
         align::Unaligned,
         execution::Unmasked,
         ops::{Dot, Max, Min, ReductionOp, Sum},
-        scalar::{NumericElement, Scalar},
+        scalar::NumericElement,
         view::SimdView,
     };
     use hermes_simd_intrinsics::Scalar as ScalarArch;

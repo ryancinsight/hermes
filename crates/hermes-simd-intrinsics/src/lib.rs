@@ -1,6 +1,7 @@
 //! Hardware intrinsics and backend-specific implementations of SIMD kernels.
 //!
-//! This crate provides concrete [`SimdKernel`] implementations for every
+//! This crate provides concrete [`SimdKernel`](hermes_simd_core::kernel::SimdKernel)
+//! implementations for every
 //! supported architecture marker:
 //!
 //! | Marker          | ISA          | f32 lanes | f64 lanes |
@@ -9,7 +10,7 @@
 //! | [`Avx2`]        | x86 AVX2     | 8         | 4         |
 //! | [`Avx512`]      | x86 AVX-512F | 16        | 8         |
 //! | [`Neon`]        | AArch64 NEON | 4         | 2         |
-//! | [`SveArch`]     | AArch64 SVE  | stub      | stub      |
+//! | `SveArch` (aarch64) | AArch64 SVE | stub    | stub      |
 //!
 //! Optional crate-feature backends:
 //! - `wide` — wraps the [`wide`](https://docs.rs/wide) crate.

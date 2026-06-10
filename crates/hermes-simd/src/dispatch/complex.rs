@@ -131,18 +131,35 @@ where
             lanes <= MAX_STACK_LANES,
             "SIMD lane count exceeds stack buffer"
         );
+        // Two independent accumulators break the loop-carried add dependency
+        // so consecutive FMAs can overlap in the pipeline.
         // SAFETY: feature availability is guaranteed by the dispatching caller.
-        let mut acc = unsafe { A::zero() };
+        let (mut acc0, mut acc1) = unsafe { (A::zero(), A::zero()) };
+        while offset + 2 * lanes <= a.len() {
+            // SAFETY: offset + 2*lanes <= len was checked above; `a` and `b`
+            // are valid for reads of `2*lanes` primitive values.
+            unsafe {
+                let av0 = A::load_unaligned(a.as_ptr().add(offset));
+                let bv0 = A::load_unaligned(b.as_ptr().add(offset));
+                acc0 = A::add(acc0, complex_mul_vector::<T, A, CONJ_B>(av0, bv0));
+                let av1 = A::load_unaligned(a.as_ptr().add(offset + lanes));
+                let bv1 = A::load_unaligned(b.as_ptr().add(offset + lanes));
+                acc1 = A::add(acc1, complex_mul_vector::<T, A, CONJ_B>(av1, bv1));
+            }
+            offset += 2 * lanes;
+        }
         while offset + lanes <= a.len() {
             // SAFETY: offset + lanes <= len was checked above; `a` and `b` are
             // valid for reads of `lanes` primitive values.
             unsafe {
                 let av = A::load_unaligned(a.as_ptr().add(offset));
                 let bv = A::load_unaligned(b.as_ptr().add(offset));
-                acc = A::add(acc, complex_mul_vector::<T, A, CONJ_B>(av, bv));
+                acc0 = A::add(acc0, complex_mul_vector::<T, A, CONJ_B>(av, bv));
             }
             offset += lanes;
         }
+        // SAFETY: same feature contract as above.
+        let acc = unsafe { A::add(acc0, acc1) };
 
         // Single spill: fold even lanes into re, odd lanes into im.
         let mut buf = [T::ZERO; MAX_STACK_LANES];

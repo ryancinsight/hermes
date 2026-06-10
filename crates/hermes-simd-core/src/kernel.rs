@@ -19,8 +19,8 @@
 //!   merge-masking semantics: lanes where `mask[i] = 0` are taken from `src`.
 //!
 //! - **Compress / expand** — scatter/gather from/to contiguous storage:
-//!   - `compress`: packs selected lanes (mask[i]=1) to low lanes of result.
-//!   - `expand`: scatters low lanes of `src` to positions where mask[i]=1.
+//!   - `compress`: packs selected lanes (`mask[i]=1`) to low lanes of result.
+//!   - `expand`: scatters low lanes of `src` to positions where `mask[i]=1`.
 //!
 //! - **Gather** (`gather`, `gather_masked`) — indirect indexed load from a base pointer.
 //!
@@ -152,7 +152,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
 
     /// Elementwise subtraction: `a - b`.
     ///
-    /// Default: scalar fallback via [`crate::kernel_helpers::generic_binary_op`].
+    /// Default: scalar fallback via `crate::kernel_helpers::generic_binary_op`.
     /// Float and SIMD backends override this with the appropriate vectorized instruction
     /// (e.g., `_mm256_sub_ps` for AVX2 f32, `vsubq_f32` for NEON).
     ///

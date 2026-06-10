@@ -7,17 +7,14 @@ pub mod types;
 pub mod view;
 
 pub use cow::{
-    BlockedCooCow,
-    // Per-format Cow containers
-    CsrCow,
-    DenseWithMaskCow,
+    // Format-to-owned-storage mapping for Cow containers
+    CowFormat,
     OwnedBlockedCoo,
     // Owned heap-backed storage types
     OwnedCsr,
     OwnedDenseWithMask,
     OwnedSellP,
-    SellPCow,
-    // Default SparseCow alias (= CsrCow)
+    // Generic Clone-on-Write sparse container
     SparseCow,
 };
 pub use ops::SparseOps;

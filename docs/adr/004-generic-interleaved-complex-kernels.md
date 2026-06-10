@@ -46,9 +46,11 @@ scalar)]` and two new `SimdOps` methods (`interleaved_complex_mul_assign`,
 dense kernels. `InterleavedComplexLane`, the per-type impl duplication, the
 `OnceLock` caches, and both hand-written AVX functions are removed.
 
-NEON uses the default emulated primitives until aarch64 overrides
-(`vrev64q`, `vtrn1q`/`vtrn2q`, fused-negate composition) are added and
-compile-verified on an aarch64 toolchain.
+NEON f32/f64 override the primitives with `vrev64q_f32` / `vextq_f64`
+(swap), `vtrn1q`/`vtrn2q` (duplication), and a sign-flip XOR composed with
+`vfmaq` for the alternating FMAs (rounding-identical to a native
+`fmaddsub`). Compile-verified against `aarch64-unknown-linux-gnu`; runtime
+differential validation on aarch64 hardware remains outstanding.
 
 ## Consequences
 

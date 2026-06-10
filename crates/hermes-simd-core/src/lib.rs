@@ -14,7 +14,7 @@
 //! | [`view`] | `SimdView`, `SimdError` — safe typed slice views |
 //! | [`tiling`] | Const-generic tiled dot product and `TilingPolicy` |
 //! | [`sparse`] | `SparseView`, format ZSTs, data structs, SpMV kernels |
-//! | [`vec`] | `AlignedVec` — heap-allocated aligned vector |
+//! | [`vec`](mod@crate::vec) | `AlignedVec` — heap-allocated aligned vector |
 //! | [`cow`] | `SimdCow` — SIMD-aware copy-on-write |
 //! | [`tensor`] | N-D tensor views, GEMM, softmax, LayerNorm, Attention |
 
