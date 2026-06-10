@@ -1,36 +1,32 @@
 # hermes-simd
 
-A high-performance, zero-overhead Rust SIMD abstraction library focusing on data-parallel computing, Intel AMX tiling, AVX-512 VNNI, SWAR Chess Bitboards, and Sparse SpMV kernels.
+A high-performance, zero-overhead Rust SIMD abstraction workspace covering dense, sparse, complex, and packed sub-byte data-parallel kernels — plus Intel AMX tiling, AVX-512 VNNI, and SWAR chess bitboards.
 
-The workspace is designed for extreme runtime efficiency, using traits, ZST markers, and full compiler monomorphization to generate machine code identical to hand-optimized assembly. It compiles entirely on stable Rust with no unstable nightly compiler prerequisites.
+The workspace is designed for extreme runtime efficiency, using traits, ZST markers, const generics, and full compiler monomorphization to generate machine code identical to hand-optimized assembly. It compiles entirely on stable Rust with no unstable nightly compiler prerequisites.
 
 ## Workspace Structure
 
-The project is structured as a multi-crate workspace:
-- **`crates/hermes-simd-core`**: Core abstractions, align typestates, reference type-state parameterization (`SimdView`), mask wrappers (`BitMask`), execution modes (`Unmasked`/`Masked`), and unified `ComputeView` trait.
-- **`crates/hermes-simd-intrinsics`**: Low-level, architecture-specific vector kernels (Scalar, AVX2, AVX-512, NEON), Intel AMX engine, AVX-512 VNNI tile multipliers, and sliding attack bitboards.
-- **`crates/hermes-simd-macros`**: Procedural macros (`#[runtime_dispatch]`, `#[derive(SparseData)]`) for compile-time generation of dispatch boilerplate.
-- **`crates/hermes-simd`**: The public safe API facade that handles dynamic CPUID runtime dispatch and safe client interactions.
-- **`crates/hermes-simd-examples`**: Demo applications showing bitboard computations, dot products, and copy-on-write SIMD utilities.
-- **`crates/hermes-simd-benches`**: Matrix benching suite with Criterion and a custom parser to compile results.
+The project is structured as a multi-crate workspace (dependencies flow strictly downward):
+
+- **`crates/hermes-numeric`**: Numeric type foundation — the precision ladder (`Bf4`/`F4`/`Bf8`/`F8`/`F16`/`Bf16`/`F32`/`F64`/`I8`/`I16`/`I32`), packed 4-bit storage (two values per byte), cast traits, and rkyv zero-copy serialization. No SIMD dependencies.
+- **`crates/hermes-simd-core`**: Core abstractions — `SimdView<'a, T, Arch, Align, Mode, Ref>` typestate views, the `SimdKernel<T>` operation trait, `SimdCow` dense copy-on-write, generic `SparseCow<T, Format, Arch>`, `BitMask<N>`, reduction/element/scan op strategy ZSTs, const-generic tiling, and N-D tensor views.
+- **`crates/hermes-simd-intrinsics`**: Architecture-specific kernels (`Scalar`, `Avx2`, `Avx512`, `Neon` ZST markers implementing `SimdKernel<T>`), Intel AMX engine, AVX-512 VNNI tile multipliers, packed 4-bit hardware unpacking, and sliding-attack bitboard backends.
+- **`crates/hermes-simd-types`**: Monomorphized convenience aliases and the compile-time `PreferredArch` selection.
+- **`crates/hermes-simd-macros`**: Procedural macros — `#[runtime_dispatch]` generates compile-time-gated plus runtime-detected dispatchers from one generic kernel function.
+- **`crates/hermes-simd`**: Public facade — the sealed `SimdOps` extension trait, runtime-dispatched free functions (`sum`, `dot`, `spmv_*`, `interleaved_complex_*`, …), and `dispatch_view` CPUID routing.
+- **`crates/hermes-simd-examples`**: Demos — bitboards, dot products, copy-on-write, interleaved complex throughput.
+- **`crates/hermes-simd-benches`**: Criterion + divan benchmark suite with report generation.
 
 ## Key Features
 
-1. **Intel AMX Acceleration**:
-   - Self-contained, stable inline assembly support for AMX registers and instructions (`tdpbf16ps`, `tdpbssd`).
-   - RAII `AmxSession` cache manager to load tile configurations once and amortize setup latency.
-   - 2x2 register blocking for high-throughput matrix multiply kernels.
-2. **AVX-512 & VNNI Optimization**:
-   - VNNI tile matrix multiplication (`gemm_int8`) utilizing bit-parallel unpacking of sub-byte INT4 elements to INT8.
-   - Vector mask registers (`__mmask16`/`__mmask8`) mapped to branchless conditional logic.
-3. **SWAR Chess Bitboards**:
-   - Sliding Rook/Bishop attack generator backends: Kogge-Stone (parallel direction vectorization), Hyperbola Quintessence, Fancy Magic Bitboards, and Hybrid SWAR-Magic.
-   - Batch attack queries using a unified `BitBoardView`.
-   - Pure SWAR bit utilities (byte-wise popcounts, bit scans, MSB/LSB isolation).
-4. **Sparse SIMD (SpMV)**:
-   - Format-parameterized views for CSR, Sliced ELLPACK (SELL-p), Blocked COO, and Dense-with-Mask layouts.
-5. **Type-State Reference Parameterization**:
-   - Unified `SimdView<'a, T, Arch, Align, Ref>` where `Ref` can be `&'a [T]` or `&'a mut [T]`. Enforces covariance/invariance and aliasing safety at compile time with zero runtime layout overhead.
+1. **Generic runtime dispatch**: one `<T: Scalar, A: SimdKernel<T>>` kernel per operation; `#[runtime_dispatch(avx512f, avx2, neon, scalar)]` emits the per-ISA `#[target_feature]` wrappers and the detection ladder. No per-type kernel clones, no type names in identifiers.
+2. **Interleaved complex kernels**: `interleaved_complex_dot` / `interleaved_complex_mul_assign` over `[re, im, ...]` primitive slices, fully register-resident via adjacent-pair `SimdKernel` primitives (`swap_adjacent`, `dup_even`, `dup_odd`, `fmaddsub`, `fmsubadd`) with AVX2/AVX-512/NEON overrides and a `const CONJ_B` conjugation flag (see `docs/adr/004`).
+3. **Copy-on-write containers**: `SimdCow` (dense, with map/zip/reduce/scan/norm extensions) and one generic `SparseCow<T, F, Arch>` covering every sparse format through the `CowFormat` trait — zero-copy reads, single-allocation promotion.
+4. **Sparse SIMD (SpMV)**: format-parameterized views for CSR, Sliced ELLPACK (SELL-p), Blocked COO, and Dense-with-Mask layouts.
+5. **Intel AMX acceleration**: stable inline-assembly AMX (`tdpbf16ps`, `tdpbssd`), RAII `AmxSession` tile-config caching, 2×2 register blocking; VNNI tile GEMM with bit-parallel INT4→INT8 unpacking.
+6. **SWAR chess bitboards**: Kogge-Stone, Hyperbola Quintessence, Fancy Magic, and Hybrid SWAR-Magic sliding-attack backends behind one `BitBoardView`.
+7. **Typestate safety**: alignment (`Aligned<A>`/`Unaligned`), execution mode (`Masked`/`Unmasked`), and reference mutability are compile-time parameters with zero layout overhead.
+8. **Precision ladder**: 4-bit through 64-bit numeric types with packed storage and hardware-accelerated unpacking into `SimdCow`.
 
 ## Feature Flags
 
@@ -47,7 +43,7 @@ The project is structured as a multi-crate workspace:
 
 ## Quickstart
 
-### Dense Sum Reduction (Dynamic Dispatch)
+### Dense Sum Reduction (Runtime Dispatch)
 ```rust
 use hermes_simd::sum;
 
@@ -68,18 +64,29 @@ let result = masked_dot(&a, &b, &mask).unwrap(); // computes 1*1 + 3*1 + 5*1
 assert_eq!(result, 9.0);
 ```
 
+### Interleaved Complex Dot (Runtime Dispatch)
+```rust
+use hermes_simd::interleaved_complex_dot_runtime;
+
+// [re0, im0, re1, im1]: (1 + 2i), (3 + 4i)
+let a = [1.0f64, 2.0, 3.0, 4.0];
+let b = [5.0f64, 6.0, 7.0, 8.0];
+
+// sum(a[k] * conj(b[k])) — CONJ_B selects conjugation at compile time
+let (re, im) = interleaved_complex_dot_runtime::<f64, true>(&a, &b).unwrap();
+assert_eq!((re, im), (70.0, 8.0));
+```
+
 ### High-level GEMM (AMX / VNNI Fallback)
 ```rust
 use hermes_simd::gemm_int8;
 
-let m = 32;
-let n = 32;
-let k = 64;
+let (m, n, k) = (32, 32, 64);
 let a = vec![1i8; m * k];
 let b = vec![2i8; k * n];
 let mut c = vec![0i32; m * n];
 
-// Automatically dispatches to Intel AMX (if available), AVX-512 VNNI, or Scalar loops
+// Automatically dispatches to Intel AMX (if available), AVX-512 VNNI, or scalar loops
 unsafe {
     gemm_int8(m, n, k, &a, k, &b, n, &mut c, n).unwrap();
 }
@@ -87,26 +94,30 @@ unsafe {
 
 ---
 
-## Running Verification
+## Verification
 
-### Automated Tests
-Run the unit, integration, and property tests across the workspace:
 ```powershell
+# Unit, integration, differential, and property tests (proptest)
 cargo test --workspace
-```
 
-### Examples
-Run the SWAR bitboard simulator:
-```powershell
-cargo run -p hermes-simd-examples --example swar_bitboards
-```
+# Lint and format gates
+cargo clippy --workspace --all-targets -- -D warnings
+cargo fmt --all -- --check
 
-### Benchmarks
-Generate the performance overview report:
-```powershell
-# Compiles benchmarks
-cargo check --benches
+# Cross-target compile check (NEON kernels)
+cargo check --workspace --target aarch64-unknown-linux-gnu
 
-# Runs benchmarks and updates benchmarks_results.md
+# Benchmarks → updates benchmarks_results.md
 cargo run -p hermes-simd-benches
 ```
+
+Differential testing policy: every optimized backend (AVX2, AVX-512, NEON, AMX) is verified against the always-available `Scalar` backend — bitwise on dyadic-exact inputs, within analytically derived rounding bounds on arbitrary inputs.
+
+## Project Management
+
+- Design decisions: [`docs/adr/`](docs/adr/)
+- Strategic roadmap: [`backlog.md`](backlog.md)
+- Active sprint tactics: [`checklist.md`](checklist.md)
+- Version history: [`CHANGELOG.md`](CHANGELOG.md)
+
+Current version: **0.1.0** (pre-release; canonical trait surfaces defined, breaking changes documented per minor release).
