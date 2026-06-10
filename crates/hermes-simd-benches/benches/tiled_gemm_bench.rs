@@ -2,7 +2,9 @@
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use half::bf16;
-use hermes_simd::{gemm, tiled_gemm, AmxSupport, Scalar, TileMatrixMultiply};
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+use hermes_simd::AmxSupport;
+use hermes_simd::{gemm, tiled_gemm, Scalar, TileMatrixMultiply};
 
 fn bench_tiled_gemm(c: &mut Criterion) {
     let mut group = c.benchmark_group("Tiled GEMM f32");
