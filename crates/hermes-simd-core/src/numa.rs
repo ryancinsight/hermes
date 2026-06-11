@@ -36,7 +36,16 @@ pub struct MnemosyneNumaAllocator;
 
 impl NumaAllocator for MnemosyneNumaAllocator {
     unsafe fn alloc_on_node(&self, layout: Layout, node: u32) -> *mut u8 {
-        #[cfg(all(target_os = "linux", feature = "libnuma"))]
+        #[cfg(feature = "mnemosyne-memory")]
+        {
+            let _binding = NumaBinding::bind(node);
+            unsafe { core::alloc::GlobalAlloc::alloc(&mnemosyne::Mnemosyne, layout) }
+        }
+        #[cfg(all(
+            not(feature = "mnemosyne-memory"),
+            target_os = "linux",
+            feature = "libnuma"
+        ))]
         {
             // On Linux we can use numa_alloc_onnode.
             #[link(name = "numa")]
@@ -50,7 +59,7 @@ impl NumaAllocator for MnemosyneNumaAllocator {
                 ptr
             }
         }
-        #[cfg(target_os = "windows")]
+        #[cfg(all(not(feature = "mnemosyne-memory"), target_os = "windows"))]
         {
             // On Windows we can use VirtualAllocExNuma.
             extern "system" {
@@ -82,7 +91,11 @@ impl NumaAllocator for MnemosyneNumaAllocator {
                 ptr as *mut u8
             }
         }
-        #[cfg(not(any(all(target_os = "linux", feature = "libnuma"), target_os = "windows")))]
+        #[cfg(not(any(
+            feature = "mnemosyne-memory",
+            all(target_os = "linux", feature = "libnuma"),
+            target_os = "windows"
+        )))]
         {
             let _ = node;
             alloc::alloc::alloc(layout)
@@ -90,7 +103,18 @@ impl NumaAllocator for MnemosyneNumaAllocator {
     }
 
     unsafe fn dealloc_on_node(&self, ptr: *mut u8, layout: Layout, _node: u32) {
-        #[cfg(all(target_os = "linux", feature = "libnuma"))]
+        #[cfg(feature = "mnemosyne-memory")]
+        {
+            let _binding = NumaBinding::bind(_node);
+            unsafe {
+                core::alloc::GlobalAlloc::dealloc(&mnemosyne::Mnemosyne, ptr, layout);
+            }
+        }
+        #[cfg(all(
+            not(feature = "mnemosyne-memory"),
+            target_os = "linux",
+            feature = "libnuma"
+        ))]
         {
             #[link(name = "numa")]
             extern "C" {
@@ -98,7 +122,7 @@ impl NumaAllocator for MnemosyneNumaAllocator {
             }
             numa_free(ptr, layout.size());
         }
-        #[cfg(target_os = "windows")]
+        #[cfg(all(not(feature = "mnemosyne-memory"), target_os = "windows"))]
         {
             extern "system" {
                 fn GetCurrentProcess() -> *mut core::ffi::c_void;
@@ -120,7 +144,11 @@ impl NumaAllocator for MnemosyneNumaAllocator {
                 alloc::alloc::dealloc(ptr, layout);
             }
         }
-        #[cfg(not(any(all(target_os = "linux", feature = "libnuma"), target_os = "windows")))]
+        #[cfg(not(any(
+            feature = "mnemosyne-memory",
+            all(target_os = "linux", feature = "libnuma"),
+            target_os = "windows"
+        )))]
         {
             let _ = _node;
             alloc::alloc::dealloc(ptr, layout);

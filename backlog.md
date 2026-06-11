@@ -93,6 +93,11 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
       **themis `CpuTopology` owns**, and its `MnemosyneNumaAllocator` names
       mnemosyne's allocation responsibility — a structural duplication across
       the stack SSOT map (themis=topology law, mnemosyne=allocation).
+- [x] **[patch] Default provider feature policy**: every Hermes package
+      defaults `parallel` and `mnemosyne-memory`; the default
+      `MnemosyneNumaAllocator` path now uses Mnemosyne allocation instead of a
+      name-only std/platform allocator branch. The broader Themis topology
+      replacement below remains open.
 - [ ] **[arch] NUMA consolidation onto themis/mnemosyne**: replace
       `numa.rs`'s detection layer with a `themis` dependency (`CpuTopology`,
       `NumaNodeId`, distances) and route `NumaAllocator` through mnemosyne's

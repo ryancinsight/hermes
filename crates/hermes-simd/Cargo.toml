@@ -30,9 +30,21 @@ name = "complex"
 harness = false
 
 [features]
-default = ["std"]
+default = ["std", "parallel", "mnemosyne-memory"]
 # Linux NUMA node placement via libnuma (links -lnuma); off by default.
 libnuma = ["hermes-simd-core/libnuma"]
+parallel = [
+    "hermes-simd-core/parallel",
+    "hermes-simd-intrinsics/parallel",
+    "hermes-numeric/parallel",
+    "hermes-simd-types/parallel",
+]
+mnemosyne-memory = [
+    "hermes-simd-core/mnemosyne-memory",
+    "hermes-simd-intrinsics/mnemosyne-memory",
+    "hermes-numeric/mnemosyne-memory",
+    "hermes-simd-types/mnemosyne-memory",
+]
 std = [
     "hermes-simd-core/std",
     "hermes-simd-intrinsics/std",

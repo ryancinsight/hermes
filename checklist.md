@@ -33,6 +33,9 @@
   its feature-combination probing (rkyv `size_*` feature requirement);
   per-crate scoped runs are the working procedure.
 - `panic = "abort"` in the release profile: CI tests the dev profile.
+- Full Themis topology consolidation remains open: Hermes still owns the
+  public `NumaTopologyService` facade and platform binding fallback, while
+  default NUMA-vector allocations now route through Mnemosyne.
 
 ## Post-0.2.0 increment (2026-06-10)
 
@@ -59,6 +62,12 @@
       Miri instead of returning synthetic values; AMX configuration/release
       instructions are no-ops only for session-state tests; CI now runs
       `cargo +nightly miri test -p hermes-simd-intrinsics`.
+- [x] [patch] Default provider features: every Hermes package now defaults
+      `parallel` and `mnemosyne-memory`; `hermes-simd-core` pins Mnemosyne
+      `938d0c2` and routes `AlignedVec::with_capacity_numa` allocation and
+      deallocation through `mnemosyne::Mnemosyne` under the default feature.
+      Verification: fmt, clippy all-targets/all-features, workspace tests,
+      warning-clean docs, and no-default-features check.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 

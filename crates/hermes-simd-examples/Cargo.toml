@@ -22,3 +22,8 @@ path = "examples/cow_example.rs"
 [[example]]
 name = "complex_dot"
 path = "examples/complex_dot.rs"
+
+[features]
+default = ["parallel", "mnemosyne-memory"]
+parallel = ["hermes-simd/parallel"]
+mnemosyne-memory = ["hermes-simd/mnemosyne-memory"]

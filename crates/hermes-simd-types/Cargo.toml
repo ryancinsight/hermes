@@ -13,5 +13,10 @@ hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.2.0"
 half = { workspace = true }
 
 [features]
-default = ["std"]
+default = ["std", "parallel", "mnemosyne-memory"]
 std = ["hermes-simd-core/std", "hermes-simd-intrinsics/std"]
+parallel = ["hermes-simd-core/parallel", "hermes-simd-intrinsics/parallel"]
+mnemosyne-memory = [
+    "hermes-simd-core/mnemosyne-memory",
+    "hermes-simd-intrinsics/mnemosyne-memory",
+]
