@@ -55,6 +55,10 @@
       generation records detected ISA features and suppresses AMX
       context-pressure rows on non-AMX hosts; dense scalar baselines now
       black-box operands/accumulation to prevent optimized-away work.
+- [x] [patch] Miri intrinsics boundary: VNNI/AMX compute asm panics under
+      Miri instead of returning synthetic values; AMX configuration/release
+      instructions are no-ops only for session-state tests; CI now runs
+      `cargo +nightly miri test -p hermes-simd-intrinsics`.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 

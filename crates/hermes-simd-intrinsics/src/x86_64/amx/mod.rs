@@ -255,7 +255,8 @@ pub mod raw {
     /// Load tile configuration from memory.
     #[inline(always)]
     pub unsafe fn ldtilecfg(config: &AmxConfig) {
-        #[cfg(target_arch = "x86_64")]
+        let _ = config;
+        #[cfg(all(target_arch = "x86_64", not(miri)))]
         {
             core::arch::asm!(
                 "ldtilecfg [{ptr}]",
@@ -267,7 +268,8 @@ pub mod raw {
     /// Store tile configuration to memory.
     #[inline(always)]
     pub unsafe fn sttilecfg(config: &mut AmxConfig) {
-        #[cfg(target_arch = "x86_64")]
+        let _ = config;
+        #[cfg(all(target_arch = "x86_64", not(miri)))]
         {
             core::arch::asm!(
                 "sttilecfg [{ptr}]",
@@ -279,7 +281,7 @@ pub mod raw {
     /// Release AMX tile configuration (returns tile state to initialized).
     #[inline(always)]
     pub unsafe fn tilerelease() {
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(all(target_arch = "x86_64", not(miri)))]
         {
             core::arch::asm!("tilerelease");
         }
@@ -288,7 +290,12 @@ pub mod raw {
     /// Zero out a tile register.
     #[inline(always)]
     pub unsafe fn tilezero(tile: u8) {
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(miri)]
+        {
+            let _ = tile;
+            panic!("AMX tile execution is not available under Miri");
+        }
+        #[cfg(all(target_arch = "x86_64", not(miri)))]
         {
             match tile {
                 0 => core::arch::asm!("tilezero tmm0"),
@@ -307,7 +314,12 @@ pub mod raw {
     /// Load 2D data from memory into a tile register.
     #[inline(always)]
     pub unsafe fn tileloadd(tile: u8, base: *const core::ffi::c_void, stride: isize) {
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(miri)]
+        {
+            let _ = (tile, base, stride);
+            panic!("AMX tile execution is not available under Miri");
+        }
+        #[cfg(all(target_arch = "x86_64", not(miri)))]
         {
             match tile {
                 0 => {
@@ -342,7 +354,12 @@ pub mod raw {
     /// Store 2D data from a tile register into memory.
     #[inline(always)]
     pub unsafe fn tilestored(tile: u8, base: *mut core::ffi::c_void, stride: isize) {
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(miri)]
+        {
+            let _ = (tile, base, stride);
+            panic!("AMX tile execution is not available under Miri");
+        }
+        #[cfg(all(target_arch = "x86_64", not(miri)))]
         {
             match tile {
                 0 => {
@@ -377,7 +394,12 @@ pub mod raw {
     /// Compute F32 dot product of BF16 elements: dst += src1 * src2
     #[inline(always)]
     pub unsafe fn tdpbf16ps(dst: u8, src1: u8, src2: u8) {
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(miri)]
+        {
+            let _ = (dst, src1, src2);
+            panic!("AMX tile execution is not available under Miri");
+        }
+        #[cfg(all(target_arch = "x86_64", not(miri)))]
         {
             match (dst, src1, src2) {
                 (2, 0, 6) => core::arch::asm!("tdpbf16ps tmm2, tmm0, tmm6"),
@@ -399,7 +421,12 @@ pub mod raw {
     /// Compute INT32 dot product of INT8 elements: dst += src1 * src2
     #[inline(always)]
     pub unsafe fn tdpbssd(dst: u8, src1: u8, src2: u8) {
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(miri)]
+        {
+            let _ = (dst, src1, src2);
+            panic!("AMX tile execution is not available under Miri");
+        }
+        #[cfg(all(target_arch = "x86_64", not(miri)))]
         {
             match (dst, src1, src2) {
                 (2, 0, 6) => core::arch::asm!("tdpbssd tmm2, tmm0, tmm6"),
@@ -442,3 +469,46 @@ pub trait AmxGemm<TA, TB, TC> {
 pub mod bf16;
 /// AMX tile GEMM over signed 8-bit integer inputs (`tdpbssd`).
 pub mod int8;
+
+#[cfg(all(test, miri))]
+mod tests {
+    use super::{AmxBatchSession, AmxConfig, AmxSession};
+
+    #[test]
+    fn miri_session_nesting_preserves_active_config_until_outer_drop() {
+        let config = AmxConfig::new_uniform(16, 64);
+        assert!(!AmxSession::is_active());
+
+        {
+            let _outer = AmxSession::new(&config);
+            assert!(AmxSession::is_active());
+            {
+                let _inner = AmxSession::new(&config);
+                assert!(AmxSession::is_active());
+            }
+            assert!(AmxSession::is_active());
+        }
+
+        assert!(!AmxSession::is_active());
+    }
+
+    #[test]
+    fn miri_explicit_release_resets_session_state() {
+        let config = AmxConfig::new_uniform(16, 64);
+        let _session = AmxSession::new(&config);
+        assert!(AmxSession::is_active());
+
+        AmxSession::release();
+        assert!(!AmxSession::is_active());
+    }
+
+    #[test]
+    fn miri_batch_session_drop_resets_session_state() {
+        let config = AmxConfig::new_uniform(16, 64);
+        {
+            let _session = AmxBatchSession::begin(&config);
+            assert!(AmxSession::is_active());
+        }
+        assert!(!AmxSession::is_active());
+    }
+}

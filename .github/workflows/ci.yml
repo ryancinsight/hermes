@@ -35,7 +35,7 @@ jobs:
         run: cargo check --workspace --no-default-features
 
   miri:
-    name: miri (hermes-simd-core pointer logic)
+    name: miri (core + intrinsics boundary)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,8 +44,10 @@ jobs:
           toolchain: nightly
           components: miri
       - uses: Swatinem/rust-cache@v2
-      - name: cargo miri test
+      - name: cargo miri test (core pointer logic)
         run: cargo +nightly miri test -p hermes-simd-core
+      - name: cargo miri test (intrinsics boundary state)
+        run: cargo +nightly miri test -p hermes-simd-intrinsics
 
   test-aarch64:
     name: test (aarch64, runtime NEON validation)

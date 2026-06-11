@@ -11,6 +11,7 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - Internal x86 VNNI asm instruction macro for `vpdpbssd`, keeping assembly behind the monomorphized tile-matmul backend contract without a hot-loop wrapper call.
 - Benchmark reports now record benchmark-relevant host ISA features and the runtime dense-dispatch backend selected on the runner.
 - Host-capability integration tests validate runtime dispatch, local AVX2 execution when available, and irregular-shape GEMM fallback coverage.
+- Miri coverage now extends to the `hermes-simd-intrinsics` boundary: AMX session state is tested under Miri while hardware execution paths remain native-only.
 
 ### Fixed
 - `#[runtime_dispatch]` emitted `std::is_x86_feature_detected!` unconditionally, breaking `--no-default-features` builds; runtime-detection arms are now gated on the consuming crate's `std` feature (no_std keeps compile-time arms + scalar fallback).
@@ -18,6 +19,7 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - INT4 unpack regression coverage now asserts the complete signed nibble domain.
 - AMX context-pressure benchmarks no longer publish scalar fallback timings under an AMX-specific label on non-AMX hosts.
 - Dense scalar benchmark baselines now black-box operands and accumulation so Criterion measures real iteration work instead of an optimized-away constant.
+- Inline asm compute forms panic under Miri instead of returning fake values; Miri-valid AMX lifecycle operations are no-ops only for session-state verification.
 
 ## [0.2.0] — 2026-06-10
 
