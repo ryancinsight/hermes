@@ -73,6 +73,11 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
 
 ## P3 — Architecture & maintenance <a id="p3"></a>
 
+- [x] **[patch] x86 VNNI asm form** (delivered post-0.2.0): factor repeated
+      `vpdpbssd` inline assembly into one internal instruction macro with
+      explicit target-feature contract. The portable surface remains
+      `TileMatrixMultiply`/runtime dispatch; asm is not promoted to a separate
+      public abstraction.
 - [ ] **[arch] Per-type x86 kernel dedup**: avx2_f32/avx2_f64/avx512_f32/
       avx512_f64 share method-body shape differing only in intrinsic suffix and
       lane count. Evaluate build-time generation (`build.rs` generator preferred

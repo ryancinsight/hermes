@@ -23,7 +23,7 @@ The project is structured as a multi-crate workspace (dependencies flow strictly
 2. **Interleaved complex kernels**: `interleaved_complex_dot` / `interleaved_complex_mul_assign` over `[re, im, ...]` primitive slices, fully register-resident via adjacent-pair `SimdKernel` primitives (`swap_adjacent`, `dup_even`, `dup_odd`, `fmaddsub`, `fmsubadd`) with AVX2/AVX-512/NEON overrides and a `const CONJ_B` conjugation flag (see `docs/adr/004`).
 3. **Copy-on-write containers**: `SimdCow` (dense, with map/zip/reduce/scan/norm extensions) and one generic `SparseCow<T, F, Arch>` covering every sparse format through the `CowFormat` trait — zero-copy reads, single-allocation promotion.
 4. **Sparse SIMD (SpMV)**: format-parameterized views for CSR, Sliced ELLPACK (SELL-p), Blocked COO, and Dense-with-Mask layouts.
-5. **Intel AMX acceleration**: stable inline-assembly AMX (`tdpbf16ps`, `tdpbssd`), RAII `AmxSession` tile-config caching, 2×2 register blocking; VNNI tile GEMM with bit-parallel INT4→INT8 unpacking.
+5. **Intel AMX acceleration**: stable inline-assembly AMX (`tdpbf16ps`, `tdpbssd`), RAII `AmxSession` tile-config caching, 2×2 register blocking; VNNI tile GEMM uses a single internal `vpdpbssd` asm macro plus bit-parallel INT4→INT8 unpacking.
 6. **SWAR chess bitboards**: Kogge-Stone, Hyperbola Quintessence, Fancy Magic, and Hybrid SWAR-Magic sliding-attack backends behind one `BitBoardView`.
 7. **Typestate safety**: alignment (`Aligned<A>`/`Unaligned`), execution mode (`Masked`/`Unmasked`), and reference mutability are compile-time parameters with zero layout overhead.
 8. **Precision ladder**: 4-bit through 64-bit numeric types with packed storage and hardware-accelerated unpacking into `SimdCow`.

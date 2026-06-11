@@ -118,6 +118,17 @@ fn test_unpack_int4() {
     assert_eq!(unpacked[1], -6);
 }
 
+#[test]
+fn test_unpack_int4_signed_nibble_domain() {
+    let packed = [0x10u8, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0xFE];
+    let mut unpacked = [0i8; 16];
+    unpack_int4(&packed, &mut unpacked);
+    assert_eq!(
+        unpacked,
+        [0, 1, 2, 3, 4, 5, 6, 7, -8, -7, -6, -5, -4, -3, -2, -1]
+    );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SparseCow tests
 // ─────────────────────────────────────────────────────────────────────────────

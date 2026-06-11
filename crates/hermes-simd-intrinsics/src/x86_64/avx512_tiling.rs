@@ -141,14 +141,7 @@ impl TileMatrixMultiply<i8, i8, i32, Avx512, Avx512, 16, 16, 64> for Avx512 {
             for i in 0..16 {
                 let a_val = core::ptr::read_unaligned(a.add(i * a_stride + k) as *const i32);
                 let a_vec = _mm512_set1_epi32(a_val);
-                let mut dst = c_regs[i];
-                core::arch::asm!(
-                    "vpdpbssd {dst}, {src1}, {src2}",
-                    dst = inout(zmm_reg) dst,
-                    src1 = in(zmm_reg) a_vec,
-                    src2 = in(zmm_reg) b_vec,
-                );
-                c_regs[i] = dst;
+                c_regs[i] = crate::x86_64::asm_intrinsics::vpdpbssd!(c_regs[i], a_vec, b_vec);
             }
         }
 
@@ -205,14 +198,7 @@ impl TileMatrixMultiply<I8, I8, I32, Avx512, Avx512, 16, 16, 64> for Avx512 {
             for i in 0..16 {
                 let a_val = core::ptr::read_unaligned(a.add(i * a_stride + k) as *const i32);
                 let a_vec = _mm512_set1_epi32(a_val);
-                let mut dst = c_regs[i];
-                core::arch::asm!(
-                    "vpdpbssd {dst}, {src1}, {src2}",
-                    dst = inout(zmm_reg) dst,
-                    src1 = in(zmm_reg) a_vec,
-                    src2 = in(zmm_reg) b_vec,
-                );
-                c_regs[i] = dst;
+                c_regs[i] = crate::x86_64::asm_intrinsics::vpdpbssd!(c_regs[i], a_vec, b_vec);
             }
         }
 
@@ -229,20 +215,24 @@ pub fn unpack_int4(packed: &[u8], unpacked: &mut [i8]) {
     let len = packed.len();
     assert!(unpacked.len() >= len * 2);
 
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
     {
-        #[cfg(target_feature = "avx2")]
-        {
-            unsafe {
-                unpack_int4_avx2(packed, unpacked);
-                return;
-            }
+        unsafe {
+            unpack_int4_avx2(packed, unpacked);
         }
     }
 
-    // Fallback scalar loop
-    for i in 0..len {
-        let byte = packed[i] as i8;
+    #[cfg(not(all(target_arch = "x86_64", target_feature = "avx2")))]
+    {
+        unpack_int4_scalar(packed, unpacked);
+    }
+}
+
+#[cfg(not(all(target_arch = "x86_64", target_feature = "avx2")))]
+#[inline]
+fn unpack_int4_scalar(packed: &[u8], unpacked: &mut [i8]) {
+    for (i, byte) in packed.iter().copied().enumerate() {
+        let byte = byte as i8;
         unpacked[2 * i] = (byte << 4) >> 4;
         unpacked[2 * i + 1] = byte >> 4;
     }

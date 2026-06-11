@@ -44,6 +44,11 @@
 - [x] [patch] `#![deny(missing_docs)]` on all six public crates; 12 items documented.
 - [x] [minor] Complex criterion bench suite + recorded baselines
       (benchmarks_results.md); threshold automation remains open.
+- [x] [patch] x86 VNNI asm cleanup: `vpdpbssd` factored into one internal
+      asm macro with `nostack`/`nomem`/`preserves_flags`; both AVX-512 tile
+      kernels expand it inside the target-feature-gated loop. Added complete
+      signed-nibble INT4 unpack regression coverage and documented the asm
+      scope boundary.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 
