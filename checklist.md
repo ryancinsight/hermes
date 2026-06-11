@@ -49,6 +49,12 @@
       kernels expand it inside the target-feature-gated loop. Added complete
       signed-nibble INT4 unpack regression coverage and documented the asm
       scope boundary.
+- [x] [patch] local-capable test/bench hardening: host dispatch tests cover
+      the locally detected dense backend, AVX2 direct execution when present,
+      and irregular INT8 GEMM against scalar reference. Benchmark report
+      generation records detected ISA features and suppresses AMX
+      context-pressure rows on non-AMX hosts; dense scalar baselines now
+      black-box operands/accumulation to prevent optimized-away work.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 

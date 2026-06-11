@@ -3,17 +3,21 @@
 //! Benchmark groups:
 //! - `Dense Sum f32` — `sum::<f32>` dispatch vs scalar iterator, sizes 256–1M
 //! - `Dense Dot f32` — `dot::<f32>` dispatch vs scalar iterator, sizes 256–65536
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use hermes_simd::{dot, sum};
 
 #[inline(never)]
 fn scalar_sum(data: &[f32]) -> f32 {
-    data.iter().sum()
+    data.iter()
+        .copied()
+        .fold(0.0f32, |acc, x| black_box(acc + black_box(x)))
 }
 
 #[inline(never)]
 fn scalar_dot(a: &[f32], b: &[f32]) -> f32 {
-    a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
+    a.iter().zip(b.iter()).fold(0.0f32, |acc, (&x, &y)| {
+        black_box(acc + black_box(x) * black_box(y))
+    })
 }
 
 fn bench_sum(c: &mut Criterion) {
@@ -23,10 +27,10 @@ fn bench_sum(c: &mut Criterion) {
         group.throughput(Throughput::Elements(size as u64));
 
         group.bench_with_input(BenchmarkId::new("scalar_iter", size), &size, |b, _| {
-            b.iter(|| scalar_sum(&data))
+            b.iter(|| scalar_sum(black_box(&data)))
         });
         group.bench_with_input(BenchmarkId::new("dispatch", size), &size, |b, _| {
-            b.iter(|| sum::<f32>(&data))
+            b.iter(|| sum::<f32>(black_box(&data)))
         });
     }
     group.finish();
@@ -42,10 +46,10 @@ fn bench_dot(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("scalar_iter", size),
             &size,
-            |bencher, _| bencher.iter(|| scalar_dot(&a, &b)),
+            |bencher, _| bencher.iter(|| scalar_dot(black_box(&a), black_box(&b))),
         );
         group.bench_with_input(BenchmarkId::new("dispatch", size), &size, |bencher, _| {
-            bencher.iter(|| dot::<f32>(&a, &b).unwrap())
+            bencher.iter(|| dot::<f32>(black_box(&a), black_box(&b)).unwrap())
         });
     }
     group.finish();
