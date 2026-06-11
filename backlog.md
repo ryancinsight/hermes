@@ -80,8 +80,22 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
 - [ ] **[minor] SVE backend**: real implementations blocked on stable
       `core::arch::aarch64` SVE intrinsics; revisit on toolchain updates
       (stub documented in `aarch64/sve.rs`).
-- [ ] **[minor] NUMA module status**: `hermes-simd-core/src/numa.rs` — audit
-      for completeness/usage; either integrate with benches or document scope.
+- [x] **[minor] NUMA module status** (audited 2026-06-11): `numa.rs` IS
+      integrated — `hermes-simd::dispatcher` uses `NumaTopologyService`/
+      `verify_numa_locality`, `vec` uses `NumaAllocator`, and types_tests
+      cover node count/distance. Finding: it reimplements platform NUMA
+      detection (`GetNumaHighestNodeNumber` on Windows, sysfs on Linux) that
+      **themis `CpuTopology` owns**, and its `MnemosyneNumaAllocator` names
+      mnemosyne's allocation responsibility — a structural duplication across
+      the stack SSOT map (themis=topology law, mnemosyne=allocation).
+- [ ] **[arch] NUMA consolidation onto themis/mnemosyne**: replace
+      `numa.rs`'s detection layer with a `themis` dependency (`CpuTopology`,
+      `NumaNodeId`, distances) and route `NumaAllocator` through mnemosyne's
+      placement-hinted allocation, keeping only the SIMD-specific locality
+      verification here. Adds a hermes→themis edge (consistent with
+      moirai/mnemosyne, which already consume themis law). Touches
+      dispatcher + vec + tests: one coordinated unit with call-site updates,
+      no compatibility shims.
 
 ## P4 — Documentation <a id="p4"></a>
 
