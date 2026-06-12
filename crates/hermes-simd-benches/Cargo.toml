@@ -31,6 +31,10 @@ name = "masked_bench"
 harness = false
 
 [[bench]]
+name = "packed_bench"
+harness = false
+
+[[bench]]
 name = "sparse_bench"
 harness = false
 

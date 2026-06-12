@@ -20,6 +20,8 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - Sparse SpMV benchmarks now sweep CSR, SELL-p, and Blocked-COO across 1K,
   10K, and 100K rows at 0.1%, 1%, and 10% non-zero density; Dense-with-mask is
   capped at 10K rows to bound local memory use.
+- Packed4 COW unpacking now has a focused Criterion benchmark target over
+  1K, 16K, and 256K logical elements for both public packed formats.
 - Host-capability integration tests validate runtime dispatch, local AVX2 execution when available, and irregular-shape GEMM fallback coverage.
 - Miri coverage now extends to the `hermes-simd-intrinsics` boundary: AMX session state is tested under Miri while hardware execution paths remain native-only.
 - `parallel` and `mnemosyne-memory` are default features on every Hermes package; `mnemosyne-memory` routes `AlignedVec::with_capacity_numa` allocation and deallocation through Mnemosyne by default.
@@ -33,6 +35,9 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - Inline asm compute forms panic under Miri instead of returning fake values; Miri-valid AMX lifecycle operations are no-ops only for session-state verification.
 - README now documents the Atlas SIMD/MIMD/GPU ownership boundary so consumers
   compose Hermes with Moirai and Hephaestus without duplicating responsibility.
+- Packed4 COW unpacking delegates to the `Packable4` dispatcher, so the
+  facade uses the existing AVX-512/AVX2/scalar runtime selection instead of an
+  AVX-512-only x86 branch.
 
 ## [0.2.0] — 2026-06-10
 

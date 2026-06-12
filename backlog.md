@@ -88,10 +88,11 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
       across CSR/SELL-p/BCOO with 1024 columns; Dense-with-mask is capped at
       10K rows because it stores full dense values and masks. Sparse module
       docs now record format-selection guidance.
-- [ ] **[minor] Packed4 unpack generalization**: `HardwareUnpack` currently
-      routes x86_64 through the AVX-512 tiling path only; add an AVX2 unpack
-      and runtime selection, and fold the Bf4/F4 impl pair into the dispatch
-      abstraction if a third packed format lands.
+- [x] **[minor] Packed4 unpack generalization** (delivered 2026-06-12):
+      `Packed4CowExt` delegates to `Packable4::unpack_slice_packed`, reusing
+      the hermes-numeric AVX-512/AVX2/scalar dispatcher and removing the
+      facade-local Bf4/F4 hardware-unpack impl pair. Criterion now includes a
+      focused packed COW unpack benchmark.
 - [ ] **[minor] Complex mul_assign unroll**: evaluate 2× unroll (as done for
       dot) once store-bound profile is confirmed; criterion data first.
 

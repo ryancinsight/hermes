@@ -408,44 +408,7 @@ pub trait Packed4CowExt<'a, T: Packable4> {
         Align: Alignment;
 }
 
-// Private helper trait to dispatch unpacking to the best hardware backends
-pub(crate) trait HardwareUnpack: Packable4 {
-    fn hardware_unpack(packed: &[u8], unpacked: &mut [Self::Unpacked]);
-}
-
-impl HardwareUnpack for Bf4 {
-    #[inline(always)]
-    fn hardware_unpack(packed: &[u8], unpacked: &mut [Bf16]) {
-        #[cfg(target_arch = "x86_64")]
-        {
-            hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_packed_bf4_to_bf16(
-                packed, unpacked,
-            );
-        }
-        #[cfg(not(target_arch = "x86_64"))]
-        {
-            <Self as Packable4>::unpack_slice_packed(packed, unpacked);
-        }
-    }
-}
-
-impl HardwareUnpack for F4 {
-    #[inline(always)]
-    fn hardware_unpack(packed: &[u8], unpacked: &mut [F32]) {
-        #[cfg(target_arch = "x86_64")]
-        {
-            hermes_simd_intrinsics::x86_64::avx512_tiling::unpack_packed_f4_to_f32(
-                packed, unpacked,
-            );
-        }
-        #[cfg(not(target_arch = "x86_64"))]
-        {
-            <Self as Packable4>::unpack_slice_packed(packed, unpacked);
-        }
-    }
-}
-
-impl<'a, T: Packable4 + HardwareUnpack> Packed4CowExt<'a, T> for Packed4Cow<'a, T> {
+impl<'a, T: Packable4> Packed4CowExt<'a, T> for Packed4Cow<'a, T> {
     #[inline]
     fn unpack_to_cow<Arch, Align>(&self) -> SimdCow<'static, T::Unpacked, Arch, Align>
     where
@@ -460,7 +423,7 @@ impl<'a, T: Packable4 + HardwareUnpack> Packed4CowExt<'a, T> for Packed4Cow<'a, 
         let view = self.as_view();
         let n = view.len().min(dest.len());
         let even_len = (n / 2) * 2;
-        T::hardware_unpack(
+        T::unpack_slice_packed(
             &view.as_packed_slice()[..even_len / 2],
             &mut dest[..even_len],
         );

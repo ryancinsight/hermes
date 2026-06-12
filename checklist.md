@@ -87,8 +87,13 @@
 - [x] [patch] Atlas compute boundary docs: README states Hermes owns SIMD
       lane-parallel kernels and slice-oriented dispatch, Moirai owns MIMD
       scheduling, and Hephaestus owns GPU/device lifetimes.
+- [x] [minor] Packed4 unpack generalization: `Packed4CowExt` now calls the
+      canonical `Packable4` packed dispatcher, so the facade inherits AVX-512,
+      AVX2, and scalar runtime selection without a duplicate x86 branch.
+      Coverage: odd-length full-nibble COW unpack regression plus a focused
+      Criterion benchmark target.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 
-- [minor] Packed4 AVX2 unpack path (P2).
 - [minor] 0.3.0 release for the additive absolute-reduction API.
+- [minor] Complex `mul_assign` unroll profile (P2).

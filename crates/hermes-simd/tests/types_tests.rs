@@ -1332,7 +1332,47 @@ fn test_packed4_cow() {
     assert_eq!(simd_cow_f32[0].0, 1.0);
     assert_eq!(simd_cow_f32[1].0, 4.0);
 
-    // 6. Test iteration
+    // 6. Test odd-length packed COW unpacking across the full nibble domain.
+    let odd_len = 31_usize;
+    let mut packed = Vec::with_capacity(odd_len.div_ceil(2));
+    for byte_index in 0..odd_len.div_ceil(2) {
+        let lo = (2 * byte_index) as u8 & 0x0f;
+        let hi = (2 * byte_index + 1) as u8 & 0x0f;
+        packed.push(Bf4::pack_pair(Bf4(lo), Bf4(hi)));
+    }
+    let odd_cow = PackedBf4Cow::from_packed_slice(&packed, odd_len).unwrap();
+    let simd_cow: SimdCow<'static, Bf16, Scalar, Unaligned> = odd_cow.unpack_to_cow();
+    assert_eq!(simd_cow.len(), odd_len);
+    for index in 0..odd_len {
+        let expected = Bf4((index as u8) & 0x0f).to_f32();
+        let actual = simd_cow[index].to_f32();
+        if expected.is_nan() {
+            assert!(actual.is_nan());
+        } else {
+            assert_eq!(actual.to_bits(), expected.to_bits());
+        }
+    }
+
+    let mut packed = Vec::with_capacity(odd_len.div_ceil(2));
+    for byte_index in 0..odd_len.div_ceil(2) {
+        let lo = (2 * byte_index) as u8 & 0x0f;
+        let hi = (2 * byte_index + 1) as u8 & 0x0f;
+        packed.push(F4::pack_pair(F4(lo), F4(hi)));
+    }
+    let odd_cow = PackedF4Cow::from_packed_slice(&packed, odd_len).unwrap();
+    let simd_cow: SimdCow<'static, F32, Scalar, Unaligned> = odd_cow.unpack_to_cow();
+    assert_eq!(simd_cow.len(), odd_len);
+    for index in 0..odd_len {
+        let expected = F4((index as u8) & 0x0f).to_f32();
+        let actual = simd_cow[index].0;
+        if expected.is_nan() {
+            assert!(actual.is_nan());
+        } else {
+            assert_eq!(actual.to_bits(), expected.to_bits());
+        }
+    }
+
+    // 7. Test iteration
     let mut sum = 0.0;
     for elem in &cow_bf4 {
         sum += elem.to_f32();
