@@ -68,6 +68,11 @@
       deallocation through `mnemosyne::Mnemosyne` under the default feature.
       Verification: fmt, clippy all-targets/all-features, workspace tests,
       warning-clean docs, and no-default-features check.
+- [x] [minor] Absolute reductions: `AbsSum` / `AbsMax` and dispatched
+      `abs_sum` / `abs_max` provide Hermes-owned L1 and infinity norm
+      accumulators for Leto/Apollo consumers without temporary buffers.
+      Evidence tier: value-semantic tests plus full workspace gate (`fmt`,
+      `check`, `test`, `clippy -D warnings`, docs).
 - [x] [minor] Criterion threshold automation: `run-benches` now writes
       `benchmarks_baseline.json`, enforces baseline rows with
       `--check-regressions`, and is split into SRP modules (`cli`,
@@ -80,4 +85,4 @@
 
 - [minor] SpMV scalability sweep (P2).
 - [minor] Packed4 AVX2 unpack path (P2).
-- [minor] 0.2.1 release once the above accumulate.
+- [minor] 0.3.0 release for the additive absolute-reduction API.

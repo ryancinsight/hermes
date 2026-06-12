@@ -5,6 +5,10 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 ## [Unreleased]
 
 ### Added
+- Generic absolute reductions: `AbsSum` / `AbsMax` reduction strategies plus
+  runtime-dispatched `abs_sum` / `abs_max` APIs for Leto/Apollo norm paths,
+  using transformed SIMD seeds and transform-free partial merges to avoid
+  temporary absolute-value buffers.
 - Criterion benchmark suite for the interleaved complex kernels (`benches/complex.rs`), runtime-dispatch vs `Scalar` series as a built-in regression reference.
 - CI: `cargo miri test` job over hermes-simd-core (pointer/view/cow logic) and a `--no-default-features` build check.
 - `#![deny(missing_docs)]` on all six public crates; remaining undocumented items (bitboard backends, AMX submodules, emulated-kernel macro, magic `OnceLock`) documented.
