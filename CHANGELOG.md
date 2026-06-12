@@ -28,8 +28,12 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 - Interleaved complex `mul_assign` now processes two SIMD registers per loop
-  iteration, reducing loop overhead and improving Criterion throughput across
-  the measured 256-16K complex-pair range.
+  iteration on SIMD backends and uses a direct four-pair scalar loop for large
+  scalar inputs, reducing loop overhead in the measured complex benchmark
+  range.
+- `benchmarks_baseline.json` and `benchmarks_results.md` now include the
+  packed4 COW unpack benchmark rows and refreshed complex `mul_assign`
+  measurements from the local AVX2 host.
 
 ### Fixed
 - `#[runtime_dispatch]` emitted `std::is_x86_feature_detected!` unconditionally, breaking `--no-default-features` builds; runtime-detection arms are now gated on the consuming crate's `std` feature (no_std keeps compile-time arms + scalar fallback).

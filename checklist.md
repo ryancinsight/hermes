@@ -94,10 +94,16 @@
       Criterion benchmark target.
 - [x] [minor] Complex `mul_assign` unroll: in-place interleaved complex
       multiply now processes two SIMD registers per loop iteration before the
-      single-register and scalar tails. Evidence: focused Criterion run
-      improved runtime-dispatch medians across all measured sizes.
+      single-register and scalar tails, with a direct four-pair scalar loop for
+      large scalar buffers. Evidence: focused Criterion runs plus refreshed
+      48-row local AVX2 baseline.
 - [x] [patch] README current-version metadata corrected from `0.1.0` to
       `0.2.0`.
+- [x] [patch] Benchmark baseline refresh: `run-benches --parse-only
+      --write-baseline --check-regressions` regenerated
+      `benchmarks_baseline.json` and `benchmarks_results.md` from local
+      Criterion output, including packed4 COW unpack and the unrolled complex
+      `mul_assign` rows. Regression self-check covered 48 rows.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 

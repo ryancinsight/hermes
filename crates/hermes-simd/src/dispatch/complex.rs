@@ -71,6 +71,39 @@ where
         return Err(SimdError::LengthMismatch);
     }
 
+    if A::REGISTER_WIDTH_BITS == 0 && a.len() >= 32_768 {
+        let mut lane = 0usize;
+        while lane + 8 <= a.len() {
+            let (re0, im0) = mul_pair::<T, CONJ_B>(a[lane], a[lane + 1], b[lane], b[lane + 1]);
+            a[lane] = re0;
+            a[lane + 1] = im0;
+
+            let (re1, im1) =
+                mul_pair::<T, CONJ_B>(a[lane + 2], a[lane + 3], b[lane + 2], b[lane + 3]);
+            a[lane + 2] = re1;
+            a[lane + 3] = im1;
+
+            let (re2, im2) =
+                mul_pair::<T, CONJ_B>(a[lane + 4], a[lane + 5], b[lane + 4], b[lane + 5]);
+            a[lane + 4] = re2;
+            a[lane + 5] = im2;
+
+            let (re3, im3) =
+                mul_pair::<T, CONJ_B>(a[lane + 6], a[lane + 7], b[lane + 6], b[lane + 7]);
+            a[lane + 6] = re3;
+            a[lane + 7] = im3;
+
+            lane += 8;
+        }
+        while lane < a.len() {
+            let (re, im) = mul_pair::<T, CONJ_B>(a[lane], a[lane + 1], b[lane], b[lane + 1]);
+            a[lane] = re;
+            a[lane + 1] = im;
+            lane += 2;
+        }
+        return Ok(());
+    }
+
     let lanes = A::LANE_COUNT;
     let mut offset = 0usize;
 

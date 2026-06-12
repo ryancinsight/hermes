@@ -1,10 +1,34 @@
 {
   "version": 1,
-  "generated_at": "2026-06-12 11:46:02 -04:00",
+  "generated_at": "2026-06-12 17:17:46 -04:00",
   "cpu": "Intel(R) Core(TM) Ultra 9 285K",
   "runtime_backend": "avx2",
   "isa_features": "avx2, fma",
   "results": [
+    {
+      "group_id": "Blocked-COO SpMV f32 scalability",
+      "function_id": "bcoo4x4",
+      "value_str": "rows_1024_density_0.1pct",
+      "time_ns": 768.039928166588,
+      "throughput_kind": "Elements",
+      "throughput_val": 1048576
+    },
+    {
+      "group_id": "Blocked-COO SpMV f32 scalability",
+      "function_id": "bcoo8x8",
+      "value_str": "rows_1024_density_0.1pct",
+      "time_ns": 1048.4509391832194,
+      "throughput_kind": "Elements",
+      "throughput_val": 1048576
+    },
+    {
+      "group_id": "CSR SpMV f32 scalability",
+      "function_id": "csr",
+      "value_str": "rows_1024_density_0.1pct",
+      "time_ns": 1457.8046820481195,
+      "throughput_kind": "Elements",
+      "throughput_val": 1048576
+    },
     {
       "group_id": "Dense Dot f32",
       "function_id": "dispatch",
@@ -150,6 +174,30 @@
       "throughput_val": 65536
     },
     {
+      "group_id": "DenseWithMask SpMV f32 scalability",
+      "function_id": "dense_masked",
+      "value_str": "rows_1024_density_0.1pct",
+      "time_ns": 229452.352029749,
+      "throughput_kind": "Elements",
+      "throughput_val": 1048576
+    },
+    {
+      "group_id": "SELL-p SpMV f32 scalability",
+      "function_id": "sellp4",
+      "value_str": "rows_1024_density_0.1pct",
+      "time_ns": 712.7709087487916,
+      "throughput_kind": "Elements",
+      "throughput_val": 1048576
+    },
+    {
+      "group_id": "SELL-p SpMV f32 scalability",
+      "function_id": "sellp8",
+      "value_str": "rows_1024_density_0.1pct",
+      "time_ns": 497.3767587811443,
+      "throughput_kind": "Elements",
+      "throughput_val": 1048576
+    },
+    {
       "group_id": "Tiled GEMM f32",
       "function_id": "tiled_gemm",
       "value_str": "32",
@@ -233,7 +281,7 @@
       "group_id": "complex_mul_assign",
       "function_id": "runtime",
       "value_str": "1024",
-      "time_ns": 412.1113736877146,
+      "time_ns": 381.2692396628378,
       "throughput_kind": "Elements",
       "throughput_val": 1024
     },
@@ -241,7 +289,7 @@
       "group_id": "complex_mul_assign",
       "function_id": "runtime",
       "value_str": "16384",
-      "time_ns": 7844.098742275215,
+      "time_ns": 9141.119287858866,
       "throughput_kind": "Elements",
       "throughput_val": 16384
     },
@@ -249,7 +297,7 @@
       "group_id": "complex_mul_assign",
       "function_id": "runtime",
       "value_str": "256",
-      "time_ns": 122.0866975063956,
+      "time_ns": 110.33263057534708,
       "throughput_kind": "Elements",
       "throughput_val": 256
     },
@@ -257,7 +305,7 @@
       "group_id": "complex_mul_assign",
       "function_id": "runtime",
       "value_str": "4096",
-      "time_ns": 2221.317960454094,
+      "time_ns": 2298.037968779153,
       "throughput_kind": "Elements",
       "throughput_val": 4096
     },
@@ -265,7 +313,7 @@
       "group_id": "complex_mul_assign",
       "function_id": "scalar",
       "value_str": "1024",
-      "time_ns": 609.6317090685374,
+      "time_ns": 778.7746588925062,
       "throughput_kind": "Elements",
       "throughput_val": 1024
     },
@@ -273,7 +321,7 @@
       "group_id": "complex_mul_assign",
       "function_id": "scalar",
       "value_str": "16384",
-      "time_ns": 9907.767427763183,
+      "time_ns": 11113.870789962852,
       "throughput_kind": "Elements",
       "throughput_val": 16384
     },
@@ -281,7 +329,7 @@
       "group_id": "complex_mul_assign",
       "function_id": "scalar",
       "value_str": "256",
-      "time_ns": 135.39224319315852,
+      "time_ns": 136.78607126227126,
       "throughput_kind": "Elements",
       "throughput_val": 256
     },
@@ -289,9 +337,57 @@
       "group_id": "complex_mul_assign",
       "function_id": "scalar",
       "value_str": "4096",
-      "time_ns": 2452.249638145904,
+      "time_ns": 2896.105071518263,
       "throughput_kind": "Elements",
       "throughput_val": 4096
+    },
+    {
+      "group_id": "packed4_cow_unpack",
+      "function_id": "bf4_to_wide",
+      "value_str": "1024",
+      "time_ns": 50.72364489252382,
+      "throughput_kind": null,
+      "throughput_val": null
+    },
+    {
+      "group_id": "packed4_cow_unpack",
+      "function_id": "bf4_to_wide",
+      "value_str": "16384",
+      "time_ns": 610.3256207469277,
+      "throughput_kind": null,
+      "throughput_val": null
+    },
+    {
+      "group_id": "packed4_cow_unpack",
+      "function_id": "bf4_to_wide",
+      "value_str": "262144",
+      "time_ns": 30878.635145799435,
+      "throughput_kind": null,
+      "throughput_val": null
+    },
+    {
+      "group_id": "packed4_cow_unpack",
+      "function_id": "f4_to_wide",
+      "value_str": "1024",
+      "time_ns": 136.06888778727568,
+      "throughput_kind": null,
+      "throughput_val": null
+    },
+    {
+      "group_id": "packed4_cow_unpack",
+      "function_id": "f4_to_wide",
+      "value_str": "16384",
+      "time_ns": 3279.2474702071386,
+      "throughput_kind": null,
+      "throughput_val": null
+    },
+    {
+      "group_id": "packed4_cow_unpack",
+      "function_id": "f4_to_wide",
+      "value_str": "262144",
+      "time_ns": 325266.23488099885,
+      "throughput_kind": null,
+      "throughput_val": null
     }
   ]
 }

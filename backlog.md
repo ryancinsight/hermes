@@ -20,6 +20,9 @@ is moirai's domain, GPU is the `hephaestus` substrate (wgpu + CUDA) via coeus/ap
 complete SIMD substrate for leto-ops/coeus hot kernels:
 - [ ] [minor] Stage C1: dedicated AVX-512 / AMX CI runners (currently self-skip on
   unsupported hosts), `no_std` feature matrix, committed criterion baselines.
+  Partial delivered (2026-06-12): local AVX2 Criterion baseline refreshed with
+  packed4 COW unpack and unrolled complex `mul_assign` rows; runner self-check
+  covered 48 rows. Dedicated AVX-512/AMX runners remain open.
 - [ ] [minor] Stage C1: SVE backend (stub → impl) for AArch64 server targets.
 - [ ] [minor] Stage C2: expand op/dtype coverage on demand from leto-ops/coeus
   (gather/scatter variants, additional reductions/scans, complex precisions) so every
