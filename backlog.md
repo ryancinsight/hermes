@@ -74,8 +74,12 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
 
 ## P2 — Performance & memory <a id="p2"></a>
 
-- [~] **[minor] Criterion regression thresholds** (complex bench suite added with built-in scalar reference series; recorded baselines + threshold enforcement remain open): record baseline numbers for
-      sum/dot/spmv/complex; a statistically significant slowdown blocks merge.
+- [x] **[minor] Criterion regression thresholds** (delivered 2026-06-12):
+      `benchmarks_baseline.json` records structured Criterion point estimates;
+      `run-benches --check-regressions` fails on missing baseline rows or rows
+      exceeding the configured ratio threshold. The runner is split into
+      cohesive modules for CLI parsing, result discovery, host metadata,
+      threshold comparison, and Markdown report rendering.
 - [ ] **[minor] SpMV scalability sweep**: bench n ∈ {1K, 10K, 100K} rows ×
       sparsity {0.1%, 1%, 10%} across CSR/SELL-p/BCOO to characterize
       format-selection crossover points; document guidance in sparse module docs.

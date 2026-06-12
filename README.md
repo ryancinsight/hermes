@@ -109,9 +109,20 @@ cargo check --workspace --target aarch64-unknown-linux-gnu
 
 # Benchmarks → updates benchmarks_results.md
 cargo run -p hermes-simd-benches
+
+# Parse existing Criterion output, refresh the JSON baseline, and enforce it
+cargo run -p hermes-simd-benches -- --parse-only --write-baseline --check-regressions
+
+# Enforce an existing baseline without updating it (default threshold: 1.10x)
+cargo run -p hermes-simd-benches -- --parse-only --check-regressions
 ```
 
 Differential testing policy: every optimized backend (AVX2, AVX-512, NEON, AMX) is verified against the always-available `Scalar` backend — bitwise on dyadic-exact inputs, within analytically derived rounding bounds on arbitrary inputs.
+
+Benchmark regression policy: `benchmarks_baseline.json` is the structured
+Criterion baseline. `--check-regressions` fails when a committed baseline row is
+missing from the current run or when the current point estimate exceeds the
+baseline by the configured threshold.
 
 ## Project Management
 

@@ -10,6 +10,9 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - `#![deny(missing_docs)]` on all six public crates; remaining undocumented items (bitboard backends, AMX submodules, emulated-kernel macro, magic `OnceLock`) documented.
 - Internal x86 VNNI asm instruction macro for `vpdpbssd`, keeping assembly behind the monomorphized tile-matmul backend contract without a hot-loop wrapper call.
 - Benchmark reports now record benchmark-relevant host ISA features and the runtime dense-dispatch backend selected on the runner.
+- Benchmark regression enforcement now uses `benchmarks_baseline.json` plus
+  `run-benches --check-regressions`; the runner is split into CLI, Criterion
+  parsing, host reporting, Markdown rendering, and threshold-check modules.
 - Host-capability integration tests validate runtime dispatch, local AVX2 execution when available, and irregular-shape GEMM fallback coverage.
 - Miri coverage now extends to the `hermes-simd-intrinsics` boundary: AMX session state is tested under Miri while hardware execution paths remain native-only.
 - `parallel` and `mnemosyne-memory` are default features on every Hermes package; `mnemosyne-memory` routes `AlignedVec::with_capacity_numa` allocation and deallocation through Mnemosyne by default.
