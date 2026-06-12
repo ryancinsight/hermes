@@ -40,6 +40,6 @@ pub mod unary;
 
 // Re-exports for backwards-compatible access at the `ops::*` level.
 pub use elementwise::{Add, BitAnd, BitOr, BitXor, Clamp, Div, ElementOp, FmaAdd, Mul, Sub};
-pub use reduction::{Dot, Max, Min, Product, ReductionOp, Sum};
+pub use reduction::{AbsMax, AbsSum, Dot, Max, Min, Product, ReductionOp, Sum};
 pub use scan::{Exclusive, Inclusive, ScanAdd, ScanMax, ScanMin, ScanMode, ScanMul, ScanOp};
 pub use unary::{Abs, Neg, Sqrt, UnaryOp};

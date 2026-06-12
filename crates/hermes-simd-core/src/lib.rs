@@ -71,9 +71,9 @@ pub use numa::{
     verify_numa_locality, MnemosyneNumaAllocator, NumaAllocator, NumaBinding, NumaTopologyService,
 };
 pub use ops::{
-    Abs, Add, BitAnd, BitOr, BitXor, Clamp, Div, Dot, ElementOp, Exclusive, FmaAdd, Inclusive, Max,
-    Min, Mul, Neg, Product, ReductionOp, ScanAdd, ScanMax, ScanMin, ScanMode, ScanMul, ScanOp,
-    Sqrt, Sub, Sum, UnaryOp,
+    Abs, AbsMax, AbsSum, Add, BitAnd, BitOr, BitXor, Clamp, Div, Dot, ElementOp, Exclusive, FmaAdd,
+    Inclusive, Max, Min, Mul, Neg, Product, ReductionOp, ScanAdd, ScanMax, ScanMin, ScanMode,
+    ScanMul, ScanOp, Sqrt, Sub, Sum, UnaryOp,
 };
 pub use scalar::{FloatElement, NumericElement, Scalar};
 pub use sparse::{

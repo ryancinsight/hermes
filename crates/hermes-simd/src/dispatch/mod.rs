@@ -4,6 +4,7 @@
 //!
 //! `sum::<f32>(data)` -> `f32::sum(data)` -> `sum::dispatch_sum::<f32>(data)` -> avx2 kernel.
 
+mod abs_reduce;
 pub mod argmax;
 pub mod argmin;
 mod axpy;
@@ -61,6 +62,10 @@ impl private::Sealed for hermes_numeric::I32 {}
 pub trait SimdOps: ScalarTrait + private::Sealed {
     /// Reduces the slice to its sum.
     fn sum(data: &[Self]) -> Self;
+    /// Reduces the slice to `Σ |x|` (L1-norm accumulator); `T::ZERO` for empty.
+    fn abs_sum(data: &[Self]) -> Self;
+    /// Reduces the slice to `max |x|` (∞-norm accumulator); `T::ZERO` for empty.
+    fn abs_max(data: &[Self]) -> Self;
     /// Reduces the slice to its minimum element.
     ///
     /// Returns `T::MAX_VALUE` for empty slices (the identity element for min).
@@ -141,6 +146,14 @@ where
     #[inline(always)]
     fn sum(data: &[Self]) -> Self {
         sum::dispatch_sum::<Self>(data)
+    }
+    #[inline(always)]
+    fn abs_sum(data: &[Self]) -> Self {
+        abs_reduce::dispatch_abs_sum::<Self>(data)
+    }
+    #[inline(always)]
+    fn abs_max(data: &[Self]) -> Self {
+        abs_reduce::dispatch_abs_max::<Self>(data)
     }
     #[inline(always)]
     fn min(data: &[Self]) -> Self {
@@ -267,6 +280,14 @@ where
         sum::dispatch_sum::<Self>(data)
     }
     #[inline(always)]
+    fn abs_sum(data: &[Self]) -> Self {
+        abs_reduce::dispatch_abs_sum::<Self>(data)
+    }
+    #[inline(always)]
+    fn abs_max(data: &[Self]) -> Self {
+        abs_reduce::dispatch_abs_max::<Self>(data)
+    }
+    #[inline(always)]
     fn min(data: &[Self]) -> Self {
         min::dispatch_min::<Self>(data)
     }
@@ -388,6 +409,14 @@ where
     #[inline(always)]
     fn sum(data: &[Self]) -> Self {
         sum::dispatch_sum::<Self>(data)
+    }
+    #[inline(always)]
+    fn abs_sum(data: &[Self]) -> Self {
+        abs_reduce::dispatch_abs_sum::<Self>(data)
+    }
+    #[inline(always)]
+    fn abs_max(data: &[Self]) -> Self {
+        abs_reduce::dispatch_abs_max::<Self>(data)
     }
     #[inline(always)]
     fn min(data: &[Self]) -> Self {
@@ -521,6 +550,18 @@ pub fn min<T: SimdOps>(data: &[T]) -> T {
 #[inline(always)]
 pub fn max<T: SimdOps>(data: &[T]) -> T {
     T::max(data)
+}
+
+/// Reduces the slice to `Σ |x|` (L1-norm accumulator); `T::ZERO` for empty.
+#[inline(always)]
+pub fn abs_sum<T: SimdOps>(data: &[T]) -> T {
+    T::abs_sum(data)
+}
+
+/// Reduces the slice to `max |x|` (∞-norm accumulator); `T::ZERO` for empty.
+#[inline(always)]
+pub fn abs_max<T: SimdOps>(data: &[T]) -> T {
+    T::abs_max(data)
 }
 
 /// Multiplies every element of `data` by `scalar` in-place.

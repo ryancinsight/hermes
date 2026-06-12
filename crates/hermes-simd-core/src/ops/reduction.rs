@@ -68,6 +68,37 @@ pub trait ReductionOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
     unsafe fn identity_vector<Arch: SimdKernel<T>>() -> Arch::Vector {
         Arch::splat(Self::identity_scalar())
     }
+
+    /// Per-element lane transform applied before combining (identity by default).
+    ///
+    /// Reductions with a per-element transform (`AbsSum` applies `abs`) override
+    /// this so the reduce loop can seed unrolled accumulators with
+    /// `transform_vector(load(...))` instead of raw loads.
+    ///
+    /// # Safety
+    /// Processor must support the target feature of `Arch`.
+    #[inline(always)]
+    unsafe fn transform_vector<Arch: SimdKernel<T>>(v: Arch::Vector) -> Arch::Vector {
+        v
+    }
+
+    /// Merge two partial accumulators WITHOUT the per-element transform.
+    ///
+    /// `accumulate` is `combine_vectors(acc, transform_vector(v))`; the reduce
+    /// loop's cross-accumulator merge must use this method, because the
+    /// partials are already transformed. Default delegates to `accumulate`,
+    /// which is correct exactly when `transform_vector` is the identity —
+    /// transform-bearing ops must override both.
+    ///
+    /// # Safety
+    /// Processor must support the target feature of `Arch`.
+    #[inline(always)]
+    unsafe fn combine_vectors<Arch: SimdKernel<T>>(
+        a: Arch::Vector,
+        b: Arch::Vector,
+    ) -> Arch::Vector {
+        Self::accumulate::<Arch>(a, b)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -100,6 +131,22 @@ pub struct Min;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Max;
 
+/// Absolute-sum reduction: computes `Σ |data[i]|` (the L1 norm accumulator).
+///
+/// Identity element is `T::ZERO`. The per-element transform is `abs`, applied
+/// lane-wise before the additive fold (`scalar_accumulate` mirrors it on the
+/// tail). Signed-integer `abs` follows `T::abs` semantics, including its
+/// behavior at `T::MIN`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AbsSum;
+
+/// Absolute-max reduction: computes `max |data[i]|` (the ∞-norm accumulator).
+///
+/// Identity element is `T::ZERO`, which is also the mathematically correct
+/// result for an empty slice since every magnitude is non-negative.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AbsMax;
+
 /// Multiplicative reduction: computes `∏ data[i]`.
 ///
 /// Identity element is `T::ONE`. Uses SIMD `mul` to accumulate lane products, then
@@ -121,6 +168,8 @@ impl crate::private::Sealed for Sum {}
 impl crate::private::Sealed for Dot {}
 impl crate::private::Sealed for Min {}
 impl crate::private::Sealed for Max {}
+impl crate::private::Sealed for AbsSum {}
+impl crate::private::Sealed for AbsMax {}
 impl crate::private::Sealed for Product {}
 
 // ---------------------------------------------------------------------------
@@ -204,6 +253,74 @@ impl<T: Scalar> ReductionOp<T> for Max {
     #[inline(always)]
     fn scalar_combine(a: T, b: T) -> T {
         a.max_scalar(b)
+    }
+}
+
+impl<T: Scalar> ReductionOp<T> for AbsSum {
+    #[inline(always)]
+    unsafe fn accumulate<Arch: SimdKernel<T>>(acc: Arch::Vector, v: Arch::Vector) -> Arch::Vector {
+        Arch::add(acc, Arch::abs(v))
+    }
+    #[inline(always)]
+    unsafe fn finalize<Arch: SimdKernel<T>>(acc: Arch::Vector) -> T {
+        Arch::sum_reduce(acc)
+    }
+    #[inline(always)]
+    fn identity_scalar() -> T {
+        T::ZERO
+    }
+    #[inline(always)]
+    fn scalar_combine(a: T, b: T) -> T {
+        a + b
+    }
+    #[inline(always)]
+    fn scalar_accumulate(acc: T, elem: T) -> T {
+        acc + elem.abs()
+    }
+    #[inline(always)]
+    unsafe fn transform_vector<Arch: SimdKernel<T>>(v: Arch::Vector) -> Arch::Vector {
+        Arch::abs(v)
+    }
+    #[inline(always)]
+    unsafe fn combine_vectors<Arch: SimdKernel<T>>(
+        a: Arch::Vector,
+        b: Arch::Vector,
+    ) -> Arch::Vector {
+        Arch::add(a, b)
+    }
+}
+
+impl<T: Scalar> ReductionOp<T> for AbsMax {
+    #[inline(always)]
+    unsafe fn accumulate<Arch: SimdKernel<T>>(acc: Arch::Vector, v: Arch::Vector) -> Arch::Vector {
+        Arch::max(acc, Arch::abs(v))
+    }
+    #[inline(always)]
+    unsafe fn finalize<Arch: SimdKernel<T>>(acc: Arch::Vector) -> T {
+        Arch::max_reduce(acc)
+    }
+    #[inline(always)]
+    fn identity_scalar() -> T {
+        T::ZERO
+    }
+    #[inline(always)]
+    fn scalar_combine(a: T, b: T) -> T {
+        a.max_scalar(b)
+    }
+    #[inline(always)]
+    fn scalar_accumulate(acc: T, elem: T) -> T {
+        acc.max_scalar(elem.abs())
+    }
+    #[inline(always)]
+    unsafe fn transform_vector<Arch: SimdKernel<T>>(v: Arch::Vector) -> Arch::Vector {
+        Arch::abs(v)
+    }
+    #[inline(always)]
+    unsafe fn combine_vectors<Arch: SimdKernel<T>>(
+        a: Arch::Vector,
+        b: Arch::Vector,
+    ) -> Arch::Vector {
+        Arch::max(a, b)
     }
 }
 

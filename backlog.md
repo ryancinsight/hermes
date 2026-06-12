@@ -24,9 +24,13 @@ complete SIMD substrate for leto-ops/coeus hot kernels:
 - [ ] [minor] Stage C2: expand op/dtype coverage on demand from leto-ops/coeus
   (gather/scatter variants, additional reductions/scans, complex precisions) so every
   leto/coeus CPU hot kernel has a hermes path rather than a scalar fallback.
-  Concrete requests on file (2026-06-12 audit): abs-sum (`Σ|x|`) and abs-max
-  (`max|x|`) slice reductions — leto `norm_l1`/`norm_max` dense paths currently
-  fall back to a scalar fold over the memory-order slice.
+  Delivered (2026-06-12): abs-sum (`Σ|x|`) and abs-max (`max|x|`) slice
+  reductions via `AbsSum`/`AbsMax` ReductionOp ZSTs + `SimdOps::{abs_sum,
+  abs_max}` dispatch. The reduce loop's unrolled head previously seeded
+  accumulators with raw loads and merged partials with `accumulate` — correct
+  only for transform-free ops; it now seeds through `transform_vector` and
+  merges through `combine_vectors`, fixing the latent defect for every
+  transform-bearing reduction (the documented SquaredSum hook included).
 - [ ] [patch] Document the SIMD(hermes) vs MIMD(moirai) vs GPU(hephaestus: wgpu + CUDA)
   boundary in README so consumers compose the three deliberately.
 

@@ -48,11 +48,15 @@ where
         let mut i = 0usize;
 
         if unrolled_len >= chunk_size {
+            // Seeds carry the per-element transform (identity for Sum/Min/Max,
+            // abs for AbsSum/AbsMax) — a raw-load seed would skip it for the
+            // first chunk. Cross-accumulator merges use combine_vectors, which
+            // never re-applies the transform to already-transformed partials.
             let ptr = data.as_ptr();
-            let mut acc0 = load(ptr);
-            let mut acc1 = load(unsafe { ptr.add(lane_count) });
-            let mut acc2 = load(unsafe { ptr.add(lane_count * 2) });
-            let mut acc3 = load(unsafe { ptr.add(lane_count * 3) });
+            let mut acc0 = unsafe { Op::transform_vector::<Arch>(load(ptr)) };
+            let mut acc1 = unsafe { Op::transform_vector::<Arch>(load(ptr.add(lane_count))) };
+            let mut acc2 = unsafe { Op::transform_vector::<Arch>(load(ptr.add(lane_count * 2))) };
+            let mut acc3 = unsafe { Op::transform_vector::<Arch>(load(ptr.add(lane_count * 3))) };
             i = chunk_size;
             let mut ptr = unsafe { ptr.add(chunk_size) };
 
@@ -65,9 +69,9 @@ where
                 i += chunk_size;
             }
 
-            acc0 = unsafe { Op::accumulate::<Arch>(acc0, acc1) };
-            acc2 = unsafe { Op::accumulate::<Arch>(acc2, acc3) };
-            acc = unsafe { Op::accumulate::<Arch>(acc0, acc2) };
+            acc0 = unsafe { Op::combine_vectors::<Arch>(acc0, acc1) };
+            acc2 = unsafe { Op::combine_vectors::<Arch>(acc2, acc3) };
+            acc = unsafe { Op::combine_vectors::<Arch>(acc0, acc2) };
         }
 
         // Remaining full SIMD vectors

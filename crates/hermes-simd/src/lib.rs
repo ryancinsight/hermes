@@ -195,6 +195,8 @@ pub use tile_matmul::{dispatch_tile_matmul, gemm, unpack_int4, TiledGemm};
 // Re-export the generic dispatch operations. These monomorphize at call sites:
 // calling `sum::<f32>(data)` produces the f32 specialization.
 pub use dispatch::{
+    abs_max,
+    abs_sum,
     argmax,
     argmin,
     axpy,
