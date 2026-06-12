@@ -17,6 +17,9 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - Benchmark regression enforcement now uses `benchmarks_baseline.json` plus
   `run-benches --check-regressions`; the runner is split into CLI, Criterion
   parsing, host reporting, Markdown rendering, and threshold-check modules.
+- Sparse SpMV benchmarks now sweep CSR, SELL-p, and Blocked-COO across 1K,
+  10K, and 100K rows at 0.1%, 1%, and 10% non-zero density; Dense-with-mask is
+  capped at 10K rows to bound local memory use.
 - Host-capability integration tests validate runtime dispatch, local AVX2 execution when available, and irregular-shape GEMM fallback coverage.
 - Miri coverage now extends to the `hermes-simd-intrinsics` boundary: AMX session state is tested under Miri while hardware execution paths remain native-only.
 - `parallel` and `mnemosyne-memory` are default features on every Hermes package; `mnemosyne-memory` routes `AlignedVec::with_capacity_numa` allocation and deallocation through Mnemosyne by default.
@@ -28,6 +31,8 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - AMX context-pressure benchmarks no longer publish scalar fallback timings under an AMX-specific label on non-AMX hosts.
 - Dense scalar benchmark baselines now black-box operands and accumulation so Criterion measures real iteration work instead of an optimized-away constant.
 - Inline asm compute forms panic under Miri instead of returning fake values; Miri-valid AMX lifecycle operations are no-ops only for session-state verification.
+- README now documents the Atlas SIMD/MIMD/GPU ownership boundary so consumers
+  compose Hermes with Moirai and Hephaestus without duplicating responsibility.
 
 ## [0.2.0] — 2026-06-10
 

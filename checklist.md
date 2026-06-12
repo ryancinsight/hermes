@@ -80,9 +80,15 @@
       542-line mixed-concern entrypoint. Evidence tier: value-semantic unit
       tests for CLI/regression/report parsing, local dense Criterion run, and
       baseline self-check over 36 rows.
+- [x] [minor] SpMV scalability sweep: sparse Criterion bench now covers
+      CSR/SELL-p/BCOO over 1K, 10K, and 100K rows at 0.1%, 1%, and 10%
+      structural non-zero density with bounded Dense-with-mask cases through
+      10K rows. Sparse module docs now state format-selection guidance.
+- [x] [patch] Atlas compute boundary docs: README states Hermes owns SIMD
+      lane-parallel kernels and slice-oriented dispatch, Moirai owns MIMD
+      scheduling, and Hephaestus owns GPU/device lifetimes.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 
-- [minor] SpMV scalability sweep (P2).
 - [minor] Packed4 AVX2 unpack path (P2).
 - [minor] 0.3.0 release for the additive absolute-reduction API.

@@ -28,6 +28,17 @@ The project is structured as a multi-crate workspace (dependencies flow strictly
 7. **Typestate safety**: alignment (`Aligned<A>`/`Unaligned`), execution mode (`Masked`/`Unmasked`), and reference mutability are compile-time parameters with zero layout overhead.
 8. **Precision ladder**: 4-bit through 64-bit numeric types with packed storage and hardware-accelerated unpacking into `SimdCow`.
 
+## Atlas Compute Boundaries
+
+Hermes is the Atlas SIMD substrate: it owns lane-parallel CPU kernels, scalar
+fallbacks, ISA dispatch, packed-lane representation, and zero-copy SIMD views.
+Thread-level MIMD scheduling belongs to Moirai, and GPU execution belongs to
+the Hephaestus substrate consumed through Coeus/Apollo. Consumers compose these
+layers by selecting Hermes for per-core vector work, Moirai for partitioning
+independent work across cores, and Hephaestus for device-resident kernels.
+Hermes APIs therefore remain synchronous, slice-oriented, and monomorphized;
+they do not own task scheduling or GPU resource lifetimes.
+
 ## Feature Flags
 
 | Feature | Description |

@@ -1,4 +1,21 @@
 //! Sparse matrix formats and representations.
+//!
+//! Format selection is workload-dependent:
+//! - CSR is the baseline for irregular sparsity with compact zero-copy storage.
+//! - SELL-p groups rows into const-generic row slices and is best when rows have
+//!   similar non-zero counts, because padding overhead stays bounded and the
+//!   vectorized path can load one slice lane per row.
+//! - Blocked COO is suited to locally dense block structure; const block
+//!   dimensions monomorphize the inner block loops without a runtime format
+//!   switch.
+//! - Dense-with-mask keeps dense row-major values plus a boolean structural
+//!   mask; it is useful when the dense layout is already required by a caller,
+//!   but it is memory-bound for low non-zero densities because it stores every
+//!   value and mask bit.
+//!
+//! `crates/hermes-simd-benches/benches/sparse_bench.rs` records the empirical
+//! crossover data. Its scalability sweep varies row count and structural
+//! non-zero density while keeping values borrowed at the kernel boundary.
 
 pub mod cow;
 pub mod ops;

@@ -1,185 +1,250 @@
-#![allow(clippy::same_item_push)]
 //! Sparse matrix-vector multiplication benchmarks.
 //!
-//! Benchmarks SpMV across formats and sparsity levels:
-//! - `CSR SpMV` — CSR format at 0%, 50%, 90%, 99% sparsity on a 512x512 matrix
-//! - `DenseWithMask SpMV` — same sparsity sweep, dense layout with per-element mask
-//! - `Blocked-COO SpMV` — 4x4 and 8x8 block formats at 90% block sparsity
-//!
-//! Matrix size is fixed at 512x512 to keep benchmark runs short; the relative
-//! throughput differences between formats are representative at larger sizes.
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use hermes_simd::{spmv_bcoo4x4, spmv_bcoo8x8, spmv_csr, spmv_dense_masked};
-use hermes_simd_core::sparse::{BlockedCooData, CsrData, DenseWithMaskData};
+//! The scalable sweep uses a fixed column count and varies row count plus
+//! structural non-zero density. CSR, SELL-p, and Blocked-COO cover 1K, 10K,
+//! and 100K rows. Dense-with-mask stores full dense values and masks, so it
+//! is capped at 10K rows to keep local memory bounded.
 
-/// Build a CSR matrix with the given sparsity (fraction of zeros) for an `nxn` matrix.
-///
-/// Uses a simple LCG for reproducible, allocation-minimal pseudo-random generation.
-fn make_csr(n: usize, sparsity: f64) -> (Vec<f32>, Vec<i32>, Vec<i32>) {
-    let mut values = Vec::new();
-    let mut col_indices = Vec::new();
-    let mut row_ptr = vec![0i32];
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use hermes_simd::{
+    spmv_bcoo4x4, spmv_bcoo8x8, spmv_csr, spmv_dense_masked, spmv_sellp4, spmv_sellp8,
+};
+use hermes_simd_core::sparse::{BlockedCooData, CsrData, DenseWithMaskData, SellPData};
 
-    let mut rng_state = 12345u64;
-    let lcg = |s: &mut u64| -> f64 {
-        *s = s
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
-        (*s >> 33) as f64 / (1u64 << 31) as f64
-    };
+const NCOLS: usize = 1024;
+const ROW_SWEEP: [usize; 3] = [1024, 10_000, 100_000];
+const DENSE_ROW_SWEEP: [usize; 2] = [1024, 10_000];
+const DENSITIES: [f64; 3] = [0.001, 0.01, 0.10];
 
-    for _r in 0..n {
-        for c in 0..n {
-            if lcg(&mut rng_state) >= sparsity {
-                values.push(1.0f32);
-                col_indices.push(c as i32);
-            }
+#[derive(Clone, Copy)]
+struct MatrixCase {
+    nrows: usize,
+    density: f64,
+}
+
+impl MatrixCase {
+    fn label(self) -> String {
+        format!("rows_{}_density_{:.1}pct", self.nrows, self.density * 100.0)
+    }
+
+    fn nnz_per_row(self) -> usize {
+        ((NCOLS as f64 * self.density).round() as usize).clamp(1, NCOLS)
+    }
+
+    fn dense_len(self) -> usize {
+        self.nrows * NCOLS
+    }
+
+    fn logical_elements(self) -> u64 {
+        self.dense_len() as u64
+    }
+}
+
+fn col_for(row: usize, ordinal: usize) -> usize {
+    (row.wrapping_mul(1_103_515_245).wrapping_add(ordinal * 97)) & (NCOLS - 1)
+}
+
+fn make_csr(case: MatrixCase) -> (Vec<f32>, Vec<i32>, Vec<i32>) {
+    let nnz_per_row = case.nnz_per_row();
+    let nnz = case.nrows * nnz_per_row;
+    let mut values = Vec::with_capacity(nnz);
+    let mut col_indices = Vec::with_capacity(nnz);
+    let mut row_ptr = Vec::with_capacity(case.nrows + 1);
+    row_ptr.push(0);
+
+    for row in 0..case.nrows {
+        for ordinal in 0..nnz_per_row {
+            values.push(1.0);
+            col_indices.push(col_for(row, ordinal) as i32);
         }
         row_ptr.push(values.len() as i32);
     }
     (values, col_indices, row_ptr)
 }
 
-/// Build a DenseWithMask matrix with the given sparsity.
-fn make_dense_masked(n: usize, sparsity: f64) -> (Vec<f32>, Vec<bool>) {
-    let mut rng = 99991u64;
-    let lcg = |s: &mut u64| -> f64 {
-        *s = s
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
-        (*s >> 33) as f64 / (1u64 << 31) as f64
-    };
-    let total = n * n;
-    let values: Vec<f32> = (0..total).map(|_| 1.0f32).collect();
-    let mask: Vec<bool> = (0..total).map(|_| lcg(&mut rng) >= sparsity).collect();
+fn make_sellp<const C: usize>(case: MatrixCase) -> (Vec<f32>, Vec<i32>, Vec<i32>, Vec<i32>) {
+    let nnz_per_row = case.nnz_per_row();
+    let nslices = case.nrows.div_ceil(C);
+    let padded_rows = nslices * C;
+    let entries = padded_rows * nnz_per_row;
+    let mut values = Vec::with_capacity(entries);
+    let mut col_indices = Vec::with_capacity(entries);
+    let mut slice_ptr = Vec::with_capacity(nslices + 1);
+    let mut slice_col_count = Vec::with_capacity(nslices);
+
+    slice_ptr.push(0);
+    for slice in 0..nslices {
+        slice_col_count.push(nnz_per_row as i32);
+        for ordinal in 0..nnz_per_row {
+            for lane in 0..C {
+                let row = slice * C + lane;
+                if row < case.nrows {
+                    values.push(1.0);
+                    col_indices.push(col_for(row, ordinal) as i32);
+                } else {
+                    values.push(0.0);
+                    col_indices.push(0);
+                }
+            }
+        }
+        slice_ptr.push(values.len() as i32);
+    }
+    (values, col_indices, slice_ptr, slice_col_count)
+}
+
+fn make_bcoo<const BM: usize, const BN: usize>(
+    case: MatrixCase,
+) -> (Vec<f32>, Vec<i32>, Vec<i32>, usize) {
+    let n_block_rows = case.nrows.div_ceil(BM);
+    let n_block_cols = NCOLS / BN;
+    let blocks_per_row =
+        ((n_block_cols as f64 * case.density).round() as usize).clamp(1, n_block_cols);
+    let nblocks = n_block_rows * blocks_per_row;
+    let block_size = BM * BN;
+    let mut blocks = Vec::with_capacity(nblocks * block_size);
+    let mut block_rows = Vec::with_capacity(nblocks);
+    let mut block_cols = Vec::with_capacity(nblocks);
+
+    for block_row in 0..n_block_rows {
+        for ordinal in 0..blocks_per_row {
+            let block_col = (block_row.wrapping_mul(17).wrapping_add(ordinal * 13)) % n_block_cols;
+            blocks.extend(std::iter::repeat_n(1.0, block_size));
+            block_rows.push((block_row * BM) as i32);
+            block_cols.push((block_col * BN) as i32);
+        }
+    }
+    (blocks, block_rows, block_cols, nblocks)
+}
+
+fn make_dense_masked(case: MatrixCase) -> (Vec<f32>, Vec<bool>) {
+    let values = vec![1.0; case.dense_len()];
+    let active_period = (1.0 / case.density).round() as usize;
+    let mask = (0..case.dense_len())
+        .map(|idx| idx % active_period == 0)
+        .collect();
     (values, mask)
 }
 
-/// Build a Blocked-COO matrix at `sparsity` block-level sparsity for const block dims.
-fn make_bcoo<const BM: usize, const BN: usize>(
-    n: usize,
-    sparsity: f64,
-) -> (Vec<f32>, Vec<i32>, Vec<i32>, usize) {
-    let n_block_rows = n / BM;
-    let n_block_cols = n / BN;
-    let block_size = BM * BN;
-
-    let mut rng = 77771u64;
-    let lcg = |s: &mut u64| -> f64 {
-        *s = s
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
-        (*s >> 33) as f64 / (1u64 << 31) as f64
-    };
-
-    let mut blocks: Vec<f32> = Vec::new();
-    let mut brow: Vec<i32> = Vec::new();
-    let mut bcol: Vec<i32> = Vec::new();
-
-    for br in 0..n_block_rows {
-        for bc in 0..n_block_cols {
-            if lcg(&mut rng) >= sparsity {
-                for _ in 0..block_size {
-                    blocks.push(1.0f32);
-                }
-                brow.push((br * BM) as i32);
-                bcol.push((bc * BN) as i32);
-            }
-        }
-    }
-    let nblocks = brow.len();
-    (blocks, brow, bcol, nblocks)
-}
-
 fn bench_csr_spmv(c: &mut Criterion) {
-    let mut group = c.benchmark_group("CSR SpMV f32");
-    let n = 512usize;
-    let x = vec![1.0f32; n];
-
-    for sparsity in [0.0f64, 0.5, 0.9, 0.99] {
-        let (vals, cols, ptr) = make_csr(n, sparsity);
-        let mut y = vec![0.0f32; n];
-        let label = format!("sparsity_{:.0}pct", sparsity * 100.0);
-        group.throughput(Throughput::Elements(n as u64 * n as u64));
-        group.bench_with_input(BenchmarkId::new("csr", &label), &sparsity, |b, _| {
-            b.iter(|| {
-                y.fill(0.0);
-                spmv_csr::<f32>(
-                    CsrData::new(&vals[..], &cols[..], &ptr[..], n, n),
-                    &x,
-                    &mut y,
-                );
-            })
-        });
+    let mut group = c.benchmark_group("CSR SpMV f32 scalability");
+    for nrows in ROW_SWEEP {
+        let x = vec![1.0f32; NCOLS];
+        for density in DENSITIES {
+            let case = MatrixCase { nrows, density };
+            let (values, cols, row_ptr) = make_csr(case);
+            let data = CsrData::new(&values, &cols, &row_ptr, nrows, NCOLS);
+            let mut y = vec![0.0f32; nrows];
+            group.throughput(Throughput::Elements(case.logical_elements()));
+            group.bench_with_input(BenchmarkId::new("csr", case.label()), &case, |bench, _| {
+                bench.iter(|| {
+                    y.fill(0.0);
+                    spmv_csr::<f32>(data.clone(), black_box(&x), black_box(&mut y));
+                })
+            });
+        }
     }
     group.finish();
 }
 
-fn bench_dense_masked_spmv(c: &mut Criterion) {
-    let mut group = c.benchmark_group("DenseWithMask SpMV f32");
-    let n = 512usize;
-    let x = vec![1.0f32; n];
+fn bench_sellp_spmv(c: &mut Criterion) {
+    let mut group = c.benchmark_group("SELL-p SpMV f32 scalability");
+    for nrows in ROW_SWEEP {
+        let x = vec![1.0f32; NCOLS];
+        for density in DENSITIES {
+            let case = MatrixCase { nrows, density };
+            let (values4, cols4, ptr4, count4) = make_sellp::<4>(case);
+            let data4 = SellPData::new(&values4, &cols4, &ptr4, &count4, nrows, NCOLS);
+            let mut y4 = vec![0.0f32; nrows];
+            group.throughput(Throughput::Elements(case.logical_elements()));
+            group.bench_with_input(
+                BenchmarkId::new("sellp4", case.label()),
+                &case,
+                |bench, _| {
+                    bench.iter(|| {
+                        y4.fill(0.0);
+                        spmv_sellp4::<f32>(data4.clone(), black_box(&x), black_box(&mut y4));
+                    })
+                },
+            );
 
-    for sparsity in [0.0f64, 0.5, 0.9, 0.99] {
-        let (vals, mask) = make_dense_masked(n, sparsity);
-        let mut y = vec![0.0f32; n];
-        let label = format!("sparsity_{:.0}pct", sparsity * 100.0);
-        group.throughput(Throughput::Elements(n as u64 * n as u64));
-        group.bench_with_input(
-            BenchmarkId::new("dense_masked", &label),
-            &sparsity,
-            |b, _| {
-                b.iter(|| {
-                    y.fill(0.0);
-                    spmv_dense_masked::<f32>(
-                        DenseWithMaskData::new(&vals[..], &mask[..], n, n),
-                        &x,
-                        &mut y,
-                    );
-                })
-            },
-        );
+            let (values8, cols8, ptr8, count8) = make_sellp::<8>(case);
+            let data8 = SellPData::new(&values8, &cols8, &ptr8, &count8, nrows, NCOLS);
+            let mut y8 = vec![0.0f32; nrows];
+            group.bench_with_input(
+                BenchmarkId::new("sellp8", case.label()),
+                &case,
+                |bench, _| {
+                    bench.iter(|| {
+                        y8.fill(0.0);
+                        spmv_sellp8::<f32>(data8.clone(), black_box(&x), black_box(&mut y8));
+                    })
+                },
+            );
+        }
     }
     group.finish();
 }
 
 fn bench_bcoo_spmv(c: &mut Criterion) {
-    let mut group = c.benchmark_group("Blocked-COO SpMV f32");
-    let n = 512usize;
-    let x = vec![1.0f32; n];
-    let sparsity = 0.9f64;
-    group.throughput(Throughput::Elements(n as u64 * n as u64));
+    let mut group = c.benchmark_group("Blocked-COO SpMV f32 scalability");
+    for nrows in ROW_SWEEP {
+        let x = vec![1.0f32; NCOLS];
+        for density in DENSITIES {
+            let case = MatrixCase { nrows, density };
+            let (blocks4, brow4, bcol4, nblocks4) = make_bcoo::<4, 4>(case);
+            let data4 = BlockedCooData::new(&blocks4, &brow4, &bcol4, nblocks4, nrows, NCOLS);
+            let mut y4 = vec![0.0f32; nrows];
+            group.throughput(Throughput::Elements(case.logical_elements()));
+            group.bench_with_input(
+                BenchmarkId::new("bcoo4x4", case.label()),
+                &case,
+                |bench, _| {
+                    bench.iter(|| {
+                        y4.fill(0.0);
+                        spmv_bcoo4x4::<f32>(data4.clone(), black_box(&x), black_box(&mut y4));
+                    })
+                },
+            );
 
-    // 4x4 blocks
-    {
-        let (blocks, brow, bcol, nblocks) = make_bcoo::<4, 4>(n, sparsity);
-        let mut y = vec![0.0f32; n];
-        group.bench_function("bcoo_4x4", |b| {
-            b.iter(|| {
-                y.fill(0.0);
-                spmv_bcoo4x4::<f32>(
-                    BlockedCooData::new(&blocks[..], &brow[..], &bcol[..], nblocks, n, n),
-                    &x,
-                    &mut y,
-                );
-            })
-        });
+            let (blocks8, brow8, bcol8, nblocks8) = make_bcoo::<8, 8>(case);
+            let data8 = BlockedCooData::new(&blocks8, &brow8, &bcol8, nblocks8, nrows, NCOLS);
+            let mut y8 = vec![0.0f32; nrows];
+            group.bench_with_input(
+                BenchmarkId::new("bcoo8x8", case.label()),
+                &case,
+                |bench, _| {
+                    bench.iter(|| {
+                        y8.fill(0.0);
+                        spmv_bcoo8x8::<f32>(data8.clone(), black_box(&x), black_box(&mut y8));
+                    })
+                },
+            );
+        }
     }
+    group.finish();
+}
 
-    // 8x8 blocks
-    {
-        let (blocks, brow, bcol, nblocks) = make_bcoo::<8, 8>(n, sparsity);
-        let mut y = vec![0.0f32; n];
-        group.bench_function("bcoo_8x8", |b| {
-            b.iter(|| {
-                y.fill(0.0);
-                spmv_bcoo8x8::<f32>(
-                    BlockedCooData::new(&blocks[..], &brow[..], &bcol[..], nblocks, n, n),
-                    &x,
-                    &mut y,
-                );
-            })
-        });
+fn bench_dense_masked_spmv(c: &mut Criterion) {
+    let mut group = c.benchmark_group("DenseWithMask SpMV f32 scalability");
+    for nrows in DENSE_ROW_SWEEP {
+        let x = vec![1.0f32; NCOLS];
+        for density in DENSITIES {
+            let case = MatrixCase { nrows, density };
+            let (values, mask) = make_dense_masked(case);
+            let data = DenseWithMaskData::new(&values, &mask, nrows, NCOLS);
+            let mut y = vec![0.0f32; nrows];
+            group.throughput(Throughput::Elements(case.logical_elements()));
+            group.bench_with_input(
+                BenchmarkId::new("dense_masked", case.label()),
+                &case,
+                |bench, _| {
+                    bench.iter(|| {
+                        y.fill(0.0);
+                        spmv_dense_masked::<f32>(data.clone(), black_box(&x), black_box(&mut y));
+                    })
+                },
+            );
+        }
     }
     group.finish();
 }
@@ -187,7 +252,8 @@ fn bench_bcoo_spmv(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_csr_spmv,
-    bench_dense_masked_spmv,
-    bench_bcoo_spmv
+    bench_sellp_spmv,
+    bench_bcoo_spmv,
+    bench_dense_masked_spmv
 );
 criterion_main!(benches);

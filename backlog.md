@@ -31,8 +31,11 @@ complete SIMD substrate for leto-ops/coeus hot kernels:
   only for transform-free ops; it now seeds through `transform_vector` and
   merges through `combine_vectors`, fixing the latent defect for every
   transform-bearing reduction (the documented SquaredSum hook included).
-- [ ] [patch] Document the SIMD(hermes) vs MIMD(moirai) vs GPU(hephaestus: wgpu + CUDA)
-  boundary in README so consumers compose the three deliberately.
+- [x] [patch] Document the SIMD(hermes) vs MIMD(moirai) vs GPU(hephaestus: wgpu + CUDA)
+  boundary in README so consumers compose the three deliberately. Delivered
+  2026-06-12: README defines Hermes as the synchronous, slice-oriented SIMD
+  substrate; Moirai owns thread-level partitioning; Hephaestus owns GPU
+  resource lifetimes and device-resident kernels.
 
 ## Stage assessment (2026-06-10)
 
@@ -80,9 +83,11 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
       exceeding the configured ratio threshold. The runner is split into
       cohesive modules for CLI parsing, result discovery, host metadata,
       threshold comparison, and Markdown report rendering.
-- [ ] **[minor] SpMV scalability sweep**: bench n ∈ {1K, 10K, 100K} rows ×
-      sparsity {0.1%, 1%, 10%} across CSR/SELL-p/BCOO to characterize
-      format-selection crossover points; document guidance in sparse module docs.
+- [x] **[minor] SpMV scalability sweep** (delivered 2026-06-12): bench row
+      counts ∈ {1K, 10K, 100K} at structural non-zero density {0.1%, 1%, 10%}
+      across CSR/SELL-p/BCOO with 1024 columns; Dense-with-mask is capped at
+      10K rows because it stores full dense values and masks. Sparse module
+      docs now record format-selection guidance.
 - [ ] **[minor] Packed4 unpack generalization**: `HardwareUnpack` currently
       routes x86_64 through the AVX-512 tiling path only; add an AVX2 unpack
       and runtime selection, and fold the Bf4/F4 impl pair into the dispatch
