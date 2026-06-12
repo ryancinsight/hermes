@@ -197,6 +197,7 @@ pub use tile_matmul::{dispatch_tile_matmul, gemm, unpack_int4, TiledGemm};
 pub use dispatch::{
     argmax,
     argmin,
+    axpy,
     dot,
     elementwise_add,
     elementwise_div,

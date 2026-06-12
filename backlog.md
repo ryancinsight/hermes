@@ -4,6 +4,14 @@ Strategic roadmap. Triage order: correctness → architecture → tests → docs
 Tags: `[patch]` / `[minor]` / `[major]` / `[arch]` per SemVer change class.
 Tactical breakdown of the active items lives in [checklist.md](checklist.md).
 
+## Delivered (2026-06-11)
+
+- [x] [minor] AXPY provider: `SimdOps::axpy` / dispatched `axpy` free fn —
+  fused row update `out[i] += alpha * x[i]` via the `fmadd` primitive with
+  scalar tail, no temporaries, length-mismatch error. Driver: leto matmul SIMD
+  dispatch (its Stage C2 gate). Value tests across all tail sizes, f32/f64,
+  zero-alpha identity, mismatch rejection.
+
 ## Atlas in-house replacement roadmap — hermes slice [arch]
 
 hermes is the Atlas **SIMD SSOT** (data-parallel lanes), replacing std::simd / packed_simd

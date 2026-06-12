@@ -6,6 +6,7 @@
 
 pub mod argmax;
 pub mod argmin;
+mod axpy;
 pub mod binary;
 pub mod complex;
 pub mod dot;
@@ -76,6 +77,8 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     fn argmax(data: &[Self]) -> Option<(usize, Self)>;
     /// Computes the dot product of two slices.
     fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError>;
+    /// Fused row update `out[i] += alpha * x[i]` (AXPY) with no temporaries.
+    fn axpy(alpha: Self, x: &[Self], out: &mut [Self]) -> Result<(), SimdError>;
     /// Computes the elementwise product and writes to `out`.
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError>;
     /// Computes the elementwise sum `a[i] + b[i]` and writes to `out`.
@@ -162,6 +165,10 @@ where
     #[inline(always)]
     fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError> {
         dot::dispatch_dot::<Self>(a, b)
+    }
+    #[inline(always)]
+    fn axpy(alpha: Self, x: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
+        axpy::dispatch_axpy::<Self>(alpha, x, out)
     }
     #[inline(always)]
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
@@ -284,6 +291,10 @@ where
         dot::dispatch_dot::<Self>(a, b)
     }
     #[inline(always)]
+    fn axpy(alpha: Self, x: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
+        axpy::dispatch_axpy::<Self>(alpha, x, out)
+    }
+    #[inline(always)]
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
         binary::dispatch_elementwise_binary::<Self, Mul>(a, b, out, Mul)
     }
@@ -401,6 +412,10 @@ where
     #[inline(always)]
     fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError> {
         dot::dispatch_dot::<Self>(a, b)
+    }
+    #[inline(always)]
+    fn axpy(alpha: Self, x: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
+        axpy::dispatch_axpy::<Self>(alpha, x, out)
     }
     #[inline(always)]
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
@@ -530,6 +545,13 @@ pub fn argmax<T: SimdOps>(data: &[T]) -> Option<(usize, T)> {
 #[inline(always)]
 pub fn dot<T: SimdOps>(a: &[T], b: &[T]) -> Result<T, SimdError> {
     T::dot(a, b)
+}
+
+/// Fused row update `out[i] += alpha * x[i]` (AXPY) via runtime-dispatched
+/// SIMD with no temporary allocation. Errors on length mismatch.
+#[inline(always)]
+pub fn axpy<T: SimdOps>(alpha: T, x: &[T], out: &mut [T]) -> Result<(), SimdError> {
+    T::axpy(alpha, x, out)
 }
 
 /// Computes the elementwise multiplication of two slices and writes to `out`.
