@@ -106,14 +106,18 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
       `MnemosyneNumaAllocator` path now uses Mnemosyne allocation instead of a
       name-only std/platform allocator branch. The broader Themis topology
       replacement below remains open.
-- [ ] **[arch] NUMA consolidation onto themis/mnemosyne**: replace
-      `numa.rs`'s detection layer with a `themis` dependency (`CpuTopology`,
-      `NumaNodeId`, distances) and route `NumaAllocator` through mnemosyne's
-      placement-hinted allocation, keeping only the SIMD-specific locality
-      verification here. Adds a hermes→themis edge (consistent with
-      moirai/mnemosyne, which already consume themis law). Touches
-      dispatcher + vec + tests: one coordinated unit with call-site updates,
-      no compatibility shims.
+- [x] **[arch] NUMA consolidation onto themis/mnemosyne** (delivered
+      2026-06-12): `numa.rs` detection now delegates to themis —
+      `current_numa_node` → `themis::try_current_numa_node` (Option-honest,
+      added in themis 0.7.0), `NumaTopologyService::{current_cpu,total_nodes,
+      node_distance}` → `themis::current_processor` / process-cached
+      `CpuTopology::detect()` distance tables. The duplicated libnuma /
+      GetNumaHighestNodeNumber / sched_getcpu platform blocks are deleted.
+      Allocation already routes through mnemosyne (`MnemosyneNumaAllocator`
+      with `NumaBinding`). Kept in hermes by design: `NumaAllocator` trait,
+      `NumaBinding` thread-affinity RAII, and `verify_numa_locality` —
+      SIMD-specific concerns the topology SSOT should not own. Public query
+      surface unchanged; dispatcher/vec/tests untouched.
 
 ## P4 — Documentation <a id="p4"></a>
 

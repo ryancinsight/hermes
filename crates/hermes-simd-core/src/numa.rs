@@ -157,45 +157,11 @@ impl NumaAllocator for MnemosyneNumaAllocator {
 }
 
 /// Returns the index of the NUMA node the current thread is executing on.
+///
+/// Delegates to the themis topology SSOT. `None` means the platform did not
+/// report a node — never a fabricated node 0.
 pub fn current_numa_node() -> Option<u32> {
-    #[cfg(all(target_os = "linux", feature = "libnuma"))]
-    {
-        #[link(name = "numa")]
-        extern "C" {
-            fn sched_getcpu() -> i32;
-            fn numa_node_of_cpu(cpu: i32) -> i32;
-        }
-        unsafe {
-            let cpu = sched_getcpu();
-            if cpu >= 0 {
-                let node = numa_node_of_cpu(cpu);
-                if node >= 0 {
-                    return Some(node as u32);
-                }
-            }
-            None
-        }
-    }
-    #[cfg(target_os = "windows")]
-    {
-        extern "system" {
-            fn GetCurrentProcessorNumber() -> u32;
-            fn GetNumaProcessorNode(processor: u8, node_number: *mut u8) -> i32;
-        }
-        unsafe {
-            let cpu = GetCurrentProcessorNumber() as u8;
-            let mut node = 0u8;
-            if GetNumaProcessorNode(cpu, &mut node) != 0 {
-                Some(node as u32)
-            } else {
-                None
-            }
-        }
-    }
-    #[cfg(not(any(all(target_os = "linux", feature = "libnuma"), target_os = "windows")))]
-    {
-        None
-    }
+    themis::try_current_numa_node().map(|node| node.get())
 }
 
 /// Refreshes and returns the current NUMA node index for the executing thread.
@@ -208,56 +174,45 @@ pub fn numa_node_count() -> u32 {
     NumaTopologyService::total_nodes()
 }
 
-/// Retrieve the NUMA distance between two NUMA nodes.
-/// Returns 10 if node_a == node_b, and queries the OS distance tables or returns 20 as remote fallback.
-pub fn numa_node_distance(node_a: u32, node_b: u32) -> u32 {
-    if node_a == node_b {
-        return 10;
-    }
-    #[cfg(all(target_os = "linux", feature = "libnuma"))]
-    {
-        #[link(name = "numa")]
-        extern "C" {
-            fn numa_distance(node1: i32, node2: i32) -> i32;
-        }
-        let dist = unsafe { numa_distance(node_a as i32, node_b as i32) };
-        if dist > 0 {
-            return dist as u32;
-        }
-    }
-    20
+/// Process-cached themis topology snapshot: detection reads sysfs / Windows
+/// topology tables once; every later query borrows the cached result.
+#[cfg(feature = "std")]
+fn topology() -> Option<&'static themis::CpuTopology> {
+    static TOPOLOGY: std::sync::OnceLock<Option<themis::CpuTopology>> = std::sync::OnceLock::new();
+    TOPOLOGY.get_or_init(themis::CpuTopology::detect).as_ref()
 }
 
-/// Verify if the physical memory backing a pointer range is resident on a specific node.
+/// Retrieve the NUMA distance between two NUMA nodes.
+///
+/// Returns the themis topology distance-table entry; when no topology is
+/// available (detection failed or `no_std`) it falls back to the documented
+/// 10 local / 20 remote convention.
+pub fn numa_node_distance(node_a: u32, node_b: u32) -> u32 {
+    #[cfg(feature = "std")]
+    {
+        use themis::NumaNodeId;
+        if let Some(topology) = topology() {
+            return topology.distance(NumaNodeId::new(node_a), NumaNodeId::new(node_b));
+        }
+    }
+    if node_a == node_b {
+        10
+    } else {
+        20
+    }
+}
+
 /// Topology service to query NUMA nodes and logical processors.
+///
+/// Detection is delegated to themis (`CpuTopology`, `try_current_numa_node`,
+/// `current_processor`) — the stack topology SSOT; this type keeps the
+/// SIMD-facing query surface stable.
 pub struct NumaTopologyService;
 
 impl NumaTopologyService {
     /// Query the current CPU/processor index.
     pub fn current_cpu() -> Option<u32> {
-        #[cfg(target_os = "linux")]
-        {
-            extern "C" {
-                fn sched_getcpu() -> i32;
-            }
-            let cpu = unsafe { sched_getcpu() };
-            if cpu >= 0 {
-                Some(cpu as u32)
-            } else {
-                None
-            }
-        }
-        #[cfg(target_os = "windows")]
-        {
-            extern "system" {
-                fn GetCurrentProcessorNumber() -> u32;
-            }
-            Some(unsafe { GetCurrentProcessorNumber() })
-        }
-        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-        {
-            None
-        }
+        themis::current_processor()
     }
 
     /// Query the current NUMA node ID.
@@ -267,32 +222,13 @@ impl NumaTopologyService {
 
     /// Get total number of NUMA nodes in the system.
     pub fn total_nodes() -> u32 {
-        #[cfg(all(target_os = "linux", feature = "libnuma"))]
+        #[cfg(feature = "std")]
         {
-            #[link(name = "numa")]
-            extern "C" {
-                fn numa_num_configured_nodes() -> i32;
-            }
-            let count = unsafe { numa_num_configured_nodes() };
-            if count > 0 {
-                count as u32
-            } else {
-                1
-            }
+            topology().map_or(1, |t| {
+                u32::try_from(t.numa_nodes().len().max(1)).unwrap_or(u32::MAX)
+            })
         }
-        #[cfg(target_os = "windows")]
-        {
-            extern "system" {
-                fn GetNumaHighestNodeNumber(highest_node_number: *mut u32) -> i32;
-            }
-            let mut highest = 0;
-            if unsafe { GetNumaHighestNodeNumber(&mut highest) } != 0 {
-                highest + 1
-            } else {
-                1
-            }
-        }
-        #[cfg(not(any(all(target_os = "linux", feature = "libnuma"), target_os = "windows")))]
+        #[cfg(not(feature = "std"))]
         {
             1
         }

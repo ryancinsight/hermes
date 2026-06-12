@@ -21,7 +21,8 @@ rust-version = "1.95"
 
 [workspace.dependencies]
 half = { version = "2.3", default-features = false }
-mnemosyne = { git = "https://github.com/ryancinsight/Mnemosyne.git", rev = "938d0c2bc094d3bbe7745d68d60e05a531e0cfc2", default-features = false }
+mnemosyne = { git = "https://github.com/ryancinsight/Mnemosyne.git", rev = "43a02f38ba4593b407f9dc674267126c6a4240e1", default-features = false }
+themis = { git = "https://github.com/ryancinsight/themis", version = "0.7.0", default-features = false }
 
 [profile.release]
 opt-level = 3

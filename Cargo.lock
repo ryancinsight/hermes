@@ -573,6 +573,7 @@ dependencies = [
  "hermes-simd-intrinsics",
  "mnemosyne",
  "rkyv",
+ "themis",
 ]
 
 [[package]]
@@ -730,7 +731,7 @@ checksum = "953f07c43838f8e6f9758cab68bf5bed85465e7587ebe0b823f1bcd81978ad3a"
 [[package]]
 name = "melinoe"
 version = "0.6.0"
-source = "git+https://github.com/ryancinsight/melinoe.git#cb4e371c38dac53a33bb72c726c98178a6430842"
+source = "git+https://github.com/ryancinsight/melinoe.git#8140882ce58c9e68f70e242f3509133cc53080d9"
 
 [[package]]
 name = "memchr"
@@ -750,7 +751,7 @@ dependencies = [
 [[package]]
 name = "mnemosyne"
 version = "0.2.0"
-source = "git+https://github.com/ryancinsight/Mnemosyne.git?rev=938d0c2bc094d3bbe7745d68d60e05a531e0cfc2#938d0c2bc094d3bbe7745d68d60e05a531e0cfc2"
+source = "git+https://github.com/ryancinsight/Mnemosyne.git?rev=43a02f38ba4593b407f9dc674267126c6a4240e1#43a02f38ba4593b407f9dc674267126c6a4240e1"
 dependencies = [
  "mnemosyne-arena",
  "mnemosyne-backend",
@@ -764,7 +765,7 @@ dependencies = [
 [[package]]
 name = "mnemosyne-arena"
 version = "0.2.0"
-source = "git+https://github.com/ryancinsight/Mnemosyne.git?rev=938d0c2bc094d3bbe7745d68d60e05a531e0cfc2#938d0c2bc094d3bbe7745d68d60e05a531e0cfc2"
+source = "git+https://github.com/ryancinsight/Mnemosyne.git?rev=43a02f38ba4593b407f9dc674267126c6a4240e1#43a02f38ba4593b407f9dc674267126c6a4240e1"
 dependencies = [
  "mnemosyne-backend",
  "mnemosyne-core",
@@ -774,7 +775,7 @@ dependencies = [
 [[package]]
 name = "mnemosyne-backend"
 version = "0.1.0"
-source = "git+https://github.com/ryancinsight/Mnemosyne.git?rev=938d0c2bc094d3bbe7745d68d60e05a531e0cfc2#938d0c2bc094d3bbe7745d68d60e05a531e0cfc2"
+source = "git+https://github.com/ryancinsight/Mnemosyne.git?rev=43a02f38ba4593b407f9dc674267126c6a4240e1#43a02f38ba4593b407f9dc674267126c6a4240e1"
 dependencies = [
  "mnemosyne-core",
 ]
@@ -782,12 +783,12 @@ dependencies = [
 [[package]]
 name = "mnemosyne-core"
 version = "0.1.0"
-source = "git+https://github.com/ryancinsight/Mnemosyne.git?rev=938d0c2bc094d3bbe7745d68d60e05a531e0cfc2#938d0c2bc094d3bbe7745d68d60e05a531e0cfc2"
+source = "git+https://github.com/ryancinsight/Mnemosyne.git?rev=43a02f38ba4593b407f9dc674267126c6a4240e1#43a02f38ba4593b407f9dc674267126c6a4240e1"
 
 [[package]]
 name = "mnemosyne-decay"
 version = "0.1.0"
-source = "git+https://github.com/ryancinsight/Mnemosyne.git?rev=938d0c2bc094d3bbe7745d68d60e05a531e0cfc2#938d0c2bc094d3bbe7745d68d60e05a531e0cfc2"
+source = "git+https://github.com/ryancinsight/Mnemosyne.git?rev=43a02f38ba4593b407f9dc674267126c6a4240e1#43a02f38ba4593b407f9dc674267126c6a4240e1"
 dependencies = [
  "mnemosyne-arena",
  "mnemosyne-backend",
@@ -797,7 +798,7 @@ dependencies = [
 [[package]]
 name = "mnemosyne-hardened"
 version = "0.1.0"
-source = "git+https://github.com/ryancinsight/Mnemosyne.git?rev=938d0c2bc094d3bbe7745d68d60e05a531e0cfc2#938d0c2bc094d3bbe7745d68d60e05a531e0cfc2"
+source = "git+https://github.com/ryancinsight/Mnemosyne.git?rev=43a02f38ba4593b407f9dc674267126c6a4240e1#43a02f38ba4593b407f9dc674267126c6a4240e1"
 dependencies = [
  "mnemosyne-core",
 ]
@@ -805,7 +806,7 @@ dependencies = [
 [[package]]
 name = "mnemosyne-local"
 version = "0.1.0"
-source = "git+https://github.com/ryancinsight/Mnemosyne.git?rev=938d0c2bc094d3bbe7745d68d60e05a531e0cfc2#938d0c2bc094d3bbe7745d68d60e05a531e0cfc2"
+source = "git+https://github.com/ryancinsight/Mnemosyne.git?rev=43a02f38ba4593b407f9dc674267126c6a4240e1#43a02f38ba4593b407f9dc674267126c6a4240e1"
 dependencies = [
  "mnemosyne-arena",
  "mnemosyne-backend",
@@ -817,7 +818,7 @@ dependencies = [
 [[package]]
 name = "mnemosyne-prof"
 version = "0.1.0"
-source = "git+https://github.com/ryancinsight/Mnemosyne.git?rev=938d0c2bc094d3bbe7745d68d60e05a531e0cfc2#938d0c2bc094d3bbe7745d68d60e05a531e0cfc2"
+source = "git+https://github.com/ryancinsight/Mnemosyne.git?rev=43a02f38ba4593b407f9dc674267126c6a4240e1#43a02f38ba4593b407f9dc674267126c6a4240e1"
 dependencies = [
  "backtrace",
  "mnemosyne-core",
@@ -1290,8 +1291,8 @@ dependencies = [
 
 [[package]]
 name = "themis"
-version = "0.6.0"
-source = "git+https://github.com/ryancinsight/themis#bdcddfe294f941ef2f84fd4ce38537906b0fec23"
+version = "0.7.0"
+source = "git+https://github.com/ryancinsight/themis#65889060bb8a667ea5c46c737eb276cf51aeac46"
 dependencies = [
  "melinoe",
 ]
