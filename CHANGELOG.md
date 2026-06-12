@@ -26,6 +26,11 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - Miri coverage now extends to the `hermes-simd-intrinsics` boundary: AMX session state is tested under Miri while hardware execution paths remain native-only.
 - `parallel` and `mnemosyne-memory` are default features on every Hermes package; `mnemosyne-memory` routes `AlignedVec::with_capacity_numa` allocation and deallocation through Mnemosyne by default.
 
+### Changed
+- Interleaved complex `mul_assign` now processes two SIMD registers per loop
+  iteration, reducing loop overhead and improving Criterion throughput across
+  the measured 256-16K complex-pair range.
+
 ### Fixed
 - `#[runtime_dispatch]` emitted `std::is_x86_feature_detected!` unconditionally, breaking `--no-default-features` builds; runtime-detection arms are now gated on the consuming crate's `std` feature (no_std keeps compile-time arms + scalar fallback).
 - rkyv-exercising unit tests are ignored under Miri (rkyv 0.7 archived access violates Stacked Borrows inside the dependency); hermes's own unsafe passes Miri clean.
@@ -38,6 +43,8 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - Packed4 COW unpacking delegates to the `Packable4` dispatcher, so the
   facade uses the existing AVX-512/AVX2/scalar runtime selection instead of an
   AVX-512-only x86 branch.
+- README current-version metadata now reflects the released `0.2.0` workspace
+  state.
 
 ## [0.2.0] — 2026-06-10
 

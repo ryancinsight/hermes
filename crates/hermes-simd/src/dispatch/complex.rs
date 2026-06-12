@@ -77,6 +77,26 @@ where
     // The vectorized path requires an even lane count so every register holds
     // whole (re, im) pairs; all provided backends satisfy this.
     if lanes >= 2 && lanes & 1 == 0 {
+        while offset + 2 * lanes <= a.len() {
+            // SAFETY: offset + 2*lanes <= len was checked above; `a` and `b`
+            // are valid for reads (and `a` for writes) of `2*lanes`
+            // primitive values. `A`'s target features are guaranteed by the
+            // dispatching caller.
+            unsafe {
+                let av0 = A::load_unaligned(a.as_ptr().add(offset));
+                let bv0 = A::load_unaligned(b.as_ptr().add(offset));
+                let res0 = complex_mul_vector::<T, A, CONJ_B>(av0, bv0);
+                A::store_unaligned(a.as_mut_ptr().add(offset), res0);
+
+                let next = offset + lanes;
+                let av1 = A::load_unaligned(a.as_ptr().add(next));
+                let bv1 = A::load_unaligned(b.as_ptr().add(next));
+                let res1 = complex_mul_vector::<T, A, CONJ_B>(av1, bv1);
+                A::store_unaligned(a.as_mut_ptr().add(next), res1);
+            }
+            offset += 2 * lanes;
+        }
+
         while offset + lanes <= a.len() {
             // SAFETY: offset + lanes <= len was checked above; `a` and `b` are
             // valid for reads (and `a` for writes) of `lanes` primitive values.

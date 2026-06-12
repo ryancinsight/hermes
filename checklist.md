@@ -92,8 +92,14 @@
       AVX2, and scalar runtime selection without a duplicate x86 branch.
       Coverage: odd-length full-nibble COW unpack regression plus a focused
       Criterion benchmark target.
+- [x] [minor] Complex `mul_assign` unroll: in-place interleaved complex
+      multiply now processes two SIMD registers per loop iteration before the
+      single-register and scalar tails. Evidence: focused Criterion run
+      improved runtime-dispatch medians across all measured sizes.
+- [x] [patch] README current-version metadata corrected from `0.1.0` to
+      `0.2.0`.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 
 - [minor] 0.3.0 release for the additive absolute-reduction API.
-- [minor] Complex `mul_assign` unroll profile (P2).
+- [arch] Per-type x86 kernel dedup ADR (P3).

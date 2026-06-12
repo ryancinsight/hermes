@@ -93,8 +93,11 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
       the hermes-numeric AVX-512/AVX2/scalar dispatcher and removing the
       facade-local Bf4/F4 hardware-unpack impl pair. Criterion now includes a
       focused packed COW unpack benchmark.
-- [ ] **[minor] Complex mul_assign unroll**: evaluate 2× unroll (as done for
-      dot) once store-bound profile is confirmed; criterion data first.
+- [x] **[minor] Complex mul_assign unroll** (delivered 2026-06-12):
+      `interleaved_complex_mul_assign` processes two SIMD registers per loop
+      iteration before the single-register and scalar tails. Criterion
+      validation on this host showed runtime improvement across 256, 1K, 4K,
+      and 16K complex-pair inputs.
 
 ## P3 — Architecture & maintenance <a id="p3"></a>
 

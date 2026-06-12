@@ -142,4 +142,4 @@ baseline by the configured threshold.
 - Active sprint tactics: [`checklist.md`](checklist.md)
 - Version history: [`CHANGELOG.md`](CHANGELOG.md)
 
-Current version: **0.1.0** (pre-release; canonical trait surfaces defined, breaking changes documented per minor release).
+Current version: **0.2.0** (pre-release; canonical trait surfaces defined, breaking changes documented per minor release).
