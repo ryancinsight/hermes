@@ -74,6 +74,19 @@ impl<'a, 'b, T, const N: usize> TensorView<'a, T, N, RowMajor, &'b [T]> {
     ///
     /// # Errors
     /// Returns [`TensorError::ShapeMismatch`] if `∏ shape > data.len()`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use hermes_simd_core::TensorView;
+    ///
+    /// let data = [0, 1, 2, 3, 4, 5];
+    /// let view = TensorView::<i32, 2>::new(&data, [2, 3]).unwrap();
+    ///
+    /// assert_eq!(view.shape(), [2, 3]);
+    /// assert_eq!(view.strides(), [3, 1]);
+    /// assert_eq!(view.get([1, 2]).unwrap(), 5);
+    /// ```
     #[inline]
     pub fn new(data: &'b [T], shape: [usize; N]) -> Result<Self, TensorError> {
         let elem_count = shape.iter().product::<usize>();

@@ -22,6 +22,9 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   capped at 10K rows to bound local memory use.
 - Packed4 COW unpacking now has a focused Criterion benchmark target over
   1K, 16K, and 256K logical elements for both public packed formats.
+- Runnable doctests now cover the public complex kernels, sparse CSR
+  `SparseCow` SpMV, and const-generic `TensorView` construction/access paths;
+  `hermes-simd-core` doctests are enabled.
 - Host-capability integration tests validate runtime dispatch, local AVX2 execution when available, and irregular-shape GEMM fallback coverage.
 - Miri coverage now extends to the `hermes-simd-intrinsics` boundary: AMX session state is tested under Miri while hardware execution paths remain native-only.
 - `parallel` and `mnemosyne-memory` are default features on every Hermes package; `mnemosyne-memory` routes `AlignedVec::with_capacity_numa` allocation and deallocation through Mnemosyne by default.

@@ -132,6 +132,29 @@ impl CowFormat for DenseWithMask {
 /// `Borrowed` wraps a zero-copy [`SparseView`]; `Owned` holds heap-backed
 /// storage. Reads never allocate; [`SparseCow::to_owned`] promotes exactly
 /// once.
+///
+/// # Examples
+///
+/// ```
+/// use hermes_simd_core::{Csr, CsrData};
+/// use hermes_simd_core::sparse::{SparseCow, SparseSpMv};
+/// use hermes_simd_intrinsics::Scalar;
+///
+/// let values = [1.0_f64, 2.0, 3.0];
+/// let col_indices = [0, 2, 1];
+/// let row_ptr = [0, 2, 3];
+/// let data = CsrData::new(&values, &col_indices, &row_ptr, 2, 3);
+/// let matrix = SparseCow::<f64, Csr, Scalar>::borrowed(data);
+///
+/// let x = [10.0, 20.0, 30.0];
+/// let mut y = [0.0; 2];
+/// matrix.spmv(&x, &mut y);
+///
+/// assert_eq!(matrix.nrows(), 2);
+/// assert_eq!(matrix.ncols(), 3);
+/// assert!(matrix.is_borrowed());
+/// assert_eq!(y, [70.0, 60.0]);
+/// ```
 pub enum SparseCow<'a, T: Send + Sync, F: CowFormat, Arch: SimdArch> {
     /// Zero-copy borrowed view.
     Borrowed(SparseView<'a, T, F, Arch>),

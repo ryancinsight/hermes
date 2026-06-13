@@ -62,6 +62,10 @@
       Miri instead of returning synthetic values; AMX configuration/release
       instructions are no-ops only for session-state tests; CI now runs
       `cargo +nightly miri test -p hermes-simd-intrinsics`.
+- [x] [patch] runnable doctest coverage: enabled doctests for
+      `hermes-simd-core` and added value-semantic examples for complex
+      multiplication/dot, sparse CSR `SparseCow` SpMV, and const-generic
+      `TensorView`.
 - [x] [patch] Default provider features: every Hermes package now defaults
       `parallel` and `mnemosyne-memory`; `hermes-simd-core` pins Mnemosyne
       `938d0c2` and routes `AlignedVec::with_capacity_numa` allocation and

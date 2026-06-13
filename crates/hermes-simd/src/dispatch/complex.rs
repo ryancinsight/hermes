@@ -58,6 +58,19 @@ where
 ///
 /// `a[k] = a[k] * b[k]` when `CONJ_B == false`, and
 /// `a[k] = a[k] * conj(b[k])` when `CONJ_B == true`.
+///
+/// # Examples
+///
+/// ```
+/// use hermes_simd::{interleaved_complex_mul_assign, Scalar};
+///
+/// let mut lhs = [1.0_f64, 2.0, 3.0, -1.0];
+/// let rhs = [4.0_f64, -2.0, 0.5, 5.0];
+///
+/// interleaved_complex_mul_assign::<f64, Scalar, false>(&mut lhs, &rhs).unwrap();
+///
+/// assert_eq!(lhs, [8.0, 6.0, 6.5, 14.5]);
+/// ```
 #[inline]
 pub fn interleaved_complex_mul_assign<T, A, const CONJ_B: bool>(
     a: &mut [T],
@@ -161,6 +174,19 @@ where
 /// primitive lane order. The returned tuple is `(re, im)` for
 /// `sum(a[k] * b[k])`; when `CONJ_B` is true, the operation is
 /// `sum(a[k] * conj(b[k]))`.
+///
+/// # Examples
+///
+/// ```
+/// use hermes_simd::{interleaved_complex_dot, Scalar};
+///
+/// let lhs = [1.0_f64, 2.0, 3.0, 4.0];
+/// let rhs = [5.0_f64, 6.0, 7.0, 8.0];
+///
+/// let product_sum = interleaved_complex_dot::<f64, Scalar, false>(&lhs, &rhs).unwrap();
+///
+/// assert_eq!(product_sum, (-18.0, 68.0));
+/// ```
 #[inline]
 pub fn interleaved_complex_dot<T, A, const CONJ_B: bool>(
     a: &[T],
