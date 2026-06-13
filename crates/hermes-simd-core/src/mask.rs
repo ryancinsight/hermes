@@ -155,9 +155,17 @@ impl<const N: usize> BitMask<N> {
     /// Processor must support the target feature of `Arch`.
     ///
     /// # Example
-    /// ```rust,ignore
-    /// let bm = BitMask::<16>::leading_k(5);
-    /// let native: [bool; 4] = unsafe { bm.to_native_mask::<f32, Scalar>() };
+    /// ```rust
+    /// use hermes_simd_core::mask::BitMask;
+    /// use hermes_simd_core::kernel::SimdKernel;
+    /// use hermes_simd_intrinsics::Scalar;
+    ///
+    /// let bm = BitMask::<4>::leading_k(3);
+    /// // SAFETY: `Scalar` has no target-feature precondition.
+    /// let native: <Scalar as SimdKernel<f32>>::Mask =
+    ///     unsafe { bm.to_native_mask::<f32, Scalar>() };
+    ///
+    /// assert_eq!(native, [true, true, true, false]);
     /// ```
     #[inline(always)]
     pub unsafe fn to_native_mask<T, Arch>(self) -> Arch::Mask
@@ -251,10 +259,12 @@ impl<const N: usize> IntoIterator for BitMask<N> {
     /// Iterate over active lane indices in ascending order.
     ///
     /// # Example
-    /// ```rust,ignore
+    /// ```rust
     /// use hermes_simd_core::mask::BitMask;
+    ///
     /// let mask = BitMask::<8>::from_bools(&[true, false, true, false, true, false, false, false]);
     /// let indices: Vec<usize> = mask.into_iter().collect();
+    ///
     /// assert_eq!(indices, vec![0, 2, 4]);
     /// ```
     #[inline(always)]

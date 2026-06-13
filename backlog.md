@@ -160,6 +160,9 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
 - [x] **[patch] Runnable core examples**: converted kernel, compute, and tiling
       public Rustdoc examples from compile-only `no_run` to executable
       value-semantic doctests.
+- [x] **[patch] Runnable `BitMask` examples**: converted native-mask conversion
+      and active-lane iteration examples from ignored snippets to executable
+      value-semantic doctests.
 - [x] **[patch] `#![deny(missing_docs)]`** (delivered post-0.2.0: all six public crates) on all public crates (currently
       `warn` in hermes-simd-core).
 

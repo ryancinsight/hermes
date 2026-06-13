@@ -75,6 +75,8 @@
 - [x] [patch] runnable core doctests: kernel, compute, and tiling examples now
       execute value assertions under `cargo test --doc --workspace` instead of
       compile-only `no_run`.
+- [x] [patch] runnable BitMask doctests: native-mask conversion and
+      active-lane iteration examples now execute value assertions.
 - [x] [patch] Default provider features: every Hermes package now defaults
       `parallel` and `mnemosyne-memory`; `hermes-simd-core` pins Mnemosyne
       `938d0c2` and routes `AlignedVec::with_capacity_numa` allocation and
