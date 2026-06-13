@@ -157,6 +157,9 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
 
 - [x] **[patch] Doctest coverage**: `cargo doc` is warning-clean; extended
       runnable doctests to the complex, sparse-Cow, and tensor public surfaces.
+- [x] **[patch] Runnable core examples**: converted kernel, compute, and tiling
+      public Rustdoc examples from compile-only `no_run` to executable
+      value-semantic doctests.
 - [x] **[patch] `#![deny(missing_docs)]`** (delivered post-0.2.0: all six public crates) on all public crates (currently
       `warn` in hermes-simd-core).
 

@@ -21,7 +21,7 @@ use crate::view::SimdView;
 ///
 /// Query the length of a dense `SimdView` through the `ComputeView` facade:
 ///
-/// ```rust,no_run
+/// ```rust
 /// use hermes_simd_core::compute::ComputeView;
 /// use hermes_simd_core::view::SimdView;
 /// use hermes_simd_intrinsics::Scalar;
@@ -126,7 +126,7 @@ use crate::scalar::Scalar;
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```rust
 /// use hermes_simd_core::compute::{ComputeView, ComputeReduce};
 /// use hermes_simd_core::view::SimdView;
 /// use hermes_simd_core::ops::Sum;

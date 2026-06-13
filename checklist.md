@@ -72,6 +72,9 @@
 - [x] [minor] SVE property coverage: `hermes-simd` re-exports `SveArch`, and
       the shared kernel property suite now runs its mask/compress/expand,
       gather, and leading-tail invariants on every host.
+- [x] [patch] runnable core doctests: kernel, compute, and tiling examples now
+      execute value assertions under `cargo test --doc --workspace` instead of
+      compile-only `no_run`.
 - [x] [patch] Default provider features: every Hermes package now defaults
       `parallel` and `mnemosyne-memory`; `hermes-simd-core` pins Mnemosyne
       `938d0c2` and routes `AlignedVec::with_capacity_numa` allocation and

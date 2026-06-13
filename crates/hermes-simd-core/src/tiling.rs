@@ -49,7 +49,7 @@ use core::marker::PhantomData;
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```rust
 /// use hermes_simd_core::tiling::{TilingPolicy, TilingStrategy};
 /// use hermes_simd_core::view::SimdView;
 /// use hermes_simd_core::align::Unaligned;
@@ -121,7 +121,7 @@ where
 ///
 /// Dot product via the `tiled_dot` free function (preferred API):
 ///
-/// ```rust,no_run
+/// ```rust
 /// use hermes_simd_core::tiling::tiled_dot;
 /// use hermes_simd_core::view::SimdView;
 /// use hermes_simd_core::align::Unaligned;

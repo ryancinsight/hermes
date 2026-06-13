@@ -47,7 +47,7 @@
 ///
 /// Use the always-available `Scalar` backend for cross-platform code paths:
 ///
-/// ```rust,no_run
+/// ```rust
 /// use hermes_simd_intrinsics::Scalar;
 /// use hermes_simd_core::kernel::SimdKernel;
 ///
@@ -55,7 +55,7 @@
 /// let splat4: <Scalar as SimdKernel<f32>>::Vector =
 ///     unsafe { <Scalar as SimdKernel<f32>>::splat(1.0_f32) };
 /// let sum: f32 = unsafe { <Scalar as SimdKernel<f32>>::sum_reduce(splat4) };
-/// assert_eq!(sum, 4.0_f32 * <Scalar as SimdKernel<f32>>::LANE_COUNT as f32);
+/// assert_eq!(sum, <Scalar as SimdKernel<f32>>::LANE_COUNT as f32);
 /// ```
 pub trait SimdKernel<T: crate::scalar::Scalar>:
     crate::private::Sealed + Send + Sync + Sized + 'static
@@ -101,7 +101,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```rust
     /// use hermes_simd_intrinsics::Scalar;
     /// use hermes_simd_core::kernel::SimdKernel;
     ///
@@ -175,7 +175,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```rust
     /// use hermes_simd_intrinsics::Scalar;
     /// use hermes_simd_core::kernel::SimdKernel;
     ///
@@ -383,7 +383,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```rust
     /// use hermes_simd_intrinsics::Scalar;
     /// use hermes_simd_core::kernel::SimdKernel;
     ///
