@@ -50,9 +50,71 @@ where
     Ok(())
 }
 
+#[runtime_dispatch(avx512f, avx2, neon, scalar)]
+pub(super) fn dispatch_axpy_rows_kernel<T, A>(
+    alphas: &[T],
+    x: &[T],
+    out: &mut [T],
+    row_stride: usize,
+    rows: usize,
+    cols: usize,
+) -> Result<(), SimdError>
+where
+    T: Scalar,
+    A: SimdArch + SimdKernel<T>,
+{
+    if rows == 0 || cols == 0 {
+        return Ok(());
+    }
+    let Some(last_row_offset) = rows
+        .checked_sub(1)
+        .and_then(|row| row.checked_mul(row_stride))
+    else {
+        return Err(SimdError::LengthMismatch);
+    };
+    let Some(required_out_len) = last_row_offset.checked_add(cols) else {
+        return Err(SimdError::LengthMismatch);
+    };
+    if alphas.len() < rows || x.len() < cols || row_stride < cols || out.len() < required_out_len {
+        return Err(SimdError::LengthMismatch);
+    }
+
+    let lane_count = A::LANE_COUNT;
+    let simd_len = (cols / lane_count) * lane_count;
+    let x_ptr = x.as_ptr();
+    let out_ptr = out.as_mut_ptr();
+
+    for row in 0..rows {
+        let alpha = alphas[row];
+        let row_offset = row * row_stride;
+        // SAFETY: validation above proves every row spans `cols` elements
+        // inside `out` with `row_stride >= cols`, so rows are disjoint. The
+        // RHS row spans `cols` elements inside `x`, and the vector loop stays
+        // within `simd_len <= cols`.
+        unsafe {
+            let valpha = A::splat(alpha);
+            let row_ptr = out_ptr.add(row_offset);
+            let mut col = 0usize;
+            while col < simd_len {
+                let vx = A::load_unaligned(x_ptr.add(col));
+                let vo = A::load_unaligned(row_ptr.add(col));
+                A::store_unaligned(row_ptr.add(col), A::fmadd(vx, valpha, vo));
+                col += lane_count;
+            }
+
+            for col in simd_len..cols {
+                let out_ref = row_ptr.add(col);
+                *out_ref = *out_ref + *x_ptr.add(col) * alpha;
+            }
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::super::axpy;
+    use super::super::{axpy, axpy_rows};
 
     #[test]
     fn axpy_matches_scalar_reference_across_tail_sizes() {
@@ -92,5 +154,35 @@ mod tests {
         let expected = out.clone();
         axpy(0.0, &x, &mut out).unwrap();
         assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn axpy_rows_matches_repeated_axpy_with_padding() {
+        let rows = 5usize;
+        let cols = 17usize;
+        let row_stride = 23usize;
+        let alphas: Vec<f64> = (0..rows).map(|row| row as f64 * 0.25 - 0.5).collect();
+        let x: Vec<f64> = (0..cols).map(|col| col as f64 * 1.5 - 2.0).collect();
+        let mut out: Vec<f64> = (0..rows * row_stride).map(|i| i as f64 * 0.125).collect();
+        let mut expected = out.clone();
+
+        for row in 0..rows {
+            let start = row * row_stride;
+            axpy(alphas[row], &x, &mut expected[start..start + cols]).unwrap();
+        }
+
+        axpy_rows(&alphas, &x, &mut out, row_stride, rows, cols).unwrap();
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn axpy_rows_rejects_invalid_extents() {
+        let alphas = [1.0f64, 2.0];
+        let x = [1.0f64, 2.0, 3.0];
+        let mut out = [0.0f64; 5];
+
+        assert!(axpy_rows(&alphas, &x, &mut out, 2, 2, 3).is_err());
+        assert!(axpy_rows(&alphas[..1], &x, &mut out, 3, 2, 3).is_err());
+        assert!(axpy_rows(&alphas, &x[..2], &mut out, 3, 2, 3).is_err());
     }
 }

@@ -84,6 +84,15 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError>;
     /// Fused row update `out[i] += alpha * x[i]` (AXPY) with no temporaries.
     fn axpy(alpha: Self, x: &[Self], out: &mut [Self]) -> Result<(), SimdError>;
+    /// Fused multi-row update `out[row, i] += alphas[row] * x[i]`.
+    fn axpy_rows(
+        alphas: &[Self],
+        x: &[Self],
+        out: &mut [Self],
+        row_stride: usize,
+        rows: usize,
+        cols: usize,
+    ) -> Result<(), SimdError>;
     /// Computes the elementwise product and writes to `out`.
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError>;
     /// Computes the elementwise sum `a[i] + b[i]` and writes to `out`.
@@ -182,6 +191,17 @@ where
     #[inline(always)]
     fn axpy(alpha: Self, x: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
         axpy::dispatch_axpy::<Self>(alpha, x, out)
+    }
+    #[inline(always)]
+    fn axpy_rows(
+        alphas: &[Self],
+        x: &[Self],
+        out: &mut [Self],
+        row_stride: usize,
+        rows: usize,
+        cols: usize,
+    ) -> Result<(), SimdError> {
+        axpy::dispatch_axpy_rows::<Self>(alphas, x, out, row_stride, rows, cols)
     }
     #[inline(always)]
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
@@ -316,6 +336,17 @@ where
         axpy::dispatch_axpy::<Self>(alpha, x, out)
     }
     #[inline(always)]
+    fn axpy_rows(
+        alphas: &[Self],
+        x: &[Self],
+        out: &mut [Self],
+        row_stride: usize,
+        rows: usize,
+        cols: usize,
+    ) -> Result<(), SimdError> {
+        axpy::dispatch_axpy_rows::<Self>(alphas, x, out, row_stride, rows, cols)
+    }
+    #[inline(always)]
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
         binary::dispatch_elementwise_binary::<Self, Mul>(a, b, out, Mul)
     }
@@ -445,6 +476,17 @@ where
     #[inline(always)]
     fn axpy(alpha: Self, x: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
         axpy::dispatch_axpy::<Self>(alpha, x, out)
+    }
+    #[inline(always)]
+    fn axpy_rows(
+        alphas: &[Self],
+        x: &[Self],
+        out: &mut [Self],
+        row_stride: usize,
+        rows: usize,
+        cols: usize,
+    ) -> Result<(), SimdError> {
+        axpy::dispatch_axpy_rows::<Self>(alphas, x, out, row_stride, rows, cols)
     }
     #[inline(always)]
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
@@ -593,6 +635,20 @@ pub fn dot<T: SimdOps>(a: &[T], b: &[T]) -> Result<T, SimdError> {
 #[inline(always)]
 pub fn axpy<T: SimdOps>(alpha: T, x: &[T], out: &mut [T]) -> Result<(), SimdError> {
     T::axpy(alpha, x, out)
+}
+
+/// Fused multi-row update `out[row, i] += alphas[row] * x[i]` via one
+/// runtime-dispatched SIMD kernel. `out` is a row-major strided window.
+#[inline(always)]
+pub fn axpy_rows<T: SimdOps>(
+    alphas: &[T],
+    x: &[T],
+    out: &mut [T],
+    row_stride: usize,
+    rows: usize,
+    cols: usize,
+) -> Result<(), SimdError> {
+    T::axpy_rows(alphas, x, out, row_stride, rows, cols)
 }
 
 /// Computes the elementwise multiplication of two slices and writes to `out`.

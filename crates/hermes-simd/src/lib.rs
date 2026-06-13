@@ -201,6 +201,7 @@ pub use dispatch::{
     argmax,
     argmin,
     axpy,
+    axpy_rows,
     dot,
     elementwise_add,
     elementwise_div,
