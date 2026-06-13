@@ -10,7 +10,7 @@
 //! | [`Avx2`]        | x86 AVX2     | 8         | 4         |
 //! | [`Avx512`]      | x86 AVX-512F | 16        | 8         |
 //! | [`Neon`]        | AArch64 NEON | 4         | 2         |
-//! | `SveArch` (aarch64) | AArch64 SVE | stub    | stub      |
+//! | [`SveArch`]    | AArch64 SVE shape, emulated | 16 | 8 |
 //!
 //! Optional crate-feature backends:
 //! - `wide` — wraps the [`wide`](https://docs.rs/wide) crate.

@@ -9,9 +9,9 @@ pub mod neon_f32;
 #[cfg(target_arch = "aarch64")]
 pub mod neon_f64;
 
-/// SVE stub is always compiled so downstream crates can reference [`SveArch`](sve::SveArch)
-/// without a target-arch guard. All methods `unimplemented!()` unless
-/// `+sve` is enabled and real intrinsics are substituted.
+/// SVE-shaped emulated backend, always compiled so downstream crates can
+/// reference [`SveArch`](sve::SveArch) without a target-arch guard. Native SVE
+/// intrinsics remain a separate backend item pending stable Rust support.
 pub mod sve;
 
 // Neon emulated kernels for half::bf16, i8, i16, i32

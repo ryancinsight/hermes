@@ -66,6 +66,9 @@
       `hermes-simd-core` and added value-semantic examples for complex
       multiplication/dot, sparse CSR `SparseCow` SpMV, and const-generic
       `TensorView`.
+- [x] [patch] SVE callable fallback: `SveArch` f32/f64 now use the
+      monomorphized lane-emulated kernel macro (`16xf32`, `8xf64`) with
+      value-semantic tests. Native SVE intrinsics remain tracked separately.
 - [x] [patch] Default provider features: every Hermes package now defaults
       `parallel` and `mnemosyne-memory`; `hermes-simd-core` pins Mnemosyne
       `938d0c2` and routes `AlignedVec::with_capacity_numa` allocation and

@@ -23,7 +23,9 @@ complete SIMD substrate for leto-ops/coeus hot kernels:
   Partial delivered (2026-06-12): local AVX2 Criterion baseline refreshed with
   packed4 COW unpack and unrolled complex `mul_assign` rows; runner self-check
   covered 48 rows. Dedicated AVX-512/AMX runners remain open.
-- [ ] [minor] Stage C1: SVE backend (stub → impl) for AArch64 server targets.
+- [x] [patch] Stage C1: `SveArch` callable fallback (stub removal) — delivered
+  2026-06-13 as a value-preserving 512-bit-shape emulated backend for f32/f64.
+- [ ] [minor] Stage C1: native SVE intrinsic backend for AArch64 server targets.
 - [ ] [minor] Stage C2: expand op/dtype coverage on demand from leto-ops/coeus
   (gather/scatter variants, additional reductions/scans, complex precisions) so every
   leto/coeus CPU hot kernel has a hermes path rather than a scalar fallback.
@@ -113,9 +115,12 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
       avx512_f64 share method-body shape differing only in intrinsic suffix and
       lane count. Evaluate build-time generation (`build.rs` generator preferred
       over `macro_rules!`) — maintenance payoff only; requires ADR.
-- [ ] **[minor] SVE backend**: real implementations blocked on stable
-      `core::arch::aarch64` SVE intrinsics; revisit on toolchain updates
-      (stub documented in `aarch64/sve.rs`).
+- [x] **[patch] SVE callable fallback**: removed `unimplemented!()` SVE
+      `SimdKernel` methods and routed `SveArch` f32/f64 through the existing
+      lane-emulated kernel macro with value-semantic tests.
+- [ ] **[minor] Native SVE backend**: hardware intrinsic implementation remains
+      blocked on stable `core::arch::aarch64` SVE vector types; revisit on
+      toolchain updates.
 - [x] **[minor] NUMA module status** (audited 2026-06-11): `numa.rs` IS
       integrated — `hermes-simd::dispatcher` uses `NumaTopologyService`/
       `verify_numa_locality`, `vec` uses `NumaAllocator`, and types_tests

@@ -30,6 +30,9 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - `parallel` and `mnemosyne-memory` are default features on every Hermes package; `mnemosyne-memory` routes `AlignedVec::with_capacity_numa` allocation and deallocation through Mnemosyne by default.
 
 ### Changed
+- `SveArch` is now a callable 512-bit-shape emulated backend for f32/f64
+  (`16xf32`, `8xf64`) instead of a public marker with `unimplemented!()`
+  kernel methods. Native SVE intrinsics remain a separate pending backend.
 - Interleaved complex `mul_assign` now processes two SIMD registers per loop
   iteration on SIMD backends and uses a direct four-pair scalar loop for large
   scalar inputs, reducing loop overhead in the measured complex benchmark
