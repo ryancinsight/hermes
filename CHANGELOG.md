@@ -28,6 +28,9 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - Host-capability integration tests validate runtime dispatch, local AVX2 execution when available, and irregular-shape GEMM fallback coverage.
 - Miri coverage now extends to the `hermes-simd-intrinsics` boundary: AMX session state is tested under Miri while hardware execution paths remain native-only.
 - `parallel` and `mnemosyne-memory` are default features on every Hermes package; `mnemosyne-memory` routes `AlignedVec::with_capacity_numa` allocation and deallocation through Mnemosyne by default.
+- `hermes-simd` re-exports `SveArch` with the other architecture markers, and
+  the kernel property suite now exercises its mask, compress/expand, gather,
+  and leading-tail invariants on every host.
 
 ### Changed
 - `SveArch` is now a callable 512-bit-shape emulated backend for f32/f64

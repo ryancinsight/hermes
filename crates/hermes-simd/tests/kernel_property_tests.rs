@@ -1,11 +1,12 @@
 //! Property tests for `SimdKernel` mask, compress/expand, gather, and
 //! tail-mask primitives, exercised per architecture backend.
 //!
-//! The `Scalar` backend always runs; AVX2 / AVX-512 run when the host CPU
-//! supports them (CI provides at least AVX2 on x86_64 runners and NEON on
-//! aarch64 runners via `PreferredArch`-independent explicit markers).
+//! The `Scalar` and SVE-shaped emulated backends always run; AVX2 / AVX-512 run
+//! when the host CPU supports them (CI provides at least AVX2 on x86_64 runners
+//! and NEON on aarch64 runners via `PreferredArch`-independent explicit
+//! markers).
 
-use hermes_simd::Scalar;
+use hermes_simd::{Scalar, SveArch};
 use hermes_simd_core::align::Unaligned;
 use hermes_simd_core::execution::Unmasked;
 use hermes_simd_core::kernel::SimdKernel;
@@ -105,6 +106,7 @@ proptest! {
         vals in prop::collection::vec(-1000.0f32..1000.0, 1..32),
     ) {
         check_all_kernel_invariants::<Scalar>(bm, &vals);
+        check_all_kernel_invariants::<SveArch>(bm, &vals);
 
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
@@ -130,6 +132,7 @@ proptest! {
             }),
     ) {
         check_gather_matches_reference::<Scalar>(&values, &indices);
+        check_gather_matches_reference::<SveArch>(&values, &indices);
 
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {

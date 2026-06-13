@@ -69,6 +69,9 @@
 - [x] [patch] SVE callable fallback: `SveArch` f32/f64 now use the
       monomorphized lane-emulated kernel macro (`16xf32`, `8xf64`) with
       value-semantic tests. Native SVE intrinsics remain tracked separately.
+- [x] [minor] SVE property coverage: `hermes-simd` re-exports `SveArch`, and
+      the shared kernel property suite now runs its mask/compress/expand,
+      gather, and leading-tail invariants on every host.
 - [x] [patch] Default provider features: every Hermes package now defaults
       `parallel` and `mnemosyne-memory`; `hermes-simd-core` pins Mnemosyne
       `938d0c2` and routes `AlignedVec::with_capacity_numa` allocation and

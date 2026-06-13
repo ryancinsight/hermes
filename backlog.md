@@ -25,6 +25,9 @@ complete SIMD substrate for leto-ops/coeus hot kernels:
   covered 48 rows. Dedicated AVX-512/AMX runners remain open.
 - [x] [patch] Stage C1: `SveArch` callable fallback (stub removal) — delivered
   2026-06-13 as a value-preserving 512-bit-shape emulated backend for f32/f64.
+- [x] [minor] Stage C1: `SveArch` public marker + property coverage —
+  delivered 2026-06-13 by re-exporting it from `hermes-simd` and adding it to
+  the host-independent kernel property suite.
 - [ ] [minor] Stage C1: native SVE intrinsic backend for AArch64 server targets.
 - [ ] [minor] Stage C2: expand op/dtype coverage on demand from leto-ops/coeus
   (gather/scatter variants, additional reductions/scans, complex precisions) so every
@@ -118,6 +121,9 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
 - [x] **[patch] SVE callable fallback**: removed `unimplemented!()` SVE
       `SimdKernel` methods and routed `SveArch` f32/f64 through the existing
       lane-emulated kernel macro with value-semantic tests.
+- [x] **[minor] SVE property coverage**: `hermes-simd` re-exports `SveArch`,
+      and `kernel_property_tests` now exercises its mask round-trip,
+      compress/expand, gather, and leading-tail invariants on every host.
 - [ ] **[minor] Native SVE backend**: hardware intrinsic implementation remains
       blocked on stable `core::arch::aarch64` SVE vector types; revisit on
       toolchain updates.
