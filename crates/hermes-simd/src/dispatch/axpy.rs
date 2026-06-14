@@ -84,24 +84,25 @@ where
     let x_ptr = x.as_ptr();
     let out_ptr = out.as_mut_ptr();
 
-    for row in 0..rows {
-        let alpha = alphas[row];
-        let row_offset = row * row_stride;
-        // SAFETY: validation above proves every row spans `cols` elements
-        // inside `out` with `row_stride >= cols`, so rows are disjoint. The
-        // RHS row spans `cols` elements inside `x`, and the vector loop stays
-        // within `simd_len <= cols`.
-        unsafe {
-            let valpha = A::splat(alpha);
-            let row_ptr = out_ptr.add(row_offset);
-            let mut col = 0usize;
-            while col < simd_len {
-                let vx = A::load_unaligned(x_ptr.add(col));
+    // SAFETY: validation above proves every row spans `cols` elements inside
+    // `out` with `row_stride >= cols`, so rows are disjoint. The RHS row spans
+    // `cols` elements inside `x`, and the vector loop stays within
+    // `simd_len <= cols`. Looping by column chunk loads each RHS vector once
+    // and applies it to the row block before moving to the next chunk.
+    unsafe {
+        let mut col = 0usize;
+        while col < simd_len {
+            let vx = A::load_unaligned(x_ptr.add(col));
+            for (row, &alpha) in alphas.iter().take(rows).enumerate() {
+                let row_ptr = out_ptr.add(row * row_stride);
                 let vo = A::load_unaligned(row_ptr.add(col));
-                A::store_unaligned(row_ptr.add(col), A::fmadd(vx, valpha, vo));
-                col += lane_count;
+                A::store_unaligned(row_ptr.add(col), A::fmadd(vx, A::splat(alpha), vo));
             }
+            col += lane_count;
+        }
 
+        for (row, &alpha) in alphas.iter().take(rows).enumerate() {
+            let row_ptr = out_ptr.add(row * row_stride);
             for col in simd_len..cols {
                 let out_ref = row_ptr.add(col);
                 *out_ref = *out_ref + *x_ptr.add(col) * alpha;
