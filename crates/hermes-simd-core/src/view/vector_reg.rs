@@ -459,7 +459,7 @@ where
     T: Scalar,
 {
     let alignment = Arch::LANE_COUNT * core::mem::size_of::<T>();
-    (ptr as usize).is_multiple_of(alignment)
+    alignment != 0 && (ptr as usize).is_multiple_of(alignment)
 }
 
 struct AssertLaneIndex<T, Arch, const I: usize>(PhantomData<(T, Arch)>);
