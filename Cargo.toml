@@ -22,7 +22,7 @@ rust-version = "1.95"
 [workspace.dependencies]
 half = { version = "2.3", default-features = false }
 mnemosyne = { git = "https://github.com/ryancinsight/Mnemosyne.git", rev = "1e014d25461b322345c15fb3cf9467b5388616dd", default-features = false }
-themis = { git = "https://github.com/ryancinsight/themis", version = "0.8.0", default-features = false }
+themis = { git = "https://github.com/ryancinsight/themis", version = "0.9.9", default-features = false }
 
 [profile.release]
 opt-level = 3
@@ -34,3 +34,16 @@ panic = "abort"
 opt-level = 3
 lto = "fat"
 codegen-units = 1
+
+[patch."https://github.com/ryancinsight/themis"]
+themis = { path = "../themis" }
+
+[patch."https://github.com/ryancinsight/Mnemosyne.git"]
+mnemosyne = { path = "../mnemosyne/crates/mnemosyne" }
+mnemosyne-core = { path = "../mnemosyne/crates/mnemosyne-core" }
+mnemosyne-arena = { path = "../mnemosyne/crates/mnemosyne-arena" }
+mnemosyne-local = { path = "../mnemosyne/crates/mnemosyne-local" }
+mnemosyne-heap = { path = "../mnemosyne/crates/mnemosyne-heap" }
+
+[patch."https://github.com/ryancinsight/melinoe.git"]
+melinoe = { path = "../melinoe" }
