@@ -60,6 +60,12 @@ The target-token increment is available as `TargetId`,
 `None` before constructing a target-specific view, so benchmark and test
 harnesses can force a backend only when the host can execute it.
 
+Safe one-vector slice wrappers are available on `Vector<T, Arch>` as
+`load_unaligned_from_slice`, `load_aligned_from_slice`,
+`store_unaligned_to_slice`, and `store_aligned_to_slice`. These wrappers check
+slice length and vector-width alignment before calling the raw `SimdKernel`
+load/store primitives.
+
 ## Feature Flags
 
 | Feature | Description |

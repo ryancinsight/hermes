@@ -145,9 +145,10 @@
       `TargetId`/forced-dispatch test surface and prove unsupported targets
       reject safely. Evidence tier: type-level architecture view construction
       plus value-semantic host capability tests.
-- [ ] [minor] Safe one-vector slice wrappers: add bounds/alignment-checked
+- [x] [minor] Safe one-vector slice wrappers: add bounds/alignment-checked
       wrappers over `SimdKernel` load/store primitives and value-semantic
-      tests for success and failure paths.
+      tests for success and failure paths. Evidence tier: value-semantic
+      integration tests over public `Vector<T, Arch>` methods.
 - [ ] [minor] Public dense cross-target matrix: compare public facade outputs
       against Scalar across every host-supported target.
 

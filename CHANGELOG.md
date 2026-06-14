@@ -38,6 +38,9 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - `TargetId`, `dispatch_view_to`, and `dispatch_view_mut_to` provide an
   explicit target-token surface for tests and benchmarks, rejecting unsupported
   targets before constructing architecture-specific views.
+- `Vector<T, Arch>` now has safe one-vector slice wrappers for aligned and
+  unaligned load/store, returning value-semantic `SimdError` variants for short
+  or misaligned slices while preserving raw pointer kernels for hot loops.
 
 ### Changed
 - `SveArch` is now a callable 512-bit-shape emulated backend for f32/f64
@@ -75,6 +78,8 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   section, tracking Hermes-native follow-ups for target-token forced dispatch,
   safe slice wrappers, SSE2 feasibility, cross-target conformance, and
   operation-family coverage.
+- `Cargo.lock` now matches the patched local Themis package version (`0.9.11`),
+  keeping `cargo check --locked` coherent with the current Atlas checkout.
 
 ### Breaking
 - Removed fixed Blocked-COO public dispatch functions `spmv_bcoo4x4` and

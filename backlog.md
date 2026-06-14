@@ -68,11 +68,12 @@ complete SIMD substrate for leto-ops/coeus hot kernels:
       [gap_audit.md#highway-2026-06-14](gap_audit.md#highway-2026-06-14).
       Delivered 2026-06-14 as `TargetId`, `dispatch_view_to`, and
       `dispatch_view_mut_to` with value-semantic host capability tests.
-- [ ] **[minor] Safe one-vector slice wrappers**: add bounds-checked and
+- [x] **[minor] Safe one-vector slice wrappers**: add bounds-checked and
       alignment-checked wrappers over `load_aligned`, `load_unaligned`,
       `store_aligned`, and `store_unaligned` for one-vector use cases,
       preserving raw-pointer kernels for hoisted hot loops. Driver:
       [gap_audit.md#highway-2026-06-14](gap_audit.md#highway-2026-06-14).
+      Delivered 2026-06-14 on `Vector<T, Arch>` with exact failure tests.
 - [ ] **[arch] SSE2 backend feasibility ADR**: evaluate a 128-bit x86_64
       backend between Scalar and AVX2, including trait coverage, CI value, and
       maintenance cost. Driver:

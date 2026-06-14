@@ -44,6 +44,8 @@ pub use vector_reg::Vector;
 pub enum SimdError {
     /// The lengths of the operand views do not match.
     LengthMismatch,
+    /// The input slice is too small to load the requested vector.
+    InsufficientInputLength,
     /// The output slice is too small to store the results.
     InsufficientOutputLength,
     /// The memory address is not aligned as required.
@@ -56,6 +58,7 @@ impl core::fmt::Display for SimdError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::LengthMismatch => write!(f, "Operand views have mismatched lengths"),
+            Self::InsufficientInputLength => write!(f, "Input slice has insufficient length"),
             Self::InsufficientOutputLength => write!(f, "Output slice has insufficient length"),
             Self::UnalignedAddress => {
                 write!(f, "Memory address does not satisfy alignment constraints")

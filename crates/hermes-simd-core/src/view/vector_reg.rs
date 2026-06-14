@@ -1,6 +1,7 @@
 //! Monomorphized SIMD vector register wrapper.
 
 use super::mask_reg::Mask;
+use super::SimdError;
 use crate::arch::SimdArch;
 use crate::kernel::SimdKernel;
 use crate::mask::BitMask;
@@ -142,6 +143,74 @@ where
     #[inline(always)]
     pub unsafe fn store_unaligned(self, ptr: *mut T) {
         Arch::store_unaligned(ptr, self.raw);
+    }
+
+    /// Load one vector from the start of a slice using the unaligned kernel load.
+    ///
+    /// Returns [`SimdError::InsufficientInputLength`] when `data` has fewer
+    /// elements than `Arch::LANE_COUNT`.
+    #[inline(always)]
+    pub fn load_unaligned_from_slice(data: &[T]) -> Result<Self, SimdError> {
+        if data.len() < Arch::LANE_COUNT {
+            return Err(SimdError::InsufficientInputLength);
+        }
+        // SAFETY: length was checked for one complete vector; unaligned load
+        // has no alignment precondition.
+        unsafe { Ok(Self::load_unaligned(data.as_ptr())) }
+    }
+
+    /// Load one vector from the start of a slice using the aligned kernel load.
+    ///
+    /// Returns [`SimdError::InsufficientInputLength`] when `data` has fewer
+    /// elements than `Arch::LANE_COUNT`, and [`SimdError::UnalignedAddress`]
+    /// when the slice start is not aligned to the vector byte width.
+    #[inline(always)]
+    pub fn load_aligned_from_slice(data: &[T]) -> Result<Self, SimdError> {
+        if data.len() < Arch::LANE_COUNT {
+            return Err(SimdError::InsufficientInputLength);
+        }
+        if !is_vector_aligned::<T, Arch>(data.as_ptr()) {
+            return Err(SimdError::UnalignedAddress);
+        }
+        // SAFETY: length and vector-width alignment were checked above.
+        unsafe { Ok(Self::load_aligned(data.as_ptr())) }
+    }
+
+    /// Store this vector to the start of a slice using the unaligned kernel store.
+    ///
+    /// Returns [`SimdError::InsufficientOutputLength`] when `out` has fewer
+    /// elements than `Arch::LANE_COUNT`.
+    #[inline(always)]
+    pub fn store_unaligned_to_slice(self, out: &mut [T]) -> Result<(), SimdError> {
+        if out.len() < Arch::LANE_COUNT {
+            return Err(SimdError::InsufficientOutputLength);
+        }
+        // SAFETY: length was checked for one complete vector; unaligned store
+        // has no alignment precondition.
+        unsafe {
+            self.store_unaligned(out.as_mut_ptr());
+        }
+        Ok(())
+    }
+
+    /// Store this vector to the start of a slice using the aligned kernel store.
+    ///
+    /// Returns [`SimdError::InsufficientOutputLength`] when `out` has fewer
+    /// elements than `Arch::LANE_COUNT`, and [`SimdError::UnalignedAddress`]
+    /// when the slice start is not aligned to the vector byte width.
+    #[inline(always)]
+    pub fn store_aligned_to_slice(self, out: &mut [T]) -> Result<(), SimdError> {
+        if out.len() < Arch::LANE_COUNT {
+            return Err(SimdError::InsufficientOutputLength);
+        }
+        if !is_vector_aligned::<T, Arch>(out.as_ptr()) {
+            return Err(SimdError::UnalignedAddress);
+        }
+        // SAFETY: length and vector-width alignment were checked above.
+        unsafe {
+            self.store_aligned(out.as_mut_ptr());
+        }
+        Ok(())
     }
 
     /// Horizontal sum reduction of all lanes in the Vector.
@@ -381,6 +450,16 @@ where
             }
         }
     }
+}
+
+#[inline(always)]
+fn is_vector_aligned<T, Arch>(ptr: *const T) -> bool
+where
+    Arch: SimdArch + SimdKernel<T>,
+    T: Scalar,
+{
+    let alignment = Arch::LANE_COUNT * core::mem::size_of::<T>();
+    (ptr as usize).is_multiple_of(alignment)
 }
 
 struct AssertLaneIndex<T, Arch, const I: usize>(PhantomData<(T, Arch)>);

@@ -60,8 +60,8 @@ Next increments:
 - P1: delivered 2026-06-14 as `TargetId`, `dispatch_view_to`, and
   `dispatch_view_mut_to`, with unsupported targets rejected before typed view
   construction.
-- P1: add safe one-vector slice wrappers around `SimdKernel` load/store
-  primitives and test bounds/alignment failure behavior.
+- P1: delivered 2026-06-14 as safe one-vector `Vector<T, Arch>` slice
+  load/store wrappers with length and alignment failure tests.
 - P2: add SSE2 backend feasibility ADR covering trait coverage, CI value, and
   maintenance cost.
 - P2: add a public dense facade cross-target conformance test harness.
