@@ -20,6 +20,114 @@ fn expected_x86_dispatch() -> HostDispatch {
 }
 
 #[test]
+fn target_id_support_matches_host_features() {
+    assert!(TargetId::Scalar.is_supported());
+    assert_eq!(TargetId::Scalar.name(), "scalar");
+    assert_eq!(TargetId::Avx2.name(), "avx2");
+    assert_eq!(TargetId::Avx512.name(), "avx512");
+    assert_eq!(TargetId::Neon.name(), "neon");
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        assert_eq!(
+            TargetId::Avx2.is_supported(),
+            std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma")
+        );
+        assert_eq!(
+            TargetId::Avx512.is_supported(),
+            std::is_x86_feature_detected!("avx512f")
+        );
+        assert!(!TargetId::Neon.is_supported());
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        assert!(!TargetId::Avx2.is_supported());
+        assert!(!TargetId::Avx512.is_supported());
+        assert!(TargetId::Neon.is_supported());
+    }
+
+    #[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
+    {
+        assert!(!TargetId::Avx2.is_supported());
+        assert!(!TargetId::Avx512.is_supported());
+        assert!(!TargetId::Neon.is_supported());
+    }
+}
+
+#[test]
+fn forced_scalar_dispatch_view_preserves_slice_values() {
+    let data = [1.0f32, -2.0, 3.5, 4.0];
+    let view = dispatch_view_to::<f32, Unaligned>(TargetId::Scalar, &data)
+        .expect("scalar target is always supported");
+
+    match view {
+        DispatchedView::Scalar(view) => {
+            assert_eq!(view.as_slice(), &data);
+            assert_eq!(view.sum().to_bits(), 6.5f32.to_bits());
+        }
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        DispatchedView::Avx2(_) | DispatchedView::Avx512(_) => {
+            panic!("forced scalar target constructed an x86 SIMD view")
+        }
+        #[cfg(target_arch = "aarch64")]
+        DispatchedView::Neon(_) => panic!("forced scalar target constructed a NEON view"),
+    }
+}
+
+#[test]
+fn forced_mut_scalar_dispatch_view_preserves_exclusive_slice() {
+    let mut data = [1.0f32, 2.0, 3.0, 4.0];
+    let mut view = dispatch_view_mut_to::<f32, Unaligned>(TargetId::Scalar, &mut data)
+        .expect("scalar target is always supported");
+
+    match &mut view {
+        DispatchedView::Scalar(view) => {
+            let slice = view.as_slice_mut();
+            slice[2] = 9.0;
+            assert_eq!(slice, &[1.0, 2.0, 9.0, 4.0]);
+        }
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        DispatchedView::Avx2(_) | DispatchedView::Avx512(_) => {
+            panic!("forced scalar target constructed an x86 SIMD view")
+        }
+        #[cfg(target_arch = "aarch64")]
+        DispatchedView::Neon(_) => panic!("forced scalar target constructed a NEON view"),
+    }
+    assert_eq!(data, [1.0, 2.0, 9.0, 4.0]);
+}
+
+#[test]
+fn forced_dispatch_rejects_unsupported_target_before_view_construction() {
+    let data = [1.0f32; 8];
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    let unsupported = TargetId::Neon;
+    #[cfg(target_arch = "aarch64")]
+    let unsupported = TargetId::Avx2;
+    #[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
+    let unsupported = TargetId::Avx2;
+
+    assert!(!unsupported.is_supported());
+    assert!(dispatch_view_to::<f32, Unaligned>(unsupported, &data).is_none());
+}
+
+#[test]
+fn forced_dispatch_returns_view_for_each_supported_target() {
+    let data = [1.0f32; 64];
+
+    for target in [
+        TargetId::Scalar,
+        TargetId::Avx2,
+        TargetId::Avx512,
+        TargetId::Neon,
+    ] {
+        let view = dispatch_view_to::<f32, Unaligned>(target, &data);
+        assert_eq!(view.is_some(), target.is_supported(), "{target:?}");
+    }
+}
+
+#[test]
 fn runtime_dispatch_view_matches_host_features() {
     let data = [1.0f32; 64];
     let view = dispatch_view::<f32, Unaligned>(&data).expect("dispatch_view returns a backend");

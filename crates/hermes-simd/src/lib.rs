@@ -187,10 +187,13 @@ pub mod tile_matmul;
 
 /// Runtime-dispatched SIMD abstractions and dynamic facade.
 pub mod dispatch;
+/// Explicit runtime target tokens and forced dispatch helpers.
+pub mod target;
 
 pub use attacks::{bishop_attacks, queen_attacks, rook_attacks};
 pub use cpu::{AmxSupport, Avx512Support};
 pub use dispatcher::{AdaptiveDispatcher, DispatchDecision};
+pub use target::{dispatch_view_mut_to, dispatch_view_to, TargetId};
 pub use tile_matmul::{dispatch_tile_matmul, gemm, unpack_int4, TiledGemm};
 
 // Re-export the generic dispatch operations. These monomorphize at call sites:

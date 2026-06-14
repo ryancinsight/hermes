@@ -141,9 +141,10 @@
 
 ## Next sprint focus (from [gap_audit](gap_audit.md#highway-2026-06-14))
 
-- [ ] [minor] Target-token forced dispatch: define the Hermes-native
+- [x] [minor] Target-token forced dispatch: define the Hermes-native
       `TargetId`/forced-dispatch test surface and prove unsupported targets
-      fall back or reject safely.
+      reject safely. Evidence tier: type-level architecture view construction
+      plus value-semantic host capability tests.
 - [ ] [minor] Safe one-vector slice wrappers: add bounds/alignment-checked
       wrappers over `SimdKernel` load/store primitives and value-semantic
       tests for success and failure paths.

@@ -35,6 +35,9 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   doctests instead of compile-only `no_run` examples.
 - `BitMask` native-mask conversion and active-lane iteration examples now run
   as value-semantic doctests.
+- `TargetId`, `dispatch_view_to`, and `dispatch_view_mut_to` provide an
+  explicit target-token surface for tests and benchmarks, rejecting unsupported
+  targets before constructing architecture-specific views.
 
 ### Changed
 - `SveArch` is now a callable 512-bit-shape emulated backend for f32/f64

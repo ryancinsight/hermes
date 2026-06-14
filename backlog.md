@@ -62,10 +62,12 @@ complete SIMD substrate for leto-ops/coeus hot kernels:
       `https://github.com/NikoMalik/highway.git` at
       `0984271e74db124cf5e200de542e745348eb0b9e` and recorded Hermes-native
       gaps in [gap_audit.md](gap_audit.md#highway-2026-06-14).
-- [ ] **[minor] Target-token forced dispatch**: add a Hermes `TargetId` and
+- [x] **[minor] Target-token forced dispatch**: add a Hermes `TargetId` and
       `dispatch_to`-style test/benchmark surface that checks CPU support before
       entering target-feature trampolines. Driver:
       [gap_audit.md#highway-2026-06-14](gap_audit.md#highway-2026-06-14).
+      Delivered 2026-06-14 as `TargetId`, `dispatch_view_to`, and
+      `dispatch_view_mut_to` with value-semantic host capability tests.
 - [ ] **[minor] Safe one-vector slice wrappers**: add bounds-checked and
       alignment-checked wrappers over `load_aligned`, `load_unaligned`,
       `store_aligned`, and `store_unaligned` for one-vector use cases,

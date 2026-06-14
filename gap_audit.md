@@ -57,8 +57,9 @@ Decisions:
   value-semantic verification.
 
 Next increments:
-- P1: define a Hermes `TargetId`/forced dispatch test surface that verifies CPU
-  support before calling target-feature trampolines.
+- P1: delivered 2026-06-14 as `TargetId`, `dispatch_view_to`, and
+  `dispatch_view_mut_to`, with unsupported targets rejected before typed view
+  construction.
 - P1: add safe one-vector slice wrappers around `SimdKernel` load/store
   primitives and test bounds/alignment failure behavior.
 - P2: add SSE2 backend feasibility ADR covering trait coverage, CI value, and

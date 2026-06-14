@@ -55,6 +55,11 @@ The audit does not replace Hermes' sealed `SimdKernel` facade, sparse/packed
 domain kernels, AMX tiling, COW containers, tensor views, or Atlas compute
 boundaries.
 
+The target-token increment is available as `TargetId`,
+`dispatch_view_to`, and `dispatch_view_mut_to`. Unsupported targets return
+`None` before constructing a target-specific view, so benchmark and test
+harnesses can force a backend only when the host can execute it.
+
 ## Feature Flags
 
 | Feature | Description |
