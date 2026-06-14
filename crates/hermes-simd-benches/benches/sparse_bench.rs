@@ -6,9 +6,7 @@
 //! is capped at 10K rows to keep local memory bounded.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use hermes_simd::{
-    spmv_bcoo4x4, spmv_bcoo8x8, spmv_csr, spmv_dense_masked, spmv_sellp4, spmv_sellp8,
-};
+use hermes_simd::{spmv_bcoo, spmv_csr, spmv_dense_masked, spmv_sellp4, spmv_sellp8};
 use hermes_simd_core::sparse::{BlockedCooData, CsrData, DenseWithMaskData, SellPData};
 
 const NCOLS: usize = 1024;
@@ -201,7 +199,7 @@ fn bench_bcoo_spmv(c: &mut Criterion) {
                 |bench, _| {
                     bench.iter(|| {
                         y4.fill(0.0);
-                        spmv_bcoo4x4::<f32>(data4.clone(), black_box(&x), black_box(&mut y4));
+                        spmv_bcoo::<f32, 4, 4>(data4.clone(), black_box(&x), black_box(&mut y4));
                     })
                 },
             );
@@ -215,7 +213,7 @@ fn bench_bcoo_spmv(c: &mut Criterion) {
                 |bench, _| {
                     bench.iter(|| {
                         y8.fill(0.0);
-                        spmv_bcoo8x8::<f32>(data8.clone(), black_box(&x), black_box(&mut y8));
+                        spmv_bcoo::<f32, 8, 8>(data8.clone(), black_box(&x), black_box(&mut y8));
                     })
                 },
             );

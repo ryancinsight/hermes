@@ -218,8 +218,7 @@ pub use dispatch::{
     min,
     ntt_butterfly_stage_u64,
     scale,
-    spmv_bcoo4x4,
-    spmv_bcoo8x8,
+    spmv_bcoo,
     // Sparse operations — generic entry points.
     spmv_csr,
     spmv_dense_masked,

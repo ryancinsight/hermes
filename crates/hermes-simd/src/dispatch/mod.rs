@@ -110,10 +110,12 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
         -> Result<(), SimdError>;
     /// Computes sparse SpMV using CSR.
     fn spmv_csr(data: CsrData<'_, Self>, x: &[Self], y: &mut [Self]);
-    /// Computes sparse SpMV using Blocked-COO 4x4.
-    fn spmv_bcoo4x4(data: BlockedCooData<'_, Self, 4, 4>, x: &[Self], y: &mut [Self]);
-    /// Computes sparse SpMV using Blocked-COO 8x8.
-    fn spmv_bcoo8x8(data: BlockedCooData<'_, Self, 8, 8>, x: &[Self], y: &mut [Self]);
+    /// Computes sparse SpMV using const-generic Blocked-COO tiles.
+    fn spmv_bcoo<const BM: usize, const BN: usize>(
+        data: BlockedCooData<'_, Self, BM, BN>,
+        x: &[Self],
+        y: &mut [Self],
+    );
     /// Computes sparse SpMV using Dense-with-Mask.
     fn spmv_dense_masked(data: DenseWithMaskData<'_, Self>, x: &[Self], y: &mut [Self]);
     /// Computes sparse SpMV using Sliced ELLPACK (SELL-p) with C = 4.
@@ -241,12 +243,12 @@ where
         sparse::dispatch_spmv_csr::<Self>(data, x, y)
     }
     #[inline(always)]
-    fn spmv_bcoo4x4(data: BlockedCooData<'_, Self, 4, 4>, x: &[Self], y: &mut [Self]) {
-        SparseView::<Self, BlockedCoo<4, 4>, ScalarArch>::from_blocked_coo_4x4(data).spmv(x, y);
-    }
-    #[inline(always)]
-    fn spmv_bcoo8x8(data: BlockedCooData<'_, Self, 8, 8>, x: &[Self], y: &mut [Self]) {
-        SparseView::<Self, BlockedCoo<8, 8>, ScalarArch>::from_blocked_coo_8x8(data).spmv(x, y);
+    fn spmv_bcoo<const BM: usize, const BN: usize>(
+        data: BlockedCooData<'_, Self, BM, BN>,
+        x: &[Self],
+        y: &mut [Self],
+    ) {
+        SparseView::<Self, BlockedCoo<BM, BN>, ScalarArch>::from_blocked_coo(data).spmv(x, y);
     }
     #[inline(always)]
     fn spmv_dense_masked(data: DenseWithMaskData<'_, Self>, x: &[Self], y: &mut [Self]) {
@@ -384,12 +386,12 @@ where
         sparse::dispatch_spmv_csr::<Self>(data, x, y)
     }
     #[inline(always)]
-    fn spmv_bcoo4x4(data: BlockedCooData<'_, Self, 4, 4>, x: &[Self], y: &mut [Self]) {
-        SparseView::<Self, BlockedCoo<4, 4>, ScalarArch>::from_blocked_coo_4x4(data).spmv(x, y);
-    }
-    #[inline(always)]
-    fn spmv_bcoo8x8(data: BlockedCooData<'_, Self, 8, 8>, x: &[Self], y: &mut [Self]) {
-        SparseView::<Self, BlockedCoo<8, 8>, ScalarArch>::from_blocked_coo_8x8(data).spmv(x, y);
+    fn spmv_bcoo<const BM: usize, const BN: usize>(
+        data: BlockedCooData<'_, Self, BM, BN>,
+        x: &[Self],
+        y: &mut [Self],
+    ) {
+        SparseView::<Self, BlockedCoo<BM, BN>, ScalarArch>::from_blocked_coo(data).spmv(x, y);
     }
     #[inline(always)]
     fn spmv_dense_masked(data: DenseWithMaskData<'_, Self>, x: &[Self], y: &mut [Self]) {
@@ -526,12 +528,12 @@ where
         sparse::dispatch_spmv_csr::<Self>(data, x, y)
     }
     #[inline(always)]
-    fn spmv_bcoo4x4(data: BlockedCooData<'_, Self, 4, 4>, x: &[Self], y: &mut [Self]) {
-        SparseView::<Self, BlockedCoo<4, 4>, ScalarArch>::from_blocked_coo_4x4(data).spmv(x, y);
-    }
-    #[inline(always)]
-    fn spmv_bcoo8x8(data: BlockedCooData<'_, Self, 8, 8>, x: &[Self], y: &mut [Self]) {
-        SparseView::<Self, BlockedCoo<8, 8>, ScalarArch>::from_blocked_coo_8x8(data).spmv(x, y);
+    fn spmv_bcoo<const BM: usize, const BN: usize>(
+        data: BlockedCooData<'_, Self, BM, BN>,
+        x: &[Self],
+        y: &mut [Self],
+    ) {
+        SparseView::<Self, BlockedCoo<BM, BN>, ScalarArch>::from_blocked_coo(data).spmv(x, y);
     }
     #[inline(always)]
     fn spmv_dense_masked(data: DenseWithMaskData<'_, Self>, x: &[Self], y: &mut [Self]) {
@@ -715,16 +717,14 @@ pub fn spmv_csr<T: SimdOps>(data: CsrData<'_, T>, x: &[T], y: &mut [T]) {
     T::spmv_csr(data, x, y)
 }
 
-/// Computes sparse SpMV using Blocked-COO 4x4.
+/// Computes sparse SpMV using const-generic Blocked-COO tiles.
 #[inline(always)]
-pub fn spmv_bcoo4x4<T: SimdOps>(data: BlockedCooData<'_, T, 4, 4>, x: &[T], y: &mut [T]) {
-    T::spmv_bcoo4x4(data, x, y)
-}
-
-/// Computes sparse SpMV using Blocked-COO 8x8.
-#[inline(always)]
-pub fn spmv_bcoo8x8<T: SimdOps>(data: BlockedCooData<'_, T, 8, 8>, x: &[T], y: &mut [T]) {
-    T::spmv_bcoo8x8(data, x, y)
+pub fn spmv_bcoo<T: SimdOps, const BM: usize, const BN: usize>(
+    data: BlockedCooData<'_, T, BM, BN>,
+    x: &[T],
+    y: &mut [T],
+) {
+    T::spmv_bcoo::<BM, BN>(data, x, y)
 }
 
 /// Computes sparse SpMV using Dense-with-Mask.

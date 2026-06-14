@@ -40,6 +40,9 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - `SveArch` is now a callable 512-bit-shape emulated backend for f32/f64
   (`16xf32`, `8xf64`) instead of a public marker with `unimplemented!()`
   kernel methods. Native SVE intrinsics remain a separate pending backend.
+- Blocked-COO SpMV dispatch now uses one const-generic `spmv_bcoo::<T, BM, BN>`
+  entry point, so tile shape monomorphizes from the call site instead of
+  cloning fixed 4x4 and 8x8 public functions.
 - Interleaved complex `mul_assign` now processes two SIMD registers per loop
   iteration on SIMD backends and uses a direct four-pair scalar loop for large
   scalar inputs, reducing loop overhead in the measured complex benchmark
@@ -62,6 +65,12 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   AVX-512-only x86 branch.
 - README current-version metadata now reflects the released `0.2.0` workspace
   state.
+
+### Breaking
+- Removed fixed Blocked-COO public dispatch functions `spmv_bcoo4x4` and
+  `spmv_bcoo8x8`; use `spmv_bcoo::<T, BM, BN>`. Removed fixed
+  `SparseView::from_blocked_coo_4x4` and `SparseView::from_blocked_coo_8x8`;
+  use `SparseView::<T, BlockedCoo<BM, BN>, Arch>::from_blocked_coo`.
 
 ## [0.2.0] — 2026-06-10
 

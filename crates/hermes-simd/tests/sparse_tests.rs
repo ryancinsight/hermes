@@ -49,7 +49,7 @@ fn test_blocked_coo_4x4_spmv() {
     let data = BlockedCooData::new(&block[..], &block_row[..], &block_col[..], 1, 4, 4);
     let x = [2.0f32, 3.0, 5.0, 7.0];
     let mut y = [0.0f32; 4];
-    spmv_bcoo4x4::<f32>(data, &x, &mut y);
+    spmv_bcoo::<f32, 4, 4>(data, &x, &mut y);
     assert_eq!(y, x);
 }
 

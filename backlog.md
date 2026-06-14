@@ -11,6 +11,11 @@ Tactical breakdown of the active items lives in [checklist.md](checklist.md).
   scalar tail, no temporaries, length-mismatch error. Driver: leto matmul SIMD
   dispatch (its Stage C2 gate). Value tests across all tail sizes, f32/f64,
   zero-alpha identity, mismatch rejection.
+- [x] [minor] Const-generic Blocked-COO dispatch: replaced fixed public
+  `spmv_bcoo4x4`/`spmv_bcoo8x8` dispatch and fixed
+  `SparseView::from_blocked_coo_4x4`/`from_blocked_coo_8x8` constructors with
+  one `spmv_bcoo::<T, BM, BN>` public API and the existing generic
+  `from_blocked_coo` constructor. Driver: structural duplication audit.
 
 ## Atlas in-house replacement roadmap — hermes slice [arch]
 

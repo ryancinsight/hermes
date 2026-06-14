@@ -119,6 +119,13 @@
       `benchmarks_baseline.json` and `benchmarks_results.md` from local
       Criterion output, including packed4 COW unpack and the unrolled complex
       `mul_assign` rows. Regression self-check covered 48 rows.
+- [x] [minor] Const-generic Blocked-COO dispatch: removed fixed public
+      `spmv_bcoo4x4`/`spmv_bcoo8x8` dispatch functions and fixed
+      `SparseView::from_blocked_coo_4x4`/`from_blocked_coo_8x8` constructors
+      in favor of one `spmv_bcoo::<T, BM, BN>` API and the existing generic
+      `from_blocked_coo` constructor. Evidence tier: type-level const-generic
+      shape encoding plus value-semantic sparse tests and benchmark parser
+      regression self-check.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 

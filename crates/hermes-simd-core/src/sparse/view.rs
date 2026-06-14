@@ -127,30 +127,6 @@ where
     }
 }
 
-impl<'a, T: 'a, Arch: SimdArch> SparseView<'a, T, BlockedCoo<4, 4>, Arch> {
-    /// Create a `SparseView` over Blocked-COO 4x4 data.
-    #[inline]
-    pub fn from_blocked_coo_4x4(data: BlockedCooData<'a, T, 4, 4>) -> Self {
-        Self {
-            data,
-            _arch: PhantomData,
-            _lifetime: PhantomData,
-        }
-    }
-}
-
-impl<'a, T: 'a, Arch: SimdArch> SparseView<'a, T, BlockedCoo<8, 8>, Arch> {
-    /// Create a `SparseView` over Blocked-COO 8x8 data.
-    #[inline]
-    pub fn from_blocked_coo_8x8(data: BlockedCooData<'a, T, 8, 8>) -> Self {
-        Self {
-            data,
-            _arch: PhantomData,
-            _lifetime: PhantomData,
-        }
-    }
-}
-
 impl<'a, T: 'a, Arch> SparseView<'a, T, DenseWithMask, Arch>
 where
     Arch: SimdArch,
