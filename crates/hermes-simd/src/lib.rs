@@ -222,8 +222,7 @@ pub use dispatch::{
     // Sparse operations — generic entry points.
     spmv_csr,
     spmv_dense_masked,
-    spmv_sellp4,
-    spmv_sellp8,
+    spmv_sellp,
     // Generic free functions — the primary public API.
     sum,
     tiled_gemm,

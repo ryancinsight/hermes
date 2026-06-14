@@ -70,7 +70,7 @@ fn test_sellp_spmv_correctness() {
     let x = [10.0f32, 10.0, 10.0, 10.0];
     let mut y = [0.0f32; 4];
 
-    let view = SparseView::<f32, SellP<4>, Scalar>::from_sellp4(data);
+    let view = SparseView::<f32, SellP<4>, Scalar>::from_sellp(data);
     view.spmv(&x, &mut y);
 
     assert_eq!(y, [10.0, 20.0, 30.0, 40.0]);
@@ -93,7 +93,7 @@ fn test_sellp_spmv_dispatch() {
     let x = [10.0f32, 10.0, 10.0, 10.0];
     let mut y = [0.0f32; 4];
 
-    spmv_sellp4::<f32>(data.clone(), &x, &mut y);
+    spmv_sellp::<f32, 4>(data.clone(), &x, &mut y);
     assert_eq!(y, [10.0, 20.0, 30.0, 40.0]);
 
     let mut y8 = [0.0f32; 4];
@@ -105,7 +105,7 @@ fn test_sellp_spmv_dispatch() {
         4,
         4,
     );
-    spmv_sellp8::<f32>(data8, &x, &mut y8);
+    spmv_sellp::<f32, 8>(data8, &x, &mut y8);
     assert_eq!(y8, [10.0, 20.0, 30.0, 40.0]);
 }
 

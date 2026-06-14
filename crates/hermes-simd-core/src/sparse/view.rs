@@ -88,30 +88,6 @@ where
     }
 }
 
-impl<'a, T: 'a, Arch: SimdArch> SparseView<'a, T, SellP<4>, Arch> {
-    /// Create a `SparseView` over SELL-p data with C=4.
-    #[inline]
-    pub fn from_sellp4(data: SellPData<'a, T, 4>) -> Self {
-        Self {
-            data,
-            _arch: PhantomData,
-            _lifetime: PhantomData,
-        }
-    }
-}
-
-impl<'a, T: 'a, Arch: SimdArch> SparseView<'a, T, SellP<8>, Arch> {
-    /// Create a `SparseView` over SELL-p data with C=8.
-    #[inline]
-    pub fn from_sellp8(data: SellPData<'a, T, 8>) -> Self {
-        Self {
-            data,
-            _arch: PhantomData,
-            _lifetime: PhantomData,
-        }
-    }
-}
-
 impl<'a, T: 'a, const BM: usize, const BN: usize, Arch> SparseView<'a, T, BlockedCoo<BM, BN>, Arch>
 where
     Arch: SimdArch,

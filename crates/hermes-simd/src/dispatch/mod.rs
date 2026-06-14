@@ -118,10 +118,8 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     );
     /// Computes sparse SpMV using Dense-with-Mask.
     fn spmv_dense_masked(data: DenseWithMaskData<'_, Self>, x: &[Self], y: &mut [Self]);
-    /// Computes sparse SpMV using Sliced ELLPACK (SELL-p) with C = 4.
-    fn spmv_sellp4(data: SellPData<'_, Self, 4>, x: &[Self], y: &mut [Self]);
-    /// Computes sparse SpMV using Sliced ELLPACK (SELL-p) with C = 8.
-    fn spmv_sellp8(data: SellPData<'_, Self, 8>, x: &[Self], y: &mut [Self]);
+    /// Computes sparse SpMV using const-generic Sliced ELLPACK (SELL-p).
+    fn spmv_sellp<const C: usize>(data: SellPData<'_, Self, C>, x: &[Self], y: &mut [Self]);
     /// Computes register-blocked tiled GEMM: `c += A * B`.
     fn tiled_gemm(
         a: &[Self],
@@ -255,12 +253,8 @@ where
         sparse::dispatch_spmv_dense_masked::<Self>(data, x, y)
     }
     #[inline(always)]
-    fn spmv_sellp4(data: SellPData<'_, Self, 4>, x: &[Self], y: &mut [Self]) {
-        sparse::dispatch_spmv_sellp4::<Self>(data, x, y)
-    }
-    #[inline(always)]
-    fn spmv_sellp8(data: SellPData<'_, Self, 8>, x: &[Self], y: &mut [Self]) {
-        sparse::dispatch_spmv_sellp8::<Self>(data, x, y)
+    fn spmv_sellp<const C: usize>(data: SellPData<'_, Self, C>, x: &[Self], y: &mut [Self]) {
+        sparse::dispatch_spmv_sellp::<Self, C>(data, x, y)
     }
     #[inline(always)]
     fn tiled_gemm(
@@ -398,12 +392,8 @@ where
         sparse::dispatch_spmv_dense_masked::<Self>(data, x, y)
     }
     #[inline(always)]
-    fn spmv_sellp4(data: SellPData<'_, Self, 4>, x: &[Self], y: &mut [Self]) {
-        sparse::dispatch_spmv_sellp4::<Self>(data, x, y)
-    }
-    #[inline(always)]
-    fn spmv_sellp8(data: SellPData<'_, Self, 8>, x: &[Self], y: &mut [Self]) {
-        sparse::dispatch_spmv_sellp8::<Self>(data, x, y)
+    fn spmv_sellp<const C: usize>(data: SellPData<'_, Self, C>, x: &[Self], y: &mut [Self]) {
+        sparse::dispatch_spmv_sellp::<Self, C>(data, x, y)
     }
     #[inline(always)]
     fn tiled_gemm(
@@ -540,12 +530,8 @@ where
         sparse::dispatch_spmv_dense_masked::<Self>(data, x, y)
     }
     #[inline(always)]
-    fn spmv_sellp4(data: SellPData<'_, Self, 4>, x: &[Self], y: &mut [Self]) {
-        sparse::dispatch_spmv_sellp4::<Self>(data, x, y)
-    }
-    #[inline(always)]
-    fn spmv_sellp8(data: SellPData<'_, Self, 8>, x: &[Self], y: &mut [Self]) {
-        sparse::dispatch_spmv_sellp8::<Self>(data, x, y)
+    fn spmv_sellp<const C: usize>(data: SellPData<'_, Self, C>, x: &[Self], y: &mut [Self]) {
+        sparse::dispatch_spmv_sellp::<Self, C>(data, x, y)
     }
     #[inline(always)]
     fn tiled_gemm(
@@ -733,16 +719,10 @@ pub fn spmv_dense_masked<T: SimdOps>(data: DenseWithMaskData<'_, T>, x: &[T], y:
     T::spmv_dense_masked(data, x, y)
 }
 
-/// Computes sparse SpMV using Sliced ELLPACK (SELL-p) with C = 4.
+/// Computes sparse SpMV using const-generic Sliced ELLPACK (SELL-p).
 #[inline(always)]
-pub fn spmv_sellp4<T: SimdOps>(data: SellPData<'_, T, 4>, x: &[T], y: &mut [T]) {
-    T::spmv_sellp4(data, x, y)
-}
-
-/// Computes sparse SpMV using Sliced ELLPACK (SELL-p) with C = 8.
-#[inline(always)]
-pub fn spmv_sellp8<T: SimdOps>(data: SellPData<'_, T, 8>, x: &[T], y: &mut [T]) {
-    T::spmv_sellp8(data, x, y)
+pub fn spmv_sellp<T: SimdOps, const C: usize>(data: SellPData<'_, T, C>, x: &[T], y: &mut [T]) {
+    T::spmv_sellp::<C>(data, x, y)
 }
 
 /// Computes register-blocked tiled GEMM: `c += A * B`.

@@ -16,6 +16,11 @@ Tactical breakdown of the active items lives in [checklist.md](checklist.md).
   `SparseView::from_blocked_coo_4x4`/`from_blocked_coo_8x8` constructors with
   one `spmv_bcoo::<T, BM, BN>` public API and the existing generic
   `from_blocked_coo` constructor. Driver: structural duplication audit.
+- [x] [minor] Const-generic SELL-p dispatch: replaced fixed public
+  `spmv_sellp4`/`spmv_sellp8` dispatch and fixed
+  `SparseView::from_sellp4`/`from_sellp8` constructors with one
+  `spmv_sellp::<T, C>` public API and the existing generic `from_sellp`
+  constructor. Driver: structural duplication audit.
 
 ## Atlas in-house replacement roadmap — hermes slice [arch]
 

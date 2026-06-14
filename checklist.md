@@ -126,6 +126,13 @@
       `from_blocked_coo` constructor. Evidence tier: type-level const-generic
       shape encoding plus value-semantic sparse tests and benchmark parser
       regression self-check.
+- [x] [minor] Const-generic SELL-p dispatch: removed fixed public
+      `spmv_sellp4`/`spmv_sellp8` dispatch functions and fixed
+      `SparseView::from_sellp4`/`from_sellp8` constructors in favor of one
+      `spmv_sellp::<T, C>` API and the existing generic `from_sellp`
+      constructor. Evidence tier: type-level const-generic slice-height
+      encoding plus value-semantic sparse tests and benchmark parser
+      regression self-check.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 

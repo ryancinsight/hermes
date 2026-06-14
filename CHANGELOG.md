@@ -43,6 +43,9 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - Blocked-COO SpMV dispatch now uses one const-generic `spmv_bcoo::<T, BM, BN>`
   entry point, so tile shape monomorphizes from the call site instead of
   cloning fixed 4x4 and 8x8 public functions.
+- SELL-p SpMV dispatch now uses one const-generic `spmv_sellp::<T, C>` entry
+  point, preserving runtime architecture dispatch while removing fixed slice
+  height functions.
 - Interleaved complex `mul_assign` now processes two SIMD registers per loop
   iteration on SIMD backends and uses a direct four-pair scalar loop for large
   scalar inputs, reducing loop overhead in the measured complex benchmark
@@ -71,6 +74,10 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   `spmv_bcoo8x8`; use `spmv_bcoo::<T, BM, BN>`. Removed fixed
   `SparseView::from_blocked_coo_4x4` and `SparseView::from_blocked_coo_8x8`;
   use `SparseView::<T, BlockedCoo<BM, BN>, Arch>::from_blocked_coo`.
+- Removed fixed SELL-p public dispatch functions `spmv_sellp4` and
+  `spmv_sellp8`; use `spmv_sellp::<T, C>`. Removed fixed
+  `SparseView::from_sellp4` and `SparseView::from_sellp8`; use
+  `SparseView::<T, SellP<C>, Arch>::from_sellp`.
 
 ## [0.2.0] — 2026-06-10
 

@@ -30,19 +30,13 @@ pub(super) fn dispatch_spmv_dense_masked_kernel<T, A>(
 }
 
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
-pub(super) fn dispatch_spmv_sellp4_kernel<T, A>(data: SellPData<'_, T, 4>, x: &[T], y: &mut [T])
-where
+pub(super) fn dispatch_spmv_sellp_kernel<T, const C: usize, A>(
+    data: SellPData<'_, T, C>,
+    x: &[T],
+    y: &mut [T],
+) where
     T: Scalar,
     A: SimdArch + SimdKernel<T>,
 {
-    SparseView::<T, SellP<4>, A>::from_sellp4(data).spmv(x, y);
-}
-
-#[runtime_dispatch(avx512f, avx2, neon, scalar)]
-pub(super) fn dispatch_spmv_sellp8_kernel<T, A>(data: SellPData<'_, T, 8>, x: &[T], y: &mut [T])
-where
-    T: Scalar,
-    A: SimdArch + SimdKernel<T>,
-{
-    SparseView::<T, SellP<8>, A>::from_sellp8(data).spmv(x, y);
+    SparseView::<T, SellP<C>, A>::from_sellp(data).spmv(x, y);
 }
