@@ -3,6 +3,7 @@
 Strategic roadmap. Triage order: correctness → architecture → tests → docs → PM.
 Tags: `[patch]` / `[minor]` / `[major]` / `[arch]` per SemVer change class.
 Tactical breakdown of the active items lives in [checklist.md](checklist.md).
+External gap findings live in [gap_audit.md](gap_audit.md).
 
 ## Delivered (2026-06-11)
 
@@ -54,6 +55,35 @@ complete SIMD substrate for leto-ops/coeus hot kernels:
   2026-06-12: README defines Hermes as the synchronous, slice-oriented SIMD
   substrate; Moirai owns thread-level partitioning; Hephaestus owns GPU
   resource lifetimes and device-resident kernels.
+
+## External reference audits <a id="external-reference-audits"></a>
+
+- [x] **[patch] Highway comparison audit** (2026-06-14): audited
+      `https://github.com/NikoMalik/highway.git` at
+      `0984271e74db124cf5e200de542e745348eb0b9e` and recorded Hermes-native
+      gaps in [gap_audit.md](gap_audit.md#highway-2026-06-14).
+- [ ] **[minor] Target-token forced dispatch**: add a Hermes `TargetId` and
+      `dispatch_to`-style test/benchmark surface that checks CPU support before
+      entering target-feature trampolines. Driver:
+      [gap_audit.md#highway-2026-06-14](gap_audit.md#highway-2026-06-14).
+- [ ] **[minor] Safe one-vector slice wrappers**: add bounds-checked and
+      alignment-checked wrappers over `load_aligned`, `load_unaligned`,
+      `store_aligned`, and `store_unaligned` for one-vector use cases,
+      preserving raw-pointer kernels for hoisted hot loops. Driver:
+      [gap_audit.md#highway-2026-06-14](gap_audit.md#highway-2026-06-14).
+- [ ] **[arch] SSE2 backend feasibility ADR**: evaluate a 128-bit x86_64
+      backend between Scalar and AVX2, including trait coverage, CI value, and
+      maintenance cost. Driver:
+      [gap_audit.md#highway-2026-06-14](gap_audit.md#highway-2026-06-14).
+- [ ] **[minor] Public dense facade cross-target matrix**: force every
+      supported target available on the host and compare public dense facade
+      results against Scalar for representative arithmetic, mask, reduction,
+      gather, and shuffle paths. Driver:
+      [gap_audit.md#highway-2026-06-14](gap_audit.md#highway-2026-06-14).
+- [ ] **[minor] Operation-family coverage map**: expand the coarse Stage C2
+      row into per-family entries for arithmetic, bitwise, comparison, masks,
+      conversions, shuffle/rearrange, reductions, float, memory, and crypto,
+      admitting each family only when an Atlas consumer needs it.
 
 ## Stage assessment (2026-06-10)
 

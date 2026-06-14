@@ -68,6 +68,10 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   AVX-512-only x86 branch.
 - README current-version metadata now reflects the released `0.2.0` workspace
   state.
+- Added a Highway reference gap audit (`gap_audit.md`) and README baseline
+  section, tracking Hermes-native follow-ups for target-token forced dispatch,
+  safe slice wrappers, SSE2 feasibility, cross-target conformance, and
+  operation-family coverage.
 
 ### Breaking
 - Removed fixed Blocked-COO public dispatch functions `spmv_bcoo4x4` and

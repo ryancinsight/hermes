@@ -1,6 +1,6 @@
 # Checklist — active sprint
 
-**Target version: 0.2.0** · Strategy: [backlog.md](backlog.md) · Phase: Closure (release)
+**Target version: 0.2.0** · Strategy: [backlog.md](backlog.md) · Gap register: [gap_audit.md](gap_audit.md) · Phase: Closure (release)
 
 ## Sprint scope: ship 0.2.0 with CI
 
@@ -133,6 +133,22 @@
       constructor. Evidence tier: type-level const-generic slice-height
       encoding plus value-semantic sparse tests and benchmark parser
       regression self-check.
+- [x] [patch] Highway comparison audit: audited
+      `https://github.com/NikoMalik/highway.git` at
+      `0984271e74db124cf5e200de542e745348eb0b9e` and recorded Hermes-native
+      follow-ups in `gap_audit.md`, `backlog.md`, and README. Evidence tier:
+      source audit plus local code search.
+
+## Next sprint focus (from [gap_audit](gap_audit.md#highway-2026-06-14))
+
+- [ ] [minor] Target-token forced dispatch: define the Hermes-native
+      `TargetId`/forced-dispatch test surface and prove unsupported targets
+      fall back or reject safely.
+- [ ] [minor] Safe one-vector slice wrappers: add bounds/alignment-checked
+      wrappers over `SimdKernel` load/store primitives and value-semantic
+      tests for success and failure paths.
+- [ ] [minor] Public dense cross-target matrix: compare public facade outputs
+      against Scalar across every host-supported target.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 

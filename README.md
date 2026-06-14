@@ -39,6 +39,22 @@ independent work across cores, and Hephaestus for device-resident kernels.
 Hermes APIs therefore remain synchronous, slice-oriented, and monomorphized;
 they do not own task scheduling or GPU resource lifetimes.
 
+## External SIMD Reference Baseline
+
+Hermes tracks external SIMD libraries as coverage references, not as API
+authorities. The current external audit compares Hermes with
+[`NikoMalik/highway`](https://github.com/NikoMalik/highway) at commit
+`0984271e74db124cf5e200de542e745348eb0b9e`; findings live in
+[`gap_audit.md`](gap_audit.md#highway-2026-06-14).
+
+Actionable gaps from that audit are Hermes-native: target-token forced
+dispatch for tests/benchmarks, safe one-vector slice wrappers over raw
+`SimdKernel` load/store primitives, an SSE2 feasibility ADR, a public dense
+cross-target conformance matrix, and a finer operation-family coverage map.
+The audit does not replace Hermes' sealed `SimdKernel` facade, sparse/packed
+domain kernels, AMX tiling, COW containers, tensor views, or Atlas compute
+boundaries.
+
 ## Feature Flags
 
 | Feature | Description |
