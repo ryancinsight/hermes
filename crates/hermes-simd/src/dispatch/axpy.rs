@@ -1,10 +1,9 @@
 //! Generic runtime-dispatch AXPY kernel: `out[i] += alpha * x[i]`.
 //!
-//! The fused row-update primitive matmul-style consumers (leto) accumulate
-//! with: one broadcast multiplier, a streaming read of `x`, and an in-place
-//! read-modify-write of `out`, with no temporary allocation. SIMD chunks use
-//! the fused multiply-add primitive; the scalar tail is covered
-//! element-by-element.
+//! The fused row-update primitives matmul-style consumers (leto) accumulate
+//! with broadcast multipliers, streaming reads of RHS panels, and in-place
+//! updates of `out`, with no temporary allocation. SIMD chunks use the fused
+//! multiply-add primitive; scalar tails are covered element-by-element.
 
 use hermes_simd_core::{arch::SimdArch, kernel::SimdKernel, scalar::Scalar, view::SimdError};
 use hermes_simd_macros::runtime_dispatch;
@@ -155,30 +154,37 @@ where
     let x_ptr = x_panel.as_ptr();
     let out_ptr = out.as_mut_ptr();
 
-    for shared in 0..depth {
-        let x_row_offset = shared * cols;
-        let alpha_col_offset = shared * rows;
-        for row in 0..rows {
-            // SAFETY: validation above proves every RHS panel row has `cols`
-            // elements, every output row spans `cols` elements inside `out`
-            // with `row_stride >= cols`, and row windows are disjoint.
-            unsafe {
-                let alpha = *alphas.get_unchecked(alpha_col_offset + row);
-                let valpha = A::splat(alpha);
-                let x_row = x_ptr.add(x_row_offset);
-                let row_ptr = out_ptr.add(row * row_stride);
-                let mut col = 0usize;
-                while col < simd_len {
+    for row in 0..rows {
+        // SAFETY: validation above proves every RHS panel row has `cols`
+        // elements, every output row spans `cols` elements inside `out` with
+        // `row_stride >= cols`, and row windows are disjoint. The depth loop
+        // uses checked `rows * depth` and `depth * cols` bounds validated
+        // before pointer arithmetic.
+        unsafe {
+            let row_ptr = out_ptr.add(row * row_stride);
+            let mut col = 0usize;
+            while col < simd_len {
+                let mut acc = A::load_unaligned(row_ptr.add(col));
+                for shared in 0..depth {
+                    let alpha = *alphas.get_unchecked(shared * rows + row);
+                    let valpha = A::splat(alpha);
+                    let x_row = x_ptr.add(shared * cols);
                     let vx = A::load_unaligned(x_row.add(col));
-                    let vo = A::load_unaligned(row_ptr.add(col));
-                    A::store_unaligned(row_ptr.add(col), A::fmadd(vx, valpha, vo));
-                    col += lane_count;
+                    acc = A::fmadd(vx, valpha, acc);
                 }
+                A::store_unaligned(row_ptr.add(col), acc);
+                col += lane_count;
+            }
 
-                for col in simd_len..cols {
-                    let out_ref = row_ptr.add(col);
-                    *out_ref = *out_ref + *x_row.add(col) * alpha;
+            for col in simd_len..cols {
+                let out_ref = row_ptr.add(col);
+                let mut acc = *out_ref;
+                for shared in 0..depth {
+                    let alpha = *alphas.get_unchecked(shared * rows + row);
+                    let x_row = x_ptr.add(shared * cols);
+                    acc = acc + *x_row.add(col) * alpha;
                 }
+                *out_ref = acc;
             }
         }
     }

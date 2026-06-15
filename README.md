@@ -73,7 +73,8 @@ select against the scalar target.
 The public AXPY facade includes `axpy`, `axpy_rows`, and `axpy_rows_batch`.
 `axpy_rows_batch` fuses a depth-major panel accumulation into one
 runtime-dispatched kernel, so dense row-panel consumers avoid repeated facade
-dispatch and allocate no temporaries.
+dispatch, allocate no temporaries, and store each output lane once after
+accumulating across depth in registers.
 
 ## Feature Flags
 

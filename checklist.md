@@ -155,7 +155,9 @@
 - [x] [minor] Batched AXPY rows: add `axpy_rows_batch` to the sealed
       `SimdOps` facade and runtime-dispatch it through the existing AXPY
       kernel family. Evidence tier: value-semantic differential test against
-      repeated `axpy_rows`, plus exact invalid-extent error assertions.
+      repeated `axpy_rows`, exact invalid-extent error assertions, and Miri
+      coverage of the unsafe pointer loop. Memory model: each output lane is
+      loaded once, accumulated across depth in registers, and stored once.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 

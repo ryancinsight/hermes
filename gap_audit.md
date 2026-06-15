@@ -76,10 +76,11 @@ Evidence tier: value-semantic differential and boundary tests.
 
 - [minor] Batched dense row-panel accumulation: delivered `axpy_rows_batch`
   as one runtime-dispatched fused AXPY-family kernel. The API avoids repeated
-  public facade dispatch for depth-major row-panel consumers and allocates no
-  temporaries. Coverage compares against repeated `axpy_rows` and asserts exact
-  `SimdError::LengthMismatch` failures for invalid output stride, alpha panel,
-  and RHS panel extents.
+  public facade dispatch for depth-major row-panel consumers, allocates no
+  temporaries, and keeps output memory traffic to one load/store per output
+  lane by accumulating across depth in registers. Coverage compares against
+  repeated `axpy_rows` and asserts exact `SimdError::LengthMismatch` failures
+  for invalid output stride, alpha panel, and RHS panel extents.
 
 ## Residual Risks
 
