@@ -160,6 +160,9 @@
       loaded once, accumulated across depth in registers, and stored once.
       Benchmark coverage: `axpy_rows_batch_f32` compares the fused path with
       repeated public `axpy_rows` calls.
+- [x] [patch] Dense/AXPY error-contract hardening: length-mismatch tests now
+      assert exact `SimdError::LengthMismatch` values instead of only
+      asserting that an error exists.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 

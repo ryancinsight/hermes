@@ -130,13 +130,22 @@ fn test_elementwise_binary_matches_scalar_reference() {
 #[test]
 fn test_elementwise_binary_length_mismatch() {
     let mut out = [0.0f32; 2];
-    assert!(elementwise_add::<f32>(&[1.0, 2.0], &[1.0], &mut out).is_err());
-    assert!(elementwise_div::<f32>(&[1.0], &[1.0, 2.0], &mut out).is_err());
+    assert_eq!(
+        elementwise_add::<f32>(&[1.0, 2.0], &[1.0], &mut out),
+        Err(SimdError::LengthMismatch)
+    );
+    assert_eq!(
+        elementwise_div::<f32>(&[1.0], &[1.0, 2.0], &mut out),
+        Err(SimdError::LengthMismatch)
+    );
 }
 
 #[test]
 fn test_mismatched_lengths() {
-    assert!(dot::<f32>(&[1.0, 2.0], &[1.0]).is_err());
+    assert_eq!(
+        dot::<f32>(&[1.0, 2.0], &[1.0]),
+        Err(SimdError::LengthMismatch)
+    );
 }
 
 #[test]
@@ -185,7 +194,10 @@ fn test_masked_dot_f32_correctness() {
 
 #[test]
 fn test_masked_dot_length_mismatch() {
-    assert!(masked_dot::<f32>(&[1.0, 2.0], &[1.0], &[true, false]).is_err());
+    assert_eq!(
+        masked_dot::<f32>(&[1.0, 2.0], &[1.0], &[true, false]),
+        Err(SimdError::LengthMismatch)
+    );
 }
 
 #[test]

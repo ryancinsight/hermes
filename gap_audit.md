@@ -83,6 +83,10 @@ Evidence tier: value-semantic differential and boundary tests.
   for invalid output stride, alpha panel, and RHS panel extents. Benchmark
   coverage now compares `axpy_rows_batch` against repeated public `axpy_rows`
   on the same depth-major row panels.
+- [patch] Dense/AXPY error-contract hardening: selected length-mismatch tests
+  now assert exact `SimdError::LengthMismatch` values. This removes
+  existence-only failure assertions from the touched dense facade and AXPY
+  contract surface.
 
 ## Residual Risks
 

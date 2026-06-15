@@ -225,7 +225,7 @@ mod tests {
     fn axpy_rejects_length_mismatch() {
         let x = [1.0f64, 2.0];
         let mut out = [0.0f64; 3];
-        assert!(axpy(1.0, &x, &mut out).is_err());
+        assert_eq!(axpy(1.0, &x, &mut out), Err(SimdError::LengthMismatch));
     }
 
     #[test]
@@ -262,9 +262,18 @@ mod tests {
         let x = [1.0f64, 2.0, 3.0];
         let mut out = [0.0f64; 5];
 
-        assert!(axpy_rows(&alphas, &x, &mut out, 2, 2, 3).is_err());
-        assert!(axpy_rows(&alphas[..1], &x, &mut out, 3, 2, 3).is_err());
-        assert!(axpy_rows(&alphas, &x[..2], &mut out, 3, 2, 3).is_err());
+        assert_eq!(
+            axpy_rows(&alphas, &x, &mut out, 2, 2, 3),
+            Err(SimdError::LengthMismatch)
+        );
+        assert_eq!(
+            axpy_rows(&alphas[..1], &x, &mut out, 3, 2, 3),
+            Err(SimdError::LengthMismatch)
+        );
+        assert_eq!(
+            axpy_rows(&alphas, &x[..2], &mut out, 3, 2, 3),
+            Err(SimdError::LengthMismatch)
+        );
     }
 
     #[test]
