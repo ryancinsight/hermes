@@ -23,6 +23,9 @@ External gap findings live in [gap_audit.md](gap_audit.md).
 - [x] [patch] Dense/AXPY error-contract hardening: selected public dense
   facade and AXPY length-mismatch tests assert exact
   `SimdError::LengthMismatch` values instead of existence-only failures.
+- [x] [patch] Select/unary error-contract hardening: select, unary-map, and
+  COW FMA tests assert exact `SimdError` variants for length mismatch and
+  insufficient output capacity.
 - [x] [minor] Const-generic Blocked-COO dispatch: replaced fixed public
   `spmv_bcoo4x4`/`spmv_bcoo8x8` dispatch and fixed
   `SparseView::from_blocked_coo_4x4`/`from_blocked_coo_8x8` constructors with

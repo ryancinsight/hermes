@@ -87,6 +87,9 @@ Evidence tier: value-semantic differential and boundary tests.
   now assert exact `SimdError::LengthMismatch` values. This removes
   existence-only failure assertions from the touched dense facade and AXPY
   contract surface.
+- [patch] Select/unary error-contract hardening: selected select, unary-map,
+  and COW FMA tests now assert exact `SimdError` variants for length mismatch
+  and insufficient output capacity.
 
 ## Residual Risks
 

@@ -52,6 +52,8 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   fused row-panel kernel against repeated public `axpy_rows` calls.
 - Dense and AXPY length-mismatch tests now assert the exact
   `SimdError::LengthMismatch` contract instead of existence-only failures.
+- Select, unary-map, and COW FMA error-path tests now assert exact
+  `SimdError` variants for length and output-capacity failures.
 
 ### Changed
 - `SveArch` is now a callable 512-bit-shape emulated backend for f32/f64

@@ -163,6 +163,9 @@
 - [x] [patch] Dense/AXPY error-contract hardening: length-mismatch tests now
       assert exact `SimdError::LengthMismatch` values instead of only
       asserting that an error exists.
+- [x] [patch] Select/unary error-contract hardening: select, unary-map, and
+      COW FMA tests now assert exact `SimdError` variants for length mismatch
+      and insufficient output capacity.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 

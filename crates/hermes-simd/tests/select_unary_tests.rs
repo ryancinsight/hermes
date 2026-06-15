@@ -3,8 +3,8 @@
 //! ZST strategy correctness.
 
 use hermes_simd::{
-    Abs, Clamp, Exclusive, Inclusive, Neg, Scalar, ScanAdd, ScanMax, ScanMin, SimdCow, SimdView,
-    Sqrt, Unaligned, Unmasked,
+    Abs, Clamp, Exclusive, Inclusive, Neg, Scalar, ScanAdd, ScanMax, ScanMin, SimdCow, SimdError,
+    SimdView, Sqrt, Unaligned, Unmasked,
 };
 
 type View<'a, T> = SimdView<'a, T, Scalar, Unaligned, Unmasked, &'a [T]>;
@@ -16,6 +16,13 @@ fn view<T>(data: &[T]) -> View<'_, T> {
 }
 fn view_mut<T>(data: &mut [T]) -> ViewMut<'_, T> {
     SimdView::new_mut(data).expect("Scalar/Unaligned always succeeds")
+}
+
+fn assert_simd_error<T>(result: Result<T, SimdError>, expected: SimdError) {
+    match result {
+        Err(actual) => assert_eq!(actual, expected),
+        Ok(_) => panic!("expected {expected:?}"),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +70,7 @@ fn test_select_length_mismatch() {
     let mask = [true, true, false];
     let va = view(&a);
     let vb = view(&b);
-    assert!(va.select(&mask, &vb).is_err());
+    assert_simd_error(va.select(&mask, &vb), SimdError::LengthMismatch);
 }
 
 #[test]
@@ -73,7 +80,7 @@ fn test_select_mask_too_short() {
     let mask = [true];
     let va = view(&a);
     let vb = view(&b);
-    assert!(va.select(&mask, &vb).is_err());
+    assert_simd_error(va.select(&mask, &vb), SimdError::InsufficientOutputLength);
 }
 
 // ---------------------------------------------------------------------------
@@ -155,7 +162,10 @@ fn test_map_unary_out_too_short() {
     let data = [1.0f32, 2.0, 3.0, 4.0];
     let v = view(&data);
     let mut out = [0.0f32; 2];
-    assert!(v.map_unary(Abs, &mut out).is_err());
+    assert_simd_error(
+        v.map_unary(Abs, &mut out),
+        SimdError::InsufficientOutputLength,
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -300,5 +310,5 @@ fn test_fma_cow_length_mismatch() {
     let ca = Cow::<f32>::borrow_slice(&a).unwrap();
     let cb = Cow::<f32>::borrow_slice(&b).unwrap();
     let cc = Cow::<f32>::borrow_slice(&c).unwrap();
-    assert!(ca.fma_cow(&cb, &cc).is_err());
+    assert_simd_error(ca.fma_cow(&cb, &cc), SimdError::LengthMismatch);
 }
