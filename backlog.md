@@ -17,7 +17,9 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   via one runtime-dispatched kernel, no temporaries, length-mismatch error.
   Driver: leto/coeus dense-panel accumulation. Delivered 2026-06-15 with
   repeated-`axpy_rows` differential coverage, invalid-extent tests, and
-  register accumulation that stores each output lane once per call.
+  register accumulation that stores each output lane once per call. Criterion
+  coverage: `axpy_rows_batch_f32` compares the fused kernel against repeated
+  public `axpy_rows` calls on depth-major row panels.
 - [x] [minor] Const-generic Blocked-COO dispatch: replaced fixed public
   `spmv_bcoo4x4`/`spmv_bcoo8x8` dispatch and fixed
   `SparseView::from_blocked_coo_4x4`/`from_blocked_coo_8x8` constructors with

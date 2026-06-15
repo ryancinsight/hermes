@@ -80,7 +80,9 @@ Evidence tier: value-semantic differential and boundary tests.
   temporaries, and keeps output memory traffic to one load/store per output
   lane by accumulating across depth in registers. Coverage compares against
   repeated `axpy_rows` and asserts exact `SimdError::LengthMismatch` failures
-  for invalid output stride, alpha panel, and RHS panel extents.
+  for invalid output stride, alpha panel, and RHS panel extents. Benchmark
+  coverage now compares `axpy_rows_batch` against repeated public `axpy_rows`
+  on the same depth-major row panels.
 
 ## Residual Risks
 

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-06-12 17:17:46 -04:00",
+  "generated_at": "2026-06-15 16:08:34 -04:00",
   "cpu": "Intel(R) Core(TM) Ultra 9 285K",
   "runtime_backend": "avx2",
   "isa_features": "avx2, fma",
@@ -214,6 +214,38 @@
       "throughput_val": 262144
     },
     {
+      "group_id": "axpy_rows_batch_f32",
+      "function_id": "batch",
+      "value_str": "rows_16_depth_16_cols_512",
+      "time_ns": 5599.520237919314,
+      "throughput_kind": "Elements",
+      "throughput_val": 131072
+    },
+    {
+      "group_id": "axpy_rows_batch_f32",
+      "function_id": "batch",
+      "value_str": "rows_8_depth_8_cols_256",
+      "time_ns": 1695.4834495232712,
+      "throughput_kind": "Elements",
+      "throughput_val": 16384
+    },
+    {
+      "group_id": "axpy_rows_batch_f32",
+      "function_id": "repeated_axpy_rows",
+      "value_str": "rows_16_depth_16_cols_512",
+      "time_ns": 10005.69532113126,
+      "throughput_kind": "Elements",
+      "throughput_val": 131072
+    },
+    {
+      "group_id": "axpy_rows_batch_f32",
+      "function_id": "repeated_axpy_rows",
+      "value_str": "rows_8_depth_8_cols_256",
+      "time_ns": 1646.4769991626029,
+      "throughput_kind": "Elements",
+      "throughput_val": 16384
+    },
+    {
       "group_id": "complex_dot",
       "function_id": "runtime",
       "value_str": "1024",
@@ -342,6 +374,70 @@
       "throughput_val": 4096
     },
     {
+      "group_id": "dot_f32",
+      "function_id": "default",
+      "value_str": "1024",
+      "time_ns": 41.14720962924041,
+      "throughput_kind": "Elements",
+      "throughput_val": 1024
+    },
+    {
+      "group_id": "dot_f32",
+      "function_id": "default",
+      "value_str": "16384",
+      "time_ns": 886.448030720911,
+      "throughput_kind": "Elements",
+      "throughput_val": 16384
+    },
+    {
+      "group_id": "dot_f32",
+      "function_id": "default",
+      "value_str": "256",
+      "time_ns": 13.738844419924504,
+      "throughput_kind": "Elements",
+      "throughput_val": 256
+    },
+    {
+      "group_id": "dot_f32",
+      "function_id": "default",
+      "value_str": "4096",
+      "time_ns": 158.17867914420248,
+      "throughput_kind": "Elements",
+      "throughput_val": 4096
+    },
+    {
+      "group_id": "elementwise_mul_f32",
+      "function_id": "default",
+      "value_str": "1024",
+      "time_ns": 54.887399754683976,
+      "throughput_kind": "Elements",
+      "throughput_val": 1024
+    },
+    {
+      "group_id": "elementwise_mul_f32",
+      "function_id": "default",
+      "value_str": "16384",
+      "time_ns": 1732.5308705748398,
+      "throughput_kind": "Elements",
+      "throughput_val": 16384
+    },
+    {
+      "group_id": "elementwise_mul_f32",
+      "function_id": "default",
+      "value_str": "256",
+      "time_ns": 16.24523635479847,
+      "throughput_kind": "Elements",
+      "throughput_val": 256
+    },
+    {
+      "group_id": "elementwise_mul_f32",
+      "function_id": "default",
+      "value_str": "4096",
+      "time_ns": 337.1068593711316,
+      "throughput_kind": "Elements",
+      "throughput_val": 4096
+    },
+    {
       "group_id": "packed4_cow_unpack",
       "function_id": "bf4_to_wide",
       "value_str": "1024",
@@ -388,6 +484,38 @@
       "time_ns": 325266.23488099885,
       "throughput_kind": null,
       "throughput_val": null
+    },
+    {
+      "group_id": "sum_f32",
+      "function_id": "default",
+      "value_str": "1024",
+      "time_ns": 20.452581525778303,
+      "throughput_kind": "Elements",
+      "throughput_val": 1024
+    },
+    {
+      "group_id": "sum_f32",
+      "function_id": "default",
+      "value_str": "16384",
+      "time_ns": 449.22094516100185,
+      "throughput_kind": "Elements",
+      "throughput_val": 16384
+    },
+    {
+      "group_id": "sum_f32",
+      "function_id": "default",
+      "value_str": "256",
+      "time_ns": 7.107319253089634,
+      "throughput_kind": "Elements",
+      "throughput_val": 256
+    },
+    {
+      "group_id": "sum_f32",
+      "function_id": "default",
+      "value_str": "4096",
+      "time_ns": 72.82161190955513,
+      "throughput_kind": "Elements",
+      "throughput_val": 4096
     }
   ]
 }

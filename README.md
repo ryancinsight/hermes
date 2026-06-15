@@ -171,6 +171,8 @@ Benchmark regression policy: `benchmarks_baseline.json` is the structured
 Criterion baseline. `--check-regressions` fails when a committed baseline row is
 missing from the current run or when the current point estimate exceeds the
 baseline by the configured threshold.
+The dense suite includes `axpy_rows_batch_f32`, which compares fused
+depth-major row-panel accumulation against repeated public `axpy_rows` calls.
 
 ## Project Management
 

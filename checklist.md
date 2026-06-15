@@ -158,6 +158,8 @@
       repeated `axpy_rows`, exact invalid-extent error assertions, and Miri
       coverage of the unsafe pointer loop. Memory model: each output lane is
       loaded once, accumulated across depth in registers, and stored once.
+      Benchmark coverage: `axpy_rows_batch_f32` compares the fused path with
+      repeated public `axpy_rows` calls.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 
