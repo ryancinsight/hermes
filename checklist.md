@@ -149,8 +149,9 @@
       wrappers over `SimdKernel` load/store primitives and value-semantic
       tests for success and failure paths. Evidence tier: value-semantic
       integration tests over public `Vector<T, Arch>` methods.
-- [ ] [minor] Public dense cross-target matrix: compare public facade outputs
-      against Scalar across every host-supported target.
+- [x] [minor] Public dense cross-target matrix: compare public facade outputs
+      against Scalar across every host-supported target. Evidence tier:
+      value-semantic differential tests over forced `TargetId` views.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 

@@ -64,7 +64,9 @@ Next increments:
   load/store wrappers with length and alignment failure tests.
 - P2: add SSE2 backend feasibility ADR covering trait coverage, CI value, and
   maintenance cost.
-- P2: add a public dense facade cross-target conformance test harness.
+- P2: delivered 2026-06-15 as host-supported `TargetId` dense conformance
+  tests against Scalar for reductions, elementwise arithmetic, gather, and
+  select.
 - P3: turn the operation-family gap map into per-family checklist rows driven
   by consumer demand.
 

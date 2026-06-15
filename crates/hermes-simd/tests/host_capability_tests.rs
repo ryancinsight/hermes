@@ -128,6 +128,136 @@ fn forced_dispatch_returns_view_for_each_supported_target() {
 }
 
 #[test]
+fn forced_dense_facade_matches_scalar_for_every_supported_target() {
+    let a: Vec<f32> = (0..96).map(|i| (i % 9) as f32 - 4.0).collect();
+    let b: Vec<f32> = (0..96).map(|i| (i % 7) as f32 - 3.0).collect();
+    let indices = [95, 0, 17, 31, 64, 7, 88, 45, 3, 72, 11, 59];
+    let mask: Vec<bool> = (0..a.len()).map(|i| i % 3 == 0 || i % 5 == 0).collect();
+
+    let expected = dense_scalar_reference(&a, &b, &indices, &mask);
+
+    for target in [
+        TargetId::Scalar,
+        TargetId::Avx2,
+        TargetId::Avx512,
+        TargetId::Neon,
+    ] {
+        if target.is_supported() {
+            assert_forced_dense_target_matches(target, &a, &b, &indices, &mask, &expected);
+        }
+    }
+}
+
+struct DenseReference {
+    sum_bits: u32,
+    dot_bits: u32,
+    mul: Vec<f32>,
+    add: Vec<f32>,
+    sub: Vec<f32>,
+    gather: Vec<f32>,
+    select: Vec<f32>,
+}
+
+fn dense_scalar_reference(a: &[f32], b: &[f32], indices: &[i32], mask: &[bool]) -> DenseReference {
+    let scalar_a = SimdView::<f32, Scalar, Unaligned>::new(a).unwrap();
+    let scalar_b = SimdView::<f32, Scalar, Unaligned>::new(b).unwrap();
+
+    let mut mul = vec![0.0; a.len()];
+    scalar_a.elementwise_mul(&scalar_b, &mut mul).unwrap();
+
+    let mut add = vec![0.0; a.len()];
+    scalar_a.zip_into(&scalar_b, &mut add, Add).unwrap();
+
+    let mut sub = vec![0.0; a.len()];
+    scalar_a.zip_into(&scalar_b, &mut sub, Sub).unwrap();
+
+    let mut gather = vec![0.0; indices.len()];
+    scalar_a.gather(indices, &mut gather).unwrap();
+
+    let select = scalar_a.select(mask, &scalar_b).unwrap().to_vec();
+
+    DenseReference {
+        sum_bits: scalar_a.sum().to_bits(),
+        dot_bits: scalar_a.dot(&scalar_b).unwrap().to_bits(),
+        mul,
+        add,
+        sub,
+        gather,
+        select,
+    }
+}
+
+fn assert_forced_dense_target_matches(
+    target: TargetId,
+    a: &[f32],
+    b: &[f32],
+    indices: &[i32],
+    mask: &[bool],
+    expected: &DenseReference,
+) {
+    let view_a =
+        dispatch_view_to::<f32, Unaligned>(target, a).expect("supported target constructs a view");
+    let view_b =
+        dispatch_view_to::<f32, Unaligned>(target, b).expect("supported target constructs a view");
+
+    match (view_a, view_b) {
+        (DispatchedView::Scalar(a_view), DispatchedView::Scalar(b_view)) => {
+            assert_dense_view_matches_target(target, &a_view, &b_view, indices, mask, expected);
+        }
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        (DispatchedView::Avx2(a_view), DispatchedView::Avx2(b_view)) => {
+            assert_dense_view_matches_target(target, &a_view, &b_view, indices, mask, expected);
+        }
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        (DispatchedView::Avx512(a_view), DispatchedView::Avx512(b_view)) => {
+            assert_dense_view_matches_target(target, &a_view, &b_view, indices, mask, expected);
+        }
+        #[cfg(target_arch = "aarch64")]
+        (DispatchedView::Neon(a_view), DispatchedView::Neon(b_view)) => {
+            assert_dense_view_matches_target(target, &a_view, &b_view, indices, mask, expected);
+        }
+        _ => panic!("target {target:?} constructed mismatched view variants"),
+    }
+}
+
+fn assert_dense_view_matches_target<Arch>(
+    target: TargetId,
+    a: &SimdView<'_, f32, Arch, Unaligned>,
+    b: &SimdView<'_, f32, Arch, Unaligned>,
+    indices: &[i32],
+    mask: &[bool],
+    expected: &DenseReference,
+) where
+    Arch: SimdArch + SimdKernel<f32>,
+{
+    assert_eq!(a.sum().to_bits(), expected.sum_bits, "{target:?} sum");
+    assert_eq!(
+        a.dot(b).unwrap().to_bits(),
+        expected.dot_bits,
+        "{target:?} dot"
+    );
+
+    let mut mul = vec![0.0; a.len()];
+    a.elementwise_mul(b, &mut mul).unwrap();
+    assert_eq!(mul, expected.mul, "{target:?} elementwise_mul");
+
+    let mut add = vec![0.0; a.len()];
+    a.zip_into(b, &mut add, Add).unwrap();
+    assert_eq!(add, expected.add, "{target:?} add");
+
+    let mut sub = vec![0.0; a.len()];
+    a.zip_into(b, &mut sub, Sub).unwrap();
+    assert_eq!(sub, expected.sub, "{target:?} sub");
+
+    let mut gather = vec![0.0; indices.len()];
+    a.gather(indices, &mut gather).unwrap();
+    assert_eq!(gather, expected.gather, "{target:?} gather");
+
+    let select = a.select(mask, b).unwrap().to_vec();
+    assert_eq!(select, expected.select, "{target:?} select");
+}
+
+#[test]
 fn runtime_dispatch_view_matches_host_features() {
     let data = [1.0f32; 64];
     let view = dispatch_view::<f32, Unaligned>(&data).expect("dispatch_view returns a backend");

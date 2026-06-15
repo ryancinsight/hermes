@@ -78,11 +78,13 @@ complete SIMD substrate for leto-ops/coeus hot kernels:
       backend between Scalar and AVX2, including trait coverage, CI value, and
       maintenance cost. Driver:
       [gap_audit.md#highway-2026-06-14](gap_audit.md#highway-2026-06-14).
-- [ ] **[minor] Public dense facade cross-target matrix**: force every
+- [x] **[minor] Public dense facade cross-target matrix**: force every
       supported target available on the host and compare public dense facade
       results against Scalar for representative arithmetic, mask, reduction,
       gather, and shuffle paths. Driver:
       [gap_audit.md#highway-2026-06-14](gap_audit.md#highway-2026-06-14).
+      Delivered 2026-06-15 with host-supported `TargetId` checks over sum,
+      dot, elementwise arithmetic, gather, and select.
 - [ ] **[minor] Operation-family coverage map**: expand the coarse Stage C2
       row into per-family entries for arithmetic, bitwise, comparison, masks,
       conversions, shuffle/rearrange, reductions, float, memory, and crypto,

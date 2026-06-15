@@ -41,6 +41,9 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - `Vector<T, Arch>` now has safe one-vector slice wrappers for aligned and
   unaligned load/store, returning value-semantic `SimdError` variants for short
   or misaligned slices while preserving raw pointer kernels for hot loops.
+- Host-capability tests now force every supported `TargetId` and compare dense
+  facade sum, dot, elementwise arithmetic, gather, and select results against
+  the scalar target.
 
 ### Changed
 - `SveArch` is now a callable 512-bit-shape emulated backend for f32/f64
