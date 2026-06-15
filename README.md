@@ -70,6 +70,11 @@ Dense target conformance is covered by host-capability tests that force every
 supported `TargetId` and compare sum, dot, elementwise arithmetic, gather, and
 select against the scalar target.
 
+The public AXPY facade includes `axpy`, `axpy_rows`, and `axpy_rows_batch`.
+`axpy_rows_batch` fuses a depth-major panel accumulation into one
+runtime-dispatched kernel, so dense row-panel consumers avoid repeated facade
+dispatch and allocate no temporaries.
+
 ## Feature Flags
 
 | Feature | Description |

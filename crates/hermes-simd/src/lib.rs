@@ -205,6 +205,7 @@ pub use dispatch::{
     argmin,
     axpy,
     axpy_rows,
+    axpy_rows_batch,
     dot,
     elementwise_add,
     elementwise_div,

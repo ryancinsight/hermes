@@ -110,9 +110,86 @@ where
     Ok(())
 }
 
+#[runtime_dispatch(avx512f, avx2, neon, scalar)]
+pub(super) fn dispatch_axpy_rows_batch_kernel<T, A>(
+    alphas: &[T],
+    x_panel: &[T],
+    out: &mut [T],
+    row_stride: usize,
+    rows: usize,
+    depth: usize,
+    cols: usize,
+) -> Result<(), SimdError>
+where
+    T: Scalar,
+    A: SimdArch + SimdKernel<T>,
+{
+    if rows == 0 || depth == 0 || cols == 0 {
+        return Ok(());
+    }
+    let Some(alpha_len) = rows.checked_mul(depth) else {
+        return Err(SimdError::LengthMismatch);
+    };
+    let Some(panel_len) = depth.checked_mul(cols) else {
+        return Err(SimdError::LengthMismatch);
+    };
+    let Some(last_row_offset) = rows
+        .checked_sub(1)
+        .and_then(|row| row.checked_mul(row_stride))
+    else {
+        return Err(SimdError::LengthMismatch);
+    };
+    let Some(required_out_len) = last_row_offset.checked_add(cols) else {
+        return Err(SimdError::LengthMismatch);
+    };
+    if alphas.len() < alpha_len
+        || x_panel.len() < panel_len
+        || row_stride < cols
+        || out.len() < required_out_len
+    {
+        return Err(SimdError::LengthMismatch);
+    }
+
+    let lane_count = A::LANE_COUNT;
+    let simd_len = (cols / lane_count) * lane_count;
+    let x_ptr = x_panel.as_ptr();
+    let out_ptr = out.as_mut_ptr();
+
+    for shared in 0..depth {
+        let x_row_offset = shared * cols;
+        let alpha_col_offset = shared * rows;
+        for row in 0..rows {
+            // SAFETY: validation above proves every RHS panel row has `cols`
+            // elements, every output row spans `cols` elements inside `out`
+            // with `row_stride >= cols`, and row windows are disjoint.
+            unsafe {
+                let alpha = *alphas.get_unchecked(alpha_col_offset + row);
+                let valpha = A::splat(alpha);
+                let x_row = x_ptr.add(x_row_offset);
+                let row_ptr = out_ptr.add(row * row_stride);
+                let mut col = 0usize;
+                while col < simd_len {
+                    let vx = A::load_unaligned(x_row.add(col));
+                    let vo = A::load_unaligned(row_ptr.add(col));
+                    A::store_unaligned(row_ptr.add(col), A::fmadd(vx, valpha, vo));
+                    col += lane_count;
+                }
+
+                for col in simd_len..cols {
+                    let out_ref = row_ptr.add(col);
+                    *out_ref = *out_ref + *x_row.add(col) * alpha;
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::super::{axpy, axpy_rows};
+    use super::super::{axpy, axpy_rows, axpy_rows_batch};
+    use hermes_simd_core::view::SimdError;
 
     #[test]
     fn axpy_matches_scalar_reference_across_tail_sizes() {
@@ -182,5 +259,58 @@ mod tests {
         assert!(axpy_rows(&alphas, &x, &mut out, 2, 2, 3).is_err());
         assert!(axpy_rows(&alphas[..1], &x, &mut out, 3, 2, 3).is_err());
         assert!(axpy_rows(&alphas, &x[..2], &mut out, 3, 2, 3).is_err());
+    }
+
+    #[test]
+    fn axpy_rows_batch_matches_repeated_axpy_rows_with_padding() {
+        let rows = 4usize;
+        let depth = 3usize;
+        let cols = 19usize;
+        let row_stride = 23usize;
+        let alphas: Vec<f64> = (0..rows * depth)
+            .map(|idx| idx as f64 * 0.125 - 0.75)
+            .collect();
+        let x_panel: Vec<f64> = (0..depth * cols)
+            .map(|idx| idx as f64 * 0.25 - 1.5)
+            .collect();
+        let mut out: Vec<f64> = (0..rows * row_stride).map(|i| i as f64 * 0.03125).collect();
+        let mut expected = out.clone();
+
+        for shared in 0..depth {
+            let alpha_start = shared * rows;
+            let x_start = shared * cols;
+            axpy_rows(
+                &alphas[alpha_start..alpha_start + rows],
+                &x_panel[x_start..x_start + cols],
+                &mut expected,
+                row_stride,
+                rows,
+                cols,
+            )
+            .unwrap();
+        }
+
+        axpy_rows_batch(&alphas, &x_panel, &mut out, row_stride, rows, depth, cols).unwrap();
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn axpy_rows_batch_rejects_invalid_extents() {
+        let alphas = [1.0f64, 2.0, 3.0, 4.0];
+        let x_panel = [1.0f64, 2.0, 3.0, 4.0, 5.0, 6.0];
+        let mut out = [0.0f64; 6];
+
+        assert_eq!(
+            axpy_rows_batch(&alphas, &x_panel, &mut out, 2, 2, 2, 3),
+            Err(SimdError::LengthMismatch)
+        );
+        assert_eq!(
+            axpy_rows_batch(&alphas[..3], &x_panel, &mut out, 3, 2, 2, 3),
+            Err(SimdError::LengthMismatch)
+        );
+        assert_eq!(
+            axpy_rows_batch(&alphas, &x_panel[..5], &mut out, 3, 2, 2, 3),
+            Err(SimdError::LengthMismatch)
+        );
     }
 }

@@ -93,6 +93,17 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
         rows: usize,
         cols: usize,
     ) -> Result<(), SimdError>;
+    /// Fused batched multi-row update:
+    /// `out[row, i] += sum_k alphas[k, row] * x_panel[k, i]`.
+    fn axpy_rows_batch(
+        alphas: &[Self],
+        x_panel: &[Self],
+        out: &mut [Self],
+        row_stride: usize,
+        rows: usize,
+        depth: usize,
+        cols: usize,
+    ) -> Result<(), SimdError>;
     /// Computes the elementwise product and writes to `out`.
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError>;
     /// Computes the elementwise sum `a[i] + b[i]` and writes to `out`.
@@ -202,6 +213,18 @@ where
         cols: usize,
     ) -> Result<(), SimdError> {
         axpy::dispatch_axpy_rows::<Self>(alphas, x, out, row_stride, rows, cols)
+    }
+    #[inline(always)]
+    fn axpy_rows_batch(
+        alphas: &[Self],
+        x_panel: &[Self],
+        out: &mut [Self],
+        row_stride: usize,
+        rows: usize,
+        depth: usize,
+        cols: usize,
+    ) -> Result<(), SimdError> {
+        axpy::dispatch_axpy_rows_batch::<Self>(alphas, x_panel, out, row_stride, rows, depth, cols)
     }
     #[inline(always)]
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
@@ -343,6 +366,18 @@ where
         axpy::dispatch_axpy_rows::<Self>(alphas, x, out, row_stride, rows, cols)
     }
     #[inline(always)]
+    fn axpy_rows_batch(
+        alphas: &[Self],
+        x_panel: &[Self],
+        out: &mut [Self],
+        row_stride: usize,
+        rows: usize,
+        depth: usize,
+        cols: usize,
+    ) -> Result<(), SimdError> {
+        axpy::dispatch_axpy_rows_batch::<Self>(alphas, x_panel, out, row_stride, rows, depth, cols)
+    }
+    #[inline(always)]
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
         binary::dispatch_elementwise_binary::<Self, Mul>(a, b, out, Mul)
     }
@@ -479,6 +514,18 @@ where
         cols: usize,
     ) -> Result<(), SimdError> {
         axpy::dispatch_axpy_rows::<Self>(alphas, x, out, row_stride, rows, cols)
+    }
+    #[inline(always)]
+    fn axpy_rows_batch(
+        alphas: &[Self],
+        x_panel: &[Self],
+        out: &mut [Self],
+        row_stride: usize,
+        rows: usize,
+        depth: usize,
+        cols: usize,
+    ) -> Result<(), SimdError> {
+        axpy::dispatch_axpy_rows_batch::<Self>(alphas, x_panel, out, row_stride, rows, depth, cols)
     }
     #[inline(always)]
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
@@ -637,6 +684,24 @@ pub fn axpy_rows<T: SimdOps>(
     cols: usize,
 ) -> Result<(), SimdError> {
     T::axpy_rows(alphas, x, out, row_stride, rows, cols)
+}
+
+/// Fused batched multi-row update:
+/// `out[row, i] += sum_k alphas[k, row] * x_panel[k, i]` via one
+/// runtime-dispatched SIMD kernel. `alphas` is depth-major with `rows`
+/// elements per depth, `x_panel` is depth-major with `cols` elements per
+/// depth, and `out` is a row-major strided window.
+#[inline(always)]
+pub fn axpy_rows_batch<T: SimdOps>(
+    alphas: &[T],
+    x_panel: &[T],
+    out: &mut [T],
+    row_stride: usize,
+    rows: usize,
+    depth: usize,
+    cols: usize,
+) -> Result<(), SimdError> {
+    T::axpy_rows_batch(alphas, x_panel, out, row_stride, rows, depth, cols)
 }
 
 /// Computes the elementwise multiplication of two slices and writes to `out`.

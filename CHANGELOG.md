@@ -44,6 +44,9 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - Host-capability tests now force every supported `TargetId` and compare dense
   facade sum, dot, elementwise arithmetic, gather, and select results against
   the scalar target.
+- `axpy_rows_batch` adds one runtime-dispatched fused kernel for
+  `out[row, i] += sum_k alphas[k, row] * x_panel[k, i]`, avoiding repeated
+  facade dispatch when a consumer accumulates a dense row panel.
 
 ### Changed
 - `SveArch` is now a callable 512-bit-shape emulated backend for f32/f64

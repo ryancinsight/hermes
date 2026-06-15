@@ -152,6 +152,10 @@
 - [x] [minor] Public dense cross-target matrix: compare public facade outputs
       against Scalar across every host-supported target. Evidence tier:
       value-semantic differential tests over forced `TargetId` views.
+- [x] [minor] Batched AXPY rows: add `axpy_rows_batch` to the sealed
+      `SimdOps` facade and runtime-dispatch it through the existing AXPY
+      kernel family. Evidence tier: value-semantic differential test against
+      repeated `axpy_rows`, plus exact invalid-extent error assertions.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 
