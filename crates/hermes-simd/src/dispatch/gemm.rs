@@ -42,9 +42,20 @@ where
 
             match decision {
                 crate::dispatcher::DispatchDecision::Scalar => {
-                    <TilingPolicy<1, 1> as TilingStrategy<T, A, Unaligned>>::gemm(
-                        &v1, &v2, c, m, n, k,
-                    )
+                    let is_too_small = (m < 16) || (n < 16) || (k < 32);
+                    if A::LANE_COUNT > 8 && !is_too_small {
+                        <TilingPolicy<6, 4> as TilingStrategy<T, A, Unaligned>>::gemm(
+                            &v1, &v2, c, m, n, k,
+                        )
+                    } else if A::LANE_COUNT > 1 && !is_too_small {
+                        <TilingPolicy<3, 4> as TilingStrategy<T, A, Unaligned>>::gemm(
+                            &v1, &v2, c, m, n, k,
+                        )
+                    } else {
+                        <TilingPolicy<1, 1> as TilingStrategy<T, A, Unaligned>>::gemm(
+                            &v1, &v2, c, m, n, k,
+                        )
+                    }
                 }
                 _ => {
                     if A::LANE_COUNT > 8 {
