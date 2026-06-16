@@ -48,7 +48,14 @@ where
                             &v1, &v2, c, m, n, k,
                         )
                     } else if A::LANE_COUNT > 1 && !is_too_small {
-                        <TilingPolicy<3, 4> as TilingStrategy<T, A, Unaligned>>::gemm(
+                        // AVX2/NEON class (16 vector registers). The kernel holds
+                        // `TILE_M*TILE_N` accumulators + `TILE_N` B-vectors + 1
+                        // broadcast A-scalar live across the k-loop; `<3,3>` needs
+                        // 9 + 3 + 1 = 13 registers, leaving headroom for loop
+                        // temporaries (no spill). `<3,4>` (12+4+1 = 17) and `<4,3>`
+                        // (12+3+1 = 16, zero headroom) both spill on a 16-register
+                        // file and measured ~30-60% slower at 256².
+                        <TilingPolicy<3, 3> as TilingStrategy<T, A, Unaligned>>::gemm(
                             &v1, &v2, c, m, n, k,
                         )
                     } else {

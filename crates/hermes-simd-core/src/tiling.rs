@@ -299,12 +299,15 @@ where
                 }
 
                 for kk in 0..k {
-                    let mut a_regs = [unsafe { Arch::zero() }; TILE_M];
-                    for i in 0..current_tile_m {
-                        let a_val = a_slice[(r + i) * k + kk];
-                        a_regs[i] = unsafe { Arch::splat(a_val) };
-                    }
-
+                    // Load the TILE_N B-vectors of this k-row once and reuse them
+                    // across the TILE_M output rows. The A operand is broadcast on
+                    // the fly per row (one live register), not materialized into a
+                    // TILE_M-wide array, so the live register set is
+                    // `TILE_M*TILE_N` accumulators + `TILE_N` B-vectors + 1 A-scalar
+                    // — chosen (with the tile shape) to fit the architectural
+                    // register file and avoid spills. The per-accumulator FMA order
+                    // is unchanged, so results are bitwise-identical to the
+                    // materialized-A form.
                     let mut b_regs = [unsafe { Arch::zero() }; TILE_N];
                     for j in 0..TILE_N {
                         let b_ptr =
@@ -313,9 +316,10 @@ where
                     }
 
                     for i in 0..current_tile_m {
+                        let a_reg = unsafe { Arch::splat(a_slice[(r + i) * k + kk]) };
                         for j in 0..TILE_N {
                             accumulators[i][j] =
-                                unsafe { Arch::fmadd(a_regs[i], b_regs[j], accumulators[i][j]) };
+                                unsafe { Arch::fmadd(a_reg, b_regs[j], accumulators[i][j]) };
                         }
                     }
                 }
