@@ -158,6 +158,18 @@ impl<const TILE_M: usize, const TILE_N: usize> TilingPolicy<TILE_M, TILE_N> {
 /// Zero-sized type used to force `TilingPolicy` into a generic bound without runtime cost.
 pub struct _TileMarker<const M: usize, const N: usize>(PhantomData<TilingPolicy<M, N>>);
 
+/// Byte threshold of the right-hand operand `B` (`k × n`) above which GEMM packs
+/// B column panels into a contiguous scratch before the register kernel.
+///
+/// Below it `B` stays resident in L2 across the `⌈m / TILE_M⌉` row-block passes,
+/// so packing only adds a copy and an allocation (measured ~50% slower at 64²).
+/// Above it `B` is evicted between passes and re-streamed from L3/DRAM, so the
+/// one-pass pack pays for itself (measured ~6% faster at 512² f64, growing with
+/// size). Set to a conservative 512 KiB — at or below a typical L2 — so the
+/// crossover is taken slightly early rather than late. The pack is also gated on
+/// `m > TILE_M` (more than one row block, otherwise there is no reuse to exploit).
+const GEMM_PACK_B_BYTES_THRESHOLD: usize = 512 * 1024;
+
 #[inline(never)]
 fn check_gemv_dimensions(
     a_len: usize,
@@ -228,6 +240,77 @@ where
     <TilingPolicy<TILE_M, TILE_N> as TilingStrategy<T, Arch, Align>>::gemm(a, b, c, m, n, k)
 }
 
+/// Compute one `TILE_M × (TILE_N·LANE_COUNT)` register tile of `C += A · B`.
+///
+/// `b_base`/`b_row_stride` abstract over the B source: either the in-place matrix
+/// (row stride `n`) or a packed contiguous column panel (row stride `block_n`).
+/// A single monomorphized micro-kernel therefore serves both the direct and the
+/// packed code paths (SSOT — no second contraction implementation). The A operand
+/// is broadcast on the fly (one live register); each k-row of B is loaded into
+/// `TILE_N` vector registers and reused across all `TILE_M` output rows, so the
+/// live register set is `TILE_M·TILE_N` accumulators + `TILE_N` B-vectors + 1
+/// A-scalar (sized with the tile shape to fit the architectural register file).
+///
+/// # Safety
+/// `c` is a row-major `m × n` matrix whose tile at `(r, col_n)` with
+/// `current_tile_m ≤ TILE_M` rows and `TILE_N·LANE_COUNT` columns lies within it;
+/// `a_slice` is a row-major `m × k` matrix; `b_base` addresses at least `k` rows of
+/// `TILE_N·LANE_COUNT` contiguous elements at stride `b_row_stride`. The caller's
+/// [`check_tiled_gemm_dimensions`] guarantees these spans.
+// The arguments (A/C operands, tile origin `r`/`col_n`, partial-row count, the
+// `n`/`k` dimensions, and the abstracted B source `b_base`/`b_row_stride`) are all
+// load-bearing inputs to a hot micro-kernel; bundling them into a struct would add
+// indirection to the inner loop for no clarity gain.
+#[allow(clippy::too_many_arguments)]
+#[inline(always)]
+unsafe fn gemm_register_tile<T, Arch, const TILE_M: usize, const TILE_N: usize>(
+    a_slice: &[T],
+    c: &mut [T],
+    r: usize,
+    current_tile_m: usize,
+    col_n: usize,
+    n: usize,
+    k: usize,
+    b_base: *const T,
+    b_row_stride: usize,
+) where
+    Arch: SimdArch + SimdKernel<T>,
+    T: Scalar,
+{
+    let lane_count = Arch::LANE_COUNT;
+    let mut accumulators = [[unsafe { Arch::zero() }; TILE_N]; TILE_M];
+
+    for i in 0..current_tile_m {
+        let row_idx = r + i;
+        for j in 0..TILE_N {
+            let c_ptr = unsafe { c.as_ptr().add(row_idx * n + col_n + j * lane_count) };
+            accumulators[i][j] = unsafe { Arch::load_unaligned(c_ptr) };
+        }
+    }
+
+    for kk in 0..k {
+        let mut b_regs = [unsafe { Arch::zero() }; TILE_N];
+        for j in 0..TILE_N {
+            let b_ptr = unsafe { b_base.add(kk * b_row_stride + j * lane_count) };
+            b_regs[j] = unsafe { Arch::load_unaligned(b_ptr) };
+        }
+        for i in 0..current_tile_m {
+            let a_reg = unsafe { Arch::splat(a_slice[(r + i) * k + kk]) };
+            for j in 0..TILE_N {
+                accumulators[i][j] = unsafe { Arch::fmadd(a_reg, b_regs[j], accumulators[i][j]) };
+            }
+        }
+    }
+
+    for i in 0..current_tile_m {
+        let row_idx = r + i;
+        for j in 0..TILE_N {
+            let c_ptr = unsafe { c.as_mut_ptr().add(row_idx * n + col_n + j * lane_count) };
+            unsafe { Arch::store_unaligned(c_ptr, accumulators[i][j]) };
+        }
+    }
+}
+
 impl<T, Arch, Align, const TILE_M: usize, const TILE_N: usize> TilingStrategy<T, Arch, Align>
     for TilingPolicy<TILE_M, TILE_N>
 where
@@ -264,90 +347,102 @@ where
         let lane_count = Arch::LANE_COUNT;
         let block_n = TILE_N * lane_count;
 
-        let load = |ptr: *const T| -> Arch::Vector {
-            if Align::IS_ALIGNED {
-                unsafe { Arch::load_aligned(ptr) }
-            } else {
-                unsafe { Arch::load_unaligned(ptr) }
-            }
-        };
+        let simd_n_len = (n / block_n) * block_n;
 
-        let store = |ptr: *mut T, val: Arch::Vector| {
-            let is_aligned = Align::IS_ALIGNED && (ptr as usize) % Align::ALIGN_BYTES == 0;
-            if is_aligned {
-                unsafe { Arch::store_aligned(ptr, val) };
-            } else {
-                unsafe { Arch::store_unaligned(ptr, val) };
-            }
-        };
-
-        let mut r = 0;
-        while r < m {
-            let current_tile_m = if r + TILE_M <= m { TILE_M } else { m - r };
+        // Loop order and B-panel packing (Goto/BLIS layered GEMM).
+        //
+        // Every TILE_M-row block consumes the same `block_n`-wide column panel of
+        // B. Reading it in place re-streams that panel `⌈m / TILE_M⌉` times over a
+        // stride-`n` access pattern (only `block_n` of every `n` row elements are
+        // touched), so it is evicted and refetched from L2/L3 on each pass —
+        // bandwidth-bound. Packing the panel once into a contiguous `k × block_n`
+        // scratch (sequential, TLB-friendly) lets all row blocks reuse it from L1,
+        // returning the kernel toward compute-bound. The pack is a single O(k·n)
+        // pass amortized over O(m·n·k) FMAs, so it pays once there is more than one
+        // row block (`m > TILE_M`); smaller problems take the in-place path with no
+        // allocation. The per-accumulator FMA order is identical in both paths, so
+        // results are bitwise-identical regardless of packing.
+        let b_bytes = n
+            .saturating_mul(k)
+            .saturating_mul(core::mem::size_of::<T>());
+        if m > TILE_M && simd_n_len > 0 && b_bytes >= GEMM_PACK_B_BYTES_THRESHOLD {
+            let mut packed = alloc::vec![T::ZERO; k * block_n];
             let mut col_n = 0;
-            let simd_n_len = (n / block_n) * block_n;
-
             while col_n < simd_n_len {
-                let mut accumulators = [[unsafe { Arch::zero() }; TILE_N]; TILE_M];
-
-                for i in 0..current_tile_m {
-                    let row_idx = r + i;
-                    for j in 0..TILE_N {
-                        let c_ptr = unsafe { c.as_ptr().add(row_idx * n + col_n + j * lane_count) };
-                        accumulators[i][j] = load(c_ptr);
-                    }
-                }
-
                 for kk in 0..k {
-                    // Load the TILE_N B-vectors of this k-row once and reuse them
-                    // across the TILE_M output rows. The A operand is broadcast on
-                    // the fly per row (one live register), not materialized into a
-                    // TILE_M-wide array, so the live register set is
-                    // `TILE_M*TILE_N` accumulators + `TILE_N` B-vectors + 1 A-scalar
-                    // — chosen (with the tile shape) to fit the architectural
-                    // register file and avoid spills. The per-accumulator FMA order
-                    // is unchanged, so results are bitwise-identical to the
-                    // materialized-A form.
-                    let mut b_regs = [unsafe { Arch::zero() }; TILE_N];
-                    for j in 0..TILE_N {
-                        let b_ptr =
-                            unsafe { b_slice.as_ptr().add(kk * n + col_n + j * lane_count) };
-                        b_regs[j] = load(b_ptr);
-                    }
-
-                    for i in 0..current_tile_m {
-                        let a_reg = unsafe { Arch::splat(a_slice[(r + i) * k + kk]) };
-                        for j in 0..TILE_N {
-                            accumulators[i][j] =
-                                unsafe { Arch::fmadd(a_reg, b_regs[j], accumulators[i][j]) };
-                        }
+                    // SAFETY: `kk < k` and `col_n + block_n ≤ simd_n_len ≤ n`, so the
+                    // source span `[kk*n+col_n, +block_n)` lies within `b` (validated
+                    // by `check_tiled_gemm_dimensions`) and the destination
+                    // `[kk*block_n, +block_n)` within the `k*block_n` scratch.
+                    unsafe {
+                        core::ptr::copy_nonoverlapping(
+                            b_slice.as_ptr().add(kk * n + col_n),
+                            packed.as_mut_ptr().add(kk * block_n),
+                            block_n,
+                        );
                     }
                 }
 
-                for i in 0..current_tile_m {
-                    let row_idx = r + i;
-                    for j in 0..TILE_N {
-                        let c_ptr =
-                            unsafe { c.as_mut_ptr().add(row_idx * n + col_n + j * lane_count) };
-                        store(c_ptr, accumulators[i][j]);
+                let mut r = 0;
+                while r < m {
+                    let current_tile_m = if r + TILE_M <= m { TILE_M } else { m - r };
+                    // SAFETY: the packed panel holds `k` rows of `block_n` contiguous
+                    // elements (row stride `block_n`); the C tile at `(r, col_n)` is
+                    // within the validated `m × n` output.
+                    unsafe {
+                        gemm_register_tile::<T, Arch, TILE_M, TILE_N>(
+                            a_slice,
+                            c,
+                            r,
+                            current_tile_m,
+                            col_n,
+                            n,
+                            k,
+                            packed.as_ptr(),
+                            block_n,
+                        );
                     }
+                    r += TILE_M;
                 }
-
                 col_n += block_n;
             }
-
-            for col_tail in simd_n_len..n {
-                for i in 0..current_tile_m {
-                    let row_idx = r + i;
-                    let mut sum = T::ZERO;
-                    for kk in 0..k {
-                        sum += a_slice[row_idx * k + kk] * b_slice[kk * n + col_tail];
+        } else {
+            let mut r = 0;
+            while r < m {
+                let current_tile_m = if r + TILE_M <= m { TILE_M } else { m - r };
+                let mut col_n = 0;
+                while col_n < simd_n_len {
+                    // SAFETY: B is read in place at row stride `n`; `col_n + block_n ≤ n`
+                    // and the C tile lies within the validated `m × n` output.
+                    unsafe {
+                        gemm_register_tile::<T, Arch, TILE_M, TILE_N>(
+                            a_slice,
+                            c,
+                            r,
+                            current_tile_m,
+                            col_n,
+                            n,
+                            k,
+                            b_slice.as_ptr().add(col_n),
+                            n,
+                        );
                     }
-                    c[row_idx * n + col_tail] += sum;
+                    col_n += block_n;
                 }
+                r += TILE_M;
             }
+        }
 
-            r += TILE_M;
+        // Scalar cleanup for the `n % block_n` trailing columns (all rows). Each
+        // (row, col) is written exactly once, independent of the tiling above.
+        for col_tail in simd_n_len..n {
+            for row in 0..m {
+                let mut sum = T::ZERO;
+                for kk in 0..k {
+                    sum += a_slice[row * k + kk] * b_slice[kk * n + col_tail];
+                }
+                c[row * n + col_tail] += sum;
+            }
         }
 
         Ok(())
