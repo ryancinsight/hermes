@@ -1,6 +1,6 @@
 use hermes_simd::{
     interleaved_complex_dot, interleaved_complex_dot_runtime, interleaved_complex_mul_assign,
-    interleaved_complex_mul_assign_runtime, PreferredArch, Scalar,
+    interleaved_complex_mul_assign_runtime, PreferredArch, Scalar, SimdError,
 };
 
 fn reference_mul<const CONJ_B: bool>(a: &mut [f64], b: &[f64]) {
@@ -26,6 +26,13 @@ fn reference_dot<const CONJ_B: bool>(a: &[f64], b: &[f64]) -> (f64, f64) {
         im += ar * bi + ai * br;
     }
     (re, im)
+}
+
+fn assert_simd_error<T>(result: Result<T, SimdError>, expected: SimdError) {
+    match result {
+        Err(actual) => assert_eq!(actual, expected),
+        Ok(_) => panic!("expected {expected:?}"),
+    }
 }
 
 #[test]
@@ -368,13 +375,18 @@ mod complex_properties {
 #[test]
 fn interleaved_complex_mul_assign_rejects_invalid_shapes() {
     let mut odd = [1.0f32, 2.0, 3.0];
-    assert!(interleaved_complex_mul_assign::<f32, PreferredArch, false>(
-        &mut odd,
-        &[1.0, 2.0, 3.0]
-    )
-    .is_err());
+    assert_simd_error(
+        interleaved_complex_mul_assign::<f32, PreferredArch, false>(&mut odd, &[1.0, 2.0, 3.0]),
+        SimdError::LengthMismatch,
+    );
 
     let mut lhs = [1.0f32, 2.0];
-    assert!(interleaved_complex_mul_assign::<f32, PreferredArch, false>(&mut lhs, &[1.0]).is_err());
-    assert!(interleaved_complex_dot::<f32, PreferredArch, false>(&lhs, &[1.0]).is_err());
+    assert_simd_error(
+        interleaved_complex_mul_assign::<f32, PreferredArch, false>(&mut lhs, &[1.0]),
+        SimdError::LengthMismatch,
+    );
+    assert_simd_error(
+        interleaved_complex_dot::<f32, PreferredArch, false>(&lhs, &[1.0]),
+        SimdError::LengthMismatch,
+    );
 }

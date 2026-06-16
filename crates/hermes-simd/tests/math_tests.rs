@@ -4,9 +4,16 @@
 //! All tests run against the `Scalar` arch (lane=1) for portability.
 //! The scalar fallback is the authoritative correctness reference.
 
-use hermes_simd::{Scalar, SimdCow, Unaligned};
+use hermes_simd::{Scalar, SimdCow, SimdError, Unaligned};
 
 type Cow<'a, T> = SimdCow<'a, T, Scalar, Unaligned>;
+
+fn assert_simd_error<T>(result: Result<T, SimdError>, expected: SimdError) {
+    match result {
+        Err(actual) => assert_eq!(actual, expected),
+        Ok(_) => panic!("expected {expected:?}"),
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Scalar-broadcast arithmetic
@@ -88,7 +95,7 @@ fn test_div_cow_f32() {
 fn test_div_cow_length_mismatch() {
     let a = Cow::<f32>::from_slice(&[1.0, 2.0]);
     let b = Cow::<f32>::from_slice(&[1.0, 2.0, 3.0]);
-    assert!(a.div_cow(&b).is_err());
+    assert_simd_error(a.div_cow(&b), SimdError::LengthMismatch);
 }
 
 // ---------------------------------------------------------------------------

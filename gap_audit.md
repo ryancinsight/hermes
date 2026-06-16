@@ -90,6 +90,9 @@ Evidence tier: value-semantic differential and boundary tests.
 - [patch] Select/unary error-contract hardening: selected select, unary-map,
   and COW FMA tests now assert exact `SimdError` variants for length mismatch
   and insufficient output capacity.
+- [patch] Operation-family error-contract hardening: selected new operation,
+  strategy, complex, gather, scan, and COW math tests now assert exact
+  `SimdError` variants instead of existence-only failures.
 
 ## Residual Risks
 

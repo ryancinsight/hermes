@@ -4,7 +4,7 @@
 
 use hermes_simd::{
     argmax, argmin, max, min, scale, Abs, Clamp, Exclusive, Inclusive, Neg, Scalar, ScanAdd,
-    ScanMax, ScanMin, ScanMul, SimdView, Sqrt, Unaligned, Unmasked,
+    ScanMax, ScanMin, ScanMul, SimdError, SimdView, Sqrt, Unaligned, Unmasked,
 };
 use hermes_simd_core::ops::{Max, Min, Sum};
 
@@ -20,6 +20,13 @@ fn v(data: &[f32]) -> View<'_, f32> {
 }
 fn v_mut(data: &mut [f32]) -> ViewMut<'_, f32> {
     SimdView::new_mut(data).expect("scalar always ok")
+}
+
+fn assert_simd_error<T>(result: Result<T, SimdError>, expected: SimdError) {
+    match result {
+        Err(actual) => assert_eq!(actual, expected),
+        Ok(_) => panic!("expected {expected:?}"),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -224,7 +231,7 @@ fn test_map_unary_output_too_short() {
     let data = [1.0f32; 8];
     let mut out = vec![0.0f32; 4];
     let err = v(&data).map_unary(Abs, &mut out);
-    assert!(err.is_err());
+    assert_eq!(err, Err(SimdError::InsufficientOutputLength));
 }
 
 // ---------------------------------------------------------------------------
@@ -297,7 +304,7 @@ fn test_prefix_scan_output_too_short() {
     let data = [1.0f32; 5];
     let mut out = vec![0.0f32; 3];
     let err = v(&data).prefix_scan(&mut out, ScanAdd, Inclusive);
-    assert!(err.is_err());
+    assert_eq!(err, Err(SimdError::InsufficientOutputLength));
 }
 
 // ---------------------------------------------------------------------------
@@ -322,7 +329,7 @@ fn test_select_length_mismatch() {
     let b = [10.0f32; 5];
     let mask = [true; 4];
     let err = v(&a).select(&mask, &v(&b));
-    assert!(err.is_err());
+    assert_simd_error(err, SimdError::LengthMismatch);
 }
 
 #[test]
@@ -331,7 +338,7 @@ fn test_select_mask_too_short() {
     let b = [10.0f32; 5];
     let mask = [true; 3];
     let err = v(&a).select(&mask, &v(&b));
-    assert!(err.is_err());
+    assert_simd_error(err, SimdError::InsufficientOutputLength);
 }
 
 #[test]
@@ -361,7 +368,7 @@ fn test_gather_output_too_short() {
     let indices = [0i32, 1, 2, 3, 4, 5, 6, 7];
     let mut out = vec![0.0f32; 4]; // too short
     let err = v(&data).gather(&indices, &mut out);
-    assert!(err.is_err());
+    assert_eq!(err, Err(SimdError::InsufficientOutputLength));
 }
 
 #[test]
@@ -370,7 +377,7 @@ fn test_gather_index_out_of_bounds() {
     let indices = [0i32, 1, 2, 10]; // 10 >= 4
     let mut out = vec![0.0f32; 4];
     let err = v(&data).gather(&indices, &mut out);
-    assert!(err.is_err());
+    assert_eq!(err, Err(SimdError::IndexOutOfBounds));
 }
 
 #[test]
@@ -379,7 +386,7 @@ fn test_gather_negative_index() {
     let indices = [-1i32, 0, 1, 2];
     let mut out = vec![0.0f32; 4];
     let err = v(&data).gather(&indices, &mut out);
-    assert!(err.is_err());
+    assert_eq!(err, Err(SimdError::IndexOutOfBounds));
 }
 
 // ---------------------------------------------------------------------------
@@ -402,7 +409,7 @@ fn test_zip_transform_length_mismatch() {
     let a = [1.0f32; 5];
     let b = [1.0f32; 6];
     let err = v(&a).zip_transform(&v(&b), Mul);
-    assert!(err.is_err());
+    assert_simd_error(err, SimdError::LengthMismatch);
 }
 
 // ---------------------------------------------------------------------------

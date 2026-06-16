@@ -3,7 +3,7 @@
 //! `add_assign`/`mul_assign`/`elementwise_mul` produce identical results.
 
 use hermes_simd::{
-    Add, BitAnd, BitOr, BitXor, Div, Mul, Scalar, SimdView, Sub, Unaligned, Unmasked,
+    Add, BitAnd, BitOr, BitXor, Div, Mul, Scalar, SimdError, SimdView, Sub, Unaligned, Unmasked,
 };
 
 // ---------------------------------------------------------------------------
@@ -212,7 +212,7 @@ fn test_transform_in_place_length_mismatch() {
     let b_view = make_view(&b);
     let mut a_view = make_view_mut(&mut a);
     let err = a_view.transform_in_place(&b_view, Add);
-    assert!(err.is_err());
+    assert_eq!(err, Err(SimdError::LengthMismatch));
 }
 
 #[test]
@@ -223,7 +223,7 @@ fn test_zip_into_length_mismatch() {
     let a_view = make_view(&a);
     let b_view = make_view(&b);
     let err = a_view.zip_into(&b_view, &mut out, Add);
-    assert!(err.is_err());
+    assert_eq!(err, Err(SimdError::LengthMismatch));
 }
 
 #[test]
@@ -234,7 +234,7 @@ fn test_zip_into_output_too_short() {
     let a_view = make_view(&a);
     let b_view = make_view(&b);
     let err = a_view.zip_into(&b_view, &mut out, Add);
-    assert!(err.is_err());
+    assert_eq!(err, Err(SimdError::InsufficientOutputLength));
 }
 
 // ---------------------------------------------------------------------------
