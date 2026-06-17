@@ -201,6 +201,42 @@ fn bench_gemv_strided_f32(c: &mut Criterion) {
     group.finish();
 }
 
+/// Reflector-apply dot batch: `w[j] = vᵀ·colⱼ` for `n` columns of length `n`.
+/// Compares the per-column `dot` loop (what a Householder apply does today) with
+/// a single `gemv_strided` over the column block (rows = columns, `lda` = the
+/// buffer's row count) — isolating whether register-blocking's reuse of `v`
+/// across columns beats `n` independent dots for this shape.
+fn bench_reflector_dots_f64(c: &mut Criterion) {
+    let mut group = c.benchmark_group("reflector_dots_f64");
+    for &n in &[32usize, 64, 128, 256] {
+        group.throughput(Throughput::Elements((n as u64) * (n as u64)));
+        // Column-major block: column j at j*n, length n (lda = n here).
+        let cols: Vec<f64> = (0..n * n).map(|i| (i % 13) as f64 * 0.1 - 0.6).collect();
+        let v: Vec<f64> = (0..n).map(|i| (i % 7) as f64 * 0.2 - 0.6).collect();
+
+        group.bench_with_input(BenchmarkId::new("per_column_dot", n), &n, |bench, &n| {
+            bench.iter(|| {
+                let mut w = vec![0.0f64; n];
+                for (j, wj) in w.iter_mut().enumerate() {
+                    *wj = dot(black_box(&v), black_box(&cols[j * n..j * n + n])).unwrap();
+                }
+                black_box(w)
+            })
+        });
+
+        group.bench_with_input(BenchmarkId::new("gemv_strided", n), &n, |bench, &n| {
+            bench.iter(|| {
+                let mut w = vec![0.0f64; n];
+                // rows = columns of the block; each row contiguous length n, lda = n.
+                gemv_strided(black_box(&cols), black_box(&v), black_box(&mut w), n, n, n)
+                    .expect("invariant: extents valid");
+                black_box(w)
+            })
+        });
+    }
+    group.finish();
+}
+
 fn bench_axpy_rows_batch_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("axpy_rows_batch_f32");
     for &case in AXPY_BATCH_CASES {
@@ -274,6 +310,7 @@ criterion_group!(
     bench_gemv_f32,
     bench_gemv_strided_f32,
     bench_gemv_transpose_f32,
+    bench_reflector_dots_f64,
     bench_axpy_rows_batch_f32
 );
 criterion_main!(dense_benches);
