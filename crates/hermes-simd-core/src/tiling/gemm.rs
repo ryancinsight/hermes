@@ -2,7 +2,7 @@
 //!
 //! Row-major operands: `A` is `m × k`, `B` is `k × n`, `C` is `m × n`. The
 //! kernel is the textbook Goto/BLIS layering — an inner register micro-kernel
-//! ([`gemm_register_tile`]) wrapped by a packing/loop-order policy ([`gemm_impl`])
+//! (`gemm_register_tile`) wrapped by a packing/loop-order policy (`gemm_impl`)
 //! that keeps the reused operand cache-resident.
 //!
 //! # Theorem 1 (correctness)
@@ -14,7 +14,7 @@
 //! `[simd_n_len, n)`; the row range `[0, m)` into register blocks of `TILE_M`
 //! (last block possibly short, `current_tile_m`). Every `(i,j)` lies in exactly
 //! one (row-block, column-panel-or-tail) cell. For panel cells
-//! [`gemm_register_tile`] loads `C[i, j]`, executes
+//! `gemm_register_tile` loads `C[i, j]`, executes
 //! `acc ← acc + Σ_p A[i,p]·B[p,j]` over all `p ∈ [0,k)`, and stores `acc`; for
 //! tail cells the scalar loop does the same sum. Cells are disjoint, so each
 //! `C[i,j]` is read-modify-written exactly once with the complete `p`-sum. ∎
@@ -56,7 +56,7 @@
 //! reused from L1 across all row blocks, reducing slow-memory B traffic to the
 //! single `Θ(k·n)` pack pass. Packing therefore wins exactly when `B` does not fit
 //! cache; below that threshold the pack's copy + allocation is pure overhead. The
-//! crossover is encoded by [`GEMM_PACK_B_BYTES_THRESHOLD`] (gated additionally on
+//! crossover is encoded by `GEMM_PACK_B_BYTES_THRESHOLD` (gated additionally on
 //! `m > TILE_M`, since with a single row block there is no reuse to amortize). ∎
 
 use crate::{

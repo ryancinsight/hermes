@@ -30,8 +30,9 @@ where
         unsafe {
             out.set_len(len);
         }
-        // We don't gate on errors here: lengths match by construction.
-        let _ = self.view().map_unary(op, out.as_mut_slice());
+        self.view()
+            .map_unary(op, out.as_mut_slice())
+            .expect("invariant: output length equals input length");
         SimdCow::Owned(out)
     }
 

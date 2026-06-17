@@ -170,6 +170,12 @@
       strategy, complex, gather, scan, and COW math tests now assert exact
       `SimdError` variants for invalid shape, short output, and invalid index
       cases.
+- [x] [patch] COW unary invariant cleanup: `SimdCow::map_unary` now asserts
+      its internally constructed output-length invariant instead of silently
+      discarding the `SimdView::map_unary` result.
+- [x] [patch] GEMM tiling rustdoc cleanup: module theorem prose now references
+      private implementation details as code text instead of public intra-doc
+      links.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 

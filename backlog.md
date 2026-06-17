@@ -29,6 +29,12 @@ External gap findings live in [gap_audit.md](gap_audit.md).
 - [x] [patch] Operation-family error-contract hardening: new operation,
   strategy, complex, and COW math tests assert exact `SimdError` variants for
   short outputs, length mismatch, and invalid gather indices.
+- [x] [patch] COW unary invariant cleanup: `SimdCow::map_unary` now asserts
+  its internally constructed output-length invariant instead of discarding the
+  `SimdView::map_unary` result.
+- [x] [patch] GEMM tiling rustdoc cleanup: module theorem prose now references
+  private implementation details as code text instead of public intra-doc
+  links.
 - [x] [minor] Const-generic Blocked-COO dispatch: replaced fixed public
   `spmv_bcoo4x4`/`spmv_bcoo8x8` dispatch and fixed
   `SparseView::from_blocked_coo_4x4`/`from_blocked_coo_8x8` constructors with

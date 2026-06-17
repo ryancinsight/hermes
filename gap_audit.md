@@ -93,6 +93,11 @@ Evidence tier: value-semantic differential and boundary tests.
 - [patch] Operation-family error-contract hardening: selected new operation,
   strategy, complex, gather, scan, and COW math tests now assert exact
   `SimdError` variants instead of existence-only failures.
+- [patch] COW unary invariant cleanup: `SimdCow::map_unary` no longer
+  discards the `SimdView::map_unary` result; the locally constructed equal
+  length invariant is explicit in the panic message.
+- [patch] GEMM tiling rustdoc cleanup: private implementation names in module
+  theorem prose no longer emit public rustdoc private-link warnings.
 
 ## Residual Risks
 

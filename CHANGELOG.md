@@ -57,6 +57,10 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - New operation, strategy, complex, gather, scan, and COW math error-path
   tests now assert exact `SimdError` variants for invalid shape, short output,
   and invalid index contracts.
+- `SimdCow::map_unary` now asserts its internally constructed output-length
+  invariant instead of silently discarding the impossible `map_unary` error.
+- GEMM tiling module docs now avoid private intra-doc links, keeping workspace
+  rustdoc warning-clean after the vertical tiling split.
 
 ### Changed
 - `SveArch` is now a callable 512-bit-shape emulated backend for f32/f64
