@@ -176,13 +176,14 @@ where
         };
 
         let simd_len = (len / lane_count) * lane_count;
-        let mut total = if let Some(acc) = accumulator {
-            unsafe { Arch::sum_reduce(acc) }
-        } else {
-            T::ZERO
-        };
 
-        // Middle SIMD loop for elements that didn't fit into the unrolled loop
+        // Middle SIMD loop for elements that didn't fit into the unrolled loop.
+        // Continue accumulating into the *vector* register via `fmadd` and reduce
+        // to scalar ONCE at the end — rather than a horizontal `sum_reduce` per
+        // lane group (which serialized the loop on the ~5-7-cycle reduction
+        // latency and dominated small/odd-length dots, e.g. the bidiagonal-SVD
+        // reflector applies).
+        let mut acc_vec = accumulator;
         unsafe {
             let load = |p| {
                 if Align::IS_ALIGNED {
@@ -196,12 +197,18 @@ where
             for _ in 0..((simd_len - unrolled_simd_len) / lane_count) {
                 let v1 = load(middle_ptr1);
                 let v2 = load(middle_ptr2);
-                let prod = Arch::mul(v1, v2);
-                total += Arch::sum_reduce(prod);
+                acc_vec = Some(match acc_vec {
+                    Some(a) => Arch::fmadd(v1, v2, a),
+                    None => Arch::mul(v1, v2),
+                });
                 middle_ptr1 = middle_ptr1.add(lane_count);
                 middle_ptr2 = middle_ptr2.add(lane_count);
             }
         }
+        let mut total = match acc_vec {
+            Some(acc) => unsafe { Arch::sum_reduce(acc) },
+            None => T::ZERO,
+        };
 
         // Scalar tail loop
         let s_slice = self.as_slice();

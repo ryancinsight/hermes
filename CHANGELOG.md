@@ -82,6 +82,16 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   packed4 COW unpack benchmark rows and refreshed complex `mul_assign`
   measurements from the local AVX2 host.
 
+### Performance
+- `SimdView::dot` middle SIMD loop now accumulates into the vector register via
+  `fmadd` and reduces to scalar once at the end, instead of a horizontal
+  `sum_reduce` per lane group. The per-group reduction serialized the loop on the
+  ~5–7-cycle horizontal-reduction latency and dominated small/odd-length dot
+  products (e.g. the length-`m−k` bidiagonal-SVD reflector applies in Leto). The
+  unrolled head's vector accumulator now carries through the residual loop; only
+  the final scalar tail reduces. Value-semantic (within the existing dot
+  tolerance; 322 workspace tests green).
+
 ### Fixed
 - `#[runtime_dispatch]` emitted `std::is_x86_feature_detected!` unconditionally, breaking `--no-default-features` builds; runtime-detection arms are now gated on the consuming crate's `std` feature (no_std keeps compile-time arms + scalar fallback).
 - rkyv-exercising unit tests are ignored under Miri (rkyv 0.7 archived access violates Stacked Borrows inside the dependency); hermes's own unsafe passes Miri clean.
