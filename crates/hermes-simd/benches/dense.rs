@@ -12,7 +12,7 @@
 use criterion::{
     black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
 };
-use hermes_simd::{axpy_rows, axpy_rows_batch, dot, elementwise_mul, sum};
+use hermes_simd::{axpy_rows, axpy_rows_batch, dot, elementwise_mul, gemv, sum};
 
 const SIZES: &[usize] = &[256, 1024, 4096, 16384];
 const AXPY_BATCH_CASES: &[AxpyBatchCase] = &[
@@ -82,6 +82,44 @@ fn bench_elementwise_mul_f32(c: &mut Criterion) {
         let mut out = vec![0.0f32; n];
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |bench, _| {
             bench.iter(|| elementwise_mul(black_box(&a), black_box(&b), black_box(&mut out)))
+        });
+    }
+    group.finish();
+}
+
+/// Register-blocked GEMV (`y = A·x`) vs a scalar row-by-row reference, over
+/// square `n × n` matrices. Exposes the SIMD speedup and guards against
+/// regression in the dispatched kernel (the instrument measures the production
+/// code path, never a tuned body).
+fn bench_gemv_f32(c: &mut Criterion) {
+    let mut group = c.benchmark_group("gemv_f32");
+    for &n in SIZES {
+        group.throughput(Throughput::Elements((n as u64) * (n as u64)));
+        let a: Vec<f32> = (0..n * n).map(|i| (i % 17) as f32 * 0.01 - 0.5).collect();
+        let x: Vec<f32> = (0..n).map(|i| (i % 11) as f32 * 0.1 - 0.3).collect();
+
+        group.bench_with_input(BenchmarkId::new("simd", n), &n, |bench, &n| {
+            bench.iter(|| {
+                let mut y = vec![0.0f32; n];
+                gemv(black_box(&a), black_box(&x), black_box(&mut y), n, n)
+                    .expect("invariant: benchmark extents are valid");
+                black_box(y)
+            })
+        });
+
+        group.bench_with_input(BenchmarkId::new("scalar_ref", n), &n, |bench, &n| {
+            bench.iter(|| {
+                let mut y = vec![0.0f32; n];
+                for r in 0..n {
+                    let row = &a[r * n..r * n + n];
+                    let mut acc = 0.0f32;
+                    for (&av, &xv) in row.iter().zip(x.iter()) {
+                        acc += av * xv;
+                    }
+                    y[r] = acc;
+                }
+                black_box(y)
+            })
         });
     }
     group.finish();
@@ -157,6 +195,7 @@ criterion_group!(
     bench_sum_f32,
     bench_dot_f32,
     bench_elementwise_mul_f32,
+    bench_gemv_f32,
     bench_axpy_rows_batch_f32
 );
 criterion_main!(dense_benches);

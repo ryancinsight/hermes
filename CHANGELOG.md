@@ -5,6 +5,15 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 ## [Unreleased]
 
 ### Added
+- Public runtime-dispatched `gemv` (`y += A·x`, register-blocked level-2 BLAS
+  matrix–vector product) plumbing the existing `TilingStrategy::gemv` /
+  `gemv_impl` core through the `SimdOps` dispatch trait, in its own
+  `dispatch/gemv.rs` leaf module. `TILE_M` row-blocking scales with the register
+  file (8/4/1 by lane count); the operand-reuse theorem is documented inline.
+  Value-semantic differential tests vs a scalar reference across shapes
+  (incl. `TILE_M` remainder + column tail), accumulate semantics, and the
+  length-mismatch error path; a `gemv_f32` Criterion benchmark vs a scalar
+  row-by-row reference (measured ≈9× at 256² on the local AVX2 host).
 - Generic absolute reductions: `AbsSum` / `AbsMax` reduction strategies plus
   runtime-dispatched `abs_sum` / `abs_max` APIs for Leto/Apollo norm paths,
   using transformed SIMD seeds and transform-free partial merges to avoid

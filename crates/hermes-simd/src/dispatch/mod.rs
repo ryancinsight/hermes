@@ -12,6 +12,7 @@ pub mod binary;
 pub mod complex;
 pub mod dot;
 pub mod gemm;
+pub mod gemv;
 pub mod masked;
 pub mod max;
 pub mod min;
@@ -139,6 +140,14 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
         m: usize,
         n: usize,
         k: usize,
+    ) -> Result<(), SimdError>;
+    /// Computes register-blocked GEMV: `y += A * x` (`A` row-major `nrows × ncols`).
+    fn gemv(
+        a: &[Self],
+        x: &[Self],
+        y: &mut [Self],
+        nrows: usize,
+        ncols: usize,
     ) -> Result<(), SimdError>;
     /// Multiplies interleaved complex lanes in-place: `a[k] *= b[k]`
     /// (`a[k] *= conj(b[k])` when `CONJ_B`).
@@ -289,6 +298,16 @@ where
         k: usize,
     ) -> Result<(), SimdError> {
         gemm::dispatch_tiled_gemm::<Self>(a, b, c, m, n, k)
+    }
+    #[inline(always)]
+    fn gemv(
+        a: &[Self],
+        x: &[Self],
+        y: &mut [Self],
+        nrows: usize,
+        ncols: usize,
+    ) -> Result<(), SimdError> {
+        gemv::dispatch_gemv::<Self>(a, x, y, nrows, ncols)
     }
     #[inline(always)]
     fn interleaved_complex_mul_assign<const CONJ_B: bool>(
@@ -442,6 +461,16 @@ where
         gemm::dispatch_tiled_gemm::<Self>(a, b, c, m, n, k)
     }
     #[inline(always)]
+    fn gemv(
+        a: &[Self],
+        x: &[Self],
+        y: &mut [Self],
+        nrows: usize,
+        ncols: usize,
+    ) -> Result<(), SimdError> {
+        gemv::dispatch_gemv::<Self>(a, x, y, nrows, ncols)
+    }
+    #[inline(always)]
     fn interleaved_complex_mul_assign<const CONJ_B: bool>(
         a: &mut [Self],
         b: &[Self],
@@ -590,6 +619,16 @@ where
         k: usize,
     ) -> Result<(), SimdError> {
         gemm::dispatch_tiled_gemm::<Self>(a, b, c, m, n, k)
+    }
+    #[inline(always)]
+    fn gemv(
+        a: &[Self],
+        x: &[Self],
+        y: &mut [Self],
+        nrows: usize,
+        ncols: usize,
+    ) -> Result<(), SimdError> {
+        gemv::dispatch_gemv::<Self>(a, x, y, nrows, ncols)
     }
     #[inline(always)]
     fn interleaved_complex_mul_assign<const CONJ_B: bool>(
@@ -801,6 +840,26 @@ pub fn tiled_gemm<T: SimdOps>(
     k: usize,
 ) -> Result<(), SimdError> {
     T::tiled_gemm(a, b, c, m, n, k)
+}
+
+/// Computes register-blocked GEMV `y += A · x` with runtime backend selection.
+///
+/// `a` is row-major `nrows × ncols`; the product **accumulates** into `y`
+/// (zero `y` first for `y = A·x`). See [`gemv`](crate::dispatch::gemv) for the
+/// operand-reuse theorem.
+///
+/// # Errors
+/// [`SimdError::LengthMismatch`] if `a.len() < nrows·ncols`, `x.len() < ncols`,
+/// or `y.len() < nrows`.
+#[inline(always)]
+pub fn gemv<T: SimdOps>(
+    a: &[T],
+    x: &[T],
+    y: &mut [T],
+    nrows: usize,
+    ncols: usize,
+) -> Result<(), SimdError> {
+    T::gemv(a, x, y, nrows, ncols)
 }
 
 /// Multiplies interleaved complex values in-place using a monomorphized SIMD architecture.
