@@ -23,6 +23,16 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   output-reuse theorem, value-semantic differential tests across shapes (incl.
   `TILE_N` remainder + column tail), accumulate semantics, error path; and a
   `gemv_transpose_f32` Criterion benchmark vs a scalar reference.
+- Public runtime-dispatched `gemv_strided` (`y += A·x` over a row-major
+  **sub-matrix** with leading dimension `lda ≥ ncols`). The core `gemv` kernel is
+  generalized in place to `gemv_strided_impl(.., lda)` (DRY — packed `gemv` now
+  delegates with `lda = ncols`, bit-for-bit unchanged, verified by a test), with
+  `TilingStrategy::gemv_strided` and `dispatch/gemv_strided.rs`. Admits matvec
+  over a trailing/leading block of a larger buffer (e.g. a reflector apply's
+  column block) without copying it out. Differential test over a true sub-matrix
+  (`lda > ncols`), a packed-equals-`gemv` equivalence test, an `lda < ncols` /
+  short-span rejection test, and a `gemv_strided_f32` Criterion benchmark over a
+  padded buffer (the gapped-row access path).
 - Generic absolute reductions: `AbsSum` / `AbsMax` reduction strategies plus
   runtime-dispatched `abs_sum` / `abs_max` APIs for Leto/Apollo norm paths,
   using transformed SIMD seeds and transform-free partial merges to avoid

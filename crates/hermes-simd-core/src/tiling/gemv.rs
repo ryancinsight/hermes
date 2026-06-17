@@ -9,6 +9,13 @@
 //! accumulators in registers (one per row) to break the per-row FMA dependency
 //! chain. The row remainder (`nrows mod TILE_M`) is handled by a single-row
 //! cleanup so any `nrows` is supported with no shape restriction.
+//!
+//! A **leading dimension** `lda` (the stride between consecutive rows, `lda ≥
+//! ncols`) lets the kernel operate on a row-major **sub-matrix** or a transposed
+//! view whose rows are contiguous but spaced apart — e.g. the trailing column
+//! block of a column-major working buffer in a reflector apply. The packed case
+//! is exactly `lda = ncols`; the contiguous per-row dot is unchanged, only the
+//! row base address advances by `lda`.
 
 use crate::{
     align::Alignment,
@@ -25,15 +32,22 @@ fn check_gemv_dimensions(
     y_len: usize,
     nrows: usize,
     ncols: usize,
+    lda: usize,
 ) -> Result<(), SimdError> {
-    if a_len < nrows * ncols || x_len < ncols || y_len < nrows {
+    // Row `r` occupies `[r·lda, r·lda + ncols)`; the last row needs the most span.
+    let a_needed = if nrows == 0 {
+        0
+    } else {
+        (nrows - 1) * lda + ncols
+    };
+    if lda < ncols || a_len < a_needed || x_len < ncols || y_len < nrows {
         return Err(SimdError::LengthMismatch);
     }
     Ok(())
 }
 
-/// Compute `y += A · x` with `A` row-major `nrows × ncols`, blocking `TILE_M`
-/// rows so each `x` vector is reused across them.
+/// Compute `y += A · x` with `A` row-major `nrows × ncols` (packed: row stride
+/// `ncols`), blocking `TILE_M` rows so each `x` vector is reused across them.
 ///
 /// # Errors
 /// [`SimdError::LengthMismatch`] if the operand spans are too small for the dims.
@@ -50,13 +64,37 @@ where
     Align: Alignment,
     T: Scalar,
 {
+    gemv_strided_impl::<T, Arch, Align, TILE_M>(a, x, y, nrows, ncols, ncols)
+}
+
+/// Compute `y += A · x` with `A` a row-major sub-matrix: `nrows × ncols` with row
+/// stride `lda ≥ ncols` (rows contiguous over `ncols`, spaced `lda` apart).
+/// `lda = ncols` is the packed [`gemv_impl`].
+///
+/// # Errors
+/// [`SimdError::LengthMismatch`] if `lda < ncols` or the operand spans are too
+/// small (`a` needs `(nrows−1)·lda + ncols`, `x ≥ ncols`, `y ≥ nrows`).
+#[inline]
+pub(super) fn gemv_strided_impl<T, Arch, Align, const TILE_M: usize>(
+    a: &SimdView<'_, T, Arch, Align>,
+    x: &SimdView<'_, T, Arch, Align>,
+    y: &mut [T],
+    nrows: usize,
+    ncols: usize,
+    lda: usize,
+) -> Result<(), SimdError>
+where
+    Arch: SimdArch + SimdKernel<T>,
+    Align: Alignment,
+    T: Scalar,
+{
     struct AssertM<const TILE_M: usize>;
     impl<const TILE_M: usize> AssertM<TILE_M> {
         const OK: () = assert!(TILE_M >= 1, "TILE_M must be at least 1");
     }
     let _ = AssertM::<TILE_M>::OK;
 
-    check_gemv_dimensions(a.len(), x.len(), y.len(), nrows, ncols)?;
+    check_gemv_dimensions(a.len(), x.len(), y.len(), nrows, ncols, lda)?;
 
     let a_slice = a.as_slice();
     let x_slice = x.as_slice();
@@ -84,7 +122,7 @@ where
 
             for i in 0..TILE_M {
                 let row_idx = r + i;
-                let a_vec = load(unsafe { a_slice.as_ptr().add(row_idx * ncols + c) });
+                let a_vec = load(unsafe { a_slice.as_ptr().add(row_idx * lda + c) });
                 accumulators[i] = unsafe { Arch::fmadd(a_vec, x_vec, accumulators[i]) };
             }
             c += lane_count;
@@ -96,7 +134,7 @@ where
             let mut sum = unsafe { Arch::sum_reduce(accumulators[i]) };
 
             for c_tail in simd_len..ncols {
-                sum += a_slice[row_idx * ncols + c_tail] * x_slice[c_tail];
+                sum += a_slice[row_idx * lda + c_tail] * x_slice[c_tail];
             }
             y[row_idx] += sum;
         }
@@ -112,14 +150,14 @@ where
             let mut acc = unsafe { Arch::zero() };
             while c < simd_len {
                 let x_vec = load(unsafe { x_slice.as_ptr().add(c) });
-                let a_vec = load(unsafe { a_slice.as_ptr().add(r * ncols + c) });
+                let a_vec = load(unsafe { a_slice.as_ptr().add(r * lda + c) });
                 acc = unsafe { Arch::fmadd(a_vec, x_vec, acc) };
                 c += lane_count;
             }
             sum = unsafe { Arch::sum_reduce(acc) };
         }
         for c_tail in c..ncols {
-            sum += a_slice[r * ncols + c_tail] * x_slice[c_tail];
+            sum += a_slice[r * lda + c_tail] * x_slice[c_tail];
         }
         y[r] += sum;
         r += 1;

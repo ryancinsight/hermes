@@ -13,6 +13,7 @@ pub mod complex;
 pub mod dot;
 pub mod gemm;
 pub mod gemv;
+pub mod gemv_strided;
 pub mod gemv_transpose;
 pub mod masked;
 pub mod max;
@@ -158,6 +159,16 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
         y: &mut [Self],
         nrows: usize,
         ncols: usize,
+    ) -> Result<(), SimdError>;
+    /// Computes register-blocked sub-matrix GEMV: `y += A * x` with row stride
+    /// `lda ≥ ncols` (`lda = ncols` is the packed [`Self::gemv`]).
+    fn gemv_strided(
+        a: &[Self],
+        x: &[Self],
+        y: &mut [Self],
+        nrows: usize,
+        ncols: usize,
+        lda: usize,
     ) -> Result<(), SimdError>;
     /// Multiplies interleaved complex lanes in-place: `a[k] *= b[k]`
     /// (`a[k] *= conj(b[k])` when `CONJ_B`).
@@ -328,6 +339,17 @@ where
         ncols: usize,
     ) -> Result<(), SimdError> {
         gemv_transpose::dispatch_gemv_transpose::<Self>(a, x, y, nrows, ncols)
+    }
+    #[inline(always)]
+    fn gemv_strided(
+        a: &[Self],
+        x: &[Self],
+        y: &mut [Self],
+        nrows: usize,
+        ncols: usize,
+        lda: usize,
+    ) -> Result<(), SimdError> {
+        gemv_strided::dispatch_gemv_strided::<Self>(a, x, y, nrows, ncols, lda)
     }
     #[inline(always)]
     fn interleaved_complex_mul_assign<const CONJ_B: bool>(
@@ -501,6 +523,17 @@ where
         gemv_transpose::dispatch_gemv_transpose::<Self>(a, x, y, nrows, ncols)
     }
     #[inline(always)]
+    fn gemv_strided(
+        a: &[Self],
+        x: &[Self],
+        y: &mut [Self],
+        nrows: usize,
+        ncols: usize,
+        lda: usize,
+    ) -> Result<(), SimdError> {
+        gemv_strided::dispatch_gemv_strided::<Self>(a, x, y, nrows, ncols, lda)
+    }
+    #[inline(always)]
     fn interleaved_complex_mul_assign<const CONJ_B: bool>(
         a: &mut [Self],
         b: &[Self],
@@ -669,6 +702,17 @@ where
         ncols: usize,
     ) -> Result<(), SimdError> {
         gemv_transpose::dispatch_gemv_transpose::<Self>(a, x, y, nrows, ncols)
+    }
+    #[inline(always)]
+    fn gemv_strided(
+        a: &[Self],
+        x: &[Self],
+        y: &mut [Self],
+        nrows: usize,
+        ncols: usize,
+        lda: usize,
+    ) -> Result<(), SimdError> {
+        gemv_strided::dispatch_gemv_strided::<Self>(a, x, y, nrows, ncols, lda)
     }
     #[inline(always)]
     fn interleaved_complex_mul_assign<const CONJ_B: bool>(
@@ -921,6 +965,26 @@ pub fn gemv_transpose<T: SimdOps>(
     ncols: usize,
 ) -> Result<(), SimdError> {
     T::gemv_transpose(a, x, y, nrows, ncols)
+}
+
+/// Computes register-blocked sub-matrix GEMV `y += A · x` with row stride `lda`,
+/// runtime backend selection. `A` is a row-major `nrows × ncols` block with
+/// leading dimension `lda ≥ ncols`; `lda = ncols` is the packed [`gemv`].
+/// Accumulates into `y`.
+///
+/// # Errors
+/// [`SimdError::LengthMismatch`] if `lda < ncols`, `a.len() < (nrows−1)·lda +
+/// ncols`, `x.len() < ncols`, or `y.len() < nrows`.
+#[inline(always)]
+pub fn gemv_strided<T: SimdOps>(
+    a: &[T],
+    x: &[T],
+    y: &mut [T],
+    nrows: usize,
+    ncols: usize,
+    lda: usize,
+) -> Result<(), SimdError> {
+    T::gemv_strided(a, x, y, nrows, ncols, lda)
 }
 
 /// Multiplies interleaved complex values in-place using a monomorphized SIMD architecture.

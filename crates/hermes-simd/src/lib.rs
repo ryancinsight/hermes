@@ -212,6 +212,7 @@ pub use dispatch::{
     elementwise_mul,
     elementwise_sub,
     gemv,
+    gemv_strided,
     gemv_transpose,
     interleaved_complex_dot,
     interleaved_complex_dot_runtime,
