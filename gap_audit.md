@@ -67,8 +67,8 @@ Next increments:
 - P2: delivered 2026-06-15 as host-supported `TargetId` dense conformance
   tests against Scalar for reductions, elementwise arithmetic, gather, and
   select.
-- P3: turn the operation-family gap map into per-family checklist rows driven
-  by consumer demand.
+- P3: delivered 2026-06-17 as a per-family coverage map in README and
+  backlog, with consumer-demand admission rules for pending families.
 
 ## Consumer-Driven SIMD Coverage - 2026-06-15
 

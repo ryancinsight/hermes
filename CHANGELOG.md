@@ -61,6 +61,8 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   invariant instead of silently discarding the impossible `map_unary` error.
 - GEMM tiling module docs now avoid private intra-doc links, keeping workspace
   rustdoc warning-clean after the vertical tiling split.
+- README/backlog now include an operation-family coverage map that distinguishes
+  delivered SIMD families from consumer-demand pending families.
 
 ### Changed
 - `SveArch` is now a callable 512-bit-shape emulated backend for f32/f64

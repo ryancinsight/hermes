@@ -176,6 +176,10 @@
 - [x] [patch] GEMM tiling rustdoc cleanup: module theorem prose now references
       private implementation details as code text instead of public intra-doc
       links.
+- [x] [patch] Operation-family coverage map: README and backlog now split the
+      Highway-derived coarse coverage gap into delivered families and
+      consumer-demand pending families. Evidence tier: source audit, not a new
+      implementation or benchmark claim.
 
 ## Next sprint candidates (from [backlog](backlog.md))
 

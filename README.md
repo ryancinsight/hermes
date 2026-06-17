@@ -70,6 +70,15 @@ Dense target conformance is covered by host-capability tests that force every
 supported `TargetId` and compare sum, dot, elementwise arithmetic, gather, and
 select against the scalar target.
 
+The operation-family coverage map is tracked in
+[`backlog.md`](backlog.md#operation-family-coverage-map). Delivered families
+include arithmetic, reductions, masks/select, memory views/wrappers, consumer
+shuffle primitives, and float-specialized kernels. Pending families are admitted
+only from consumer demand: scatter/compress-store, comparison predicates,
+standalone conversions, broad bitwise public facades, and crypto/hash
+primitives. This keeps Hermes as the SIMD SSOT without cloning Highway's full
+catalog or claiming unsupported operations.
+
 The public AXPY facade includes `axpy`, `axpy_rows`, and `axpy_rows_batch`.
 `axpy_rows_batch` fuses a depth-major panel accumulation into one
 runtime-dispatched kernel, so dense row-panel consumers avoid repeated facade

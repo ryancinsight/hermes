@@ -108,10 +108,50 @@ complete SIMD substrate for leto-ops/coeus hot kernels:
       [gap_audit.md#highway-2026-06-14](gap_audit.md#highway-2026-06-14).
       Delivered 2026-06-15 with host-supported `TargetId` checks over sum,
       dot, elementwise arithmetic, gather, and select.
-- [ ] **[minor] Operation-family coverage map**: expand the coarse Stage C2
-      row into per-family entries for arithmetic, bitwise, comparison, masks,
-      conversions, shuffle/rearrange, reductions, float, memory, and crypto,
-      admitting each family only when an Atlas consumer needs it.
+- [x] **[patch] Operation-family coverage map**: expanded the coarse Stage C2
+      row into per-family entries in README and this backlog. Evidence tier:
+      source audit over the current public surface and Highway reference audit;
+      no performance or correctness claim is made for unimplemented families.
+
+### Operation-family coverage map <a id="operation-family-coverage-map"></a>
+
+Consumer admission rule: a family becomes implementation work only when an
+Atlas consumer names a hot path or contract that requires it. Public APIs remain
+Hermes-native, monomorphized, and backed by value-semantic tests before a row is
+marked delivered.
+
+- [x] [minor] Arithmetic: dense `sum`, `dot`, elementwise add/sub/mul/div,
+  `axpy`, `axpy_rows`, `axpy_rows_batch`, sparse SpMV, and tiled GEMM/GEMV are
+  present with scalar fallback and runtime dispatch.
+- [x] [minor] Reductions: `sum`, `min`, `max`, `argmin`, `argmax`, `abs_sum`,
+  `abs_max`, dot, masked reductions, and COW reductions are present.
+- [x] [minor] Masks/select: `BitMask`, masked dense operations, `select`,
+  `masked_negate`, mask round-trip property coverage, and safe target-forced
+  dense conformance are present.
+- [x] [minor] Memory: typestate `SimdView`, `AlignedVec`, COW promotion,
+  packed4 COW unpack, safe one-vector load/store wrappers, and gather are
+  present.
+- [x] [minor] Shuffle/rearrange: complex adjacent-pair primitives
+  (`swap_adjacent`, `dup_even`, `dup_odd`, `fmaddsub`, `fmsubadd`) and packed
+  unpacking are present where consumer kernels require them.
+- [x] [minor] Float-specialized: interleaved complex multiply/dot, norm,
+  normalize, absolute reductions, and sqrt/abs/clamp unary strategies are
+  present.
+- [ ] [minor] Scatter/compress-store family: add only when an Atlas consumer
+  needs indirect writes or compaction output; current delivered scope covers
+  gather and mask/select, not scatter.
+- [ ] [minor] Comparison predicate family: add lane-wise compare APIs only when
+  a consumer needs reusable predicate outputs beyond existing min/max/select
+  contracts.
+- [ ] [minor] Conversion family: add vectorized widening/narrowing conversion
+  APIs only when a consumer needs conversion as a public SIMD operation;
+  current packed4 unpack is format-specific and owned by packed storage.
+- [ ] [minor] Bitwise public facade family: add public bitwise dense APIs only
+  when a consumer requires them; strategy ZSTs exist, but a broad public facade
+  is not admitted without demand.
+- [ ] [minor] Crypto/hash family: out of current Hermes scope unless an Atlas
+  consumer requires lane-parallel primitive support; no implementation is
+  claimed.
 
 ## Stage assessment (2026-06-10)
 
