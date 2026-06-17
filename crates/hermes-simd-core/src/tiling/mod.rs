@@ -40,6 +40,7 @@ use core::marker::PhantomData;
 pub mod dot;
 pub mod gemm;
 pub mod gemv;
+pub mod gemv_transpose;
 
 /// Trait representing a monomorphized register-blocking/tiling strategy.
 ///
@@ -81,6 +82,16 @@ pub trait TilingStrategy<T, Arch: SimdArch, Align: Alignment> {
 
     /// Perform tiled matrix-vector multiplication `y += A * x` using this strategy.
     fn gemv(
+        a: &SimdView<'_, T, Arch, Align>,
+        x: &SimdView<'_, T, Arch, Align>,
+        y: &mut [T],
+        nrows: usize,
+        ncols: usize,
+    ) -> Result<(), SimdError>;
+
+    /// Perform tiled transposed matrix-vector multiplication `y += Aᵀ * x`
+    /// (`A` row-major `nrows × ncols`, `x` length `nrows`, `y` length `ncols`).
+    fn gemv_transpose(
         a: &SimdView<'_, T, Arch, Align>,
         x: &SimdView<'_, T, Arch, Align>,
         y: &mut [T],
@@ -230,6 +241,19 @@ where
         ncols: usize,
     ) -> Result<(), SimdError> {
         gemv::gemv_impl::<T, Arch, Align, TILE_M>(a, x, y, nrows, ncols)
+    }
+
+    #[inline]
+    fn gemv_transpose(
+        a: &SimdView<'_, T, Arch, Align>,
+        x: &SimdView<'_, T, Arch, Align>,
+        y: &mut [T],
+        nrows: usize,
+        ncols: usize,
+    ) -> Result<(), SimdError> {
+        // `TILE_N` blocks the output (`y`) lane-chunks for the transpose, mirroring
+        // how `TILE_N` blocks the `B`/`c` columns in GEMM.
+        gemv_transpose::gemv_transpose_impl::<T, Arch, Align, TILE_N>(a, x, y, nrows, ncols)
     }
 
     #[inline]

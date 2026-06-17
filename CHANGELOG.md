@@ -14,6 +14,15 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   (incl. `TILE_M` remainder + column tail), accumulate semantics, and the
   length-mismatch error path; a `gemv_f32` Criterion benchmark vs a scalar
   row-by-row reference (measured ≈9× at 256² on the local AVX2 host).
+- Public runtime-dispatched `gemv_transpose` (`y += Aᵀ·x`), the complement of
+  `gemv`: a new register-blocked `gemv_transpose` core kernel
+  (`tiling/gemv_transpose.rs` + `TilingStrategy::gemv_transpose`) plus the
+  `dispatch/gemv_transpose.rs` leaf. Computes `Σᵢ xᵢ·A[i,:]` (sum of scaled rows),
+  vectorizing across the `ncols` output lanes with **no horizontal reduction**;
+  `TILE_N` blocks output lane-chunks for accumulator reuse across rows. Inline
+  output-reuse theorem, value-semantic differential tests across shapes (incl.
+  `TILE_N` remainder + column tail), accumulate semantics, error path; and a
+  `gemv_transpose_f32` Criterion benchmark vs a scalar reference.
 - Generic absolute reductions: `AbsSum` / `AbsMax` reduction strategies plus
   runtime-dispatched `abs_sum` / `abs_max` APIs for Leto/Apollo norm paths,
   using transformed SIMD seeds and transform-free partial merges to avoid

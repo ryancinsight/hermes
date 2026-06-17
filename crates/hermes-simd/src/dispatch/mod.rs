@@ -13,6 +13,7 @@ pub mod complex;
 pub mod dot;
 pub mod gemm;
 pub mod gemv;
+pub mod gemv_transpose;
 pub mod masked;
 pub mod max;
 pub mod min;
@@ -143,6 +144,15 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     ) -> Result<(), SimdError>;
     /// Computes register-blocked GEMV: `y += A * x` (`A` row-major `nrows × ncols`).
     fn gemv(
+        a: &[Self],
+        x: &[Self],
+        y: &mut [Self],
+        nrows: usize,
+        ncols: usize,
+    ) -> Result<(), SimdError>;
+    /// Computes register-blocked transposed GEMV: `y += Aᵀ * x`
+    /// (`A` row-major `nrows × ncols`, `x` length `nrows`, `y` length `ncols`).
+    fn gemv_transpose(
         a: &[Self],
         x: &[Self],
         y: &mut [Self],
@@ -310,6 +320,16 @@ where
         gemv::dispatch_gemv::<Self>(a, x, y, nrows, ncols)
     }
     #[inline(always)]
+    fn gemv_transpose(
+        a: &[Self],
+        x: &[Self],
+        y: &mut [Self],
+        nrows: usize,
+        ncols: usize,
+    ) -> Result<(), SimdError> {
+        gemv_transpose::dispatch_gemv_transpose::<Self>(a, x, y, nrows, ncols)
+    }
+    #[inline(always)]
     fn interleaved_complex_mul_assign<const CONJ_B: bool>(
         a: &mut [Self],
         b: &[Self],
@@ -471,6 +491,16 @@ where
         gemv::dispatch_gemv::<Self>(a, x, y, nrows, ncols)
     }
     #[inline(always)]
+    fn gemv_transpose(
+        a: &[Self],
+        x: &[Self],
+        y: &mut [Self],
+        nrows: usize,
+        ncols: usize,
+    ) -> Result<(), SimdError> {
+        gemv_transpose::dispatch_gemv_transpose::<Self>(a, x, y, nrows, ncols)
+    }
+    #[inline(always)]
     fn interleaved_complex_mul_assign<const CONJ_B: bool>(
         a: &mut [Self],
         b: &[Self],
@@ -629,6 +659,16 @@ where
         ncols: usize,
     ) -> Result<(), SimdError> {
         gemv::dispatch_gemv::<Self>(a, x, y, nrows, ncols)
+    }
+    #[inline(always)]
+    fn gemv_transpose(
+        a: &[Self],
+        x: &[Self],
+        y: &mut [Self],
+        nrows: usize,
+        ncols: usize,
+    ) -> Result<(), SimdError> {
+        gemv_transpose::dispatch_gemv_transpose::<Self>(a, x, y, nrows, ncols)
     }
     #[inline(always)]
     fn interleaved_complex_mul_assign<const CONJ_B: bool>(
@@ -860,6 +900,27 @@ pub fn gemv<T: SimdOps>(
     ncols: usize,
 ) -> Result<(), SimdError> {
     T::gemv(a, x, y, nrows, ncols)
+}
+
+/// Computes register-blocked transposed GEMV `y += Aᵀ · x` with runtime backend
+/// selection — the complement of [`gemv`].
+///
+/// `a` is row-major `nrows × ncols`, `x` length `nrows`, `y` length `ncols`; the
+/// product **accumulates** into `y` (zero `y` first for `y = Aᵀ·x`). See
+/// [`gemv_transpose`](crate::dispatch::gemv_transpose) for the operand-reuse theorem.
+///
+/// # Errors
+/// [`SimdError::LengthMismatch`] if `a.len() < nrows·ncols`, `x.len() < nrows`,
+/// or `y.len() < ncols`.
+#[inline(always)]
+pub fn gemv_transpose<T: SimdOps>(
+    a: &[T],
+    x: &[T],
+    y: &mut [T],
+    nrows: usize,
+    ncols: usize,
+) -> Result<(), SimdError> {
+    T::gemv_transpose(a, x, y, nrows, ncols)
 }
 
 /// Multiplies interleaved complex values in-place using a monomorphized SIMD architecture.

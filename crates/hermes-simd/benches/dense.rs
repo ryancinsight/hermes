@@ -12,7 +12,7 @@
 use criterion::{
     black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
 };
-use hermes_simd::{axpy_rows, axpy_rows_batch, dot, elementwise_mul, gemv, sum};
+use hermes_simd::{axpy_rows, axpy_rows_batch, dot, elementwise_mul, gemv, gemv_transpose, sum};
 
 const SIZES: &[usize] = &[256, 1024, 4096, 16384];
 const AXPY_BATCH_CASES: &[AxpyBatchCase] = &[
@@ -125,6 +125,41 @@ fn bench_gemv_f32(c: &mut Criterion) {
     group.finish();
 }
 
+/// Transposed GEMV (`y = Aᵀ·x`) vs a scalar sum-of-scaled-rows reference, over
+/// square `n × n` matrices — the reduction-free complement of `gemv`.
+fn bench_gemv_transpose_f32(c: &mut Criterion) {
+    let mut group = c.benchmark_group("gemv_transpose_f32");
+    for &n in SIZES {
+        group.throughput(Throughput::Elements((n as u64) * (n as u64)));
+        let a: Vec<f32> = (0..n * n).map(|i| (i % 17) as f32 * 0.01 - 0.5).collect();
+        let x: Vec<f32> = (0..n).map(|i| (i % 11) as f32 * 0.1 - 0.3).collect();
+
+        group.bench_with_input(BenchmarkId::new("simd", n), &n, |bench, &n| {
+            bench.iter(|| {
+                let mut y = vec![0.0f32; n];
+                gemv_transpose(black_box(&a), black_box(&x), black_box(&mut y), n, n)
+                    .expect("invariant: benchmark extents are valid");
+                black_box(y)
+            })
+        });
+
+        group.bench_with_input(BenchmarkId::new("scalar_ref", n), &n, |bench, &n| {
+            bench.iter(|| {
+                let mut y = vec![0.0f32; n];
+                for i in 0..n {
+                    let xi = x[i];
+                    let row = &a[i * n..i * n + n];
+                    for (yj, &av) in y.iter_mut().zip(row.iter()) {
+                        *yj += xi * av;
+                    }
+                }
+                black_box(y)
+            })
+        });
+    }
+    group.finish();
+}
+
 fn bench_axpy_rows_batch_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("axpy_rows_batch_f32");
     for &case in AXPY_BATCH_CASES {
@@ -196,6 +231,7 @@ criterion_group!(
     bench_dot_f32,
     bench_elementwise_mul_f32,
     bench_gemv_f32,
+    bench_gemv_transpose_f32,
     bench_axpy_rows_batch_f32
 );
 criterion_main!(dense_benches);
