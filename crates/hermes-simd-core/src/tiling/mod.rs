@@ -111,6 +111,18 @@ pub trait TilingStrategy<T, Arch: SimdArch, Align: Alignment> {
         lda: usize,
     ) -> Result<(), SimdError>;
 
+    /// Perform tiled transposed matrix-vector multiplication `y += Aᵀ * x` over a
+    /// row-major **sub-matrix**: `nrows × ncols` with row stride `lda ≥ ncols`
+    /// (`lda = ncols` is the packed [`Self::gemv_transpose`]).
+    fn gemv_transpose_strided(
+        a: &SimdView<'_, T, Arch, Align>,
+        x: &SimdView<'_, T, Arch, Align>,
+        y: &mut [T],
+        nrows: usize,
+        ncols: usize,
+        lda: usize,
+    ) -> Result<(), SimdError>;
+
     /// Perform tiled dot product computation using this strategy.
     fn dot(
         a: &SimdView<'_, T, Arch, Align>,
@@ -278,6 +290,20 @@ where
         lda: usize,
     ) -> Result<(), SimdError> {
         gemv::gemv_strided_impl::<T, Arch, Align, TILE_M>(a, x, y, nrows, ncols, lda)
+    }
+
+    #[inline]
+    fn gemv_transpose_strided(
+        a: &SimdView<'_, T, Arch, Align>,
+        x: &SimdView<'_, T, Arch, Align>,
+        y: &mut [T],
+        nrows: usize,
+        ncols: usize,
+        lda: usize,
+    ) -> Result<(), SimdError> {
+        gemv_transpose::gemv_transpose_strided_impl::<T, Arch, Align, TILE_N>(
+            a, x, y, nrows, ncols, lda,
+        )
     }
 
     #[inline]

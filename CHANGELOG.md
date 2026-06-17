@@ -33,6 +33,15 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   (`lda > ncols`), a packed-equals-`gemv` equivalence test, an `lda < ncols` /
   short-span rejection test, and a `gemv_strided_f32` Criterion benchmark over a
   padded buffer (the gapped-row access path).
+- Public runtime-dispatched `gemv_transpose_strided` (`y += Aᵀ·x` over a
+  row-major sub-matrix, row stride `lda ≥ ncols`) — the transpose analogue of
+  `gemv_strided`. The `gemv_transpose` core kernel is generalized in place to
+  `gemv_transpose_strided_impl(.., lda)` (DRY — packed `gemv_transpose` delegates
+  with `lda = ncols`, verified bit-for-bit equal by a test), with
+  `TilingStrategy::gemv_transpose_strided` and a `dispatch/` leaf. Admits the
+  `Aᵀ·x` reduction over a strided block (e.g. forming `Aw = Σⱼ wⱼ·colⱼ` in a
+  reflector apply) without copying. Differential test over a sub-matrix, a
+  packed-equals-`gemv_transpose` equivalence test, and an invalid-`lda` rejection.
 - Generic absolute reductions: `AbsSum` / `AbsMax` reduction strategies plus
   runtime-dispatched `abs_sum` / `abs_max` APIs for Leto/Apollo norm paths,
   using transformed SIMD seeds and transform-free partial merges to avoid

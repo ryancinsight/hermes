@@ -214,6 +214,7 @@ pub use dispatch::{
     gemv,
     gemv_strided,
     gemv_transpose,
+    gemv_transpose_strided,
     interleaved_complex_dot,
     interleaved_complex_dot_runtime,
     interleaved_complex_mul_assign,

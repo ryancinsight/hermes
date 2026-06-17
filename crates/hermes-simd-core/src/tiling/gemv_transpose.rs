@@ -27,16 +27,22 @@ fn check_gemv_t_dimensions(
     y_len: usize,
     nrows: usize,
     ncols: usize,
+    lda: usize,
 ) -> Result<(), SimdError> {
-    if a_len < nrows * ncols || x_len < nrows || y_len < ncols {
+    let a_needed = if nrows == 0 {
+        0
+    } else {
+        (nrows - 1) * lda + ncols
+    };
+    if lda < ncols || a_len < a_needed || x_len < nrows || y_len < ncols {
         return Err(SimdError::LengthMismatch);
     }
     Ok(())
 }
 
-/// Compute `y += Aᵀ · x` with `A` row-major `nrows × ncols`, `x` length `nrows`,
-/// `y` length `ncols`, blocking `TILE_N` output lane-chunks so each `y`
-/// accumulator is reused across all rows.
+/// Compute `y += Aᵀ · x` with `A` row-major `nrows × ncols` (packed: row stride
+/// `ncols`), `x` length `nrows`, `y` length `ncols`, blocking `TILE_N` output
+/// lane-chunks so each `y` accumulator is reused across all rows.
 ///
 /// # Errors
 /// [`SimdError::LengthMismatch`] if the operand spans are too small for the dims.
@@ -53,13 +59,37 @@ where
     Align: Alignment,
     T: Scalar,
 {
+    gemv_transpose_strided_impl::<T, Arch, Align, TILE_N>(a, x, y, nrows, ncols, ncols)
+}
+
+/// Compute `y += Aᵀ · x` where `A` is a row-major **sub-matrix**: `nrows × ncols`
+/// with row stride `lda ≥ ncols` (rows contiguous over `ncols`, spaced `lda`
+/// apart). `lda = ncols` is the packed [`gemv_transpose_impl`].
+///
+/// # Errors
+/// [`SimdError::LengthMismatch`] if `lda < ncols` or the operand spans are too
+/// small (`a` needs `(nrows−1)·lda + ncols`, `x ≥ nrows`, `y ≥ ncols`).
+#[inline]
+pub(super) fn gemv_transpose_strided_impl<T, Arch, Align, const TILE_N: usize>(
+    a: &SimdView<'_, T, Arch, Align>,
+    x: &SimdView<'_, T, Arch, Align>,
+    y: &mut [T],
+    nrows: usize,
+    ncols: usize,
+    lda: usize,
+) -> Result<(), SimdError>
+where
+    Arch: SimdArch + SimdKernel<T>,
+    Align: Alignment,
+    T: Scalar,
+{
     struct AssertN<const TILE_N: usize>;
     impl<const TILE_N: usize> AssertN<TILE_N> {
         const OK: () = assert!(TILE_N >= 1, "TILE_N must be at least 1");
     }
     let _ = AssertN::<TILE_N>::OK;
 
-    check_gemv_t_dimensions(a.len(), x.len(), y.len(), nrows, ncols)?;
+    check_gemv_t_dimensions(a.len(), x.len(), y.len(), nrows, ncols, lda)?;
 
     let a_slice = a.as_slice();
     let x_slice = x.as_slice();
@@ -85,7 +115,7 @@ where
         }
         for i in 0..nrows {
             let xi = unsafe { Arch::splat(x_slice[i]) };
-            let base = i * ncols + c;
+            let base = i * lda + c;
             for (t, slot) in acc.iter_mut().enumerate() {
                 let a_vec = load(unsafe { a_slice.as_ptr().add(base + t * lane_count) });
                 *slot = unsafe { Arch::fmadd(xi, a_vec, *slot) };
@@ -102,7 +132,7 @@ where
         let mut acc = unsafe { Arch::load_unaligned(y.as_ptr().add(c)) };
         for i in 0..nrows {
             let xi = unsafe { Arch::splat(x_slice[i]) };
-            let a_vec = load(unsafe { a_slice.as_ptr().add(i * ncols + c) });
+            let a_vec = load(unsafe { a_slice.as_ptr().add(i * lda + c) });
             acc = unsafe { Arch::fmadd(xi, a_vec, acc) };
         }
         unsafe { Arch::store_unaligned(y.as_mut_ptr().add(c), acc) };
@@ -113,7 +143,7 @@ where
     for c_tail in simd_cols..ncols {
         let mut s = y[c_tail];
         for i in 0..nrows {
-            s = s + x_slice[i] * a_slice[i * ncols + c_tail];
+            s = s + x_slice[i] * a_slice[i * lda + c_tail];
         }
         y[c_tail] = s;
     }
