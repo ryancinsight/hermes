@@ -9,6 +9,7 @@ use core::alloc::Layout;
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 
+#[cfg(not(feature = "mnemosyne-memory"))]
 use alloc::alloc::{alloc, dealloc};
 
 /// Zero-copy serialization support for aligned vectors using `rkyv`.
@@ -25,6 +26,7 @@ pub struct AlignedVec<T, Align: Alignment> {
     len: usize,
     cap: usize,
     node: Option<u32>,
+    alloc_align: u32,
     _marker: PhantomData<(T, Align)>,
 }
 
@@ -43,6 +45,11 @@ where
             len: 0,
             cap: 0,
             node: None,
+            alloc_align: if Align::IS_ALIGNED {
+                Align::ALIGN_BYTES as u32
+            } else {
+                core::mem::align_of::<T>() as u32
+            },
             _marker: PhantomData,
         }
     }
@@ -50,12 +57,18 @@ where
     /// Create a new `AlignedVec` with space allocated for `capacity` elements
     /// satisfying the alignment boundary constraints.
     pub fn with_capacity(capacity: usize) -> Self {
+        let default_align = if Align::IS_ALIGNED {
+            Align::ALIGN_BYTES as u32
+        } else {
+            core::mem::align_of::<T>() as u32
+        };
         if core::mem::size_of::<T>() == 0 {
             return Self {
                 ptr: core::ptr::NonNull::dangling().as_ptr(),
                 len: 0,
                 cap: usize::MAX,
                 node: None,
+                alloc_align: default_align,
                 _marker: PhantomData,
             };
         }
@@ -73,16 +86,24 @@ where
             .expect("Capacity overflow");
         let layout = Layout::from_size_align(size, align).unwrap();
 
+        #[cfg(feature = "mnemosyne-memory")]
+        let ptr =
+            unsafe { core::alloc::GlobalAlloc::alloc(&mnemosyne::Mnemosyne, layout) as *mut T };
+        #[cfg(not(feature = "mnemosyne-memory"))]
         let ptr = unsafe { alloc(layout) as *mut T };
+
         if ptr.is_null() {
             alloc::alloc::handle_alloc_error(layout);
         }
+
+        crate::numa::locality::bump_alloc_generation();
 
         Self {
             ptr,
             len: 0,
             cap: capacity,
             node: None,
+            alloc_align: align as u32,
             _marker: PhantomData,
         }
     }
@@ -90,12 +111,18 @@ where
     /// Create a new `AlignedVec` with space allocated for `capacity` elements
     /// on the specified NUMA node.
     pub fn with_capacity_numa(capacity: usize, node: u32) -> Self {
+        let default_align = if Align::IS_ALIGNED {
+            Align::ALIGN_BYTES as u32
+        } else {
+            core::mem::align_of::<T>() as u32
+        };
         if core::mem::size_of::<T>() == 0 {
             return Self {
                 ptr: core::ptr::NonNull::dangling().as_ptr(),
                 len: 0,
                 cap: usize::MAX,
                 node: Some(node),
+                alloc_align: default_align,
                 _marker: PhantomData,
             };
         }
@@ -105,6 +132,7 @@ where
                 len: 0,
                 cap: 0,
                 node: Some(node),
+                alloc_align: default_align,
                 _marker: PhantomData,
             };
         }
@@ -130,6 +158,7 @@ where
             len: 0,
             cap: capacity,
             node: Some(node),
+            alloc_align: align as u32,
             _marker: PhantomData,
         }
     }
@@ -244,6 +273,37 @@ where
         v
     }
 
+    /// Clone elements from `src` into a new `AlignedVec` in a single allocation.
+    ///
+    /// # Performance
+    ///
+    /// Exactly one call to the allocator (`with_capacity(src.len())`) followed by
+    /// cloning elements into place sequentially.
+    #[inline]
+    pub fn from_slice_clone(src: &[T]) -> Self
+    where
+        T: Clone,
+    {
+        let n = src.len();
+        if n == 0 {
+            return Self::new();
+        }
+        if core::mem::size_of::<T>() == 0 {
+            let mut v = Self::new();
+            v.len = n;
+            v.cap = usize::MAX;
+            return v;
+        }
+        let mut v = Self::with_capacity(n);
+        for i in 0..n {
+            unsafe {
+                core::ptr::write(v.ptr.add(i), src[i].clone());
+                v.len = i + 1;
+            }
+        }
+        v
+    }
+
     /// Obtains a compile-time safe immutable `SimdView` over the vector's buffer.
     #[inline(always)]
     pub fn view<'a, Arch>(
@@ -266,16 +326,45 @@ where
         SimdView::new_mut(self.as_mut_slice()).unwrap()
     }
 
-    /// Converts this `AlignedVec` to another alignment layout type-safely and zero-cost.
+    /// Converts this `AlignedVec` to another alignment layout type-safely, without checking
+    /// if the pointer satisfies the new alignment's constraints.
+    ///
+    /// # Safety
+    ///
+    /// The caller must guarantee that the underlying memory address satisfies the alignment
+    /// boundary constraints of `NewAlign`.
     #[inline(always)]
-    pub fn into_alignment<NewAlign: Alignment>(self) -> AlignedVec<T, NewAlign> {
+    pub unsafe fn into_alignment_unchecked<NewAlign: Alignment>(self) -> AlignedVec<T, NewAlign> {
         let md = core::mem::ManuallyDrop::new(self);
         AlignedVec {
             ptr: md.ptr,
             len: md.len,
             cap: md.cap,
             node: md.node,
+            alloc_align: md.alloc_align,
             _marker: PhantomData,
+        }
+    }
+
+    /// Converts this `AlignedVec` to an unaligned layout, stripping the alignment guarantee zero-cost.
+    #[inline(always)]
+    pub fn into_unaligned(self) -> AlignedVec<T, crate::align::Unaligned> {
+        unsafe { self.into_alignment_unchecked() }
+    }
+
+    /// Attempts to cast this `AlignedVec` to a stricter alignment constraint.
+    /// Returns `Some` if the pointer satisfies the alignment requirement of `NewAlign`, otherwise `None`.
+    #[inline]
+    pub fn try_into_alignment<NewAlign: Alignment>(self) -> Option<AlignedVec<T, NewAlign>> {
+        if NewAlign::IS_ALIGNED {
+            let addr = self.as_ptr() as usize;
+            if addr % NewAlign::ALIGN_BYTES == 0 {
+                unsafe { Some(self.into_alignment_unchecked()) }
+            } else {
+                None
+            }
+        } else {
+            unsafe { Some(self.into_alignment_unchecked()) }
         }
     }
 
@@ -283,12 +372,7 @@ where
         let size = capacity
             .checked_mul(core::mem::size_of::<T>())
             .expect("Capacity overflow");
-        let align = if Align::IS_ALIGNED {
-            Align::ALIGN_BYTES
-        } else {
-            core::mem::align_of::<T>()
-        };
-        Layout::from_size_align(size, align).unwrap()
+        Layout::from_size_align(size, self.alloc_align as usize).unwrap()
     }
 
     fn grow(&mut self) {
@@ -309,33 +393,44 @@ where
                 let allocator = crate::numa::MnemosyneNumaAllocator;
                 unsafe { allocator.alloc_on_node(new_layout, node) as *mut T }
             } else {
-                unsafe { alloc(new_layout) as *mut T }
+                #[cfg(feature = "mnemosyne-memory")]
+                unsafe {
+                    core::alloc::GlobalAlloc::alloc(&mnemosyne::Mnemosyne, new_layout) as *mut T
+                }
+                #[cfg(not(feature = "mnemosyne-memory"))]
+                unsafe {
+                    alloc(new_layout) as *mut T
+                }
             }
         } else {
             let old_layout = self.layout_for(self.cap);
             unsafe {
-                let new_p = if let Some(node) = self.node {
+                if let Some(node) = self.node {
                     let allocator = crate::numa::MnemosyneNumaAllocator;
-                    allocator.alloc_on_node(new_layout, node) as *mut T
+                    allocator.realloc_on_node(self.ptr as *mut u8, old_layout, new_layout, node)
+                        as *mut T
                 } else {
-                    alloc(new_layout) as *mut T
-                };
-                if !new_p.is_null() {
-                    core::ptr::copy_nonoverlapping(self.ptr, new_p, self.len);
-                    if let Some(node) = self.node {
-                        let allocator = crate::numa::MnemosyneNumaAllocator;
-                        allocator.dealloc_on_node(self.ptr as *mut u8, old_layout, node);
-                    } else {
-                        dealloc(self.ptr as *mut u8, old_layout);
-                    }
+                    #[cfg(feature = "mnemosyne-memory")]
+                    let ptr = core::alloc::GlobalAlloc::realloc(
+                        &mnemosyne::Mnemosyne,
+                        self.ptr as *mut u8,
+                        old_layout,
+                        new_layout.size(),
+                    ) as *mut T;
+                    #[cfg(not(feature = "mnemosyne-memory"))]
+                    let ptr =
+                        alloc::alloc::realloc(self.ptr as *mut u8, old_layout, new_layout.size())
+                            as *mut T;
+                    ptr
                 }
-                new_p
             }
         };
 
         if new_ptr.is_null() {
             alloc::alloc::handle_alloc_error(new_layout);
         }
+
+        crate::numa::locality::bump_alloc_generation();
 
         self.ptr = new_ptr;
         self.cap = new_cap;
@@ -358,6 +453,42 @@ impl<T, Align: Alignment> DerefMut for AlignedVec<T, Align> {
     }
 }
 
+struct DeallocGuard<T, Align: Alignment> {
+    ptr: *mut T,
+    cap: usize,
+    node: Option<u32>,
+    alloc_align: u32,
+    _marker: PhantomData<(T, Align)>,
+}
+
+impl<T, Align: Alignment> Drop for DeallocGuard<T, Align> {
+    fn drop(&mut self) {
+        if !self.ptr.is_null() && self.cap > 0 {
+            crate::numa::locality::bump_alloc_generation();
+            unsafe {
+                let size = self
+                    .cap
+                    .checked_mul(core::mem::size_of::<T>())
+                    .expect("Capacity overflow");
+                let layout = Layout::from_size_align(size, self.alloc_align as usize).unwrap();
+                if let Some(node) = self.node {
+                    let allocator = crate::numa::MnemosyneNumaAllocator;
+                    allocator.dealloc_on_node(self.ptr as *mut u8, layout, node);
+                } else {
+                    #[cfg(feature = "mnemosyne-memory")]
+                    core::alloc::GlobalAlloc::dealloc(
+                        &mnemosyne::Mnemosyne,
+                        self.ptr as *mut u8,
+                        layout,
+                    );
+                    #[cfg(not(feature = "mnemosyne-memory"))]
+                    dealloc(self.ptr as *mut u8, layout);
+                }
+            }
+        }
+    }
+}
+
 impl<T, Align: Alignment> Drop for AlignedVec<T, Align> {
     fn drop(&mut self) {
         if core::mem::size_of::<T>() == 0 {
@@ -371,15 +502,24 @@ impl<T, Align: Alignment> Drop for AlignedVec<T, Align> {
             return;
         }
         if !self.ptr.is_null() && self.cap > 0 {
+            let ptr = self.ptr;
+            let cap = self.cap;
+            let len = self.len;
+            let alloc_align = self.alloc_align;
+
+            self.ptr = core::ptr::null_mut();
+            self.cap = 0;
+            self.len = 0;
+
+            let _guard: DeallocGuard<T, Align> = DeallocGuard {
+                ptr,
+                cap,
+                node: self.node,
+                alloc_align,
+                _marker: PhantomData,
+            };
             unsafe {
-                core::ptr::drop_in_place(core::ptr::slice_from_raw_parts_mut(self.ptr, self.len));
-                let layout = self.layout_for(self.cap);
-                if let Some(node) = self.node {
-                    let allocator = crate::numa::MnemosyneNumaAllocator;
-                    allocator.dealloc_on_node(self.ptr as *mut u8, layout, node);
-                } else {
-                    dealloc(self.ptr as *mut u8, layout);
-                }
+                core::ptr::drop_in_place(core::ptr::slice_from_raw_parts_mut(ptr, len));
             }
         }
     }
@@ -393,6 +533,7 @@ impl<T: Clone, Align: Alignment> Clone for AlignedVec<T, Align> {
                 len: 0,
                 cap: usize::MAX,
                 node: self.node,
+                alloc_align: self.alloc_align,
                 _marker: PhantomData,
             };
             for val in self.as_slice() {
@@ -409,9 +550,9 @@ impl<T: Clone, Align: Alignment> Clone for AlignedVec<T, Align> {
             unsafe {
                 let val = (*self.ptr.add(i)).clone();
                 core::ptr::write(new_vec.ptr.add(i), val);
+                new_vec.len = i + 1;
             }
         }
-        new_vec.len = self.len;
         new_vec
     }
 }

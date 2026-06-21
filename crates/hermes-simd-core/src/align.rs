@@ -70,3 +70,13 @@ impl Alignment for Unaligned {
 
 impl<const A: usize> crate::private::Sealed for Aligned<A> {}
 impl crate::private::Sealed for Unaligned {}
+
+/// Helper to check if the alignment `Align` is sufficient for architecture `Arch` vector register width.
+#[inline(always)]
+pub fn is_aligned_for_arch<Arch: crate::arch::SimdArch, Align: Alignment>() -> bool {
+    if !Align::IS_ALIGNED {
+        return false;
+    }
+    let req_align = Arch::REGISTER_WIDTH_BITS as usize / 8;
+    Align::ALIGN_BYTES >= req_align
+}

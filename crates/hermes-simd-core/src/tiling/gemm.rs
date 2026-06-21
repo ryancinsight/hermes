@@ -64,6 +64,7 @@ use crate::{
     arch::SimdArch,
     kernel::SimdKernel,
     scalar::Scalar,
+    vec::AlignedVec,
     view::{SimdError, SimdView},
 };
 
@@ -203,7 +204,10 @@ where
         .saturating_mul(k)
         .saturating_mul(core::mem::size_of::<T>());
     if m > TILE_M && simd_n_len > 0 && b_bytes >= GEMM_PACK_B_BYTES_THRESHOLD {
-        let mut packed = alloc::vec![T::ZERO; k * block_n];
+        let mut packed = AlignedVec::<T, crate::align::Aligned<64>>::with_capacity(k * block_n);
+        unsafe {
+            packed.set_len(k * block_n);
+        }
         let mut col_n = 0;
         while col_n < simd_n_len {
             for kk in 0..k {

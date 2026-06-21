@@ -76,6 +76,10 @@ impl NumericElement for f32 {
     fn bitxor(self, rhs: Self) -> Self {
         Self::from_bits(self.to_bits() ^ rhs.to_bits())
     }
+    #[inline(always)]
+    fn count_ones(self) -> u32 {
+        self.to_bits().count_ones()
+    }
     /// Use native `f32::min` which correctly handles NaN propagation.
     #[inline(always)]
     fn min_scalar(self, other: Self) -> Self {
@@ -156,6 +160,10 @@ impl NumericElement for f64 {
     fn bitxor(self, rhs: Self) -> Self {
         Self::from_bits(self.to_bits() ^ rhs.to_bits())
     }
+    #[inline(always)]
+    fn count_ones(self) -> u32 {
+        self.to_bits().count_ones()
+    }
     /// Use native `f64::min` which correctly handles NaN propagation.
     #[inline(always)]
     fn min_scalar(self, other: Self) -> Self {
@@ -216,6 +224,10 @@ impl NumericElement for half::f16 {
         Self::from_bits(self.to_bits() ^ rhs.to_bits())
     }
     #[inline(always)]
+    fn count_ones(self) -> u32 {
+        self.to_bits().count_ones()
+    }
+    #[inline(always)]
     fn min_scalar(self, other: Self) -> Self {
         half::f16::from_f32(self.to_f32().min(other.to_f32()))
     }
@@ -273,6 +285,10 @@ impl NumericElement for half::bf16 {
         Self::from_bits(self.to_bits() ^ rhs.to_bits())
     }
     #[inline(always)]
+    fn count_ones(self) -> u32 {
+        self.to_bits().count_ones()
+    }
+    #[inline(always)]
     fn min_scalar(self, other: Self) -> Self {
         half::bf16::from_f32(self.to_f32().min(other.to_f32()))
     }
@@ -328,6 +344,10 @@ impl NumericElement for i8 {
     #[inline(always)]
     fn bitxor(self, rhs: Self) -> Self {
         self ^ rhs
+    }
+    #[inline(always)]
+    fn count_ones(self) -> u32 {
+        self.count_ones()
     }
     #[inline(always)]
     fn min_scalar(self, other: Self) -> Self {
@@ -395,6 +415,10 @@ impl NumericElement for i16 {
         self ^ rhs
     }
     #[inline(always)]
+    fn count_ones(self) -> u32 {
+        self.count_ones()
+    }
+    #[inline(always)]
     fn min_scalar(self, other: Self) -> Self {
         if self <= other {
             self
@@ -458,6 +482,10 @@ impl NumericElement for i32 {
     #[inline(always)]
     fn bitxor(self, rhs: Self) -> Self {
         self ^ rhs
+    }
+    #[inline(always)]
+    fn count_ones(self) -> u32 {
+        self.count_ones()
     }
     #[inline(always)]
     fn min_scalar(self, other: Self) -> Self {

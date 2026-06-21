@@ -183,5 +183,11 @@
 
 ## Next sprint candidates (from [backlog](backlog.md))
 
-- [minor] 0.3.0 release for the additive absolute-reduction API.
-- [arch] Per-type x86 kernel dedup ADR (P3).
+- [x] [minor] 0.3.0 release for the additive absolute-reduction API.
+- [x] [minor] Fast reciprocal square root (`ops::RecipSqrt`) with Newton-Raphson
+      refinement to eliminate standard `sqrt` latency (from [gap_audit](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17)).
+- [x] [arch] Masked tail-load/store infrastructure for AVX-512 / SveArch to enable Leto to run tail-free kernels (from [gap_audit](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17)).
+- [x] [minor] Expose popcount and horizontal reductions to support Jaccard/Hamming in Leto (from [gap_audit](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17)).
+- [x] [minor] Sub-byte sign-extension and unpacking/widening SIMD primitives for `Bf4`/`F4`/`I8` (from [gap_audit](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17)).
+- [x] [arch] Per-type x86 kernel dedup ADR (P3).
+- [x] [arch] x86 kernel dedup generator script.

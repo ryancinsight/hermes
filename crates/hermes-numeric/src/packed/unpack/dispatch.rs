@@ -5,7 +5,7 @@ use crate::types::{Bf16, Bf4, Bf8, F32, F4, F8};
 #[cfg(target_arch = "x86_64")]
 use super::arch::{has_avx2, has_avx512bw, has_avx512f};
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 use super::unsafe_intrinsics;
 
 use super::conv::{bf4_to_bf16_bits, f8_to_f32_bits};
@@ -27,6 +27,13 @@ pub fn unpack_bf8_to_bf16(packed: &[Bf8], unpacked: &mut [Bf16]) {
             }
             return;
         }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        unsafe {
+            unsafe_intrinsics::neon::unpack_bf8_to_bf16(packed, unpacked);
+        }
+        return;
     }
     let len = packed.len();
     let n = len.min(unpacked.len());
@@ -57,6 +64,13 @@ pub fn unpack_bf4_to_bf16(packed: &[Bf4], unpacked: &mut [Bf16]) {
             return;
         }
     }
+    #[cfg(target_arch = "aarch64")]
+    {
+        unsafe {
+            unsafe_intrinsics::neon::unpack_bf4_to_bf16(packed, unpacked);
+        }
+        return;
+    }
     let len = packed.len();
     let n = len.min(unpacked.len());
     for i in 0..n {
@@ -82,6 +96,13 @@ pub fn unpack_bf4_to_bf16_packed(packed: &[u8], unpacked: &mut [Bf16]) {
             }
             return;
         }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        unsafe {
+            unsafe_intrinsics::neon::unpack_bf4_to_bf16_packed(packed, unpacked);
+        }
+        return;
     }
     let len = packed.len();
     let n = len.min(unpacked.len() / 2);
@@ -112,6 +133,13 @@ pub fn unpack_f4_to_f32(packed: &[F4], unpacked: &mut [F32]) {
             return;
         }
     }
+    #[cfg(target_arch = "aarch64")]
+    {
+        unsafe {
+            unsafe_intrinsics::neon::unpack_f4_to_f32(packed, unpacked);
+        }
+        return;
+    }
     let len = packed.len().min(unpacked.len());
     for i in 0..len {
         unpacked[i] = F32(packed[i].to_f32());
@@ -135,6 +163,13 @@ pub fn unpack_f4_to_f32_packed(packed: &[u8], unpacked: &mut [F32]) {
             }
             return;
         }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        unsafe {
+            unsafe_intrinsics::neon::unpack_f4_to_f32_packed(packed, unpacked);
+        }
+        return;
     }
     let len = packed.len();
     let n = len.min(unpacked.len() / 2);
@@ -164,6 +199,13 @@ pub fn unpack_f8_to_f32(packed: &[F8], unpacked: &mut [F32]) {
             }
             return;
         }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        unsafe {
+            unsafe_intrinsics::neon::unpack_f8_to_f32(packed, unpacked);
+        }
+        return;
     }
     static TABLE_BITS: [u32; 256] = {
         let mut t = [0u32; 256];

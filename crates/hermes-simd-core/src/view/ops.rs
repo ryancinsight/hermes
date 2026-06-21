@@ -23,12 +23,13 @@ where
         let unroll_factor = Arch::UNROLL_FACTOR;
         let chunk_size = lane_count * unroll_factor;
         let unrolled_simd_len = (len / chunk_size) * chunk_size;
+        let simd_len = (len / lane_count) * lane_count;
         let mut ptr = data.as_ptr();
 
         let accumulator = unsafe {
             if unrolled_simd_len > 0 {
                 let load = |p| {
-                    if Align::IS_ALIGNED {
+                    if crate::align::is_aligned_for_arch::<Arch, Align>() {
                         Arch::load_aligned(p)
                     } else {
                         Arch::load_unaligned(p)
@@ -64,26 +65,27 @@ where
             }
         };
 
-        let simd_len = (len / lane_count) * lane_count;
-        let mut total = if let Some(acc) = accumulator {
-            unsafe { Arch::sum_reduce(acc) }
+        let mut acc = if let Some(a) = accumulator {
+            a
         } else {
-            T::ZERO
+            unsafe { Arch::zero() }
         };
 
         // Middle SIMD loop for elements that didn't fit into the unrolled loop
         unsafe {
             let mut middle_ptr = data.as_ptr().add(unrolled_simd_len);
             for _ in 0..((simd_len - unrolled_simd_len) / lane_count) {
-                let val = if Align::IS_ALIGNED {
+                let val = if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(middle_ptr)
                 } else {
                     Arch::load_unaligned(middle_ptr)
                 };
-                total += Arch::sum_reduce(val);
+                acc = Arch::add(acc, val);
                 middle_ptr = middle_ptr.add(lane_count);
             }
         }
+
+        let mut total = unsafe { Arch::sum_reduce(acc) };
 
         // Scalar tail loop
         for i in simd_len..len {
@@ -119,7 +121,7 @@ where
         let accumulator = unsafe {
             if unrolled_simd_len > 0 {
                 let load = |p| {
-                    if Align::IS_ALIGNED {
+                    if crate::align::is_aligned_for_arch::<Arch, Align>() {
                         Arch::load_aligned(p)
                     } else {
                         Arch::load_unaligned(p)
@@ -186,7 +188,7 @@ where
         let mut acc_vec = accumulator;
         unsafe {
             let load = |p| {
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(p)
                 } else {
                     Arch::load_unaligned(p)
@@ -247,7 +249,7 @@ where
 
         unsafe {
             let load = |p| {
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(p)
                 } else {
                     Arch::load_unaligned(p)
@@ -255,7 +257,8 @@ where
             };
 
             let store = |p, val| {
-                let is_out_aligned = Align::IS_ALIGNED && (p as usize) % Align::ALIGN_BYTES == 0;
+                let is_out_aligned = crate::align::is_aligned_for_arch::<Arch, Align>()
+                    && (p as usize) % Align::ALIGN_BYTES == 0;
 
                 if is_out_aligned {
                     Arch::store_aligned(p, val);
@@ -317,7 +320,7 @@ where
 
         unsafe {
             let load = |p| {
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(p)
                 } else {
                     Arch::load_unaligned(p)
@@ -325,7 +328,8 @@ where
             };
 
             let store = |p, val| {
-                let is_out_aligned = Align::IS_ALIGNED && (p as usize) % Align::ALIGN_BYTES == 0;
+                let is_out_aligned = crate::align::is_aligned_for_arch::<Arch, Align>()
+                    && (p as usize) % Align::ALIGN_BYTES == 0;
                 if is_out_aligned {
                     Arch::store_aligned(p, val);
                 } else {

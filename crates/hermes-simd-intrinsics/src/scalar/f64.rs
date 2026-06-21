@@ -59,6 +59,16 @@ impl SimdKernel<f64> for Scalar {
         v[0] + v[1]
     }
 
+    #[inline(always)]
+    unsafe fn sqrt(a: Self::Vector) -> Self::Vector {
+        [a[0].sqrt(), a[1].sqrt()]
+    }
+
+    #[inline(always)]
+    unsafe fn recip_sqrt(a: Self::Vector) -> Self::Vector {
+        [1.0 / a[0].sqrt(), 1.0 / a[1].sqrt()]
+    }
+
     // -----------------------------------------------------------------------
     // Masked load / store
     // -----------------------------------------------------------------------

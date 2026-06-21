@@ -28,24 +28,29 @@ impl<T> OnceLock<T> {
     where
         F: FnOnce() -> T,
     {
+        if self.state.load(Ordering::Acquire) == 2 {
+            return unsafe { (*self.value.get()).as_ref().unwrap() };
+        }
+
         loop {
-            match self
-                .state
-                .compare_exchange_weak(0, 1, Ordering::Acquire, Ordering::Relaxed)
-            {
-                Ok(_) => {
+            let current = self.state.load(Ordering::Acquire);
+            if current == 2 {
+                break;
+            }
+            if current == 0 {
+                if self
+                    .state
+                    .compare_exchange_weak(0, 1, Ordering::Acquire, Ordering::Relaxed)
+                    .is_ok()
+                {
                     unsafe {
                         *self.value.get() = Some(f());
                     }
                     self.state.store(2, Ordering::Release);
                     break;
                 }
-                Err(2) => {
-                    break;
-                }
-                Err(_) => {
-                    core::hint::spin_loop();
-                }
+            } else {
+                core::hint::spin_loop();
             }
         }
         unsafe { (*self.value.get()).as_ref().unwrap() }

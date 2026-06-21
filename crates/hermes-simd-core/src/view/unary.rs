@@ -32,7 +32,7 @@ where
 
         unsafe {
             let load = |p: *const T| {
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(p)
                 } else {
                     Arch::load_unaligned(p)
@@ -41,7 +41,9 @@ where
             let store = |p: *mut T, v: Arch::Vector| {
                 // Output alignment matches input when writing into the same AlignedVec;
                 // for cross-buffer writes, the output may differ — use Align to govern both.
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>()
+                    && (p as usize) % Align::ALIGN_BYTES == 0
+                {
                     Arch::store_aligned(p, v)
                 } else {
                     Arch::store_unaligned(p, v)
@@ -81,14 +83,14 @@ where
 
         unsafe {
             let load = |p: *mut T| {
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(p)
                 } else {
                     Arch::load_unaligned(p)
                 }
             };
             let store = |p: *mut T, v: Arch::Vector| {
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::store_aligned(p, v)
                 } else {
                     Arch::store_unaligned(p, v)

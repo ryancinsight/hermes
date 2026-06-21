@@ -20,9 +20,15 @@ pub mod masked;
 pub mod max;
 pub mod min;
 pub mod modular;
+mod popcount;
 pub mod scale;
 pub mod sparse;
 pub mod sum;
+
+pub use popcount::{
+    dispatch_reduce_popcount, dispatch_reduce_popcount_and, dispatch_reduce_popcount_or,
+    dispatch_reduce_popcount_xor,
+};
 
 use hermes_simd_core::scalar::Scalar as ScalarTrait;
 use hermes_simd_core::sparse::{
@@ -193,6 +199,14 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
         a: &[Self],
         b: &[Self],
     ) -> Result<(Self, Self), SimdError>;
+    /// Computes the horizontal sum of population counts of all elements.
+    fn reduce_popcount(data: &[Self]) -> usize;
+    /// Computes the horizontal sum of population counts of `a[i] & b[i]`.
+    fn reduce_popcount_and(a: &[Self], b: &[Self]) -> Result<usize, SimdError>;
+    /// Computes the horizontal sum of population counts of `a[i] | b[i]`.
+    fn reduce_popcount_or(a: &[Self], b: &[Self]) -> Result<usize, SimdError>;
+    /// Computes the horizontal sum of population counts of `a[i] ^ b[i]` (Hamming distance).
+    fn reduce_popcount_xor(a: &[Self], b: &[Self]) -> Result<usize, SimdError>;
 }
 
 /// x86/x86_64 specialized generic implementation of SimdOps.
@@ -387,6 +401,22 @@ where
     ) -> Result<(Self, Self), SimdError> {
         complex::dispatch_interleaved_complex_dot::<Self, CONJ_B>(a, b)
     }
+    #[inline(always)]
+    fn reduce_popcount(data: &[Self]) -> usize {
+        dispatch_reduce_popcount::<Self>(data)
+    }
+    #[inline(always)]
+    fn reduce_popcount_and(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
+        dispatch_reduce_popcount_and::<Self>(a, b)
+    }
+    #[inline(always)]
+    fn reduce_popcount_or(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
+        dispatch_reduce_popcount_or::<Self>(a, b)
+    }
+    #[inline(always)]
+    fn reduce_popcount_xor(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
+        dispatch_reduce_popcount_xor::<Self>(a, b)
+    }
 }
 
 /// AArch64 specialized generic implementation of SimdOps.
@@ -580,6 +610,22 @@ where
     ) -> Result<(Self, Self), SimdError> {
         complex::dispatch_interleaved_complex_dot::<Self, CONJ_B>(a, b)
     }
+    #[inline(always)]
+    fn reduce_popcount(data: &[Self]) -> usize {
+        dispatch_reduce_popcount::<Self>(data)
+    }
+    #[inline(always)]
+    fn reduce_popcount_and(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
+        dispatch_reduce_popcount_and::<Self>(a, b)
+    }
+    #[inline(always)]
+    fn reduce_popcount_or(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
+        dispatch_reduce_popcount_or::<Self>(a, b)
+    }
+    #[inline(always)]
+    fn reduce_popcount_xor(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
+        dispatch_reduce_popcount_xor::<Self>(a, b)
+    }
 }
 
 /// Fallback generic implementation of SimdOps.
@@ -771,6 +817,22 @@ where
         b: &[Self],
     ) -> Result<(Self, Self), SimdError> {
         complex::dispatch_interleaved_complex_dot::<Self, CONJ_B>(a, b)
+    }
+    #[inline(always)]
+    fn reduce_popcount(data: &[Self]) -> usize {
+        dispatch_reduce_popcount::<Self>(data)
+    }
+    #[inline(always)]
+    fn reduce_popcount_and(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
+        dispatch_reduce_popcount_and::<Self>(a, b)
+    }
+    #[inline(always)]
+    fn reduce_popcount_or(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
+        dispatch_reduce_popcount_or::<Self>(a, b)
+    }
+    #[inline(always)]
+    fn reduce_popcount_xor(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
+        dispatch_reduce_popcount_xor::<Self>(a, b)
     }
 }
 
@@ -1106,4 +1168,28 @@ where
     T: SimdOps,
 {
     T::interleaved_complex_dot::<CONJ_B>(a, b)
+}
+
+/// Computes the horizontal sum of population counts of all elements using runtime-dispatched SIMD.
+#[inline(always)]
+pub fn reduce_popcount<T: SimdOps>(data: &[T]) -> usize {
+    T::reduce_popcount(data)
+}
+
+/// Computes the horizontal sum of population counts of `a[i] & b[i]` using runtime-dispatched SIMD.
+#[inline(always)]
+pub fn reduce_popcount_and<T: SimdOps>(a: &[T], b: &[T]) -> Result<usize, SimdError> {
+    T::reduce_popcount_and(a, b)
+}
+
+/// Computes the horizontal sum of population counts of `a[i] | b[i]` using runtime-dispatched SIMD.
+#[inline(always)]
+pub fn reduce_popcount_or<T: SimdOps>(a: &[T], b: &[T]) -> Result<usize, SimdError> {
+    T::reduce_popcount_or(a, b)
+}
+
+/// Computes the horizontal sum of population counts of `a[i] ^ b[i]` (Hamming distance) using runtime-dispatched SIMD.
+#[inline(always)]
+pub fn reduce_popcount_xor<T: SimdOps>(a: &[T], b: &[T]) -> Result<usize, SimdError> {
+    T::reduce_popcount_xor(a, b)
 }

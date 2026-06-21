@@ -12,7 +12,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Ryan Clanton <ryanclanton@outlook.com>"]
 description = "High-performance, zero-overhead SIMD abstraction library"
@@ -43,7 +43,6 @@ mnemosyne = { path = "../mnemosyne/crates/mnemosyne" }
 mnemosyne-core = { path = "../mnemosyne/crates/mnemosyne-core" }
 mnemosyne-arena = { path = "../mnemosyne/crates/mnemosyne-arena" }
 mnemosyne-local = { path = "../mnemosyne/crates/mnemosyne-local" }
-mnemosyne-heap = { path = "../mnemosyne/crates/mnemosyne-heap" }
 
 [patch."https://github.com/ryancinsight/melinoe.git"]
 melinoe = { path = "../melinoe" }

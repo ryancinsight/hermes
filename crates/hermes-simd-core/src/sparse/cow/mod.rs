@@ -14,7 +14,7 @@ use super::{
 };
 use crate::arch::SimdArch;
 use crate::scalar::Scalar;
-use alloc::vec::Vec;
+use crate::vec::AlignedVec;
 
 pub mod owned;
 pub use owned::{OwnedBlockedCoo, OwnedCsr, OwnedDenseWithMask, OwnedSellP};
@@ -49,9 +49,9 @@ impl CowFormat for Csr {
     #[inline]
     fn to_owned_storage<T: Clone + Send + Sync>(d: &CsrData<'_, T>) -> OwnedCsr<T> {
         OwnedCsr::new(
-            d.values.to_vec(),
-            d.col_indices.to_vec(),
-            d.row_ptr.to_vec(),
+            AlignedVec::from_slice_clone(d.values),
+            AlignedVec::from_slice(d.col_indices),
+            AlignedVec::from_slice(d.row_ptr),
             d.nrows,
             d.ncols,
         )
@@ -72,10 +72,10 @@ impl<const C: usize> CowFormat for SellP<C> {
     #[inline]
     fn to_owned_storage<T: Clone + Send + Sync>(d: &SellPData<'_, T, C>) -> OwnedSellP<T, C> {
         OwnedSellP::new(
-            d.values.to_vec(),
-            d.col_indices.to_vec(),
-            d.slice_ptr.to_vec(),
-            d.slice_col_count.to_vec(),
+            AlignedVec::from_slice_clone(d.values),
+            AlignedVec::from_slice(d.col_indices),
+            AlignedVec::from_slice(d.slice_ptr),
+            AlignedVec::from_slice(d.slice_col_count),
             d.nrows,
             d.ncols,
         )
@@ -98,9 +98,9 @@ impl<const BM: usize, const BN: usize> CowFormat for BlockedCoo<BM, BN> {
         d: &BlockedCooData<'_, T, BM, BN>,
     ) -> OwnedBlockedCoo<T, BM, BN> {
         OwnedBlockedCoo::new(
-            d.blocks.to_vec(),
-            d.block_row.to_vec(),
-            d.block_col.to_vec(),
+            AlignedVec::from_slice_clone(d.blocks),
+            AlignedVec::from_slice(d.block_row),
+            AlignedVec::from_slice(d.block_col),
             d.nblocks,
             d.nrows,
             d.ncols,
@@ -123,7 +123,12 @@ impl CowFormat for DenseWithMask {
     fn to_owned_storage<T: Clone + Send + Sync>(
         d: &DenseWithMaskData<'_, T>,
     ) -> OwnedDenseWithMask<T> {
-        OwnedDenseWithMask::new(d.values.to_vec(), d.mask.to_vec(), d.nrows, d.ncols)
+        OwnedDenseWithMask::new(
+            AlignedVec::from_slice_clone(d.values),
+            AlignedVec::from_slice(d.mask),
+            d.nrows,
+            d.ncols,
+        )
     }
 }
 
@@ -260,65 +265,96 @@ where
     }
 }
 
-impl<'a, T: Send + Sync, Arch: SimdArch> SparseCow<'a, T, Csr, Arch> {
-    /// Build an owned CSR Cow from raw vectors.
+impl<'a, T: Send + Sync + Clone, Arch: SimdArch> SparseCow<'a, T, Csr, Arch> {
+    /// Build an owned CSR Cow from slices.
     #[inline]
-    pub fn from_vecs(
-        values: Vec<T>,
-        col_indices: Vec<i32>,
-        row_ptr: Vec<i32>,
+    pub fn from_slices(
+        values: &[T],
+        col_indices: &[i32],
+        row_ptr: &[i32],
         nrows: usize,
         ncols: usize,
     ) -> Self {
-        Self::Owned(OwnedCsr::new(values, col_indices, row_ptr, nrows, ncols))
-    }
-}
-
-impl<'a, T: Send + Sync, const C: usize, Arch: SimdArch> SparseCow<'a, T, SellP<C>, Arch> {
-    /// Build an owned SELL-p Cow from raw vectors.
-    #[inline]
-    pub fn from_vecs(
-        values: Vec<T>,
-        col_indices: Vec<i32>,
-        slice_ptr: Vec<i32>,
-        slice_col_count: Vec<i32>,
-        nrows: usize,
-        ncols: usize,
-    ) -> Self {
-        Self::Owned(OwnedSellP::new(
-            values,
-            col_indices,
-            slice_ptr,
-            slice_col_count,
+        Self::Owned(OwnedCsr::new(
+            AlignedVec::from_slice_clone(values),
+            AlignedVec::from_slice(col_indices),
+            AlignedVec::from_slice(row_ptr),
             nrows,
             ncols,
         ))
     }
 }
 
-impl<'a, T: Send + Sync, const BM: usize, const BN: usize, Arch: SimdArch>
+impl<'a, T: Send + Sync + Clone, const C: usize, Arch: SimdArch> SparseCow<'a, T, SellP<C>, Arch> {
+    /// Build an owned SELL-p Cow from slices.
+    #[inline]
+    pub fn from_slices(
+        values: &[T],
+        col_indices: &[i32],
+        slice_ptr: &[i32],
+        slice_col_count: &[i32],
+        nrows: usize,
+        ncols: usize,
+    ) -> Self {
+        Self::Owned(OwnedSellP::new(
+            AlignedVec::from_slice_clone(values),
+            AlignedVec::from_slice(col_indices),
+            AlignedVec::from_slice(slice_ptr),
+            AlignedVec::from_slice(slice_col_count),
+            nrows,
+            ncols,
+        ))
+    }
+}
+
+impl<'a, T: Send + Sync + Clone, const BM: usize, const BN: usize, Arch: SimdArch>
     SparseCow<'a, T, BlockedCoo<BM, BN>, Arch>
 {
-    /// Build an owned Blocked-COO Cow from raw vectors.
+    /// Build an owned Blocked-COO Cow from slices.
     #[inline]
-    pub fn from_vecs(
-        blocks: Vec<T>,
-        block_row: Vec<i32>,
-        block_col: Vec<i32>,
+    pub fn from_slices(
+        blocks: &[T],
+        block_row: &[i32],
+        block_col: &[i32],
         nblocks: usize,
         nrows: usize,
         ncols: usize,
     ) -> Self {
         Self::Owned(OwnedBlockedCoo::new(
-            blocks, block_row, block_col, nblocks, nrows, ncols,
+            AlignedVec::from_slice_clone(blocks),
+            AlignedVec::from_slice(block_row),
+            AlignedVec::from_slice(block_col),
+            nblocks,
+            nrows,
+            ncols,
         ))
     }
 }
 
-impl<'a, T: Send + Sync, Arch: SimdArch> SparseCow<'a, T, DenseWithMask, Arch> {
-    /// Build an owned DenseWithMask Cow from raw vectors.
+impl<'a, T: Send + Sync + Clone, Arch: SimdArch> SparseCow<'a, T, DenseWithMask, Arch> {
+    /// Build an owned DenseWithMask Cow from slices.
     #[inline]
-    pub fn from_vecs(values: Vec<T>, mask: Vec<bool>, nrows: usize, ncols: usize) -> Self {
-        Self::Owned(OwnedDenseWithMask::new(values, mask, nrows, ncols))
+    pub fn from_slices(values: &[T], mask: &[bool], nrows: usize, ncols: usize) -> Self {
+        Self::Owned(OwnedDenseWithMask::new(
+            AlignedVec::from_slice_clone(values),
+            AlignedVec::from_slice(mask),
+            nrows,
+            ncols,
+        ))
+    }
+}
+
+impl<'a, T: Send + Sync, F: CowFormat, Arch: SimdArch> crate::sparse::types::SparseValidate
+    for SparseCow<'a, T, F, Arch>
+where
+    for<'b> F::Storage<'b, T>: crate::sparse::types::SparseValidate,
+    F::Owned<T>: crate::sparse::types::SparseValidate,
+{
+    #[inline]
+    fn validate(&self) -> Result<(), crate::SimdError> {
+        match self {
+            Self::Borrowed(v) => v.validate(),
+            Self::Owned(o) => o.validate(),
+        }
     }
 }

@@ -11,10 +11,6 @@ use core::arch::x86_64::*;
 use hermes_simd_core::kernel::SimdKernel;
 
 /// Newtype over `__m256` so `Send + Sync` can be implemented on the wrapper.
-///
-/// Raw SIMD register types are not `Send`/`Sync` by default; the newtype
-/// carries those bounds because `__m256` contains no pointer indirection and
-/// is safe to move across threads when treated as plain data.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[repr(transparent)]
 #[derive(Copy, Clone)]
@@ -27,9 +23,8 @@ unsafe impl Sync for Avx2F32Vec {}
 
 /// AVX2 f32 blend mask.
 ///
-/// Stored as a `__m256` float register. Lane `i` is active when the sign bit
-/// of `mask[i]` is set (all-ones pattern = `f32::from_bits(0xFFFF_FFFF)`).
-/// This matches the `_mm256_blendv_ps` / `_mm256_maskstore_ps` conventions.
+/// Stored as a `__m256` register. Lane `i` is active when the sign bit
+/// of `mask[i]` is set.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[repr(transparent)]
 #[derive(Copy, Clone)]
@@ -40,7 +35,7 @@ unsafe impl Send for Avx2F32Mask {}
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 unsafe impl Sync for Avx2F32Mask {}
 
-/// AVX2 i32 index vector for f32 gather (8 × i32 in `__m256i`).
+/// AVX2 gather index vector.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[repr(transparent)]
 #[derive(Copy, Clone)]
@@ -151,7 +146,6 @@ impl SimdKernel<f32> for Avx2 {
     #[target_feature(enable = "avx2")]
     #[inline]
     unsafe fn sum_reduce(v: Self::Vector) -> f32 {
-        // Fold 8 → 4 → 2 → 1 using 128-bit halves.
         let hi_quad = _mm256_extractf128_ps(v.0, 1);
         let lo_quad = _mm256_castps256_ps128(v.0);
         let sum_quad = _mm_add_ps(lo_quad, hi_quad);
@@ -174,11 +168,10 @@ impl SimdKernel<f32> for Avx2 {
         src: Self::Vector,
     ) -> Self::Vector {
         let loaded = _mm256_loadu_ps(ptr);
-        // blendv: mask sign bit 1 → loaded; 0 → src.
         Avx2F32Vec(_mm256_blendv_ps(src.0, loaded, mask.0))
     }
 
-    /// Masked store via `_mm256_maskstore_ps`; only lanes with sign bit set are written.
+    /// Masked store via maskstore; only lanes with sign bit set are written.
     #[target_feature(enable = "avx2")]
     #[inline]
     unsafe fn masked_store_unaligned(ptr: *mut f32, mask: Self::Mask, val: Self::Vector) {
@@ -222,7 +215,6 @@ impl SimdKernel<f32> for Avx2 {
         mask: Self::Mask,
     ) -> Self::Vector {
         let result = _mm256_fmadd_ps(a.0, b.0, c.0);
-        // Inactive lanes retain c (addend pass-through, matching mask3_fmadd semantics).
         Avx2F32Vec(_mm256_blendv_ps(c.0, result, mask.0))
     }
 
@@ -235,7 +227,7 @@ impl SimdKernel<f32> for Avx2 {
     }
 
     // -----------------------------------------------------------------------
-    // Compress / Expand (emulated — AVX2 has no native vcompress)
+    // Compress / Expand (emulated)
     // -----------------------------------------------------------------------
 
     #[target_feature(enable = "avx2")]
@@ -246,7 +238,7 @@ impl SimdKernel<f32> for Avx2 {
         _mm256_storeu_ps(arr.as_mut_ptr(), src.0);
         let mut out = [0.0f32; 8];
         let mut k = 0usize;
-        for i in 0..8usize {
+        for i in 0..8 {
             if (mask_bits >> i) & 1 != 0 {
                 out[k] = arr[i];
                 k += 1;
@@ -264,7 +256,7 @@ impl SimdKernel<f32> for Avx2 {
         let mut out_arr = [0.0f32; 8];
         _mm256_storeu_ps(out_arr.as_mut_ptr(), fill.0);
         let mut k = 0usize;
-        for i in 0..8usize {
+        for i in 0..8 {
             if (mask_bits >> i) & 1 != 0 {
                 out_arr[i] = src_arr[k];
                 k += 1;
@@ -277,7 +269,6 @@ impl SimdKernel<f32> for Avx2 {
     // Gather
     // -----------------------------------------------------------------------
 
-    /// Native gather: scale = 4 (byte stride of f32).
     #[target_feature(enable = "avx2")]
     #[inline]
     unsafe fn gather(base: *const f32, indices: Self::IndexVector) -> Self::Vector {
@@ -303,14 +294,8 @@ impl SimdKernel<f32> for Avx2 {
     #[inline]
     unsafe fn mask_from_bools(bits: &[bool]) -> Self::Mask {
         debug_assert_eq!(bits.len(), 8);
-        // Active lane: all-ones bit pattern (sign bit set for blendv).
-        let vals: [f32; 8] = core::array::from_fn(|i| {
-            if bits[i] {
-                f32::from_bits(0xFFFF_FFFF)
-            } else {
-                0.0f32
-            }
-        });
+        let vals: [f32; 8] =
+            core::array::from_fn(|i| if bits[i] { <f32>::from_bits(!0) } else { 0.0 });
         Avx2F32Mask(_mm256_loadu_ps(vals.as_ptr()))
     }
 
@@ -318,13 +303,8 @@ impl SimdKernel<f32> for Avx2 {
     #[inline]
     unsafe fn leading_k_mask(k: usize) -> Self::Mask {
         let k = k.min(8);
-        let vals: [f32; 8] = core::array::from_fn(|i| {
-            if i < k {
-                f32::from_bits(0xFFFF_FFFF)
-            } else {
-                0.0f32
-            }
-        });
+        let vals: [f32; 8] =
+            core::array::from_fn(|i| if i < k { <f32>::from_bits(!0) } else { 0.0 });
         Avx2F32Mask(_mm256_loadu_ps(vals.as_ptr()))
     }
 
@@ -371,7 +351,7 @@ impl SimdKernel<f32> for Avx2 {
     #[target_feature(enable = "avx2")]
     #[inline]
     unsafe fn abs(a: Self::Vector) -> Self::Vector {
-        let sign_mask = _mm256_set1_ps(-0.0f32);
+        let sign_mask = _mm256_set1_ps(-0.0);
         Avx2F32Vec(_mm256_andnot_ps(sign_mask, a.0))
     }
 
@@ -391,6 +371,36 @@ impl SimdKernel<f32> for Avx2 {
     #[inline]
     unsafe fn sqrt(a: Self::Vector) -> Self::Vector {
         Avx2F32Vec(_mm256_sqrt_ps(a.0))
+    }
+
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn recip_sqrt(a: Self::Vector) -> Self::Vector {
+        let y0 = _mm256_rsqrt_ps(a.0);
+        let y0_sq = _mm256_mul_ps(y0, y0);
+        let half_y0 = _mm256_mul_ps(y0, _mm256_set1_ps(0.5));
+        let term = _mm256_fnmadd_ps(a.0, y0_sq, _mm256_set1_ps(3.0));
+        Avx2F32Vec(_mm256_mul_ps(half_y0, term))
+    }
+
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn popcount(a: Self::Vector) -> Self::Vector {
+        let v = _mm256_castps_si256(a.0);
+        let low_mask = _mm256_set1_epi8(0x0F);
+        let lookup = _mm256_setr_epi8(
+            0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2,
+            3, 3, 4,
+        );
+        let lo = _mm256_and_si256(v, low_mask);
+        let hi = _mm256_and_si256(_mm256_srli_epi16(v, 4), low_mask);
+        let pop_lo = _mm256_shuffle_epi8(lookup, lo);
+        let pop_hi = _mm256_shuffle_epi8(lookup, hi);
+        let pop_bytes = _mm256_add_epi8(pop_lo, pop_hi);
+        let pop_u16 = _mm256_maddubs_epi16(pop_bytes, _mm256_set1_epi8(1));
+        let pop_u32 = _mm256_madd_epi16(pop_u16, _mm256_set1_epi16(1));
+        let pop_f32 = _mm256_cvtepi32_ps(pop_u32);
+        Avx2F32Vec(pop_f32)
     }
 
     #[target_feature(enable = "avx2")]

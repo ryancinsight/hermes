@@ -35,18 +35,18 @@ fn binary_lhs_inplace<T, Arch, Align, Op>(
 
     for (chunk_lhs, mut chunk_rhs) in (&mut chunks_lhs).zip(&mut chunks_rhs) {
         unsafe {
-            let va = if Align::IS_ALIGNED {
+            let va = if crate::align::is_aligned_for_arch::<Arch, Align>() {
                 Arch::load_aligned(chunk_lhs.as_ptr())
             } else {
                 Arch::load_unaligned(chunk_lhs.as_ptr())
             };
-            let vb = if Align::IS_ALIGNED {
+            let vb = if crate::align::is_aligned_for_arch::<Arch, Align>() {
                 Arch::load_aligned(chunk_rhs.as_ptr())
             } else {
                 Arch::load_unaligned(chunk_rhs.as_ptr())
             };
             let vr = ElementOp::apply::<Arch>(op, va, vb);
-            if Align::IS_ALIGNED {
+            if crate::align::is_aligned_for_arch::<Arch, Align>() {
                 Arch::store_aligned(chunk_rhs.as_mut_ptr(), vr);
             } else {
                 Arch::store_unaligned(chunk_rhs.as_mut_ptr(), vr);

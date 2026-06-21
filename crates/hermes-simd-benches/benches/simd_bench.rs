@@ -20,6 +20,20 @@ fn scalar_dot(a: &[f32], b: &[f32]) -> f32 {
     })
 }
 
+#[inline(never)]
+fn scalar_sum_f64(data: &[f64]) -> f64 {
+    data.iter()
+        .copied()
+        .fold(0.0f64, |acc, x| black_box(acc + black_box(x)))
+}
+
+#[inline(never)]
+fn scalar_dot_f64(a: &[f64], b: &[f64]) -> f64 {
+    a.iter().zip(b.iter()).fold(0.0f64, |acc, (&x, &y)| {
+        black_box(acc + black_box(x) * black_box(y))
+    })
+}
+
 fn bench_sum(c: &mut Criterion) {
     let mut group = c.benchmark_group("Dense Sum f32");
     for &size in &[256usize, 1024, 16384, 65536, 1 << 20] {
@@ -31,6 +45,20 @@ fn bench_sum(c: &mut Criterion) {
         });
         group.bench_with_input(BenchmarkId::new("dispatch", size), &size, |b, _| {
             b.iter(|| sum::<f32>(black_box(&data)))
+        });
+    }
+    group.finish();
+
+    let mut group = c.benchmark_group("Dense Sum f64");
+    for &size in &[256usize, 1024, 16384, 65536, 1 << 20] {
+        let data = vec![1.0f64; size];
+        group.throughput(Throughput::Elements(size as u64));
+
+        group.bench_with_input(BenchmarkId::new("scalar_iter", size), &size, |b, _| {
+            b.iter(|| scalar_sum_f64(black_box(&data)))
+        });
+        group.bench_with_input(BenchmarkId::new("dispatch", size), &size, |b, _| {
+            b.iter(|| sum::<f64>(black_box(&data)))
         });
     }
     group.finish();
@@ -50,6 +78,23 @@ fn bench_dot(c: &mut Criterion) {
         );
         group.bench_with_input(BenchmarkId::new("dispatch", size), &size, |bencher, _| {
             bencher.iter(|| dot::<f32>(black_box(&a), black_box(&b)).unwrap())
+        });
+    }
+    group.finish();
+
+    let mut group = c.benchmark_group("Dense Dot f64");
+    for &size in &[256usize, 1024, 16384, 65536] {
+        let a = vec![1.0f64; size];
+        let b = vec![2.0f64; size];
+        group.throughput(Throughput::Elements(size as u64));
+
+        group.bench_with_input(
+            BenchmarkId::new("scalar_iter", size),
+            &size,
+            |bencher, _| bencher.iter(|| scalar_dot_f64(black_box(&a), black_box(&b))),
+        );
+        group.bench_with_input(BenchmarkId::new("dispatch", size), &size, |bencher, _| {
+            bencher.iter(|| dot::<f64>(black_box(&a), black_box(&b)).unwrap())
         });
     }
     group.finish();

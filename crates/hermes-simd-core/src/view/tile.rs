@@ -96,7 +96,7 @@ impl<
         'a,
         T: NumericElement,
         Backend,
-        Arch,
+        Arch: crate::arch::SimdArch,
         const ROWS: usize,
         const COLS: usize,
         Align: Alignment,
@@ -110,6 +110,10 @@ impl<
             return None;
         }
         if Align::IS_ALIGNED {
+            let req_align = Arch::REGISTER_WIDTH_BITS as usize / 8;
+            if req_align > 0 && Align::ALIGN_BYTES < req_align {
+                return None;
+            }
             let addr = data.as_ptr() as usize;
             if addr % Align::ALIGN_BYTES != 0 {
                 return None;
@@ -127,7 +131,7 @@ impl<
         'a,
         T: NumericElement,
         Backend,
-        Arch,
+        Arch: crate::arch::SimdArch,
         const ROWS: usize,
         const COLS: usize,
         Align: Alignment,
@@ -141,6 +145,10 @@ impl<
             return None;
         }
         if Align::IS_ALIGNED {
+            let req_align = Arch::REGISTER_WIDTH_BITS as usize / 8;
+            if req_align > 0 && Align::ALIGN_BYTES < req_align {
+                return None;
+            }
             let addr = data.as_ptr() as usize;
             if addr % Align::ALIGN_BYTES != 0 {
                 return None;

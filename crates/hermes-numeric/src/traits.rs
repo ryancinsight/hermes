@@ -21,6 +21,7 @@ pub trait NumericElement:
     + core::ops::MulAssign
     + core::ops::Div<Output = Self>
     + core::ops::Neg<Output = Self>
+    + CastFrom<i32>
 {
     /// Additive identity.
     const ZERO: Self;
@@ -59,6 +60,8 @@ pub trait NumericElement:
     fn bitor(self, rhs: Self) -> Self;
     /// Bitwise XOR.
     fn bitxor(self, rhs: Self) -> Self;
+    /// Count set bits (population count).
+    fn count_ones(self) -> u32;
 
     /// Elementwise minimum: returns `self` if `self <= other`, else `other`.
     ///

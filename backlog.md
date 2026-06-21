@@ -85,6 +85,9 @@ complete SIMD substrate for leto-ops/coeus hot kernels:
       `https://github.com/NikoMalik/highway.git` at
       `0984271e74db124cf5e200de542e745348eb0b9e` and recorded Hermes-native
       gaps in [gap_audit.md](gap_audit.md#highway-2026-06-14).
+- [x] **[patch] NumKong comparison audit** (2026-06-17): audited
+      `https://github.com/ashvardanian/NumKong` and recorded Hermes-native
+      gaps in [gap_audit.md](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17).
 - [x] **[minor] Target-token forced dispatch**: add a Hermes `TargetId` and
       `dispatch_to`-style test/benchmark surface that checks CPU support before
       entering target-feature trampolines. Driver:
@@ -97,10 +100,9 @@ complete SIMD substrate for leto-ops/coeus hot kernels:
       preserving raw-pointer kernels for hoisted hot loops. Driver:
       [gap_audit.md#highway-2026-06-14](gap_audit.md#highway-2026-06-14).
       Delivered 2026-06-14 on `Vector<T, Arch>` with exact failure tests.
-- [ ] **[arch] SSE2 backend feasibility ADR**: evaluate a 128-bit x86_64
-      backend between Scalar and AVX2, including trait coverage, CI value, and
-      maintenance cost. Driver:
-      [gap_audit.md#highway-2026-06-14](gap_audit.md#highway-2026-06-14).
+- [x] **[arch] SSE2 backend feasibility ADR** (delivered 2026-06-21): evaluated a 128-bit
+      x86_64 backend between Scalar and AVX2, resulting in ADR 006 recommending
+      relying on compiler auto-vectorization or evaluating SSE4.1/SSSE3 as a modern baseline.
 - [x] **[minor] Public dense facade cross-target matrix**: force every
       supported target available on the host and compare public dense facade
       results against Scalar for representative arithmetic, mask, reduction,
@@ -190,6 +192,14 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
       view/cow/sparse pointer logic in hermes-simd-core).
 - [x] **[patch] no_std + feature matrix** (delivered post-0.2.0: runtime_dispatch std-gating fixed, --no-default-features green + CI step; broader feature-combination sweep remains open): verify `--no-default-features` and
       key feature combinations build and pass.
+- [x] **[minor] Fast reciprocal square root** (delivered 2026-06-21): implement `ops::RecipSqrt` (or `rsqrt`)
+      with a Newton-Raphson refinement step for floating-point scalars, enabling Leto
+      to avoid standard `sqrt` latency in normalized vector operations. Driver:
+      [gap_audit.md](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17).
+- [x] **[arch] Masked tail-load/store API infrastructure** (delivered 2026-06-21): expose active-lane masked
+      load and store helpers in `SimdKernel` and `Vector<T, Arch>`/`Mask<T, Arch>`
+      for `Avx512` and `SveArch` so Leto can run tail-free kernels. Driver:
+      [gap_audit.md](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17).
 
 ## P2 — Performance & memory <a id="p2"></a>
 
@@ -214,6 +224,14 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
       iteration before the single-register and scalar tails. Criterion
       validation on this host showed runtime improvement across 256, 1K, 4K,
       and 16K complex-pair inputs.
+- [x] **[minor] Expose popcount and horizontal reductions** (delivered 2026-06-21): add SIMD population
+      count (`popcnt`) and bitwise horizontal fold/reduction primitives to the facade,
+      enabling Leto/Hephaestus to implement Jaccard and Hamming distance metrics. Driver:
+      [gap_audit.md](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17).
+- [x] **[minor] Sub-byte sign-extension and unpacking/widening** (delivered 2026-06-21): implement vector
+      sign-extension and unpacking primitives for `Bf4`/`F4`/`I8` types to support
+      quantized dot product optimizations in Leto. Driver:
+      [gap_audit.md](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17).
 
 ## P3 — Architecture & maintenance <a id="p3"></a>
 
@@ -222,10 +240,9 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
       explicit target-feature contract. The portable surface remains
       `TileMatrixMultiply`/runtime dispatch; asm is not promoted to a separate
       public abstraction.
-- [ ] **[arch] Per-type x86 kernel dedup**: avx2_f32/avx2_f64/avx512_f32/
-      avx512_f64 share method-body shape differing only in intrinsic suffix and
-      lane count. Evaluate build-time generation (`build.rs` generator preferred
-      over `macro_rules!`) — maintenance payoff only; requires ADR.
+- [x] **[arch] Per-type x86 kernel dedup** (delivered 2026-06-21): evaluated build-time
+      code generation vs macros for AVX2/AVX-512 duplication, resulting in
+      ADR 005 recommending build-time code generation via a custom `build.rs` script.
 - [x] **[patch] SVE callable fallback**: removed `unimplemented!()` SVE
       `SimdKernel` methods and routed `SveArch` f32/f64 through the existing
       lane-emulated kernel macro with value-semantic tests.
@@ -235,6 +252,10 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
 - [ ] **[minor] Native SVE backend**: hardware intrinsic implementation remains
       blocked on stable `core::arch::aarch64` SVE vector types; revisit on
       toolchain updates.
+- [x] **[minor] Arm SME target feasibility study**: evaluate outer-product based
+      tiled matrix multiplication kernels for Apple M4/M5 platforms. Driver:
+      [gap_audit.md](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17).
+      Delivered 2026-06-21 as ADR 007 feasibility study.
 - [x] **[minor] NUMA module status** (audited 2026-06-11): `numa.rs` IS
       integrated — `hermes-simd::dispatcher` uses `NumaTopologyService`/
       `verify_numa_locality`, `vec` uses `NumaAllocator`, and types_tests

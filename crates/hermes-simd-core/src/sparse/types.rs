@@ -318,3 +318,133 @@ impl<T, V: AsRef<[T]>, M: AsRef<[bool]>> DenseWithMaskMatrix<T, V, M> {
 
 /// Backward-compatible type alias.
 pub type DenseWithMaskData<'a, T> = DenseWithMaskMatrix<T, &'a [T], &'a [bool]>;
+
+/// Trait for validating the structural soundness of sparse matrices.
+pub trait SparseValidate {
+    /// Validate structural correctness and bounds checks.
+    fn validate(&self) -> Result<(), crate::SimdError>;
+}
+
+impl<T, V: AsRef<[T]>, I: AsRef<[i32]>> SparseValidate for CsrMatrix<T, V, I> {
+    fn validate(&self) -> Result<(), crate::SimdError> {
+        let values = self.values.as_ref();
+        let col_indices = self.col_indices.as_ref();
+        let row_ptr = self.row_ptr.as_ref();
+
+        if col_indices.len() != values.len() {
+            return Err(crate::SimdError::LengthMismatch);
+        }
+        if row_ptr.len() != self.nrows + 1 {
+            return Err(crate::SimdError::LengthMismatch);
+        }
+        if row_ptr[0] != 0 {
+            return Err(crate::SimdError::IndexOutOfBounds);
+        }
+        if row_ptr[self.nrows] as usize != values.len() {
+            return Err(crate::SimdError::LengthMismatch);
+        }
+        for i in 0..self.nrows {
+            let start = row_ptr[i];
+            let end = row_ptr[i + 1];
+            if start < 0 || end < start || end as usize > values.len() {
+                return Err(crate::SimdError::IndexOutOfBounds);
+            }
+        }
+        for &col in col_indices {
+            if col < 0 || col >= self.ncols as i32 {
+                return Err(crate::SimdError::IndexOutOfBounds);
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<T, const C: usize, V: AsRef<[T]>, I: AsRef<[i32]>> SparseValidate for SellPMatrix<T, C, V, I> {
+    fn validate(&self) -> Result<(), crate::SimdError> {
+        let values = self.values.as_ref();
+        let col_indices = self.col_indices.as_ref();
+        let slice_ptr = self.slice_ptr.as_ref();
+        let slice_col_count = self.slice_col_count.as_ref();
+
+        if col_indices.len() != values.len() {
+            return Err(crate::SimdError::LengthMismatch);
+        }
+        let nslices = self.nslices();
+        if slice_ptr.len() < nslices + 1 {
+            return Err(crate::SimdError::LengthMismatch);
+        }
+        if slice_col_count.len() < nslices {
+            return Err(crate::SimdError::LengthMismatch);
+        }
+        if slice_ptr[0] != 0 {
+            return Err(crate::SimdError::IndexOutOfBounds);
+        }
+        for s in 0..nslices {
+            let start = slice_ptr[s];
+            let end = slice_ptr[s + 1];
+            if start < 0 || end < start || end as usize > values.len() {
+                return Err(crate::SimdError::IndexOutOfBounds);
+            }
+            let col_count = slice_col_count[s];
+            if col_count < 0 {
+                return Err(crate::SimdError::IndexOutOfBounds);
+            }
+            if start as usize + col_count as usize * C > values.len() {
+                return Err(crate::SimdError::LengthMismatch);
+            }
+        }
+        for &col in col_indices {
+            if col < 0 || col >= self.ncols as i32 {
+                return Err(crate::SimdError::IndexOutOfBounds);
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<T, const BM: usize, const BN: usize, V: AsRef<[T]>, I: AsRef<[i32]>> SparseValidate
+    for BlockedCooMatrix<T, BM, BN, V, I>
+{
+    fn validate(&self) -> Result<(), crate::SimdError> {
+        let blocks = self.blocks.as_ref();
+        let block_row = self.block_row.as_ref();
+        let block_col = self.block_col.as_ref();
+
+        if blocks.len() < self.nblocks * BM * BN {
+            return Err(crate::SimdError::LengthMismatch);
+        }
+        if block_row.len() < self.nblocks {
+            return Err(crate::SimdError::LengthMismatch);
+        }
+        if block_col.len() < self.nblocks {
+            return Err(crate::SimdError::LengthMismatch);
+        }
+        for b in 0..self.nblocks {
+            let br = block_row[b];
+            let bc = block_col[b];
+            if br < 0 || br as usize + BM > self.nrows {
+                return Err(crate::SimdError::IndexOutOfBounds);
+            }
+            if bc < 0 || bc as usize + BN > self.ncols {
+                return Err(crate::SimdError::IndexOutOfBounds);
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<T, V: AsRef<[T]>, M: AsRef<[bool]>> SparseValidate for DenseWithMaskMatrix<T, V, M> {
+    fn validate(&self) -> Result<(), crate::SimdError> {
+        let values = self.values.as_ref();
+        let mask = self.mask.as_ref();
+
+        let req_len = self.nrows * self.ncols;
+        if values.len() < req_len {
+            return Err(crate::SimdError::LengthMismatch);
+        }
+        if mask.len() < values.len() {
+            return Err(crate::SimdError::LengthMismatch);
+        }
+        Ok(())
+    }
+}

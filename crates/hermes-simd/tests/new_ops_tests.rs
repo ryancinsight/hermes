@@ -508,3 +508,25 @@ fn test_scale_odd_length() {
     scale(&mut data, 2.0);
     assert_eq!(&data, &[2.0f32, 4.0, 6.0]);
 }
+
+#[test]
+fn test_reduce_popcount_dispatch() {
+    use hermes_simd::{
+        reduce_popcount, reduce_popcount_and, reduce_popcount_or, reduce_popcount_xor,
+    };
+
+    let a = [0b0001i32, 0b0011, 0b0111, 0b1111, 0b0000]; // popcounts: 1, 2, 3, 4, 0 -> sum = 10
+    let b = [0b0011i32, 0b0011, 0b0011, 0b0011, 0b0011]; // popcounts: 2, 2, 2, 2, 2 -> sum = 10
+
+    assert_eq!(reduce_popcount(&a), 10);
+    assert_eq!(reduce_popcount(&b), 10);
+
+    // a & b = [0b0001, 0b0011, 0b0011, 0b0011, 0b0000] -> popcounts: 1, 2, 2, 2, 0 -> sum = 7
+    assert_eq!(reduce_popcount_and(&a, &b).unwrap(), 7);
+
+    // a | b = [0b0011, 0b0011, 0b0111, 0b1111, 0b0011] -> popcounts: 2, 2, 3, 4, 2 -> sum = 13
+    assert_eq!(reduce_popcount_or(&a, &b).unwrap(), 13);
+
+    // a ^ b = [0b0010, 0b0000, 0b0100, 0b1100, 0b0011] -> popcounts: 1, 0, 1, 2, 2 -> sum = 6
+    assert_eq!(reduce_popcount_xor(&a, &b).unwrap(), 6);
+}

@@ -131,6 +131,10 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
     #[inline]
     pub fn new(data: &'a [T]) -> Option<Self> {
         if Align::IS_ALIGNED {
+            let req_align = Arch::REGISTER_WIDTH_BITS as usize / 8;
+            if req_align > 0 && Align::ALIGN_BYTES < req_align {
+                return None;
+            }
             let addr = data.as_ptr() as usize;
             if addr % Align::ALIGN_BYTES != 0 {
                 return None;
@@ -151,6 +155,10 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
     #[inline]
     pub fn new_mut(data: &'a mut [T]) -> Option<Self> {
         if Align::IS_ALIGNED {
+            let req_align = Arch::REGISTER_WIDTH_BITS as usize / 8;
+            if req_align > 0 && Align::ALIGN_BYTES < req_align {
+                return None;
+            }
             let addr = data.as_ptr() as usize;
             if addr % Align::ALIGN_BYTES != 0 {
                 return None;
@@ -214,6 +222,10 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode, Ref: 'a>
     pub fn try_into_aligned<const A: usize>(
         self,
     ) -> Option<SimdView<'a, T, Arch, crate::align::Aligned<A>, Mode, Ref>> {
+        let req_align = Arch::REGISTER_WIDTH_BITS as usize / 8;
+        if req_align > 0 && A < req_align {
+            return None;
+        }
         let addr = self.as_slice().as_ptr() as usize;
         if addr % A == 0 {
             Some(SimdView {
@@ -249,6 +261,10 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
         self,
         range: core::ops::Range<usize>,
     ) -> Option<SimdView<'a, T, Arch, crate::align::Aligned<A>, Mode, &'a [T]>> {
+        let req_align = Arch::REGISTER_WIDTH_BITS as usize / 8;
+        if req_align > 0 && A < req_align {
+            return None;
+        }
         let sub = &self.as_slice()[range];
         let addr = sub.as_ptr() as usize;
         if addr % A == 0 {
@@ -285,6 +301,10 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
         mut self,
         range: core::ops::Range<usize>,
     ) -> Option<SimdView<'a, T, Arch, crate::align::Aligned<A>, Mode, &'a mut [T]>> {
+        let req_align = Arch::REGISTER_WIDTH_BITS as usize / 8;
+        if req_align > 0 && A < req_align {
+            return None;
+        }
         let sub = &mut self.as_slice_mut()[range];
         let addr = sub.as_ptr() as usize;
         if addr % A == 0 {

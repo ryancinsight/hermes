@@ -58,7 +58,7 @@ where
     let tiled_len = (len / tile_width) * tile_width;
 
     let load = |ptr: *const T| -> Arch::Vector {
-        if Align::IS_ALIGNED {
+        if crate::align::is_aligned_for_arch::<Arch, Align>() {
             unsafe { Arch::load_aligned(ptr) }
         } else {
             unsafe { Arch::load_unaligned(ptr) }

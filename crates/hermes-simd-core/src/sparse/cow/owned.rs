@@ -3,17 +3,18 @@
 use super::super::{
     types::{
         BlockedCooData, BlockedCooMatrix, CsrData, CsrMatrix, DenseWithMaskData,
-        DenseWithMaskMatrix, SellPData, SellPMatrix,
+        DenseWithMaskMatrix, SellPData, SellPMatrix, SparseValidate,
     },
     SparseShape,
 };
-use alloc::vec::Vec;
+use crate::align::Aligned;
+use crate::vec::AlignedVec;
 
 /// Owned heap-backed CSR storage.
 pub struct OwnedCsr<T> {
-    pub(crate) values: Vec<T>,
-    pub(crate) col_indices: Vec<i32>,
-    pub(crate) row_ptr: Vec<i32>,
+    pub(crate) values: AlignedVec<T, Aligned<64>>,
+    pub(crate) col_indices: AlignedVec<i32, Aligned<64>>,
+    pub(crate) row_ptr: AlignedVec<i32, Aligned<64>>,
     pub(crate) nrows: usize,
     pub(crate) ncols: usize,
 }
@@ -22,9 +23,9 @@ impl<T> OwnedCsr<T> {
     /// Construct owned CSR storage.
     #[inline]
     pub fn new(
-        values: Vec<T>,
-        col_indices: Vec<i32>,
-        row_ptr: Vec<i32>,
+        values: AlignedVec<T, Aligned<64>>,
+        col_indices: AlignedVec<i32, Aligned<64>>,
+        row_ptr: AlignedVec<i32, Aligned<64>>,
         nrows: usize,
         ncols: usize,
     ) -> Self {
@@ -61,12 +62,19 @@ impl<T> SparseShape for OwnedCsr<T> {
     }
 }
 
+impl<T> SparseValidate for OwnedCsr<T> {
+    #[inline]
+    fn validate(&self) -> Result<(), crate::SimdError> {
+        self.as_view().validate()
+    }
+}
+
 /// Owned heap-backed SELL-p storage.
 pub struct OwnedSellP<T, const C: usize> {
-    pub(crate) values: Vec<T>,
-    pub(crate) col_indices: Vec<i32>,
-    pub(crate) slice_ptr: Vec<i32>,
-    pub(crate) slice_col_count: Vec<i32>,
+    pub(crate) values: AlignedVec<T, Aligned<64>>,
+    pub(crate) col_indices: AlignedVec<i32, Aligned<64>>,
+    pub(crate) slice_ptr: AlignedVec<i32, Aligned<64>>,
+    pub(crate) slice_col_count: AlignedVec<i32, Aligned<64>>,
     pub(crate) nrows: usize,
     pub(crate) ncols: usize,
 }
@@ -75,10 +83,10 @@ impl<T, const C: usize> OwnedSellP<T, C> {
     /// Construct owned SELL-p storage.
     #[inline]
     pub fn new(
-        values: Vec<T>,
-        col_indices: Vec<i32>,
-        slice_ptr: Vec<i32>,
-        slice_col_count: Vec<i32>,
+        values: AlignedVec<T, Aligned<64>>,
+        col_indices: AlignedVec<i32, Aligned<64>>,
+        slice_ptr: AlignedVec<i32, Aligned<64>>,
+        slice_col_count: AlignedVec<i32, Aligned<64>>,
         nrows: usize,
         ncols: usize,
     ) -> Self {
@@ -117,11 +125,18 @@ impl<T, const C: usize> SparseShape for OwnedSellP<T, C> {
     }
 }
 
+impl<T, const C: usize> SparseValidate for OwnedSellP<T, C> {
+    #[inline]
+    fn validate(&self) -> Result<(), crate::SimdError> {
+        self.as_view().validate()
+    }
+}
+
 /// Owned heap-backed Blocked-COO storage.
 pub struct OwnedBlockedCoo<T, const BM: usize, const BN: usize> {
-    pub(crate) blocks: Vec<T>,
-    pub(crate) block_row: Vec<i32>,
-    pub(crate) block_col: Vec<i32>,
+    pub(crate) blocks: AlignedVec<T, Aligned<64>>,
+    pub(crate) block_row: AlignedVec<i32, Aligned<64>>,
+    pub(crate) block_col: AlignedVec<i32, Aligned<64>>,
     pub(crate) nblocks: usize,
     pub(crate) nrows: usize,
     pub(crate) ncols: usize,
@@ -131,9 +146,9 @@ impl<T, const BM: usize, const BN: usize> OwnedBlockedCoo<T, BM, BN> {
     /// Construct owned Blocked-COO storage.
     #[inline]
     pub fn new(
-        blocks: Vec<T>,
-        block_row: Vec<i32>,
-        block_col: Vec<i32>,
+        blocks: AlignedVec<T, Aligned<64>>,
+        block_row: AlignedVec<i32, Aligned<64>>,
+        block_col: AlignedVec<i32, Aligned<64>>,
         nblocks: usize,
         nrows: usize,
         ncols: usize,
@@ -173,10 +188,17 @@ impl<T, const BM: usize, const BN: usize> SparseShape for OwnedBlockedCoo<T, BM,
     }
 }
 
+impl<T, const BM: usize, const BN: usize> SparseValidate for OwnedBlockedCoo<T, BM, BN> {
+    #[inline]
+    fn validate(&self) -> Result<(), crate::SimdError> {
+        self.as_view().validate()
+    }
+}
+
 /// Owned heap-backed DenseWithMask storage.
 pub struct OwnedDenseWithMask<T> {
-    pub(crate) values: Vec<T>,
-    pub(crate) mask: Vec<bool>,
+    pub(crate) values: AlignedVec<T, Aligned<64>>,
+    pub(crate) mask: AlignedVec<bool, Aligned<64>>,
     pub(crate) nrows: usize,
     pub(crate) ncols: usize,
 }
@@ -184,7 +206,12 @@ pub struct OwnedDenseWithMask<T> {
 impl<T> OwnedDenseWithMask<T> {
     /// Construct owned DenseWithMask storage.
     #[inline]
-    pub fn new(values: Vec<T>, mask: Vec<bool>, nrows: usize, ncols: usize) -> Self {
+    pub fn new(
+        values: AlignedVec<T, Aligned<64>>,
+        mask: AlignedVec<bool, Aligned<64>>,
+        nrows: usize,
+        ncols: usize,
+    ) -> Self {
         Self {
             values,
             mask,
@@ -213,5 +240,12 @@ impl<T> SparseShape for OwnedDenseWithMask<T> {
     #[inline(always)]
     fn ncols(&self) -> usize {
         self.ncols
+    }
+}
+
+impl<T> SparseValidate for OwnedDenseWithMask<T> {
+    #[inline]
+    fn validate(&self) -> Result<(), crate::SimdError> {
+        self.as_view().validate()
     }
 }

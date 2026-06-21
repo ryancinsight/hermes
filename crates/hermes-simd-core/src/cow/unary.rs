@@ -58,14 +58,14 @@ where
 
         unsafe {
             let load = |p: *const T| -> Arch::Vector {
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(p)
                 } else {
                     Arch::load_unaligned(p)
                 }
             };
             let store = |p: *mut T, v: Arch::Vector| {
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::store_aligned(p, v);
                 } else {
                     Arch::store_unaligned(p, v);
@@ -121,14 +121,14 @@ where
 
         unsafe {
             let load = |p: *const T| -> Arch::Vector {
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(p)
                 } else {
                     Arch::load_unaligned(p)
                 }
             };
             let store = |p: *mut T, v: Arch::Vector| {
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::store_aligned(p, v);
                 } else {
                     Arch::store_unaligned(p, v);

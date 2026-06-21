@@ -71,13 +71,13 @@ where
         unsafe {
             while i + lane_count <= len {
                 let m = Arch::mask_from_bools(&mask[i..i + lane_count]);
-                let vb = if Align::IS_ALIGNED {
+                let vb = if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(b.as_ptr().add(i))
                 } else {
                     Arch::load_unaligned(b.as_ptr().add(i))
                 };
                 let v_res = Arch::masked_load_unaligned(a.as_ptr().add(i), m, vb);
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::store_aligned(out_slice.as_mut_ptr().add(i), v_res);
                 } else {
                     Arch::store_unaligned(out_slice.as_mut_ptr().add(i), v_res);
@@ -120,7 +120,7 @@ where
         let mut i = 0;
         unsafe {
             while i + lane_count <= len {
-                let v = if Align::IS_ALIGNED {
+                let v = if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(data.as_ptr().add(i))
                 } else {
                     Arch::load_unaligned(data.as_ptr().add(i))
@@ -129,7 +129,7 @@ where
                 let vmask = Arch::mask_to_vector(m);
                 let neg_v = Arch::neg(v);
                 let v_res = Arch::blend(vmask, neg_v, v);
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::store_aligned(out_slice.as_mut_ptr().add(i), v_res);
                 } else {
                     Arch::store_unaligned(out_slice.as_mut_ptr().add(i), v_res);

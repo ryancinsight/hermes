@@ -72,8 +72,8 @@ pub use numa::{
 };
 pub use ops::{
     Abs, AbsMax, AbsSum, Add, BitAnd, BitOr, BitXor, Clamp, Div, Dot, ElementOp, Exclusive, FmaAdd,
-    Inclusive, Max, Min, Mul, Neg, Product, ReductionOp, ScanAdd, ScanMax, ScanMin, ScanMode,
-    ScanMul, ScanOp, Sqrt, Sub, Sum, UnaryOp,
+    Inclusive, Max, Min, Mul, Neg, Popcount, Product, RecipSqrt, ReductionOp, ScanAdd, ScanMax,
+    ScanMin, ScanMode, ScanMul, ScanOp, Sqrt, Sub, Sum, UnaryOp,
 };
 pub use scalar::{FloatElement, NumericElement, Scalar};
 pub use sparse::{

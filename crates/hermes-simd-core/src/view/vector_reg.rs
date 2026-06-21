@@ -49,7 +49,7 @@ where
             lane_count <= 128,
             "LANE_COUNT exceeds maximum debug buffer size of 128"
         );
-        let mut buf = [unsafe { core::mem::zeroed::<T>() }; 128];
+        let mut buf = [T::ZERO; 128];
         unsafe {
             Arch::store_unaligned(buf.as_mut_ptr(), self.raw);
         }
@@ -66,8 +66,8 @@ where
     fn eq(&self, other: &Self) -> bool {
         let lane_count = Arch::LANE_COUNT;
         assert!(lane_count <= 128);
-        let mut buf_self = [unsafe { core::mem::zeroed::<T>() }; 128];
-        let mut buf_other = [unsafe { core::mem::zeroed::<T>() }; 128];
+        let mut buf_self = [T::ZERO; 128];
+        let mut buf_other = [T::ZERO; 128];
         unsafe {
             Arch::store_unaligned(buf_self.as_mut_ptr(), self.raw);
             Arch::store_unaligned(buf_other.as_mut_ptr(), other.raw);
@@ -145,6 +145,24 @@ where
         Arch::store_unaligned(ptr, self.raw);
     }
 
+    /// Masked load from an unaligned pointer: active lanes loaded from `ptr`, inactive lanes from `src`.
+    ///
+    /// # Safety
+    /// `ptr` must be valid for reads.
+    #[inline(always)]
+    pub unsafe fn masked_load_unaligned(ptr: *const T, mask: Mask<T, Arch>, src: Self) -> Self {
+        Self::new(Arch::masked_load_unaligned(ptr, mask.raw, src.raw))
+    }
+
+    /// Masked store to an unaligned pointer: active lanes written to `ptr`, inactive lanes left unchanged.
+    ///
+    /// # Safety
+    /// `ptr` must be valid for writes.
+    #[inline(always)]
+    pub unsafe fn masked_store_unaligned(self, ptr: *mut T, mask: Mask<T, Arch>) {
+        Arch::masked_store_unaligned(ptr, mask.raw, self.raw);
+    }
+
     /// Load one vector from the start of a slice using the unaligned kernel load.
     ///
     /// Returns [`SimdError::InsufficientInputLength`] when `data` has fewer
@@ -213,10 +231,110 @@ where
         Ok(())
     }
 
+    /// Safe masked load from a slice.
+    ///
+    /// Active lanes (according to `mask`) must reside within the bounds of `data`.
+    /// Inactive lanes are populated from the corresponding lanes of `src`.
+    #[inline]
+    pub fn masked_load_from_slice(
+        data: &[T],
+        mask: Mask<T, Arch>,
+        src: Self,
+    ) -> Result<Self, SimdError> {
+        let len = data.len();
+        let bm = unsafe { mask.to_bitmask().0 };
+        let is_out_of_bounds = if len < 64 { (bm >> len) != 0 } else { false };
+        if is_out_of_bounds {
+            return Err(SimdError::IndexOutOfBounds);
+        }
+
+        if len >= Arch::LANE_COUNT {
+            // SAFETY: data has at least LANE_COUNT elements, and we verified that no active lane index
+            // is beyond the slice bounds (since len >= LANE_COUNT).
+            // Hence, it is safe to load directly.
+            unsafe { Ok(Self::masked_load_unaligned(data.as_ptr(), mask, src)) }
+        } else {
+            // Short slice path to prevent page faults: copy to stack-aligned buffer of size 128.
+            #[repr(C, align(64))]
+            struct AlignedBuf<T>([T; 128]);
+
+            let mut buf = AlignedBuf([T::ZERO; 128]);
+            buf.0[..len].copy_from_slice(data);
+
+            unsafe { Ok(Self::masked_load_unaligned(buf.0.as_ptr(), mask, src)) }
+        }
+    }
+
+    /// Safe masked store to a slice.
+    ///
+    /// Active lanes (according to `mask`) must reside within the bounds of `data`.
+    /// Inactive lanes in the slice are left unchanged.
+    #[inline]
+    pub fn masked_store_to_slice(
+        self,
+        data: &mut [T],
+        mask: Mask<T, Arch>,
+    ) -> Result<(), SimdError> {
+        let len = data.len();
+        let bm = unsafe { mask.to_bitmask().0 };
+        let is_out_of_bounds = if len < 64 { (bm >> len) != 0 } else { false };
+        if is_out_of_bounds {
+            return Err(SimdError::IndexOutOfBounds);
+        }
+
+        if len >= Arch::LANE_COUNT {
+            // SAFETY: data has at least LANE_COUNT elements, and we verified that no active lane index
+            // is beyond the slice bounds (since len >= LANE_COUNT).
+            // Hence, it is safe to store directly.
+            unsafe {
+                self.masked_store_unaligned(data.as_mut_ptr(), mask);
+            }
+        } else {
+            // Short slice path to prevent page faults: copy to stack-aligned buffer, perform masked store,
+            // then copy active elements back.
+            #[repr(C, align(64))]
+            struct AlignedBuf<T>([T; 128]);
+
+            let mut buf = AlignedBuf([T::ZERO; 128]);
+            buf.0[..len].copy_from_slice(data);
+
+            unsafe {
+                self.masked_store_unaligned(buf.0.as_mut_ptr(), mask);
+            }
+
+            data.copy_from_slice(&buf.0[..len]);
+        }
+        Ok(())
+    }
+
     /// Horizontal sum reduction of all lanes in the Vector.
     #[inline(always)]
     pub fn sum_reduce(self) -> T {
         unsafe { Arch::sum_reduce(self.raw) }
+    }
+
+    /// Elementwise population count (number of set bits).
+    #[inline(always)]
+    pub fn popcount(self) -> Self {
+        Self::new(unsafe { Arch::popcount(self.raw) })
+    }
+
+    /// Horizontal bitwise AND reduction across all lanes.
+    #[inline(always)]
+    pub fn horizontal_bitwise_and(self) -> T {
+        unsafe { Arch::horizontal_bitwise_and(self.raw) }
+    }
+
+    /// Horizontal bitwise OR reduction across all lanes.
+    #[inline(always)]
+    pub fn horizontal_bitwise_or(self) -> T {
+        unsafe { Arch::horizontal_bitwise_or(self.raw) }
+    }
+
+    /// Horizontal bitwise XOR reduction across all lanes.
+    #[inline(always)]
+    pub fn horizontal_bitwise_xor(self) -> T {
+        unsafe { Arch::horizontal_bitwise_xor(self.raw) }
     }
 
     /// Elementwise absolute value.
@@ -418,7 +536,7 @@ where
             "Chunk index out of bounds"
         );
         unsafe {
-            if Align::IS_ALIGNED {
+            if crate::align::is_aligned_for_arch::<Arch, Align>() {
                 Self::load_aligned(slice.as_ptr().add(offset))
             } else {
                 Self::load_unaligned(slice.as_ptr().add(offset))
@@ -443,7 +561,7 @@ where
             "Chunk index out of bounds"
         );
         unsafe {
-            if Align::IS_ALIGNED {
+            if crate::align::is_aligned_for_arch::<Arch, Align>() {
                 self.store_aligned(slice.as_mut_ptr().add(offset));
             } else {
                 self.store_unaligned(slice.as_mut_ptr().add(offset));

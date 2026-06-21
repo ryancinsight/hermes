@@ -141,3 +141,15 @@ where
         self.data.ncols()
     }
 }
+
+impl<'a, T: 'a, Format, Arch> super::types::SparseValidate for SparseView<'a, T, Format, Arch>
+where
+    Format: SparseFormat,
+    Arch: SimdArch,
+    Format::Storage<'a, T>: super::types::SparseValidate,
+{
+    #[inline]
+    fn validate(&self) -> Result<(), crate::SimdError> {
+        self.data.validate()
+    }
+}

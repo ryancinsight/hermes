@@ -8,11 +8,11 @@ authors.workspace = true
 description.workspace = true
 
 [dependencies]
-hermes-simd-core = { path = "../hermes-simd-core", version = "0.2.0", default-features = false }
-hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.2.0", default-features = false }
-hermes-numeric = { path = "../hermes-numeric", version = "0.2.0", default-features = false }
-hermes-simd-macros = { path = "../hermes-simd-macros", version = "0.2.0" }
-hermes-simd-types = { path = "../hermes-simd-types", version = "0.2.0", default-features = false }
+hermes-simd-core = { path = "../hermes-simd-core", version = "0.3.0", default-features = false }
+hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.3.0", default-features = false }
+hermes-numeric = { path = "../hermes-numeric", version = "0.3.0", default-features = false }
+hermes-simd-macros = { path = "../hermes-simd-macros", version = "0.3.0" }
+hermes-simd-types = { path = "../hermes-simd-types", version = "0.3.0", default-features = false }
 half = { workspace = true }
 bytemuck = { version = "1.14" }
 rkyv = { version = "0.7" }

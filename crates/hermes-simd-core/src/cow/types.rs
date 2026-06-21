@@ -77,7 +77,7 @@ where
     pub fn into_unaligned(self) -> SimdCow<'a, T, Arch, crate::align::Unaligned> {
         match self {
             Self::Borrowed(view) => SimdCow::Borrowed(view.into_unaligned()),
-            Self::Owned(vec) => SimdCow::Owned(vec.into_alignment()),
+            Self::Owned(vec) => SimdCow::Owned(vec.into_unaligned()),
         }
     }
 
@@ -92,7 +92,7 @@ where
             Self::Owned(vec) => {
                 let addr = vec.as_ptr() as usize;
                 if addr % A == 0 {
-                    Some(SimdCow::Owned(vec.into_alignment()))
+                    Some(SimdCow::Owned(unsafe { vec.into_alignment_unchecked() }))
                 } else {
                     None
                 }

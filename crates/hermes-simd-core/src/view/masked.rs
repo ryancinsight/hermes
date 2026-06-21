@@ -36,7 +36,7 @@ where
 
         unsafe {
             let load = |p| {
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(p)
                 } else {
                     Arch::load_unaligned(p)
@@ -44,7 +44,8 @@ where
             };
 
             let store = |p, val| {
-                let is_out_aligned = Align::IS_ALIGNED && (p as usize) % Align::ALIGN_BYTES == 0;
+                let is_out_aligned = crate::align::is_aligned_for_arch::<Arch, Align>()
+                    && (p as usize) % Align::ALIGN_BYTES == 0;
 
                 if is_out_aligned {
                     Arch::store_aligned(p, val);
@@ -69,10 +70,9 @@ where
 
         let s_slice = self.as_slice();
         let o_slice = other.as_slice();
-        let bools = mask.to_bools();
         for i in simd_len..len {
             let lane_idx = i - simd_len;
-            out[i] = if bools[lane_idx] {
+            out[i] = if mask.is_lane_active(lane_idx) {
                 s_slice[i] + o_slice[i]
             } else {
                 s_slice[i]
@@ -107,7 +107,7 @@ where
 
         unsafe {
             let load = |p| {
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(p)
                 } else {
                     Arch::load_unaligned(p)
@@ -115,7 +115,8 @@ where
             };
 
             let store = |p, val| {
-                let is_out_aligned = Align::IS_ALIGNED && (p as usize) % Align::ALIGN_BYTES == 0;
+                let is_out_aligned = crate::align::is_aligned_for_arch::<Arch, Align>()
+                    && (p as usize) % Align::ALIGN_BYTES == 0;
 
                 if is_out_aligned {
                     Arch::store_aligned(p, val);
@@ -140,10 +141,9 @@ where
 
         let s_slice = self.as_slice();
         let o_slice = other.as_slice();
-        let bools = mask.to_bools();
         for i in simd_len..len {
             let lane_idx = i - simd_len;
-            out[i] = if bools[lane_idx] {
+            out[i] = if mask.is_lane_active(lane_idx) {
                 s_slice[i] * o_slice[i]
             } else {
                 s_slice[i]
@@ -182,7 +182,7 @@ where
 
         unsafe {
             let load = |p| {
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(p)
                 } else {
                     Arch::load_unaligned(p)
@@ -190,7 +190,8 @@ where
             };
 
             let store = |p, val| {
-                let is_out_aligned = Align::IS_ALIGNED && (p as usize) % Align::ALIGN_BYTES == 0;
+                let is_out_aligned = crate::align::is_aligned_for_arch::<Arch, Align>()
+                    && (p as usize) % Align::ALIGN_BYTES == 0;
 
                 if is_out_aligned {
                     Arch::store_aligned(p, val);
@@ -218,10 +219,9 @@ where
         let a_slice = self.as_slice();
         let b_slice = b.as_slice();
         let c_slice = c.as_slice();
-        let bools = mask.to_bools();
         for i in simd_len..len {
             let lane_idx = i - simd_len;
-            out[i] = if bools[lane_idx] {
+            out[i] = if mask.is_lane_active(lane_idx) {
                 a_slice[i].scalar_fmadd(b_slice[i], c_slice[i])
             } else {
                 c_slice[i]
@@ -251,7 +251,7 @@ where
 
         unsafe {
             let load = |p| {
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(p)
                 } else {
                     Arch::load_unaligned(p)
@@ -276,10 +276,9 @@ where
         }
 
         let s_slice = self.as_slice();
-        let bools = mask.to_bools();
         for i in simd_len..len {
             let lane_idx = i - simd_len;
-            if bools[lane_idx] {
+            if mask.is_lane_active(lane_idx) {
                 out[total_written] = s_slice[i];
                 total_written += 1;
             }
@@ -308,10 +307,9 @@ where
         // Calculate the number of source elements required from `self`
         let num_simd_chunks = simd_len / lane_count;
         let mut required_len = num_simd_chunks * pop;
-        let bools = mask.to_bools();
         for i in simd_len..out_len {
             let lane_idx = i - simd_len;
-            if bools[lane_idx] {
+            if mask.is_lane_active(lane_idx) {
                 required_len += 1;
             }
         }
@@ -330,7 +328,7 @@ where
 
         unsafe {
             let load = |p| {
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(p)
                 } else {
                     Arch::load_unaligned(p)
@@ -338,7 +336,8 @@ where
             };
 
             let store = |p, val| {
-                let is_out_aligned = Align::IS_ALIGNED && (p as usize) % Align::ALIGN_BYTES == 0;
+                let is_out_aligned = crate::align::is_aligned_for_arch::<Arch, Align>()
+                    && (p as usize) % Align::ALIGN_BYTES == 0;
 
                 if is_out_aligned {
                     Arch::store_aligned(p, val);
@@ -378,7 +377,7 @@ where
         let mut src_idx = num_simd_chunks * pop;
         for i in simd_len..out_len {
             let lane_idx = i - simd_len;
-            if bools[lane_idx] {
+            if mask.is_lane_active(lane_idx) {
                 out[i] = s_slice[src_idx];
                 src_idx += 1;
             } else {

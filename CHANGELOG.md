@@ -4,6 +4,8 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-06-21
+
 ### Added
 - Public runtime-dispatched `gemv` (`y += A·x`, register-blocked level-2 BLAS
   matrix–vector product) plumbing the existing `TilingStrategy::gemv` /

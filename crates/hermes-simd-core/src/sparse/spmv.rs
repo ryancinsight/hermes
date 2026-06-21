@@ -25,7 +25,12 @@ pub trait SparseSpMv<T> {
 pub(crate) unsafe fn build_index_vector<T: Scalar, Arch: SimdKernel<T>>(
     cols: &[i32],
 ) -> Arch::IndexVector {
-    debug_assert_eq!(cols.len(), Arch::LANE_COUNT);
+    assert!(
+        cols.len() >= Arch::LANE_COUNT,
+        "cols slice length {} is less than LANE_COUNT {}",
+        cols.len(),
+        Arch::LANE_COUNT
+    );
     let ptr = cols.as_ptr() as *const Arch::IndexVector;
     core::ptr::read_unaligned(ptr)
 }
@@ -344,6 +349,11 @@ unsafe fn sellp_spmv_vectorized<T, const C: usize, Arch>(
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
 {
+    assert_eq!(
+        Arch::LANE_COUNT,
+        C,
+        "sellp_spmv_vectorized requires Arch::LANE_COUNT == C"
+    );
     let nslices = data.nslices();
     for s in 0..nslices {
         let col_count = data.slice_col_count[s] as usize;

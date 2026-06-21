@@ -88,7 +88,9 @@ pub use hermes_simd_core::{
     Neg,
     NumaBinding,
     NumaTopologyService,
+    Popcount,
     Product,
+    RecipSqrt,
     // Operation strategy ZSTs and sealed traits — zero-cost, erased at monomorphization.
     ReductionOp,
     ScanAdd,
@@ -145,9 +147,11 @@ pub use hermes_simd_intrinsics::{
 pub use hermes_simd_intrinsics::{AmxBatchSession, AmxBf16, AmxConfig, AmxInt8, AmxSession};
 
 pub use hermes_numeric::{
-    Bf16, Bf4, Bf8, Packable4, Packed4Cow, Packed4Iter, Packed4Slice, Packed4SliceMut, Packed4Vec,
-    PackedBf4Cow, PackedBf4Slice, PackedBf4SliceMut, PackedBf4Vec, PackedF4Cow, PackedF4Slice,
-    PackedF4SliceMut, PackedF4Vec, F16, F32, F4, F64, F8, I16, I32, I8,
+    unpack_bf4_to_bf16, unpack_bf4_to_bf16_packed, unpack_bf8_to_bf16, unpack_f4_to_f32,
+    unpack_f4_to_f32_packed, unpack_f8_to_f32, Bf16, Bf4, Bf8, Packable4, Packed4Cow, Packed4Iter,
+    Packed4Slice, Packed4SliceMut, Packed4Vec, PackedBf4Cow, PackedBf4Slice, PackedBf4SliceMut,
+    PackedBf4Vec, PackedF4Cow, PackedF4Slice, PackedF4SliceMut, PackedF4Vec, F16, F32, F4, F64, F8,
+    I16, I32, I8,
 };
 
 // Re-export monomorphized vector register types and PreferredArch
@@ -194,7 +198,10 @@ pub use attacks::{bishop_attacks, queen_attacks, rook_attacks};
 pub use cpu::{AmxSupport, Avx512Support};
 pub use dispatcher::{AdaptiveDispatcher, DispatchDecision};
 pub use target::{dispatch_view_mut_to, dispatch_view_to, TargetId};
-pub use tile_matmul::{dispatch_tile_matmul, gemm, unpack_int4, TiledGemm};
+pub use tile_matmul::{
+    dispatch_tile_matmul, gemm, unpack_int4, widen_I8_to_I16, widen_I8_to_I32, widen_i8_to_i16,
+    widen_i8_to_i32, TiledGemm,
+};
 
 // Re-export the generic dispatch operations. These monomorphize at call sites:
 // calling `sum::<f32>(data)` produces the f32 specialization.
@@ -225,13 +232,17 @@ pub use dispatch::{
     max,
     min,
     ntt_butterfly_stage_u64,
+    // Generic free functions — the primary public API.
+    reduce_popcount,
+    reduce_popcount_and,
+    reduce_popcount_or,
+    reduce_popcount_xor,
     scale,
     spmv_bcoo,
     // Sparse operations — generic entry points.
     spmv_csr,
     spmv_dense_masked,
     spmv_sellp,
-    // Generic free functions — the primary public API.
     sum,
     tiled_gemm,
     // Core trait — sealed; implemented for f32 and f64.

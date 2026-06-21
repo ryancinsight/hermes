@@ -66,18 +66,18 @@ where
         let mut i = 0usize;
         for (chunk_self, chunk_other) in (&mut chunks_self).zip(&mut chunks_other) {
             unsafe {
-                let va = if Align::IS_ALIGNED {
+                let va = if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(chunk_self.as_ptr())
                 } else {
                     Arch::load_unaligned(chunk_self.as_ptr())
                 };
-                let vb = if Align::IS_ALIGNED {
+                let vb = if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(chunk_other.as_ptr())
                 } else {
                     Arch::load_unaligned(chunk_other.as_ptr())
                 };
                 let vr = _op.apply::<Arch>(va, vb);
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::store_aligned(out_ptr.add(i), vr);
                 } else {
                     Arch::store_unaligned(out_ptr.add(i), vr);
@@ -134,18 +134,18 @@ where
 
         for (mut chunk_self, chunk_other) in (&mut chunks_self).zip(&mut chunks_other) {
             unsafe {
-                let va = if Align::IS_ALIGNED {
+                let va = if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(chunk_self.as_ptr())
                 } else {
                     Arch::load_unaligned(chunk_self.as_ptr())
                 };
-                let vb = if Align::IS_ALIGNED {
+                let vb = if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::load_aligned(chunk_other.as_ptr())
                 } else {
                     Arch::load_unaligned(chunk_other.as_ptr())
                 };
                 let vr = _op.apply::<Arch>(va, vb);
-                if Align::IS_ALIGNED {
+                if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::store_aligned(chunk_self.as_mut_ptr(), vr);
                 } else {
                     Arch::store_unaligned(chunk_self.as_mut_ptr(), vr);

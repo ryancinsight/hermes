@@ -346,13 +346,17 @@ impl<T: Scalar> ReductionOp<T> for Product {
     /// Processor must support the target feature of `Arch`.
     #[inline(always)]
     unsafe fn finalize<Arch: SimdKernel<T>>(acc: Arch::Vector) -> T {
-        // Fixed-size stack buffer — LANE_COUNT is a compile-time const, so the
-        // compiler stack-allocates exactly `LANE_COUNT * size_of::<T>()` bytes.
-        let mut buf = [T::ZERO; 16];
-        let lanes = Arch::LANE_COUNT.min(16);
+        const MAX_LANE_COUNT: usize = 64;
+        debug_assert!(
+            Arch::LANE_COUNT <= MAX_LANE_COUNT,
+            "LANE_COUNT {} exceeds maximum stack buffer size {}",
+            Arch::LANE_COUNT,
+            MAX_LANE_COUNT
+        );
+        let mut buf = [T::ZERO; MAX_LANE_COUNT];
         Arch::store_unaligned(buf.as_mut_ptr(), acc);
         let mut result = T::ONE;
-        for i in 0..lanes {
+        for i in 0..Arch::LANE_COUNT {
             result = result * buf[i];
         }
         result

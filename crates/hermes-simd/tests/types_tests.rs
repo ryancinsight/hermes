@@ -1023,6 +1023,39 @@ fn test_low_precision_unpacking() {
 }
 
 #[test]
+fn test_widen_i8_primitives() {
+    use hermes_simd::{
+        widen_I8_to_I16, widen_I8_to_I32, widen_i8_to_i16, widen_i8_to_i32, I16, I32, I8,
+    };
+
+    let src = [-1i8, 0, 5, 127, -128];
+    let mut dest_i16 = [0i16; 5];
+    let mut dest_i32 = [0i32; 5];
+
+    widen_i8_to_i16(&src, &mut dest_i16);
+    widen_i8_to_i32(&src, &mut dest_i32);
+
+    assert_eq!(dest_i16, [-1i16, 0, 5, 127, -128]);
+    assert_eq!(dest_i32, [-1i32, 0, 5, 127, -128]);
+
+    let src_wrapped = [I8(-1), I8(0), I8(5), I8(127), I8(-128)];
+    let mut dest_i16_wrapped = [I16(0); 5];
+    let mut dest_i32_wrapped = [I32(0); 5];
+
+    widen_I8_to_I16(&src_wrapped, &mut dest_i16_wrapped);
+    widen_I8_to_I32(&src_wrapped, &mut dest_i32_wrapped);
+
+    assert_eq!(
+        dest_i16_wrapped,
+        [I16(-1), I16(0), I16(5), I16(127), I16(-128)]
+    );
+    assert_eq!(
+        dest_i32_wrapped,
+        [I32(-1), I32(0), I32(5), I32(127), I32(-128)]
+    );
+}
+
+#[test]
 fn test_numa_topology_and_allocation() {
     use hermes_simd_core::align::Unaligned;
     use hermes_simd_core::numa::{verify_numa_locality, NumaTopologyService};
@@ -1058,6 +1091,33 @@ fn test_numa_topology_and_allocation() {
     // Verify locality check runs without crashing
     let is_local = verify_numa_locality(vec.as_ptr() as *const u8, 8, 0);
     println!("Is local to node 0: {}", is_local);
+}
+
+#[test]
+fn test_numa_locality_robustness_and_cache_pollution_prevention() {
+    use hermes_simd_core::align::Unaligned;
+    use hermes_simd_core::numa::{verify_numa_locality, NumaBinding};
+    use hermes_simd_core::AlignedVec;
+
+    // 1. Verify NumaBinding bind and drop is safe
+    {
+        let _binding = NumaBinding::bind(0);
+    }
+
+    // 2. Verify locality verification on stack memory is safe and does not crash
+    let stack_val = [0u8; 1024];
+    let _is_local_stack = verify_numa_locality(stack_val.as_ptr(), stack_val.len(), 0);
+
+    // 3. Verify locality verification on standard heap memory is safe and does not crash
+    let heap_val = std::vec![0u8; 4096];
+    let _is_local_heap = verify_numa_locality(heap_val.as_ptr(), heap_val.len(), 0);
+
+    // 4. Verify small NUMA allocations (cache-pollution mitigation bypass path) construct and drop safely
+    let mut small_vec: AlignedVec<f32, Unaligned> = AlignedVec::with_capacity_numa(2, 0);
+    small_vec.push(42.0);
+    assert_eq!(small_vec[0], 42.0);
+    assert_eq!(small_vec.len(), 1);
+    drop(small_vec);
 }
 
 #[test]
@@ -1723,4 +1783,159 @@ fn test_select_ops_neon() {
     test_select_ops_for_arch!(i8, Neon, 16);
     test_select_ops_for_arch!(i16, Neon, 8);
     test_select_ops_for_arch!(i32, Neon, 4);
+}
+
+#[test]
+fn test_insufficient_alignment_view_rejection() {
+    use hermes_numeric::F32;
+    use hermes_simd::{Avx2, Avx512, Scalar};
+    use hermes_simd_core::align::{Aligned, Unaligned};
+    use hermes_simd_core::view::SimdView;
+
+    // Buffer aligned to 64 bytes
+    #[repr(align(64))]
+    struct Align64Buf([F32; 16]);
+    let buf = Align64Buf([F32(0.0); 16]);
+
+    // 1. Scalar arch (REGISTER_WIDTH_BITS = 0) accepts any Aligned alignment
+    let view_scalar = SimdView::<'_, F32, Scalar, Aligned<16>>::new(&buf.0);
+    assert!(view_scalar.is_some());
+
+    // 2. Avx2 requires 32-byte alignment. Aligned<16> must be rejected.
+    let view_avx2_bad = SimdView::<'_, F32, Avx2, Aligned<16>>::new(&buf.0);
+    assert!(view_avx2_bad.is_none());
+
+    // Aligned<32> must be accepted.
+    let view_avx2_good = SimdView::<'_, F32, Avx2, Aligned<32>>::new(&buf.0);
+    assert!(view_avx2_good.is_some());
+
+    // try_into_aligned:<16> on Avx2 must be rejected.
+    let view_avx2_unaligned = SimdView::<'_, F32, Avx2, Unaligned>::new(&buf.0).unwrap();
+    assert!(view_avx2_unaligned.try_into_aligned::<16>().is_none());
+    assert!(view_avx2_unaligned.try_into_aligned::<32>().is_some());
+
+    // slice_aligned:<16> on Avx2 must be rejected.
+    assert!(view_avx2_unaligned.slice_aligned::<16>(0..8).is_none());
+    assert!(view_avx2_unaligned.slice_aligned::<32>(0..8).is_some());
+
+    // 3. Avx512 requires 64-byte alignment. Aligned<32> must be rejected.
+    let view_avx512_bad = SimdView::<'_, F32, Avx512, Aligned<32>>::new(&buf.0);
+    assert!(view_avx512_bad.is_none());
+
+    // Aligned<64> must be accepted.
+    let view_avx512_good = SimdView::<'_, F32, Avx512, Aligned<64>>::new(&buf.0);
+    assert!(view_avx512_good.is_some());
+}
+
+#[test]
+fn test_aligned_vec_realloc_growth() {
+    use hermes_simd_core::align::Aligned;
+    use hermes_simd_core::AlignedVec;
+
+    // 1. Standard allocation path
+    let mut vec: AlignedVec<i32, Aligned<32>> = AlignedVec::new();
+    assert_eq!(vec.len(), 0);
+    assert_eq!(vec.capacity(), 0);
+
+    for i in 0..1000 {
+        vec.push(i as i32);
+    }
+    assert_eq!(vec.len(), 1000);
+    assert!(vec.capacity() >= 1000);
+    for i in 0..1000 {
+        assert_eq!(vec[i], i as i32);
+    }
+
+    // 2. NUMA allocation path
+    let mut numa_vec: AlignedVec<i32, Aligned<32>> = AlignedVec::with_capacity_numa(2, 0);
+    assert_eq!(numa_vec.len(), 0);
+    for i in 0..500 {
+        numa_vec.push((i * 2) as i32);
+    }
+    assert_eq!(numa_vec.len(), 500);
+    for i in 0..500 {
+        assert_eq!(numa_vec[i], (i * 2) as i32);
+    }
+}
+
+#[test]
+fn test_numa_realloc_on_node_direct() {
+    use core::alloc::Layout;
+    use hermes_simd_core::numa::{MnemosyneNumaAllocator, NumaAllocator};
+
+    let allocator = MnemosyneNumaAllocator;
+    let layout1 = Layout::from_size_align(16, 8).unwrap();
+    let layout2 = Layout::from_size_align(64, 8).unwrap();
+
+    unsafe {
+        // 1. Allocate initial block
+        let ptr1 = allocator.alloc_on_node(layout1, 0);
+        assert!(!ptr1.is_null());
+
+        // Fill with test pattern
+        for i in 0..16 {
+            *ptr1.add(i) = i as u8;
+        }
+
+        // 2. Reallocate to a larger size
+        let ptr2 = allocator.realloc_on_node(ptr1, layout1, layout2, 0);
+        assert!(!ptr2.is_null());
+
+        // Verify elements are preserved
+        for i in 0..16 {
+            assert_eq!(*ptr2.add(i), i as u8);
+        }
+
+        // 3. Deallocate
+        allocator.dealloc_on_node(ptr2, layout2, 0);
+    }
+}
+
+#[test]
+fn test_numa_locality_caching_correctness_and_invalidation() {
+    use hermes_simd_core::align::Unaligned;
+    use hermes_simd_core::numa::locality::{
+        bump_alloc_generation, get_alloc_generation, verify_numa_locality,
+    };
+    use hermes_simd_core::AlignedVec;
+
+    // 1. Check initial generation
+    let gen_start = get_alloc_generation();
+
+    // 2. Perform a check on a stack address (it will cache it)
+    let data = [0u8; 1024];
+    let is_local1 = verify_numa_locality(data.as_ptr(), data.len(), 0);
+
+    // Second check on same address should hit the cache immediately (generation is same)
+    let is_local2 = verify_numa_locality(data.as_ptr(), data.len(), 0);
+    assert_eq!(is_local1, is_local2);
+
+    // Subset check should also hit the cache
+    let is_local_sub = verify_numa_locality(unsafe { data.as_ptr().add(10) }, 100, 0);
+    assert_eq!(is_local1, is_local_sub);
+
+    // 3. Allocate a vector - this must bump the generation counter
+    let vec: AlignedVec<u8, Unaligned> = AlignedVec::with_capacity(10);
+    let gen_after_alloc = get_alloc_generation();
+    assert!(gen_after_alloc > gen_start);
+    drop(vec);
+
+    // 4. Manual bump and check invalidation
+    bump_alloc_generation();
+    let gen_after_bump = get_alloc_generation();
+    assert!(gen_after_bump > gen_after_alloc);
+
+    // 5. Multi-threaded stress test for contention-free caching
+    let mut handles = std::vec![];
+    for _ in 0..8 {
+        handles.push(std::thread::spawn(move || {
+            let local_data = [0u8; 512];
+            for _ in 0..100 {
+                let _ = verify_numa_locality(local_data.as_ptr(), local_data.len(), 0);
+            }
+        }));
+    }
+    for h in handles {
+        h.join().unwrap();
+    }
 }

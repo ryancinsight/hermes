@@ -182,6 +182,27 @@ impl SimdKernel<f64> for Neon {
 
     #[target_feature(enable = "neon")]
     #[inline]
+    unsafe fn recip_sqrt(a: Self::Vector) -> Self::Vector {
+        let y0 = vrsqrteq_f64(a.0);
+        let y0_sq = vmulq_f64(y0, y0);
+        let step = vrsqrtsq_f64(a.0, y0_sq);
+        NeonF64Vec(vmulq_f64(y0, step))
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn popcount(a: Self::Vector) -> Self::Vector {
+        let v_u8 = vreinterpretq_u8_f64(a.0);
+        let pop_bytes = vcntq_u8(v_u8);
+        let pop_u16 = vpaddlq_u8(pop_bytes);
+        let pop_u32 = vpaddlq_u16(pop_u16);
+        let pop_u64 = vpaddlq_u32(pop_u32);
+        let pop_f64 = vcvtq_f64_u64(pop_u64);
+        NeonF64Vec(pop_f64)
+    }
+
+    #[target_feature(enable = "neon")]
+    #[inline]
     unsafe fn bitand(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         NeonF64Vec(vreinterpretq_f64_u64(vandq_u64(
             vreinterpretq_u64_f64(a.0),

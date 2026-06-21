@@ -159,7 +159,6 @@ impl SimdKernel<f32> for Avx512 {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        // src is the pass-through (1st arg) for inactive lanes.
         Avx512F32Vec(_mm512_mask_add_ps(src.0, mask, a.0, b.0))
     }
 
@@ -190,23 +189,19 @@ impl SimdKernel<f32> for Avx512 {
     #[inline]
     unsafe fn masked_sum_reduce(v: Self::Vector, mask: Self::Mask) -> f32 {
         let zero = _mm512_setzero_ps();
-        // Zero out inactive lanes then reduce.
-        let selected = _mm512_mask_mov_ps(zero, mask, v.0);
-        _mm512_reduce_add_ps(selected)
+        _mm512_reduce_add_ps(_mm512_mask_mov_ps(zero, mask, v.0))
     }
 
     // -----------------------------------------------------------------------
     // Native compress / expand
     // -----------------------------------------------------------------------
 
-    /// Native `VCOMPRESSPS` via `_mm512_maskz_compress_ps`.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn compress(src: Self::Vector, mask: Self::Mask) -> Self::Vector {
         Avx512F32Vec(_mm512_maskz_compress_ps(mask, src.0))
     }
 
-    /// Native `VEXPANDPS` via `_mm512_mask_expand_ps`.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn expand(src: Self::Vector, mask: Self::Mask, fill: Self::Vector) -> Self::Vector {
@@ -214,13 +209,13 @@ impl SimdKernel<f32> for Avx512 {
     }
 
     // -----------------------------------------------------------------------
-    // Native gather (scale = 4 — byte stride of f32)
+    // Gather
     // -----------------------------------------------------------------------
 
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn gather(base: *const f32, indices: Self::IndexVector) -> Self::Vector {
-        Avx512F32Vec(_mm512_i32gather_ps(indices, base as *const _, 4))
+        Avx512F32Vec(_mm512_i32gather_ps(indices, base, 4))
     }
 
     #[target_feature(enable = "avx512f")]
@@ -231,42 +226,35 @@ impl SimdKernel<f32> for Avx512 {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        Avx512F32Vec(_mm512_mask_i32gather_ps(
-            src.0,
-            mask,
-            indices,
-            base as *const _,
-            4,
-        ))
+        Avx512F32Vec(_mm512_mask_i32gather_ps(src.0, mask, indices, base, 4))
     }
 
     // -----------------------------------------------------------------------
     // Mask construction
     // -----------------------------------------------------------------------
 
-    /// Construct a `__mmask16` from a bool slice of length 16.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn mask_from_bools(bits: &[bool]) -> Self::Mask {
         debug_assert_eq!(bits.len(), 16);
-        let mut m: u16 = 0;
-        for (i, &b) in bits.iter().enumerate() {
-            if b {
-                m |= 1 << i;
+        let mut mask: u64 = 0;
+        for i in 0..16 {
+            if bits[i] {
+                mask |= 1 << i;
             }
         }
-        m
+        mask as Self::Mask
     }
 
-    /// Produce mask with bits `0..k` set (clamped to 16).
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn leading_k_mask(k: usize) -> Self::Mask {
         let k = k.min(16);
-        if k == 16 {
-            !0u16
+        if k == 0 {
+            0 as Self::Mask
         } else {
-            (1u16 << k).wrapping_sub(1)
+            let mask = (1u64 << k) - 1;
+            mask as Self::Mask
         }
     }
 
@@ -313,7 +301,7 @@ impl SimdKernel<f32> for Avx512 {
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn abs(a: Self::Vector) -> Self::Vector {
-        let sign_mask = _mm512_set1_ps(-0.0f32);
+        let sign_mask = _mm512_set1_ps(-0.0);
         Avx512F32Vec(_mm512_andnot_ps(sign_mask, a.0))
     }
 
@@ -337,12 +325,54 @@ impl SimdKernel<f32> for Avx512 {
 
     #[target_feature(enable = "avx512f")]
     #[inline]
+    unsafe fn recip_sqrt(a: Self::Vector) -> Self::Vector {
+        let y0 = _mm512_rsqrt14_ps(a.0);
+        let y0_sq = _mm512_mul_ps(y0, y0);
+        let half_y0 = _mm512_mul_ps(y0, _mm512_set1_ps(0.5));
+        let term = _mm512_fnmadd_ps(a.0, y0_sq, _mm512_set1_ps(3.0));
+        Avx512F32Vec(_mm512_mul_ps(half_y0, term))
+    }
+
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn popcount(a: Self::Vector) -> Self::Vector {
+        use core::arch::x86_64::*;
+        let v_si512 = _mm512_castps_si512(a.0);
+        let lo = _mm512_extracti64x4_epi64(v_si512, 0);
+        let hi = _mm512_extracti64x4_epi64(v_si512, 1);
+
+        let low_mask = _mm256_set1_epi8(0x0F);
+        let lookup = _mm256_setr_epi8(
+            0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2,
+            3, 3, 4,
+        );
+
+        let run_avx2_popcount = |v: __m256i| -> __m256 {
+            let v_lo = _mm256_and_si256(v, low_mask);
+            let v_hi = _mm256_and_si256(_mm256_srli_epi16(v, 4), low_mask);
+            let pop_lo = _mm256_shuffle_epi8(lookup, v_lo);
+            let pop_hi = _mm256_shuffle_epi8(lookup, v_hi);
+            let pop_bytes = _mm256_add_epi8(pop_lo, pop_hi);
+            let pop_u16 = _mm256_maddubs_epi16(pop_bytes, _mm256_set1_epi8(1));
+            let pop_u32 = _mm256_madd_epi16(pop_u16, _mm256_set1_epi16(1));
+            _mm256_cvtepi32_ps(pop_u32)
+        };
+
+        let res_lo = run_avx2_popcount(lo);
+        let res_hi = run_avx2_popcount(hi);
+
+        let merged = _mm512_insertf32x8(_mm512_castps256_ps512(res_lo), res_hi, 1);
+        Avx512F32Vec(merged)
+    }
+
+    #[target_feature(enable = "avx512f")]
+    #[inline]
     unsafe fn cmp_eq(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         let m = _mm512_cmp_ps_mask(a.0, b.0, _CMP_EQ_OQ);
         Avx512F32Vec(_mm512_mask_blend_ps(
             m,
             _mm512_setzero_ps(),
-            _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF)),
+            _mm512_set1_ps(f32::from_bits(!0)),
         ))
     }
 
@@ -353,7 +383,7 @@ impl SimdKernel<f32> for Avx512 {
         Avx512F32Vec(_mm512_mask_blend_ps(
             m,
             _mm512_setzero_ps(),
-            _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF)),
+            _mm512_set1_ps(f32::from_bits(!0)),
         ))
     }
 
@@ -364,7 +394,7 @@ impl SimdKernel<f32> for Avx512 {
         Avx512F32Vec(_mm512_mask_blend_ps(
             m,
             _mm512_setzero_ps(),
-            _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF)),
+            _mm512_set1_ps(f32::from_bits(!0)),
         ))
     }
 
@@ -375,7 +405,7 @@ impl SimdKernel<f32> for Avx512 {
         Avx512F32Vec(_mm512_mask_blend_ps(
             m,
             _mm512_setzero_ps(),
-            _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF)),
+            _mm512_set1_ps(f32::from_bits(!0)),
         ))
     }
 
@@ -386,7 +416,7 @@ impl SimdKernel<f32> for Avx512 {
         Avx512F32Vec(_mm512_mask_blend_ps(
             m,
             _mm512_setzero_ps(),
-            _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF)),
+            _mm512_set1_ps(f32::from_bits(!0)),
         ))
     }
 
@@ -397,7 +427,7 @@ impl SimdKernel<f32> for Avx512 {
         Avx512F32Vec(_mm512_mask_blend_ps(
             m,
             _mm512_setzero_ps(),
-            _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF)),
+            _mm512_set1_ps(f32::from_bits(!0)),
         ))
     }
 
@@ -424,7 +454,7 @@ impl SimdKernel<f32> for Avx512 {
         Avx512F32Vec(_mm512_mask_blend_ps(
             mask,
             _mm512_setzero_ps(),
-            _mm512_set1_ps(f32::from_bits(0xFFFF_FFFF)),
+            _mm512_set1_ps(f32::from_bits(!0)),
         ))
     }
 }

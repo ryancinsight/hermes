@@ -85,3 +85,263 @@ fn safe_aligned_load_and_store_reject_unaligned_slices() {
     );
     assert_eq!(output, [0.0; 8]);
 }
+
+#[test]
+fn test_masked_load_store_slice_scalar() {
+    use hermes_simd::{BitMask, Mask, Scalar, Vector};
+
+    // Scalar has lane count 1.
+    // Let's test with active lane.
+    let data = [42.0f32];
+    let mask_arr = [true];
+    let src = Vector::<f32, Scalar>::splat(0.0);
+    unsafe {
+        let bm = BitMask::<64>(BitMask::<1>::from_bools(&mask_arr).0);
+        let mask = Mask::<f32, Scalar>::from_bitmask(bm);
+
+        // Safe masked load
+        let vec = Vector::<f32, Scalar>::masked_load_from_slice(&data, mask, src).unwrap();
+        let mut out = [9.0f32];
+        vec.masked_store_to_slice(&mut out, mask).unwrap();
+        assert_eq!(out[0], 42.0);
+    }
+
+    // Let's test with inactive lane.
+    let mask_arr_inactive = [false];
+    unsafe {
+        let bm = BitMask::<64>(BitMask::<1>::from_bools(&mask_arr_inactive).0);
+        let mask = Mask::<f32, Scalar>::from_bitmask(bm);
+
+        // Safe masked load (should load from src since mask is false)
+        let vec = Vector::<f32, Scalar>::masked_load_from_slice(&data, mask, src).unwrap();
+        let mut out = [9.0f32];
+        vec.masked_store_to_slice(&mut out, mask).unwrap();
+        // Since store mask is false, out[0] should remain unchanged (9.0)
+        assert_eq!(out[0], 9.0);
+
+        // Also check loaded value (should be src, which is 0.0)
+        let mut out2 = [9.0f32];
+        // using active mask to store the loaded value to verify it
+        let active_bm = BitMask::<64>(BitMask::<1>::from_bools(&[true]).0);
+        let active_mask = Mask::<f32, Scalar>::from_bitmask(active_bm);
+        vec.masked_store_to_slice(&mut out2, active_mask).unwrap();
+        assert_eq!(out2[0], 0.0);
+    }
+
+    // Let's test out of bounds.
+    // An empty slice is of length 0. With active mask, this must fail.
+    unsafe {
+        let bm = BitMask::<64>(BitMask::<1>::from_bools(&[true]).0);
+        let mask = Mask::<f32, Scalar>::from_bitmask(bm);
+        let res = Vector::<f32, Scalar>::masked_load_from_slice(&[], mask, src);
+        assert_eq!(res, Err(SimdError::IndexOutOfBounds));
+
+        let mut out: [f32; 0] = [];
+        let res_store = src.masked_store_to_slice(&mut out, mask);
+        assert_eq!(res_store, Err(SimdError::IndexOutOfBounds));
+    }
+
+    // An empty slice with INACTIVE mask should succeed (index is not out of bounds for inactive lanes).
+    unsafe {
+        let bm = BitMask::<64>(BitMask::<1>::from_bools(&[false]).0);
+        let mask = Mask::<f32, Scalar>::from_bitmask(bm);
+        let _res = Vector::<f32, Scalar>::masked_load_from_slice(&[], mask, src).unwrap();
+
+        let mut out: [f32; 0] = [];
+        src.masked_store_to_slice(&mut out, mask).unwrap();
+    }
+}
+
+#[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), feature = "std"))]
+#[test]
+fn test_masked_load_store_slice_avx2() {
+    use hermes_simd::{target::TargetId, Avx2, BitMask, Mask, Vector};
+
+    if !TargetId::Avx2.is_supported() {
+        return;
+    }
+
+    // Avx2 has lane count 8 for f32.
+    let data = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+    let mask_arr = [true, false, true, false, true, false, true, false];
+    let src = Vector::<f32, Avx2>::splat(0.0);
+    unsafe {
+        let bm = BitMask::<64>(BitMask::<8>::from_bools(&mask_arr).0);
+        let mask = Mask::<f32, Avx2>::from_bitmask(bm);
+
+        // Safe masked load
+        let vec = Vector::<f32, Avx2>::masked_load_from_slice(&data, mask, src).unwrap();
+        let mut out = [9.0f32; 8];
+        vec.masked_store_to_slice(&mut out, mask).unwrap();
+        // Active lanes should be updated, inactive unchanged.
+        assert_eq!(out, [1.0, 9.0, 3.0, 9.0, 5.0, 9.0, 7.0, 9.0]);
+    }
+
+    // Let's test short slice boundary condition.
+    // data has 5 elements, but mask has active lanes only in 0..5 (e.g. indices 0, 2, 4).
+    let short_data = [10.0f32, 20.0, 30.0, 40.0, 50.0];
+    let mask_arr_short = [true, false, true, false, true, false, false, false];
+    unsafe {
+        let bm = BitMask::<64>(BitMask::<8>::from_bools(&mask_arr_short).0);
+        let mask = Mask::<f32, Avx2>::from_bitmask(bm);
+
+        let vec = Vector::<f32, Avx2>::masked_load_from_slice(&short_data, mask, src).unwrap();
+        let mut out = [99.0f32; 5];
+        vec.masked_store_to_slice(&mut out, mask).unwrap();
+        assert_eq!(out, [10.0, 99.0, 30.0, 99.0, 50.0]);
+    }
+
+    // Now test if active lane is out of bounds for the short slice.
+    // Short data has 5 elements, but mask activates lane index 6.
+    let mask_arr_oob = [true, false, true, false, true, false, true, false];
+    unsafe {
+        let bm = BitMask::<64>(BitMask::<8>::from_bools(&mask_arr_oob).0);
+        let mask = Mask::<f32, Avx2>::from_bitmask(bm);
+
+        let res = Vector::<f32, Avx2>::masked_load_from_slice(&short_data, mask, src);
+        assert_eq!(res, Err(SimdError::IndexOutOfBounds));
+
+        let mut out = [99.0f32; 5];
+        let res_store = src.masked_store_to_slice(&mut out, mask);
+        assert_eq!(res_store, Err(SimdError::IndexOutOfBounds));
+    }
+}
+
+#[cfg(all(target_arch = "aarch64", feature = "std"))]
+#[test]
+fn test_masked_load_store_slice_neon() {
+    use hermes_simd::{target::TargetId, BitMask, Mask, Neon, Vector};
+
+    if !TargetId::Neon.is_supported() {
+        return;
+    }
+
+    // Neon has lane count 4 for f32.
+    let data = [1.0f32, 2.0, 3.0, 4.0];
+    let mask_arr = [true, false, true, false];
+    let src = Vector::<f32, Neon>::splat(0.0);
+    unsafe {
+        let bm = BitMask::<64>(BitMask::<4>::from_bools(&mask_arr).0);
+        let mask = Mask::<f32, Neon>::from_bitmask(bm);
+
+        // Safe masked load
+        let vec = Vector::<f32, Neon>::masked_load_from_slice(&data, mask, src).unwrap();
+        let mut out = [9.0f32; 4];
+        vec.masked_store_to_slice(&mut out, mask).unwrap();
+        assert_eq!(out, [1.0, 9.0, 3.0, 9.0]);
+    }
+
+    // Short slice test (data length 3, active lanes 0 and 2)
+    let short_data = [10.0f32, 20.0, 30.0];
+    let mask_arr_short = [true, false, true, false];
+    unsafe {
+        let bm = BitMask::<64>(BitMask::<4>::from_bools(&mask_arr_short).0);
+        let mask = Mask::<f32, Neon>::from_bitmask(bm);
+
+        let vec = Vector::<f32, Neon>::masked_load_from_slice(&short_data, mask, src).unwrap();
+        let mut out = [99.0f32; 3];
+        vec.masked_store_to_slice(&mut out, mask).unwrap();
+        assert_eq!(out, [10.0, 99.0, 30.0]);
+    }
+
+    // Active lane out of bounds (length 3, active lane 3)
+    let mask_arr_oob = [true, false, true, true];
+    unsafe {
+        let bm = BitMask::<64>(BitMask::<4>::from_bools(&mask_arr_oob).0);
+        let mask = Mask::<f32, Neon>::from_bitmask(bm);
+
+        let res = Vector::<f32, Neon>::masked_load_from_slice(&short_data, mask, src);
+        assert_eq!(res, Err(SimdError::IndexOutOfBounds));
+
+        let mut out = [99.0f32; 3];
+        let res_store = src.masked_store_to_slice(&mut out, mask);
+        assert_eq!(res_store, Err(SimdError::IndexOutOfBounds));
+    }
+}
+
+#[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), feature = "std"))]
+#[test]
+fn test_masked_load_store_slice_avx512() {
+    use hermes_simd::{target::TargetId, Avx512, BitMask, Mask, Vector};
+
+    if !TargetId::Avx512.is_supported() {
+        return;
+    }
+
+    // Avx512 has lane count 16 for f32.
+    let mut data = [0.0f32; 16];
+    for i in 0..16 {
+        data[i] = (i + 1) as f32;
+    }
+    let mut mask_arr = [false; 16];
+    for i in 0..16 {
+        if i % 2 == 0 {
+            mask_arr[i] = true;
+        }
+    }
+    let src = Vector::<f32, Avx512>::splat(0.0);
+    unsafe {
+        let bm = BitMask::<64>(BitMask::<16>::from_bools(&mask_arr).0);
+        let mask = Mask::<f32, Avx512>::from_bitmask(bm);
+
+        // Safe masked load
+        let vec = Vector::<f32, Avx512>::masked_load_from_slice(&data, mask, src).unwrap();
+        let mut out = [99.0f32; 16];
+        vec.masked_store_to_slice(&mut out, mask).unwrap();
+        for i in 0..16 {
+            if i % 2 == 0 {
+                assert_eq!(out[i], (i + 1) as f32);
+            } else {
+                assert_eq!(out[i], 99.0);
+            }
+        }
+    }
+}
+
+#[test]
+fn test_widen_i8_simd_and_tails() {
+    use hermes_simd::{
+        widen_I8_to_I16, widen_I8_to_I32, widen_i8_to_i16, widen_i8_to_i32, I16, I32, I8,
+    };
+
+    // Test different lengths to cover SIMD loop, inner SIMD combinations, and scalar tail loop.
+    for len in 0..100 {
+        let mut src = vec![0i8; len];
+        for j in 0..len {
+            src[j] = (j as i8).wrapping_mul(31).wrapping_add(7);
+        }
+        let mut dest_i16 = vec![0i16; len];
+        let mut dest_i32 = vec![0i32; len];
+
+        widen_i8_to_i16(&src, &mut dest_i16);
+        widen_i8_to_i32(&src, &mut dest_i32);
+
+        let expected_i16: Vec<i16> = src.iter().map(|&x| x as i16).collect();
+        let expected_i32: Vec<i32> = src.iter().map(|&x| x as i32).collect();
+
+        assert_eq!(dest_i16, expected_i16, "Failed for length i16: {}", len);
+        assert_eq!(dest_i32, expected_i32, "Failed for length i32: {}", len);
+
+        // Also test transparent wrapped types
+        let src_wrapped: Vec<I8> = src.iter().map(|&x| I8(x)).collect();
+        let mut dest_i16_wrapped = vec![I16(0); len];
+        let mut dest_i32_wrapped = vec![I32(0); len];
+
+        widen_I8_to_I16(&src_wrapped, &mut dest_i16_wrapped);
+        widen_I8_to_I32(&src_wrapped, &mut dest_i32_wrapped);
+
+        let expected_i16_wrapped: Vec<I16> = src.iter().map(|&x| I16(x as i16)).collect();
+        let expected_i32_wrapped: Vec<I32> = src.iter().map(|&x| I32(x as i32)).collect();
+
+        assert_eq!(
+            dest_i16_wrapped, expected_i16_wrapped,
+            "Failed for wrapped i16: {}",
+            len
+        );
+        assert_eq!(
+            dest_i32_wrapped, expected_i32_wrapped,
+            "Failed for wrapped i32: {}",
+            len
+        );
+    }
+}

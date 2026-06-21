@@ -8,7 +8,7 @@ authors.workspace = true
 description.workspace = true
 
 [dependencies]
-hermes-numeric = { path = "../hermes-numeric", version = "0.2.0", default-features = false, features = ["rkyv"] }
+hermes-numeric = { path = "../hermes-numeric", version = "0.3.0", default-features = false, features = ["rkyv"] }
 half = { workspace = true }
 bytemuck = { version = "1.14", features = ["derive"] }
 rkyv = { version = "0.7" }
@@ -16,7 +16,7 @@ mnemosyne = { workspace = true, optional = true }
 themis = { workspace = true }
 
 [dev-dependencies]
-hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.2.0" }
+hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.3.0" }
 
 [features]
 default = ["std", "parallel", "mnemosyne-memory"]
@@ -25,4 +25,3 @@ parallel = []
 mnemosyne-memory = ["dep:mnemosyne"]
 # Linux NUMA node placement via libnuma (links -lnuma); off by default.
 libnuma = []
-

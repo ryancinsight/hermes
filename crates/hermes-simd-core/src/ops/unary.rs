@@ -57,6 +57,14 @@ pub struct Neg;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Sqrt;
 
+/// Elementwise reciprocal square root: `1.0 / sqrt(a[i])`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RecipSqrt;
+
+/// Elementwise population count: count of set bits in each lane.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Popcount;
+
 // ---------------------------------------------------------------------------
 // Sealing impls
 // ---------------------------------------------------------------------------
@@ -64,6 +72,8 @@ pub struct Sqrt;
 impl crate::private::Sealed for Abs {}
 impl crate::private::Sealed for Neg {}
 impl crate::private::Sealed for Sqrt {}
+impl crate::private::Sealed for RecipSqrt {}
+impl crate::private::Sealed for Popcount {}
 
 // ---------------------------------------------------------------------------
 // UnaryOp impls
@@ -102,6 +112,17 @@ impl<T: Scalar> UnaryOp<T> for Sqrt {
     }
 }
 
+impl<T: Scalar> UnaryOp<T> for RecipSqrt {
+    #[inline(always)]
+    unsafe fn apply<Arch: SimdKernel<T>>(self, v: Arch::Vector) -> Arch::Vector {
+        Arch::recip_sqrt(v)
+    }
+    #[inline(always)]
+    fn apply_scalar(self, a: T) -> T {
+        T::ONE / a.sqrt()
+    }
+}
+
 impl<T: Scalar + PartialOrd + NumericElement> UnaryOp<T> for Clamp<T> {
     #[inline(always)]
     unsafe fn apply<Arch: SimdKernel<T>>(self, v: Arch::Vector) -> Arch::Vector {
@@ -114,5 +135,16 @@ impl<T: Scalar + PartialOrd + NumericElement> UnaryOp<T> for Clamp<T> {
     #[inline(always)]
     fn apply_scalar(self, a: T) -> T {
         a.min_scalar(self.hi).max_scalar(self.lo)
+    }
+}
+
+impl<T: Scalar> UnaryOp<T> for Popcount {
+    #[inline(always)]
+    unsafe fn apply<Arch: SimdKernel<T>>(self, v: Arch::Vector) -> Arch::Vector {
+        Arch::popcount(v)
+    }
+    #[inline(always)]
+    fn apply_scalar(self, a: T) -> T {
+        T::cast_from(a.count_ones() as i32)
     }
 }

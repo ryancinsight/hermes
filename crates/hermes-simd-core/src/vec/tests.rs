@@ -72,3 +72,44 @@ fn test_aligned_vec_rkyv() {
     assert_eq!(deserialized[1], 20);
     assert_eq!(deserialized[2], 30);
 }
+
+#[test]
+fn test_aligned_vec_drop_exception_safety() {
+    struct PanicOnDrop;
+    impl Drop for PanicOnDrop {
+        fn drop(&mut self) {
+            panic!("intentional panic on drop");
+        }
+    }
+
+    let res = std::panic::catch_unwind(|| {
+        let mut v = AlignedVec::<PanicOnDrop, Unaligned>::new();
+        v.push(PanicOnDrop);
+    });
+    assert!(res.is_err());
+}
+
+#[test]
+fn test_aligned_vec_alignment_casting() {
+    use crate::align::Aligned;
+
+    let mut v = AlignedVec::<i32, Unaligned>::with_capacity(16);
+    v.push(1);
+    v.push(2);
+
+    let addr = v.as_ptr() as usize;
+    if addr % 32 == 0 {
+        let v_aligned = v.try_into_alignment::<Aligned<32>>();
+        assert!(v_aligned.is_some());
+        let v_aligned = v_aligned.unwrap();
+        assert_eq!(v_aligned[0], 1);
+        assert_eq!(v_aligned[1], 2);
+    } else {
+        let v_aligned = v.try_into_alignment::<Aligned<32>>();
+        assert!(v_aligned.is_none());
+    }
+
+    let v_aligned = AlignedVec::<i32, Aligned<32>>::with_capacity(16);
+    let v_unaligned = v_aligned.into_unaligned();
+    assert_eq!(v_unaligned.len(), 0);
+}

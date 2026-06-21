@@ -466,6 +466,14 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
         crate::kernel_helpers::generic_unary_op::<T, Self, _>(a, |x| x.sqrt())
     }
 
+    /// Elementwise reciprocal square root.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    unsafe fn recip_sqrt(a: Self::Vector) -> Self::Vector {
+        crate::kernel_helpers::generic_unary_op::<T, Self, _>(a, |x| T::ONE / x.sqrt())
+    }
+
     /// Elementwise equal: `a == b`.
     ///
     /// # Safety
@@ -615,6 +623,54 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
         crate::kernel_helpers::generic_horizontal_reduce::<T, Self>(v, T::MIN_VALUE, |a, b| {
             a.max_scalar(b)
         })
+    }
+
+    /// Elementwise population count (number of set bits).
+    ///
+    /// Default: scalar lane-by-lane scan using [`crate::scalar::NumericElement::count_ones`].
+    /// Target-specific intrinsics override this.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    unsafe fn popcount(a: Self::Vector) -> Self::Vector {
+        crate::kernel_helpers::generic_unary_op::<T, Self, _>(a, |x| {
+            T::cast_from(x.count_ones() as i32)
+        })
+    }
+
+    /// Horizontal bitwise AND across all lanes.
+    ///
+    /// Default: scalar lane-by-lane scan using [`crate::scalar::NumericElement::bitand`].
+    /// Target-specific intrinsics override this.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    unsafe fn horizontal_bitwise_and(v: Self::Vector) -> T {
+        crate::kernel_helpers::generic_horizontal_reduce::<T, Self>(v, T::ALL_ONES, |a, b| {
+            a.bitand(b)
+        })
+    }
+
+    /// Horizontal bitwise OR across all lanes.
+    ///
+    /// Default: scalar lane-by-lane scan using [`crate::scalar::NumericElement::bitor`].
+    /// Target-specific intrinsics override this.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    unsafe fn horizontal_bitwise_or(v: Self::Vector) -> T {
+        crate::kernel_helpers::generic_horizontal_reduce::<T, Self>(v, T::ZERO, |a, b| a.bitor(b))
+    }
+
+    /// Horizontal bitwise XOR across all lanes.
+    ///
+    /// Default: scalar lane-by-lane scan using [`crate::scalar::NumericElement::bitxor`].
+    /// Target-specific intrinsics override this.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    unsafe fn horizontal_bitwise_xor(v: Self::Vector) -> T {
+        crate::kernel_helpers::generic_horizontal_reduce::<T, Self>(v, T::ZERO, |a, b| a.bitxor(b))
     }
 
     // -------------------------------------------------------------------------
