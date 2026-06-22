@@ -37,6 +37,14 @@ impl<T, Align> AlignedVec<T, Align>
 where
     Align: Alignment,
 {
+    #[inline(always)]
+    fn layout_for_capacity(capacity: usize, align: usize) -> Layout {
+        let size = capacity
+            .checked_mul(core::mem::size_of::<T>())
+            .expect("Capacity overflow");
+        Layout::from_size_align(size, align).unwrap()
+    }
+
     /// Create a new empty `AlignedVec` with no allocation.
     #[inline]
     pub fn new() -> Self {
@@ -81,10 +89,7 @@ where
         } else {
             core::mem::align_of::<T>()
         };
-        let size = capacity
-            .checked_mul(core::mem::size_of::<T>())
-            .expect("Capacity overflow");
-        let layout = Layout::from_size_align(size, align).unwrap();
+        let layout = Self::layout_for_capacity(capacity, align);
 
         #[cfg(feature = "mnemosyne-memory")]
         let ptr =
@@ -95,8 +100,6 @@ where
         if ptr.is_null() {
             alloc::alloc::handle_alloc_error(layout);
         }
-
-        crate::numa::locality::bump_alloc_generation();
 
         Self {
             ptr,
@@ -142,10 +145,7 @@ where
         } else {
             core::mem::align_of::<T>()
         };
-        let size = capacity
-            .checked_mul(core::mem::size_of::<T>())
-            .expect("Capacity overflow");
-        let layout = Layout::from_size_align(size, align).unwrap();
+        let layout = Self::layout_for_capacity(capacity, align);
 
         let allocator = crate::numa::MnemosyneNumaAllocator;
         let ptr = unsafe { allocator.alloc_on_node(layout, node) as *mut T };
@@ -369,10 +369,7 @@ where
     }
 
     fn layout_for(&self, capacity: usize) -> Layout {
-        let size = capacity
-            .checked_mul(core::mem::size_of::<T>())
-            .expect("Capacity overflow");
-        Layout::from_size_align(size, self.alloc_align as usize).unwrap()
+        Self::layout_for_capacity(capacity, self.alloc_align as usize)
     }
 
     fn grow(&mut self) {
@@ -388,6 +385,7 @@ where
         };
         let new_layout = self.layout_for(new_cap);
 
+        let old_ptr = self.ptr;
         let new_ptr = if self.cap == 0 {
             if let Some(node) = self.node {
                 let allocator = crate::numa::MnemosyneNumaAllocator;
@@ -430,7 +428,9 @@ where
             alloc::alloc::handle_alloc_error(new_layout);
         }
 
-        crate::numa::locality::bump_alloc_generation();
+        if self.node.is_none() && self.cap > 0 && new_ptr != old_ptr {
+            crate::numa::locality::bump_alloc_generation();
+        }
 
         self.ptr = new_ptr;
         self.cap = new_cap;
@@ -466,11 +466,7 @@ impl<T, Align: Alignment> Drop for DeallocGuard<T, Align> {
         if !self.ptr.is_null() && self.cap > 0 {
             crate::numa::locality::bump_alloc_generation();
             unsafe {
-                let size = self
-                    .cap
-                    .checked_mul(core::mem::size_of::<T>())
-                    .expect("Capacity overflow");
-                let layout = Layout::from_size_align(size, self.alloc_align as usize).unwrap();
+                let layout = AlignedVec::<T, Align>::layout_for_capacity(self.cap, self.alloc_align as usize);
                 if let Some(node) = self.node {
                     let allocator = crate::numa::MnemosyneNumaAllocator;
                     allocator.dealloc_on_node(self.ptr as *mut u8, layout, node);

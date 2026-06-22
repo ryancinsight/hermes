@@ -1914,18 +1914,22 @@ fn test_numa_locality_caching_correctness_and_invalidation() {
     let is_local_sub = verify_numa_locality(unsafe { data.as_ptr().add(10) }, 100, 0);
     assert_eq!(is_local1, is_local_sub);
 
-    // 3. Allocate a vector - this must bump the generation counter
+    // 3. Allocate a vector - this should not bump the generation counter immediately
     let vec: AlignedVec<u8, Unaligned> = AlignedVec::with_capacity(10);
     let gen_after_alloc = get_alloc_generation();
-    assert!(gen_after_alloc > gen_start);
-    drop(vec);
+    assert_eq!(gen_after_alloc, gen_start);
 
-    // 4. Manual bump and check invalidation
+    // 4. Drop the vector - this must bump the generation counter (deallocation)
+    drop(vec);
+    let gen_after_drop = get_alloc_generation();
+    assert!(gen_after_drop > gen_start);
+
+    // 5. Manual bump and check invalidation
     bump_alloc_generation();
     let gen_after_bump = get_alloc_generation();
-    assert!(gen_after_bump > gen_after_alloc);
+    assert!(gen_after_bump > gen_after_drop);
 
-    // 5. Multi-threaded stress test for contention-free caching
+    // 6. Multi-threaded stress test for contention-free caching
     let mut handles = std::vec![];
     for _ in 0..8 {
         handles.push(std::thread::spawn(move || {

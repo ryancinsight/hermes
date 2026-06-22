@@ -73,7 +73,9 @@ impl AdaptiveDispatcher {
                             {
                                 static WARNED: core::sync::atomic::AtomicBool =
                                     core::sync::atomic::AtomicBool::new(false);
-                                if !WARNED.swap(true, core::sync::atomic::Ordering::Relaxed) {
+                                if !WARNED.load(core::sync::atomic::Ordering::Relaxed)
+                                    && !WARNED.swap(true, core::sync::atomic::Ordering::Relaxed)
+                                {
                                     std::eprintln!(
                                         "WARNING [hermes-simd]: Cross-node NUMA memory access detected. \
                                          Tensors reside on a remote NUMA node (current thread node: {}). \
