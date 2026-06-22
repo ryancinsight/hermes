@@ -49,11 +49,12 @@ where
             lane_count <= 128,
             "LANE_COUNT exceeds maximum debug buffer size of 128"
         );
-        let mut buf = [T::ZERO; 128];
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
         unsafe {
-            Arch::store_unaligned(buf.as_mut_ptr(), self.raw);
+            Arch::store_unaligned(buf.as_mut_ptr() as *mut T, self.raw);
+            let init_slice = core::slice::from_raw_parts(buf.as_ptr() as *const T, lane_count);
+            f.debug_list().entries(init_slice).finish()
         }
-        f.debug_list().entries(&buf[..lane_count]).finish()
     }
 }
 
@@ -66,13 +67,15 @@ where
     fn eq(&self, other: &Self) -> bool {
         let lane_count = Arch::LANE_COUNT;
         assert!(lane_count <= 128);
-        let mut buf_self = [T::ZERO; 128];
-        let mut buf_other = [T::ZERO; 128];
+        let mut buf_self = [core::mem::MaybeUninit::<T>::uninit(); 128];
+        let mut buf_other = [core::mem::MaybeUninit::<T>::uninit(); 128];
         unsafe {
-            Arch::store_unaligned(buf_self.as_mut_ptr(), self.raw);
-            Arch::store_unaligned(buf_other.as_mut_ptr(), other.raw);
+            Arch::store_unaligned(buf_self.as_mut_ptr() as *mut T, self.raw);
+            Arch::store_unaligned(buf_other.as_mut_ptr() as *mut T, other.raw);
+            let slice_self = core::slice::from_raw_parts(buf_self.as_ptr() as *const T, lane_count);
+            let slice_other = core::slice::from_raw_parts(buf_other.as_ptr() as *const T, lane_count);
+            slice_self == slice_other
         }
-        buf_self[..lane_count] == buf_other[..lane_count]
     }
 }
 
@@ -256,12 +259,17 @@ where
         } else {
             // Short slice path to prevent page faults: copy to stack-aligned buffer of size 128.
             #[repr(C, align(64))]
-            struct AlignedBuf<T>([T; 128]);
+            struct AlignedBuf<T>([core::mem::MaybeUninit<T>; 128]);
 
-            let mut buf = AlignedBuf([T::ZERO; 128]);
-            buf.0[..len].copy_from_slice(data);
+            let mut buf = AlignedBuf([core::mem::MaybeUninit::uninit(); 128]);
+            for i in 0..len {
+                buf.0[i].write(data[i]);
+            }
+            for i in len..Arch::LANE_COUNT {
+                buf.0[i].write(T::ZERO);
+            }
 
-            unsafe { Ok(Self::masked_load_unaligned(buf.0.as_ptr(), mask, src)) }
+            unsafe { Ok(Self::masked_load_unaligned(buf.0.as_ptr() as *const T, mask, src)) }
         }
     }
 
@@ -293,16 +301,21 @@ where
             // Short slice path to prevent page faults: copy to stack-aligned buffer, perform masked store,
             // then copy active elements back.
             #[repr(C, align(64))]
-            struct AlignedBuf<T>([T; 128]);
+            struct AlignedBuf<T>([core::mem::MaybeUninit<T>; 128]);
 
-            let mut buf = AlignedBuf([T::ZERO; 128]);
-            buf.0[..len].copy_from_slice(data);
-
-            unsafe {
-                self.masked_store_unaligned(buf.0.as_mut_ptr(), mask);
+            let mut buf = AlignedBuf([core::mem::MaybeUninit::uninit(); 128]);
+            for i in 0..len {
+                buf.0[i].write(data[i]);
             }
 
-            data.copy_from_slice(&buf.0[..len]);
+            unsafe {
+                self.masked_store_unaligned(buf.0.as_mut_ptr() as *mut T, mask);
+            }
+
+            unsafe {
+                let init_slice = core::slice::from_raw_parts(buf.0.as_ptr() as *const T, len);
+                data.copy_from_slice(init_slice);
+            }
         }
         Ok(())
     }
@@ -414,28 +427,29 @@ where
     #[inline(always)]
     pub fn to_array<const N: usize>(self) -> [T; N] {
         let _ = AssertLaneCount::<T, Arch, N>::OK;
-        let mut arr = [T::ZERO; N];
+        let mut arr = [core::mem::MaybeUninit::<T>::uninit(); N];
         unsafe {
-            self.store_unaligned(arr.as_mut_ptr());
+            self.store_unaligned(arr.as_mut_ptr() as *mut T);
+            core::ptr::read(arr.as_ptr() as *const [T; N])
         }
-        arr
     }
 
     /// Convert this vector mask representation (sign bits) into a portable `BitMask`.
     #[inline(always)]
     pub fn to_bitmask(self) -> BitMask<64> {
-        let mut buf = [T::ZERO; 128];
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
         let lanes = <Arch as SimdKernel<T>>::LANE_COUNT;
         unsafe {
-            self.store_unaligned(buf.as_mut_ptr());
-        }
-        let mut m = 0u64;
-        for i in 0..lanes {
-            if buf[i].to_f64() != 0.0 || buf[i].is_nan() {
-                m |= 1u64 << i;
+            self.store_unaligned(buf.as_mut_ptr() as *mut T);
+            let mut m = 0u64;
+            for i in 0..lanes {
+                let val = buf[i].assume_init();
+                if val.to_f64() != 0.0 || val.is_nan() {
+                    m |= 1u64 << i;
+                }
             }
+            BitMask(m)
         }
-        BitMask(m)
     }
 
     /// Elementwise equal comparison returning a native `Mask`.
@@ -483,15 +497,16 @@ where
         U: CastFrom<T>,
     {
         let _ = AssertLaneCountSame::<T, U, Arch>::OK;
-        let mut buf_t = [T::ZERO; 128];
-        let mut buf_u = [U::ZERO; 128];
+        let mut buf_t = [core::mem::MaybeUninit::<T>::uninit(); 128];
+        let mut buf_u = [core::mem::MaybeUninit::<U>::uninit(); 128];
         let lanes = <Arch as SimdKernel<T>>::LANE_COUNT;
         unsafe {
-            self.store_unaligned(buf_t.as_mut_ptr());
+            self.store_unaligned(buf_t.as_mut_ptr() as *mut T);
             for i in 0..lanes {
-                buf_u[i] = U::cast_from(buf_t[i]);
+                let val_t = buf_t[i].assume_init();
+                buf_u[i].write(U::cast_from(val_t));
             }
-            Vector::<U, Arch>::new(Arch::load_unaligned(buf_u.as_ptr()))
+            Vector::<U, Arch>::new(Arch::load_unaligned(buf_u.as_ptr() as *const U))
         }
     }
 
@@ -499,22 +514,22 @@ where
     #[inline(always)]
     pub fn extract<const I: usize>(self) -> T {
         let _ = AssertLaneIndex::<T, Arch, I>::OK;
-        let mut buf = [T::ZERO; 128];
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
         unsafe {
-            self.store_unaligned(buf.as_mut_ptr());
+            self.store_unaligned(buf.as_mut_ptr() as *mut T);
+            buf[I].assume_init()
         }
-        buf[I]
     }
 
     /// Insert a value into a single lane by index at compile-time.
     #[inline(always)]
     pub fn insert<const I: usize>(self, val: T) -> Self {
         let _ = AssertLaneIndex::<T, Arch, I>::OK;
-        let mut buf = [T::ZERO; 128];
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
         unsafe {
-            self.store_unaligned(buf.as_mut_ptr());
-            buf[I] = val;
-            Self::load_unaligned(buf.as_ptr())
+            self.store_unaligned(buf.as_mut_ptr() as *mut T);
+            buf[I].write(val);
+            Self::load_unaligned(buf.as_ptr() as *const T)
         }
     }
 

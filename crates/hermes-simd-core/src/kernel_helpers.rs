@@ -14,14 +14,16 @@ where
     Arch: SimdKernel<T>,
     F: FnMut(T, T) -> T,
 {
-    let mut buf_a = [T::ZERO; 128];
-    let mut buf_b = [T::ZERO; 128];
-    Arch::store_unaligned(buf_a.as_mut_ptr(), a);
-    Arch::store_unaligned(buf_b.as_mut_ptr(), b);
+    let mut buf_a = [core::mem::MaybeUninit::<T>::uninit(); 128];
+    let mut buf_b = [core::mem::MaybeUninit::<T>::uninit(); 128];
+    Arch::store_unaligned(buf_a.as_mut_ptr() as *mut T, a);
+    Arch::store_unaligned(buf_b.as_mut_ptr() as *mut T, b);
     for i in 0..Arch::LANE_COUNT {
-        buf_a[i] = op(buf_a[i], buf_b[i]);
+        let val_a = buf_a[i].assume_init();
+        let val_b = buf_b[i].assume_init();
+        buf_a[i].write(op(val_a, val_b));
     }
-    Arch::load_unaligned(buf_a.as_ptr())
+    Arch::load_unaligned(buf_a.as_ptr() as *const T)
 }
 
 #[inline(always)]
@@ -31,12 +33,13 @@ where
     Arch: SimdKernel<T>,
     F: FnMut(T) -> T,
 {
-    let mut buf = [T::ZERO; 128];
-    Arch::store_unaligned(buf.as_mut_ptr(), a);
+    let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
+    Arch::store_unaligned(buf.as_mut_ptr() as *mut T, a);
     for i in 0..Arch::LANE_COUNT {
-        buf[i] = op(buf[i]);
+        let val = buf[i].assume_init();
+        buf[i].write(op(val));
     }
-    Arch::load_unaligned(buf.as_ptr())
+    Arch::load_unaligned(buf.as_ptr() as *const T)
 }
 
 #[inline(always)]
@@ -49,17 +52,23 @@ where
     T: Scalar,
     Arch: SimdKernel<T>,
 {
-    let mut buf_mask = [T::ZERO; 128];
-    let mut buf_true = [T::ZERO; 128];
-    let mut buf_false = [T::ZERO; 128];
-    Arch::store_unaligned(buf_mask.as_mut_ptr(), mask);
-    Arch::store_unaligned(buf_true.as_mut_ptr(), true_val);
-    Arch::store_unaligned(buf_false.as_mut_ptr(), false_val);
+    let mut buf_mask = [core::mem::MaybeUninit::<T>::uninit(); 128];
+    let mut buf_true = [core::mem::MaybeUninit::<T>::uninit(); 128];
+    let mut buf_false = [core::mem::MaybeUninit::<T>::uninit(); 128];
+    Arch::store_unaligned(buf_mask.as_mut_ptr() as *mut T, mask);
+    Arch::store_unaligned(buf_true.as_mut_ptr() as *mut T, true_val);
+    Arch::store_unaligned(buf_false.as_mut_ptr() as *mut T, false_val);
     for i in 0..Arch::LANE_COUNT {
-        let is_true = buf_mask[i].is_nan() || buf_mask[i].to_f64() != 0.0;
-        buf_true[i] = if is_true { buf_true[i] } else { buf_false[i] };
+        let mask_val = buf_mask[i].assume_init();
+        let is_true = mask_val.is_nan() || mask_val.to_f64() != 0.0;
+        let val = if is_true {
+            buf_true[i].assume_init()
+        } else {
+            buf_false[i].assume_init()
+        };
+        buf_true[i].write(val);
     }
-    Arch::load_unaligned(buf_true.as_ptr())
+    Arch::load_unaligned(buf_true.as_ptr() as *const T)
 }
 
 #[inline(always)]
@@ -90,22 +99,25 @@ where
     T: Scalar,
     Arch: SimdKernel<T>,
 {
-    let mut buf_a = [T::ZERO; 128];
-    let mut buf_b = [T::ZERO; 128];
-    let mut buf_c = [T::ZERO; 128];
-    Arch::store_unaligned(buf_a.as_mut_ptr(), a);
-    Arch::store_unaligned(buf_b.as_mut_ptr(), b);
-    Arch::store_unaligned(buf_c.as_mut_ptr(), c);
+    let mut buf_a = [core::mem::MaybeUninit::<T>::uninit(); 128];
+    let mut buf_b = [core::mem::MaybeUninit::<T>::uninit(); 128];
+    let mut buf_c = [core::mem::MaybeUninit::<T>::uninit(); 128];
+    Arch::store_unaligned(buf_a.as_mut_ptr() as *mut T, a);
+    Arch::store_unaligned(buf_b.as_mut_ptr() as *mut T, b);
+    Arch::store_unaligned(buf_c.as_mut_ptr() as *mut T, c);
     for i in 0..Arch::LANE_COUNT {
-        let prod = buf_a[i] * buf_b[i];
+        let val_a = buf_a[i].assume_init();
+        let val_b = buf_b[i].assume_init();
+        let val_c = buf_c[i].assume_init();
+        let prod = val_a * val_b;
         let add = (i & 1 == 1) ^ ADD_EVEN;
-        buf_a[i] = if add {
-            prod + buf_c[i]
+        buf_a[i].write(if add {
+            prod + val_c
         } else {
-            prod - buf_c[i]
-        };
+            prod - val_c
+        });
     }
-    Arch::load_unaligned(buf_a.as_ptr())
+    Arch::load_unaligned(buf_a.as_ptr() as *const T)
 }
 
 /// Scalar lane-by-lane horizontal fold used by `min_reduce` and `max_reduce` defaults.
@@ -121,11 +133,12 @@ where
     T: Scalar,
     Arch: SimdKernel<T>,
 {
-    let mut buf = [T::ZERO; 128];
-    Arch::store_unaligned(buf.as_mut_ptr(), v);
+    let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
+    Arch::store_unaligned(buf.as_mut_ptr() as *mut T, v);
     let mut acc = identity;
     for i in 0..Arch::LANE_COUNT {
-        acc = op(acc, buf[i]);
+        let val = buf[i].assume_init();
+        acc = op(acc, val);
     }
     acc
 }

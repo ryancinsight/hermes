@@ -343,25 +343,26 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
         v: Self::Vector,
         mut carry: T,
     ) -> (Self::Vector, T) {
-        let mut buf = [T::ZERO; 128];
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
         let lanes = Self::LANE_COUNT.min(128);
-        Self::store_unaligned(buf.as_mut_ptr(), v);
+        Self::store_unaligned(buf.as_mut_ptr() as *mut T, v);
 
-        let mut out_buf = [T::ZERO; 128];
+        let mut out_buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
         if SMode::IS_INCLUSIVE {
             for j in 0..lanes {
-                carry = Op::combine(carry, buf[j]);
-                out_buf[j] = carry;
+                let temp = buf[j].assume_init();
+                carry = Op::combine(carry, temp);
+                out_buf[j].write(carry);
             }
         } else {
             for j in 0..lanes {
-                let temp = buf[j];
-                out_buf[j] = carry;
+                let temp = buf[j].assume_init();
+                out_buf[j].write(carry);
                 carry = Op::combine(carry, temp);
             }
         }
 
-        (Self::load_unaligned(out_buf.as_ptr()), carry)
+        (Self::load_unaligned(out_buf.as_ptr() as *const T), carry)
     }
 
     /// Set all lanes to zero.
@@ -697,15 +698,15 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     /// Processor must support the required target feature.
     #[inline(always)]
     unsafe fn swap_adjacent(v: Self::Vector) -> Self::Vector {
-        let mut buf = [T::ZERO; 128];
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
         let lanes = Self::LANE_COUNT.min(128);
-        Self::store_unaligned(buf.as_mut_ptr(), v);
+        Self::store_unaligned(buf.as_mut_ptr() as *mut T, v);
         let mut i = 0usize;
         while i + 1 < lanes {
             buf.swap(i, i + 1);
             i += 2;
         }
-        Self::load_unaligned(buf.as_ptr())
+        Self::load_unaligned(buf.as_ptr() as *const T)
     }
 
     /// Duplicate even lanes into odd lanes: `[a0, a1, a2, a3, ...] -> [a0, a0, a2, a2, ...]`.
@@ -717,14 +718,15 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     /// Processor must support the required target feature.
     #[inline(always)]
     unsafe fn dup_even(v: Self::Vector) -> Self::Vector {
-        let mut buf = [T::ZERO; 128];
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
         let lanes = Self::LANE_COUNT.min(128);
-        Self::store_unaligned(buf.as_mut_ptr(), v);
-        let mut out = [T::ZERO; 128];
+        Self::store_unaligned(buf.as_mut_ptr() as *mut T, v);
+        let mut out = [core::mem::MaybeUninit::<T>::uninit(); 128];
         for i in 0..lanes {
-            out[i] = buf[i & !1];
+            let src_val = buf[i & !1].assume_init();
+            out[i].write(src_val);
         }
-        Self::load_unaligned(out.as_ptr())
+        Self::load_unaligned(out.as_ptr() as *const T)
     }
 
     /// Duplicate odd lanes into even lanes: `[a0, a1, a2, a3, ...] -> [a1, a1, a3, a3, ...]`.
@@ -737,14 +739,15 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     /// Processor must support the required target feature.
     #[inline(always)]
     unsafe fn dup_odd(v: Self::Vector) -> Self::Vector {
-        let mut buf = [T::ZERO; 128];
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
         let lanes = Self::LANE_COUNT.min(128);
-        Self::store_unaligned(buf.as_mut_ptr(), v);
-        let mut out = [T::ZERO; 128];
+        Self::store_unaligned(buf.as_mut_ptr() as *mut T, v);
+        let mut out = [core::mem::MaybeUninit::<T>::uninit(); 128];
         for i in 0..lanes {
-            out[i] = buf[(i | 1).min(lanes - 1)];
+            let src_val = buf[(i | 1).min(lanes - 1)].assume_init();
+            out[i].write(src_val);
         }
-        Self::load_unaligned(out.as_ptr())
+        Self::load_unaligned(out.as_ptr() as *const T)
     }
 
     /// Alternating fused multiply: even lanes `a*b - c`, odd lanes `a*b + c`.

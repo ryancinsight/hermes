@@ -402,16 +402,20 @@ where
         }
 
         if simd_len < len {
-            let mut tail_buf = [T::ZERO; 128];
+            let mut tail_buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
+            let tail_len = len - simd_len;
             unsafe {
-                for idx in simd_len..len {
-                    tail_buf[idx - simd_len] = slice[idx];
+                for idx in 0..tail_len {
+                    tail_buf[idx].write(slice[simd_len + idx]);
                 }
-                let vec = Vector::load_unaligned(tail_buf.as_ptr());
+                for idx in tail_len..lane_count {
+                    tail_buf[idx].write(T::ZERO);
+                }
+                let vec = Vector::load_unaligned(tail_buf.as_ptr() as *const T);
                 let res = f(vec);
-                res.store_unaligned(tail_buf.as_mut_ptr());
-                for idx in simd_len..len {
-                    slice[idx] = tail_buf[idx - simd_len];
+                res.store_unaligned(tail_buf.as_mut_ptr() as *mut T);
+                for idx in 0..tail_len {
+                    slice[simd_len + idx] = tail_buf[idx].assume_init();
                 }
             }
         }
