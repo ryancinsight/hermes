@@ -89,15 +89,13 @@ pub fn verify_numa_locality(ptr: *const u8, size: usize, expected_node: u32) -> 
         let cached = LOCALITY_CACHE.with(|cache| {
             let cache_ref = cache.borrow();
             let end_val = ptr_val.saturating_add(size);
-            for entry_opt in &cache_ref.entries {
-                if let Some(entry) = entry_opt {
-                    if entry.node == expected_node
-                        && entry.generation == gen
-                        && ptr_val >= entry.ptr_start
-                        && end_val <= entry.ptr_end
-                    {
-                        return Some(entry.local);
-                    }
+            for entry in cache_ref.entries.iter().flatten() {
+                if entry.node == expected_node
+                    && entry.generation == gen
+                    && ptr_val >= entry.ptr_start
+                    && end_val <= entry.ptr_end
+                {
+                    return Some(entry.local);
                 }
             }
             None
@@ -190,7 +188,7 @@ fn verify_numa_locality_os(ptr: *const u8, size: usize, expected_node: u32) -> b
             }
             checked += chunk_len;
         }
-        return true;
+        true
     }
 
     #[cfg(target_os = "linux")]

@@ -110,7 +110,7 @@ impl_numeric_element!(
     |x: F16, y: F16| F16(half::f16::from_bits(x.0.to_bits() & y.0.to_bits())),
     |x: F16, y: F16| F16(half::f16::from_bits(x.0.to_bits() | y.0.to_bits())),
     |x: F16, y: F16| F16(half::f16::from_bits(x.0.to_bits() ^ y.0.to_bits())),
-    |x: F16| x.0.to_bits().count_ones() as u32
+    |x: F16| x.0.to_bits().count_ones()
 );
 
 impl_numeric_element!(
@@ -133,7 +133,7 @@ impl_numeric_element!(
     |x: F32, y: F32| F32(f32::from_bits(x.0.to_bits() & y.0.to_bits())),
     |x: F32, y: F32| F32(f32::from_bits(x.0.to_bits() | y.0.to_bits())),
     |x: F32, y: F32| F32(f32::from_bits(x.0.to_bits() ^ y.0.to_bits())),
-    |x: F32| x.0.to_bits().count_ones() as u32
+    |x: F32| x.0.to_bits().count_ones()
 );
 
 impl_numeric_element!(
@@ -156,7 +156,7 @@ impl_numeric_element!(
     |x: F64, y: F64| F64(f64::from_bits(x.0.to_bits() & y.0.to_bits())),
     |x: F64, y: F64| F64(f64::from_bits(x.0.to_bits() | y.0.to_bits())),
     |x: F64, y: F64| F64(f64::from_bits(x.0.to_bits() ^ y.0.to_bits())),
-    |x: F64| x.0.to_bits().count_ones() as u32
+    |x: F64| x.0.to_bits().count_ones()
 );
 
 impl_numeric_element!(
@@ -181,7 +181,7 @@ impl_numeric_element!(
     |x: Bf16, y: Bf16| Bf16(half::bf16::from_bits(x.0.to_bits() & y.0.to_bits())),
     |x: Bf16, y: Bf16| Bf16(half::bf16::from_bits(x.0.to_bits() | y.0.to_bits())),
     |x: Bf16, y: Bf16| Bf16(half::bf16::from_bits(x.0.to_bits() ^ y.0.to_bits())),
-    |x: Bf16| x.0.to_bits().count_ones() as u32
+    |x: Bf16| x.0.to_bits().count_ones()
 );
 
 macro_rules! impl_numeric_for_byte_float {
@@ -206,7 +206,7 @@ macro_rules! impl_numeric_for_byte_float {
             |x: $t, y: $t| $t(x.0 & y.0),
             |x: $t, y: $t| $t(x.0 | y.0),
             |x: $t, y: $t| $t(x.0 ^ y.0),
-            |x: $t| x.0.count_ones() as u32
+            |x: $t| x.0.count_ones()
         );
     };
 }
@@ -276,7 +276,7 @@ impl_numeric_element!(
     |x: I8, y: I8| I8(x.0 & y.0),
     |x: I8, y: I8| I8(x.0 | y.0),
     |x: I8, y: I8| I8(x.0 ^ y.0),
-    |x: I8| x.0.count_ones() as u32
+    |x: I8| x.0.count_ones()
 );
 
 impl_numeric_element!(
@@ -299,7 +299,7 @@ impl_numeric_element!(
     |x: I16, y: I16| I16(x.0 & y.0),
     |x: I16, y: I16| I16(x.0 | y.0),
     |x: I16, y: I16| I16(x.0 ^ y.0),
-    |x: I16| x.0.count_ones() as u32
+    |x: I16| x.0.count_ones()
 );
 
 impl_numeric_element!(
@@ -322,7 +322,7 @@ impl_numeric_element!(
     |x: I32, y: I32| I32(x.0 & y.0),
     |x: I32, y: I32| I32(x.0 | y.0),
     |x: I32, y: I32| I32(x.0 ^ y.0),
-    |x: I32| x.0.count_ones() as u32
+    |x: I32| x.0.count_ones()
 );
 
 macro_rules! impl_float_element {

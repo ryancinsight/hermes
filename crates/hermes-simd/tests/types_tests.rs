@@ -1838,7 +1838,7 @@ fn test_aligned_vec_realloc_growth() {
     assert_eq!(vec.capacity(), 0);
 
     for i in 0..1000 {
-        vec.push(i as i32);
+        vec.push(i);
     }
     assert_eq!(vec.len(), 1000);
     assert!(vec.capacity() >= 1000);
@@ -1850,7 +1850,7 @@ fn test_aligned_vec_realloc_growth() {
     let mut numa_vec: AlignedVec<i32, Aligned<32>> = AlignedVec::with_capacity_numa(2, 0);
     assert_eq!(numa_vec.len(), 0);
     for i in 0..500 {
-        numa_vec.push((i * 2) as i32);
+        numa_vec.push(i * 2);
     }
     assert_eq!(numa_vec.len(), 500);
     for i in 0..500 {

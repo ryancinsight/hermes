@@ -270,13 +270,13 @@ fn test_masked_load_store_slice_avx512() {
 
     // Avx512 has lane count 16 for f32.
     let mut data = [0.0f32; 16];
-    for i in 0..16 {
-        data[i] = (i + 1) as f32;
+    for (i, d) in data.iter_mut().enumerate() {
+        *d = (i + 1) as f32;
     }
     let mut mask_arr = [false; 16];
-    for i in 0..16 {
+    for (i, m) in mask_arr.iter_mut().enumerate() {
         if i % 2 == 0 {
-            mask_arr[i] = true;
+            *m = true;
         }
     }
     let src = Vector::<f32, Avx512>::splat(0.0);
@@ -288,11 +288,11 @@ fn test_masked_load_store_slice_avx512() {
         let vec = Vector::<f32, Avx512>::masked_load_from_slice(&data, mask, src).unwrap();
         let mut out = [99.0f32; 16];
         vec.masked_store_to_slice(&mut out, mask).unwrap();
-        for i in 0..16 {
+        for (i, &o) in out.iter().enumerate() {
             if i % 2 == 0 {
-                assert_eq!(out[i], (i + 1) as f32);
+                assert_eq!(o, (i + 1) as f32);
             } else {
-                assert_eq!(out[i], 99.0);
+                assert_eq!(o, 99.0);
             }
         }
     }
@@ -307,8 +307,8 @@ fn test_widen_i8_simd_and_tails() {
     // Test different lengths to cover SIMD loop, inner SIMD combinations, and scalar tail loop.
     for len in 0..100 {
         let mut src = vec![0i8; len];
-        for j in 0..len {
-            src[j] = (j as i8).wrapping_mul(31).wrapping_add(7);
+        for (j, s) in src.iter_mut().enumerate() {
+            *s = (j as i8).wrapping_mul(31).wrapping_add(7);
         }
         let mut dest_i16 = vec![0i16; len];
         let mut dest_i32 = vec![0i32; len];

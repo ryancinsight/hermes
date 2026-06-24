@@ -24,7 +24,7 @@ where
     #[inline]
     fn sum_values(&self) -> T {
         if let Some(view) =
-            crate::view::SimdView::<T, Arch, crate::align::Unaligned>::new(&self.data.values)
+            crate::view::SimdView::<T, Arch, crate::align::Unaligned>::new(self.data.values)
         {
             view.reduce(crate::ops::Sum)
         } else {
@@ -71,7 +71,7 @@ where
     #[inline]
     fn sum_values(&self) -> T {
         if let Some(view) =
-            crate::view::SimdView::<T, Arch, crate::align::Unaligned>::new(&self.data.values)
+            crate::view::SimdView::<T, Arch, crate::align::Unaligned>::new(self.data.values)
         {
             view.reduce(crate::ops::Sum)
         } else {
@@ -152,7 +152,7 @@ where
     #[inline]
     fn sum_values(&self) -> T {
         if let Some(view) =
-            crate::view::SimdView::<T, Arch, crate::align::Unaligned>::new(&self.data.blocks)
+            crate::view::SimdView::<T, Arch, crate::align::Unaligned>::new(self.data.blocks)
         {
             view.reduce(crate::ops::Sum)
         } else {
