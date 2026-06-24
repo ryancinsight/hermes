@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::kernel::SimdKernel;
+use crate::kernel::{SimdKernel, MAX_SIMD_LANES};
 use crate::scalar::Scalar;
 
 #[inline(always)]
@@ -14,8 +14,9 @@ where
     Arch: SimdKernel<T>,
     F: FnMut(T, T) -> T,
 {
-    let mut buf_a = [core::mem::MaybeUninit::<T>::uninit(); 128];
-    let mut buf_b = [core::mem::MaybeUninit::<T>::uninit(); 128];
+    const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+    let mut buf_a = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+    let mut buf_b = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
     Arch::store_unaligned(buf_a.as_mut_ptr() as *mut T, a);
     Arch::store_unaligned(buf_b.as_mut_ptr() as *mut T, b);
     for i in 0..Arch::LANE_COUNT {
@@ -33,7 +34,8 @@ where
     Arch: SimdKernel<T>,
     F: FnMut(T) -> T,
 {
-    let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
+    const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+    let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
     Arch::store_unaligned(buf.as_mut_ptr() as *mut T, a);
     for i in 0..Arch::LANE_COUNT {
         let val = buf[i].assume_init();
@@ -52,9 +54,10 @@ where
     T: Scalar,
     Arch: SimdKernel<T>,
 {
-    let mut buf_mask = [core::mem::MaybeUninit::<T>::uninit(); 128];
-    let mut buf_true = [core::mem::MaybeUninit::<T>::uninit(); 128];
-    let mut buf_false = [core::mem::MaybeUninit::<T>::uninit(); 128];
+    const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+    let mut buf_mask = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+    let mut buf_true = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+    let mut buf_false = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
     Arch::store_unaligned(buf_mask.as_mut_ptr() as *mut T, mask);
     Arch::store_unaligned(buf_true.as_mut_ptr() as *mut T, true_val);
     Arch::store_unaligned(buf_false.as_mut_ptr() as *mut T, false_val);
@@ -77,7 +80,16 @@ where
     T: Scalar,
     Arch: SimdKernel<T>,
 {
-    let mut bools = [false; 64];
+    // The `u64` bitmask and the 64-element `bools` buffer bound this default to
+    // 64 lanes; `bm >> i` for `i >= 64` is itself undefined. Checked at compile
+    // time per backend.
+    const {
+        assert!(
+            <Arch as SimdKernel<T>>::LANE_COUNT <= u64::BITS as usize,
+            "SimdKernel::LANE_COUNT exceeds the 64-lane u64 bitmask width"
+        )
+    };
+    let mut bools = [false; u64::BITS as usize];
     for i in 0..Arch::LANE_COUNT {
         bools[i] = (bm >> i) & 1 == 1;
     }
@@ -99,9 +111,10 @@ where
     T: Scalar,
     Arch: SimdKernel<T>,
 {
-    let mut buf_a = [core::mem::MaybeUninit::<T>::uninit(); 128];
-    let mut buf_b = [core::mem::MaybeUninit::<T>::uninit(); 128];
-    let mut buf_c = [core::mem::MaybeUninit::<T>::uninit(); 128];
+    const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+    let mut buf_a = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+    let mut buf_b = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+    let mut buf_c = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
     Arch::store_unaligned(buf_a.as_mut_ptr() as *mut T, a);
     Arch::store_unaligned(buf_b.as_mut_ptr() as *mut T, b);
     Arch::store_unaligned(buf_c.as_mut_ptr() as *mut T, c);
@@ -129,7 +142,8 @@ where
     T: Scalar,
     Arch: SimdKernel<T>,
 {
-    let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
+    const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+    let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
     Arch::store_unaligned(buf.as_mut_ptr() as *mut T, v);
     let mut acc = identity;
     for i in 0..Arch::LANE_COUNT {

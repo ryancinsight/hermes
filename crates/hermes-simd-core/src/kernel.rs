@@ -35,6 +35,14 @@
 //! | `compress` | `_mm512_mask_compressstoreu_ps` | emulated | emulated | loop+if |
 //! | `gather` | `_mm512_i32gather_ps` | `_mm256_i32gather_ps` | emulated | loop |
 
+/// Lane capacity of the fixed scalar-fallback stack buffers used by the default
+/// `SimdKernel` methods (`scan_vector`, `swap_adjacent`, `dup_even`/`dup_odd`,
+/// and the `kernel_helpers` scalar emulations). A backend's [`SimdKernel::LANE_COUNT`]
+/// must not exceed this, or `store_unaligned` into those buffers would overflow
+/// the stack. The current maximum is 64 (AVX-512 `i8`); the bound is checked at
+/// compile time by [`SimdKernel::LANE_BOUND_CHECK`].
+pub const MAX_SIMD_LANES: usize = 128;
+
 /// Abstract trait defining low-level vector operations.
 ///
 /// Implemented by ZST architecture markers. All methods are `unsafe` — the caller is
@@ -86,6 +94,16 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
 
     /// Number of primitive elements of type `T` in one `Vector`.
     const LANE_COUNT: usize;
+
+    /// Compile-time guard that [`LANE_COUNT`](Self::LANE_COUNT) fits the fixed
+    /// `MAX_SIMD_LANES` scalar-fallback stack buffers. Referencing this const in
+    /// the buffer-using default methods forces the assertion to be evaluated for
+    /// each concrete backend at monomorphization, turning a would-be silent
+    /// stack-buffer overflow into a compile error.
+    const LANE_BOUND_CHECK: () = assert!(
+        Self::LANE_COUNT <= MAX_SIMD_LANES,
+        "SimdKernel::LANE_COUNT exceeds MAX_SIMD_LANES; widen the scalar-fallback stack buffers"
+    );
 
     /// Loop unrolling register accumulation factor to break loop-carried dependency chains.
     const UNROLL_FACTOR: usize = 4;
@@ -343,11 +361,12 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
         v: Self::Vector,
         mut carry: T,
     ) -> (Self::Vector, T) {
-        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
-        let lanes = Self::LANE_COUNT.min(128);
+        const { Self::LANE_BOUND_CHECK };
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let lanes = Self::LANE_COUNT;
         Self::store_unaligned(buf.as_mut_ptr() as *mut T, v);
 
-        let mut out_buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
+        let mut out_buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         if SMode::IS_INCLUSIVE {
             for j in 0..lanes {
                 let temp = buf[j].assume_init();
@@ -698,8 +717,9 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     /// Processor must support the required target feature.
     #[inline(always)]
     unsafe fn swap_adjacent(v: Self::Vector) -> Self::Vector {
-        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
-        let lanes = Self::LANE_COUNT.min(128);
+        const { Self::LANE_BOUND_CHECK };
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let lanes = Self::LANE_COUNT;
         Self::store_unaligned(buf.as_mut_ptr() as *mut T, v);
         let mut i = 0usize;
         while i + 1 < lanes {
@@ -718,10 +738,11 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     /// Processor must support the required target feature.
     #[inline(always)]
     unsafe fn dup_even(v: Self::Vector) -> Self::Vector {
-        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
-        let lanes = Self::LANE_COUNT.min(128);
+        const { Self::LANE_BOUND_CHECK };
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let lanes = Self::LANE_COUNT;
         Self::store_unaligned(buf.as_mut_ptr() as *mut T, v);
-        let mut out = [core::mem::MaybeUninit::<T>::uninit(); 128];
+        let mut out = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         for i in 0..lanes {
             let src_val = buf[i & !1].assume_init();
             out[i].write(src_val);
@@ -739,10 +760,11 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     /// Processor must support the required target feature.
     #[inline(always)]
     unsafe fn dup_odd(v: Self::Vector) -> Self::Vector {
-        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
-        let lanes = Self::LANE_COUNT.min(128);
+        const { Self::LANE_BOUND_CHECK };
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let lanes = Self::LANE_COUNT;
         Self::store_unaligned(buf.as_mut_ptr() as *mut T, v);
-        let mut out = [core::mem::MaybeUninit::<T>::uninit(); 128];
+        let mut out = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         for i in 0..lanes {
             let src_val = buf[(i | 1).min(lanes - 1)].assume_init();
             out[i].write(src_val);

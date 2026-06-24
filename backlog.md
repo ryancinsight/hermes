@@ -7,6 +7,13 @@ External gap findings live in [gap_audit.md](gap_audit.md).
 
 ## Delivered (2026-06-11)
 
+- [x] [patch] (2026-06-24) Compile-time `LANE_COUNT <= MAX_SIMD_LANES` guard on
+  the scalar-fallback `[MaybeUninit<T>; 128]` stack buffers (kernel + kernel_helpers):
+  named SSOT constant + `SimdKernel::LANE_BOUND_CHECK` asserted per backend,
+  replacing the unasserted/misleadingly-half-guarded magic 128. Prevents a silent
+  stack overflow if a future wide backend (e.g. native SVE) uses the defaults.
+  Validated by a lower-the-bound build failing AVX-512 compilation. Plus a
+  rust-1.95 workspace clippy cleanup. 357 tests + clippy `-D warnings` green.
 - [x] [minor] AXPY provider: `SimdOps::axpy` / dispatched `axpy` free fn —
   fused row update `out[i] += alpha * x[i]` via the `fmadd` primitive with
   scalar tail, no temporaries, length-mismatch error. Driver: leto matmul SIMD

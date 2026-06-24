@@ -130,10 +130,32 @@ Next increments:
 - P2: Expose sub-byte sign-extension and unpacking/widening SIMD primitives (for `Bf4`/`F4`/`I8`).
 - P3: Arm SME target-feature feasibility study.
 
+## Resolved
+
+- [patch] Scalar-fallback stack-buffer lane bound (2026-06-24). The default
+  `SimdKernel` methods and `kernel_helpers` emulations stored a full vector into
+  a fixed `[MaybeUninit<T>; 128]` buffer with the `LANE_COUNT <= 128` invariant
+  unasserted (and misleadingly half-guarded by `LANE_COUNT.min(128)` on the read
+  loop but not the unclamped `store_unaligned`). A backend with `LANE_COUNT > 128`
+  (e.g. a future 2048-bit SVE `i8` at 256 lanes — see the SVE residual below)
+  would silently overflow the stack. Now encoded at compile time:
+  `MAX_SIMD_LANES` SSOT constant + `SimdKernel::LANE_BOUND_CHECK` asserted per
+  backend at monomorphization (validated by a deliberate lower-the-bound build
+  that fails AVX-512 compilation). `generic_mask_from_bitmask` gains the
+  matching `LANE_COUNT <= u64::BITS` guard. Evidence tier: compile-time
+  invariant encoding (strongest available).
+- [patch] rust-1.95 clippy workspace lints resolved (redundant `as` casts,
+  `iter().flatten()`, needless borrow/return, `enumerate()` range loops);
+  `cargo clippy --workspace --all-targets -- -D warnings` is clean again.
+
 ## Residual Risks
 
 - AVX-512 and AMX runtime validation still depends on matching hardware.
 - Native SVE remains a planned backend; current `SveArch` coverage is an
-  emulated value-semantic backend.
+  emulated value-semantic backend. When a native SVE backend lands, `LANE_COUNT`
+  may exceed `MAX_SIMD_LANES` for narrow element types; the new
+  `LANE_BOUND_CHECK` will flag it at compile time so the scalar-fallback buffers
+  are widened (or the backend overrides the affected methods natively) before it
+  builds.
 - The local `[patch]` graph warns that `mnemosyne-heap` is unused; this is not
   introduced by the Highway audit, but remains a supply-chain hygiene item.

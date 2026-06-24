@@ -4,6 +4,23 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ## [Unreleased]
 
+### Changed
+- `hermes-simd-core` [patch]: encode the scalar-fallback stack-buffer lane bound
+  at compile time. The default `SimdKernel` methods (`scan_vector`,
+  `swap_adjacent`, `dup_even`/`dup_odd`) and the `kernel_helpers` scalar
+  emulations store a full vector into a fixed `[MaybeUninit<T>; 128]` stack
+  buffer, so a backend whose `LANE_COUNT > 128` would silently overflow it
+  (UB). The magic `128` is now the named SSOT constant `MAX_SIMD_LANES`, and a
+  defaulted associated const `SimdKernel::LANE_BOUND_CHECK` (referenced via an
+  inline `const {}` in each buffer method) asserts `LANE_COUNT <= MAX_SIMD_LANES`
+  per backend at monomorphization — turning a would-be silent overflow into a
+  compile error (validated: lowering the bound makes AVX-512 fail to compile
+  with the assertion message). The misleading `LANE_COUNT.min(128)` half-guards
+  (which clamped the read loop but not the unclamped `store_unaligned`) are
+  replaced by the real invariant. `generic_mask_from_bitmask` gains the
+  analogous `LANE_COUNT <= u64::BITS` compile-time guard for its `u64` bitmask.
+  No behavioral change for existing backends (current max `LANE_COUNT` is 64).
+
 ## [0.3.0] — 2026-06-21
 
 ### Added
