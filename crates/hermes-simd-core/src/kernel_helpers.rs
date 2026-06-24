@@ -111,11 +111,7 @@ where
         let val_c = buf_c[i].assume_init();
         let prod = val_a * val_b;
         let add = (i & 1 == 1) ^ ADD_EVEN;
-        buf_a[i].write(if add {
-            prod + val_c
-        } else {
-            prod - val_c
-        });
+        buf_a[i].write(if add { prod + val_c } else { prod - val_c });
     }
     Arch::load_unaligned(buf_a.as_ptr() as *const T)
 }

@@ -73,7 +73,8 @@ where
             Arch::store_unaligned(buf_self.as_mut_ptr() as *mut T, self.raw);
             Arch::store_unaligned(buf_other.as_mut_ptr() as *mut T, other.raw);
             let slice_self = core::slice::from_raw_parts(buf_self.as_ptr() as *const T, lane_count);
-            let slice_other = core::slice::from_raw_parts(buf_other.as_ptr() as *const T, lane_count);
+            let slice_other =
+                core::slice::from_raw_parts(buf_other.as_ptr() as *const T, lane_count);
             slice_self == slice_other
         }
     }
@@ -269,7 +270,13 @@ where
                 buf.0[i].write(T::ZERO);
             }
 
-            unsafe { Ok(Self::masked_load_unaligned(buf.0.as_ptr() as *const T, mask, src)) }
+            unsafe {
+                Ok(Self::masked_load_unaligned(
+                    buf.0.as_ptr() as *const T,
+                    mask,
+                    src,
+                ))
+            }
         }
     }
 

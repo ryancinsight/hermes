@@ -49,7 +49,8 @@ thread_local! {
 struct CacheAlignedAtomicU64(core::sync::atomic::AtomicU64);
 
 #[cfg(feature = "std")]
-static ALLOC_GENERATION: CacheAlignedAtomicU64 = CacheAlignedAtomicU64(core::sync::atomic::AtomicU64::new(0));
+static ALLOC_GENERATION: CacheAlignedAtomicU64 =
+    CacheAlignedAtomicU64(core::sync::atomic::AtomicU64::new(0));
 
 /// Bump the global allocation generation counter.
 ///
@@ -58,7 +59,9 @@ static ALLOC_GENERATION: CacheAlignedAtomicU64 = CacheAlignedAtomicU64(core::syn
 #[inline]
 pub fn bump_alloc_generation() {
     #[cfg(feature = "std")]
-    ALLOC_GENERATION.0.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+    ALLOC_GENERATION
+        .0
+        .fetch_add(1, core::sync::atomic::Ordering::Relaxed);
 }
 
 /// Returns the current global allocation generation counter.
@@ -66,7 +69,9 @@ pub fn bump_alloc_generation() {
 pub fn get_alloc_generation() -> u64 {
     #[cfg(feature = "std")]
     {
-        ALLOC_GENERATION.0.load(core::sync::atomic::Ordering::Relaxed)
+        ALLOC_GENERATION
+            .0
+            .load(core::sync::atomic::Ordering::Relaxed)
     }
     #[cfg(not(feature = "std"))]
     {

@@ -466,7 +466,10 @@ impl<T, Align: Alignment> Drop for DeallocGuard<T, Align> {
         if !self.ptr.is_null() && self.cap > 0 {
             crate::numa::locality::bump_alloc_generation();
             unsafe {
-                let layout = AlignedVec::<T, Align>::layout_for_capacity(self.cap, self.alloc_align as usize);
+                let layout = AlignedVec::<T, Align>::layout_for_capacity(
+                    self.cap,
+                    self.alloc_align as usize,
+                );
                 if let Some(node) = self.node {
                     let allocator = crate::numa::MnemosyneNumaAllocator;
                     allocator.dealloc_on_node(self.ptr as *mut u8, layout, node);
