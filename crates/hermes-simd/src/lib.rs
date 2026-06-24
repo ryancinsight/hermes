@@ -402,7 +402,14 @@ where
         }
 
         if simd_len < len {
-            let mut tail_buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
+            // Tail buffer: sized conservatively at 64 elements (> any current
+            // SIMD lane width: SSE=4, AVX=8, AVX-512=16, SVE≤64).
+            // A debug assertion guards against future wider architectures.
+            debug_assert!(
+                lane_count <= 64,
+                "tail_buf[64] too small: lane_count={lane_count}"
+            );
+            let mut tail_buf = [core::mem::MaybeUninit::<T>::uninit(); 64];
             let tail_len = len - simd_len;
             unsafe {
                 for idx in 0..tail_len {
