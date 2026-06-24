@@ -15,10 +15,17 @@ impl AmxSupport for half::bf16 {
     fn has_amx() -> bool {
         #[cfg(target_arch = "x86_64")]
         {
-            let res = core::arch::x86_64::__cpuid_count(7, 0);
-            let amx_tile = (res.edx & (1 << 24)) != 0;
-            let amx_bf16 = (res.edx & (1 << 22)) != 0;
-            amx_tile && amx_bf16
+            // Cache the result — CPU capabilities are immutable at runtime and
+            // `cpuid` is a serializing instruction (~50-200 cycles).  A one-time
+            // `OnceLock` init pays the cost once per process lifetime; steady-state
+            // calls pay a single relaxed-atomic load.
+            static CACHED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+            *CACHED.get_or_init(|| {
+                let res = core::arch::x86_64::__cpuid_count(7, 0);
+                let amx_tile = (res.edx & (1 << 24)) != 0;
+                let amx_bf16 = (res.edx & (1 << 22)) != 0;
+                amx_tile && amx_bf16
+            })
         }
         #[cfg(not(target_arch = "x86_64"))]
         {
@@ -32,10 +39,13 @@ impl AmxSupport for i8 {
     fn has_amx() -> bool {
         #[cfg(target_arch = "x86_64")]
         {
-            let res = core::arch::x86_64::__cpuid_count(7, 0);
-            let amx_tile = (res.edx & (1 << 24)) != 0;
-            let amx_int8 = (res.edx & (1 << 25)) != 0;
-            amx_tile && amx_int8
+            static CACHED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+            *CACHED.get_or_init(|| {
+                let res = core::arch::x86_64::__cpuid_count(7, 0);
+                let amx_tile = (res.edx & (1 << 24)) != 0;
+                let amx_int8 = (res.edx & (1 << 25)) != 0;
+                amx_tile && amx_int8
+            })
         }
         #[cfg(not(target_arch = "x86_64"))]
         {
@@ -49,8 +59,11 @@ impl Avx512Support for half::bf16 {
     fn has_avx512() -> bool {
         #[cfg(target_arch = "x86_64")]
         {
-            let res = core::arch::x86_64::__cpuid_count(7, 1);
-            (res.eax & (1 << 5)) != 0
+            static CACHED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+            *CACHED.get_or_init(|| {
+                let res = core::arch::x86_64::__cpuid_count(7, 1);
+                (res.eax & (1 << 5)) != 0
+            })
         }
         #[cfg(not(target_arch = "x86_64"))]
         {
@@ -64,8 +77,11 @@ impl Avx512Support for i8 {
     fn has_avx512() -> bool {
         #[cfg(target_arch = "x86_64")]
         {
-            let res = core::arch::x86_64::__cpuid_count(7, 0);
-            (res.ecx & (1 << 11)) != 0
+            static CACHED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+            *CACHED.get_or_init(|| {
+                let res = core::arch::x86_64::__cpuid_count(7, 0);
+                (res.ecx & (1 << 11)) != 0
+            })
         }
         #[cfg(not(target_arch = "x86_64"))]
         {
