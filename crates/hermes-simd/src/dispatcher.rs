@@ -21,12 +21,8 @@ pub enum DispatchDecision {
 
 // ── Cached topology flags ────────────────────────────────────────────────────
 //
-// CPU feature detection (AMX/AVX-512) is already cached per-type via
-// `OnceLock` in `cpu.rs` since the previous sprint.  NUMA topology is
-// stable after process start, so we cache the "multi-node" flag once to
-// avoid repeated `NumaTopologyService::total_nodes()` calls — the
-// `current_node()` query (per-call thread syscall) is still performed on the
-// AMX/multi-node path since it IS thread-dependent.
+// CPU feature detection (AMX/AVX-512) is cached per-type via `OnceLock` in
+// `cpu.rs`. NUMA topology is stable after process start.
 
 #[cfg(target_arch = "x86_64")]
 #[inline]

@@ -195,7 +195,7 @@ pub mod dispatch;
 pub mod target;
 
 pub use attacks::{bishop_attacks, queen_attacks, rook_attacks};
-pub use cpu::{AmxSupport, Avx512Support};
+pub use cpu::{has_fma3, AmxSupport, Avx512Support, FmaSupport};
 pub use dispatcher::{AdaptiveDispatcher, DispatchDecision};
 pub use target::{dispatch_view_mut_to, dispatch_view_to, TargetId};
 pub use tile_matmul::{
