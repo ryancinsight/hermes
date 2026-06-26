@@ -70,6 +70,11 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   stamped pre-bump probe data with the post-bump generation.
 
 ### Safety
+- `hermes-simd-core` [patch]: CSR `spmv` now validates every column index is
+  `< ncols` (linear pre-loop scan) before the unchecked SIMD gather `x[cols[j]]`,
+  making the safe `spmv_csr` sound on malformed input (negative/oversized indices
+  panic instead of reading out of bounds). The scan is cheap relative to the
+  gather-bound kernel; covered by a `#[should_panic]` test.
 - `hermes-simd-core` [patch]: the BlockedCoo `spmv` and `elementwise_mul_dense`
   kernels issued unchecked `load_unaligned` reads of `BN` lanes at each block's
   column base with no guarantee the span stayed within `x`/`dense`. Added an

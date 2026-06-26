@@ -619,7 +619,12 @@ pub fn masked_add<T: SimdOps>(
     T::masked_add(a, b, mask, out)
 }
 
-/// Computes sparse SpMV using CSR.
+/// Computes sparse SpMV using CSR: `y += A · x`.
+///
+/// # Panics
+/// Panics if `x.len() < ncols`, `y.len() < nrows`, or any column index is
+/// `>= ncols` (the indices feed an unchecked SIMD gather, so they are validated
+/// up front to keep the operation memory-safe on malformed input).
 #[inline(always)]
 pub fn spmv_csr<T: SimdOps>(data: CsrData<'_, T>, x: &[T], y: &mut [T]) {
     T::spmv_csr(data, x, y)

@@ -170,9 +170,19 @@ Deferred (recorded, not silently dropped):
   and test suite. The *kernels* are already deduplicated; collapsing the
   dispatcher glue into a proc-macro-attributed `macro_rules!` would obscure the
   per-variant documentation/tests for marginal gain. Left as four clear files.
-- CSR `spmv` SIMD gather still trusts column indices in range (round-1 finding);
-  the principled fix is index validation at `SparseView` construction, an O(nnz)
-  boundary check warranting its own design increment.
+
+Resolved later (2026-06-26, scope review):
+- CSR `spmv` SIMD-gather column-index bounds (round-1 finding): now validated
+  with a linear pre-loop scan in the CSR kernel. CSR SpMV is gather/latency-bound,
+  so the O(nnz) linear validation is cheap relative to the random-access gathers
+  it guards — the earlier "too expensive" deferral reasoning did not hold for this
+  kernel. `spmv_csr` is now sound on adversarial input (negative/oversized indices
+  rejected); covered by a `#[should_panic]` test. Sparse SpMV is otherwise a
+  low-value SIMD target (gather-bound); the high-value sparse path, SpMM, already
+  vectorizes via `axpy`. Consumers (e.g. leto) own format validation at their CSR
+  construction boundary and now always route dense/SpMM ops through hermes (the
+  `simd` cargo feature was removed downstream — SIMD is the unconditional path via
+  hermes's runtime dispatch).
 
 ## Internal Audit - 2026-06-26 (round 3) <a id="audit-2026-06-26-r3"></a>
 

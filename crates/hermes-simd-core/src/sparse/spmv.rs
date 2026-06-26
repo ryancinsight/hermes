@@ -75,6 +75,20 @@ where
         let data = &self.data;
         validate_spmv_sizes(x.len(), y.len(), data.ncols, data.nrows, "CSR");
 
+        // The SIMD path gathers `x[cols[j]]` without bounds-checking the column
+        // index (only the scalar tail is checked), so a malformed CSR matrix
+        // could make this safe function read out of bounds. Validate every column
+        // index is in range up front — a linear scan, cheap relative to the
+        // random-access gathers it guards — so the kernel is sound on adversarial
+        // input. A negative `i32` becomes a huge `usize` and is rejected too.
+        for &c in data.col_indices.iter() {
+            assert!(
+                (c as usize) < data.ncols,
+                "CSR column index {c} out of range for ncols {}",
+                data.ncols
+            );
+        }
+
         let lane_count = Arch::LANE_COUNT;
 
         for r in 0..data.nrows {

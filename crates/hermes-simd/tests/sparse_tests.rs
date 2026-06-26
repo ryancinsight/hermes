@@ -14,6 +14,20 @@ fn test_spmv_csr_identity() {
 }
 
 #[test]
+#[should_panic(expected = "out of range for ncols")]
+fn test_spmv_csr_rejects_out_of_range_column() {
+    // A column index of 3 is out of range for a 3-column matrix; the SIMD gather
+    // would otherwise read out of bounds, so the kernel must reject it.
+    let values = [1.0f32, 1.0, 1.0];
+    let col_indices = [0i32, 3, 2]; // 3 >= ncols
+    let row_ptr = [0i32, 1, 2, 3];
+    let data = CsrData::new(&values[..], &col_indices[..], &row_ptr[..], 3, 3);
+    let x = [5.0f32, 7.0, 11.0];
+    let mut y = [0.0f32; 3];
+    spmv_csr::<f32>(data, &x, &mut y);
+}
+
+#[test]
 fn test_spmv_csr_accumulates() {
     // 2x2 all-ones matrix
     let values = [1.0f32, 1.0, 1.0, 1.0];
