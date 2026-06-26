@@ -4,7 +4,8 @@ use hermes_simd_core::arch::SimdArch;
 use hermes_simd_core::kernel::SimdKernel;
 use hermes_simd_core::scalar::Scalar;
 use hermes_simd_core::sparse::{
-    Csr, CsrData, DenseWithMask, DenseWithMaskData, SellP, SellPData, SparseSpMv, SparseView,
+    BlockedCoo, BlockedCooData, Csr, CsrData, DenseWithMask, DenseWithMaskData, SellP, SellPData,
+    SparseSpMv, SparseView,
 };
 use hermes_simd_macros::runtime_dispatch;
 
@@ -39,4 +40,16 @@ pub(super) fn dispatch_spmv_sellp_kernel<T, const C: usize, A>(
     A: SimdArch + SimdKernel<T>,
 {
     SparseView::<T, SellP<C>, A>::from_sellp(data).spmv(x, y);
+}
+
+#[runtime_dispatch(avx512f, avx2, neon, scalar)]
+pub(super) fn dispatch_spmv_bcoo_kernel<T, const BM: usize, const BN: usize, A>(
+    data: BlockedCooData<'_, T, BM, BN>,
+    x: &[T],
+    y: &mut [T],
+) where
+    T: Scalar,
+    A: SimdArch + SimdKernel<T>,
+{
+    SparseView::<T, BlockedCoo<BM, BN>, A>::from_blocked_coo(data).spmv(x, y);
 }

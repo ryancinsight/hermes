@@ -68,6 +68,51 @@ fn test_blocked_coo_4x4_spmv() {
 }
 
 #[test]
+fn test_blocked_coo_simd_branch_matches_scalar_reference() {
+    // `BN = 8` triggers a SIMD branch on common hosts (AVX2 lane=8 → 1×; NEON /
+    // scalar lane=4 → 2×), exercising the now-live runtime-dispatched BCOO SIMD
+    // path (previously hardcoded to ScalarArch). Dyadic-exact entries keep the
+    // SIMD reduction order bit-identical to the sequential reference.
+    const BM: usize = 2;
+    const BN: usize = 8;
+    let nrows = 2usize;
+    let ncols = 16usize;
+    let nblocks = 2usize;
+    // Two 2×8 blocks: block 0 at (row 0, col 0), block 1 at (row 0, col 8).
+    let block: Vec<f32> = (0..nblocks * BM * BN)
+        .map(|i| ((i % 7) as f32 - 3.0) * 0.5)
+        .collect();
+    let block_row = [0i32, 0i32];
+    let block_col = [0i32, 8i32];
+    let x: Vec<f32> = (0..ncols).map(|i| (i % 5) as f32 - 2.0).collect();
+
+    let mut want = vec![0.0f32; nrows];
+    for b in 0..nblocks {
+        let br = block_row[b] as usize;
+        let bc = block_col[b] as usize;
+        for i in 0..BM {
+            let mut acc = 0.0f32;
+            for j in 0..BN {
+                acc += block[b * BM * BN + i * BN + j] * x[bc + j];
+            }
+            want[br + i] += acc;
+        }
+    }
+
+    let data = BlockedCooData::new(
+        &block[..],
+        &block_row[..],
+        &block_col[..],
+        nblocks,
+        nrows,
+        ncols,
+    );
+    let mut y = vec![0.0f32; nrows];
+    spmv_bcoo::<f32, BM, BN>(data, &x, &mut y);
+    assert_eq!(y, want, "BCOO SIMD spmv must match scalar reference");
+}
+
+#[test]
 fn test_sellp_spmv_correctness() {
     let values = [1.0f32, 2.0, 3.0, 4.0];
     let col_indices = [0i32, 1, 2, 3];

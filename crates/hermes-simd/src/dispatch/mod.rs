@@ -31,9 +31,7 @@ pub use popcount::{
 };
 
 use hermes_simd_core::scalar::Scalar as ScalarTrait;
-use hermes_simd_core::sparse::{
-    BlockedCoo, BlockedCooData, CsrData, DenseWithMaskData, SellPData, SparseSpMv, SparseView,
-};
+use hermes_simd_core::sparse::{BlockedCooData, CsrData, DenseWithMaskData, SellPData};
 use hermes_simd_core::view::SimdError;
 use hermes_simd_core::{Add, Div, Mul, Sub};
 #[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
@@ -327,7 +325,9 @@ macro_rules! impl_simd_ops_methods {
             x: &[Self],
             y: &mut [Self],
         ) {
-            SparseView::<Self, BlockedCoo<BM, BN>, ScalarArch>::from_blocked_coo(data).spmv(x, y);
+            // Runtime-dispatched like the other sparse kernels (was hardcoded to
+            // ScalarArch, which left the SIMD BlockedCoo paths dead at runtime).
+            sparse::dispatch_spmv_bcoo::<Self, BM, BN>(data, x, y)
         }
         #[inline(always)]
         fn spmv_dense_masked(data: DenseWithMaskData<'_, Self>, x: &[Self], y: &mut [Self]) {
