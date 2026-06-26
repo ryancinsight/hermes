@@ -27,7 +27,7 @@
 //! |-------------------|------------------------------------------------------|
 //! | [`layout`]        | `RowMajor`, `ColMajor` ZSTs; sealed `Layout` trait   |
 //! | [`error`]         | `TensorError` enum                                   |
-//! | [`view`]          | `TensorView` struct + all impl blocks                |
+//! | [`view`]          | `TensorView` core + `rank_ops`/`simd_bridge` leaves  |
 //! | [`cow`]           | `TensorCow` enum + all impl blocks                   |
 //! | `helpers` (priv)  | `row_major_strides`, `compute_offset`                |
 
