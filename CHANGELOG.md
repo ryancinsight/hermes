@@ -11,6 +11,19 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   popcount, wrapping fmadd, min/max, constants, `CastFrom` round-trips).
 
 ### Changed
+- `hermes-simd-core` [patch]: finish the `MAX_SIMD_LANES` SSOT migration in
+  `view/vector_reg.rs` — the `Vector` scalar-fallback buffers (`Debug`,
+  `PartialEq`, `to_bitmask`, `cast`, `extract`, `insert`, masked slice load/store)
+  were still hardcoded `[_; 128]` with dead `assert!(lane_count <= 128)` runtime
+  checks. They now use the named `MAX_SIMD_LANES` (64) const with the compile-time
+  `LANE_BOUND_CHECK`, halving those stack frames and converting the dead runtime
+  asserts into per-backend compile errors; the masked-slice OOB guard's magic `64`
+  is now `u64::BITS`.
+- `hermes-simd-core` [patch]: split the 601-line `tensor/view.rs` into a vertical
+  `tensor/view/` hierarchy by concern — `mod.rs` (core N-D struct, constructors,
+  rank-agnostic accessors), `rank_ops.rs` (rank-2/3 specialized views + transpose),
+  and `simd_bridge.rs` (the rank-1 → `SimdView` seam). Pure relocation; behavior
+  unchanged.
 - `hermes-simd-core` [patch]: drop `adjust_layout_for_mnemosyne`, the small-alloc
   padding that inflated every `<=8KB` NUMA allocation to `8192+align` bytes to
   "bypass the thread-local cache". That routed small allocations into Mnemosyne's

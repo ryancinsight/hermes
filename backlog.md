@@ -7,6 +7,14 @@ External gap findings live in [gap_audit.md](gap_audit.md).
 
 ## Delivered (2026-06-11)
 
+- [x] [patch] (2026-06-26) Audit round 3 — SSOT, hierarchy, allocator retention.
+  Finished the `MAX_SIMD_LANES` SSOT migration in `view/vector_reg.rs` (dead
+  runtime asserts → compile-time `LANE_BOUND_CHECK`, 128→64 buffers); split
+  `tensor/view.rs` into a vertical `tensor/view/{mod,rank_ops,simd_bridge}`
+  hierarchy (SoC). Upstream Mnemosyne (`perf/huge-pool-byte-cap`): byte-bounded
+  huge-pool retention (~16 GiB→~256 MiB/bucket) + removed a redundant per-pop
+  atomic reload. 367 hermes tests + 210 Mnemosyne tests green; clippy/fmt/doc
+  clean. See [gap_audit](gap_audit.md#audit-2026-06-26-r3).
 - [x] [patch] (2026-06-26) Memory-efficiency cross-repo fix. Root-caused
   `AlignedVec<_, Aligned<64>>` small allocations costing ~2 MiB each (Mnemosyne
   routed `align > 16` to its huge path). Fixed upstream in Mnemosyne

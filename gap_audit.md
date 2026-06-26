@@ -174,6 +174,24 @@ Deferred (recorded, not silently dropped):
   the principled fix is index validation at `SparseView` construction, an O(nnz)
   boundary check warranting its own design increment.
 
+## Internal Audit - 2026-06-26 (round 3) <a id="audit-2026-06-26-r3"></a>
+
+Evidence tier: compile-time invariant encoding + value-semantic tests (hermes);
+value-semantic test + source-grounded retention analysis (Mnemosyne).
+
+Resolved this sprint:
+- [patch] hermes `view/vector_reg.rs` was the one module left out of the
+  `MAX_SIMD_LANES` SSOT migration: 10 sites used `[_; 128]` buffers with dead
+  `assert!(lane_count <= 128)` runtime checks. Migrated to `MAX_SIMD_LANES` (64)
+  + compile-time `LANE_BOUND_CHECK`; magic `64` OOB guard → `u64::BITS`.
+- [patch] hermes `tensor/view.rs` (601 lines) split into a vertical `tensor/view/`
+  hierarchy: core (`mod.rs`), `rank_ops.rs`, `simd_bridge.rs` — SoC, pure
+  relocation.
+- [upstream, Mnemosyne `perf/huge-pool-byte-cap`] Huge-pool retention was bounded
+  only by per-bucket block count (1024), allowing ~16 GiB/bucket of idle mappings;
+  now byte-bounded per bucket (`bucket_block_cap`, ~256 MiB) while small-huge
+  buckets keep the full count cap. Plus a redundant per-`pop` atomic reload removed.
+
 ## Internal Audit - 2026-06-26 <a id="audit-2026-06-26"></a>
 
 Four-dimension sweep (safety, contention-free perf, memory, redundancy).
