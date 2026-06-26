@@ -303,212 +303,71 @@ impl NumericElement for half::bf16 {
     }
 }
 
-impl NumericElement for i8 {
-    const ZERO: Self = 0;
-    const ONE: Self = 1;
-    const NAN: Self = 0;
-    const INFINITY: Self = 0;
-    const BYTE_WIDTH: usize = 1;
-    const ALL_ONES: Self = -1;
-    const SIGN_MASK: Self = i8::MIN;
-    const MIN_VALUE: Self = i8::MIN;
-    const MAX_VALUE: Self = i8::MAX;
+/// Shared `NumericElement` body for the built-in signed integer types. Differs
+/// from [`impl_numeric_element_unsigned`] only in `ALL_ONES` (-1), `SIGN_MASK`
+/// (`T::MIN`), and `abs`. `min_scalar`/`max_scalar` use the `PartialOrd`-based
+/// trait defaults.
+macro_rules! impl_numeric_element_signed {
+    ($t:ty, $byte_width:expr) => {
+        impl NumericElement for $t {
+            const ZERO: Self = 0;
+            const ONE: Self = 1;
+            const NAN: Self = 0;
+            const INFINITY: Self = 0;
+            const BYTE_WIDTH: usize = $byte_width;
+            const ALL_ONES: Self = -1;
+            const SIGN_MASK: Self = <$t>::MIN;
+            const MIN_VALUE: Self = <$t>::MIN;
+            const MAX_VALUE: Self = <$t>::MAX;
 
-    #[inline(always)]
-    fn abs(self) -> Self {
-        self.abs()
-    }
-    #[inline(always)]
-    fn scalar_fmadd(self, b: Self, c: Self) -> Self {
-        self.wrapping_mul(b).wrapping_add(c)
-    }
-    #[inline(always)]
-    fn sqrt(self) -> Self {
-        (self as f64).sqrt() as Self
-    }
-    #[inline(always)]
-    fn is_finite(self) -> bool {
-        true
-    }
-    #[inline(always)]
-    fn is_nan(self) -> bool {
-        false
-    }
-    #[inline(always)]
-    fn to_f64(self) -> f64 {
-        self as f64
-    }
-    #[inline(always)]
-    fn bitand(self, rhs: Self) -> Self {
-        self & rhs
-    }
-    #[inline(always)]
-    fn bitor(self, rhs: Self) -> Self {
-        self | rhs
-    }
-    #[inline(always)]
-    fn bitxor(self, rhs: Self) -> Self {
-        self ^ rhs
-    }
-    #[inline(always)]
-    fn count_ones(self) -> u32 {
-        self.count_ones()
-    }
-    #[inline(always)]
-    fn min_scalar(self, other: Self) -> Self {
-        if self <= other {
-            self
-        } else {
-            other
+            #[inline(always)]
+            fn abs(self) -> Self {
+                self.abs()
+            }
+            #[inline(always)]
+            fn scalar_fmadd(self, b: Self, c: Self) -> Self {
+                self.wrapping_mul(b).wrapping_add(c)
+            }
+            #[inline(always)]
+            fn sqrt(self) -> Self {
+                (self as f64).sqrt() as Self
+            }
+            #[inline(always)]
+            fn is_finite(self) -> bool {
+                true
+            }
+            #[inline(always)]
+            fn is_nan(self) -> bool {
+                false
+            }
+            #[inline(always)]
+            fn to_f64(self) -> f64 {
+                self as f64
+            }
+            #[inline(always)]
+            fn bitand(self, rhs: Self) -> Self {
+                self & rhs
+            }
+            #[inline(always)]
+            fn bitor(self, rhs: Self) -> Self {
+                self | rhs
+            }
+            #[inline(always)]
+            fn bitxor(self, rhs: Self) -> Self {
+                self ^ rhs
+            }
+            #[inline(always)]
+            fn count_ones(self) -> u32 {
+                self.count_ones()
+            }
         }
-    }
-    #[inline(always)]
-    fn max_scalar(self, other: Self) -> Self {
-        if self >= other {
-            self
-        } else {
-            other
-        }
-    }
+    };
 }
 
-impl NumericElement for i16 {
-    const ZERO: Self = 0;
-    const ONE: Self = 1;
-    const NAN: Self = 0;
-    const INFINITY: Self = 0;
-    const BYTE_WIDTH: usize = 2;
-    const ALL_ONES: Self = -1;
-    const SIGN_MASK: Self = i16::MIN;
-    const MIN_VALUE: Self = i16::MIN;
-    const MAX_VALUE: Self = i16::MAX;
-
-    #[inline(always)]
-    fn abs(self) -> Self {
-        self.abs()
-    }
-    #[inline(always)]
-    fn scalar_fmadd(self, b: Self, c: Self) -> Self {
-        self.wrapping_mul(b).wrapping_add(c)
-    }
-    #[inline(always)]
-    fn sqrt(self) -> Self {
-        (self as f64).sqrt() as Self
-    }
-    #[inline(always)]
-    fn is_finite(self) -> bool {
-        true
-    }
-    #[inline(always)]
-    fn is_nan(self) -> bool {
-        false
-    }
-    #[inline(always)]
-    fn to_f64(self) -> f64 {
-        self as f64
-    }
-    #[inline(always)]
-    fn bitand(self, rhs: Self) -> Self {
-        self & rhs
-    }
-    #[inline(always)]
-    fn bitor(self, rhs: Self) -> Self {
-        self | rhs
-    }
-    #[inline(always)]
-    fn bitxor(self, rhs: Self) -> Self {
-        self ^ rhs
-    }
-    #[inline(always)]
-    fn count_ones(self) -> u32 {
-        self.count_ones()
-    }
-    #[inline(always)]
-    fn min_scalar(self, other: Self) -> Self {
-        if self <= other {
-            self
-        } else {
-            other
-        }
-    }
-    #[inline(always)]
-    fn max_scalar(self, other: Self) -> Self {
-        if self >= other {
-            self
-        } else {
-            other
-        }
-    }
-}
-
-impl NumericElement for i32 {
-    const ZERO: Self = 0;
-    const ONE: Self = 1;
-    const NAN: Self = 0;
-    const INFINITY: Self = 0;
-    const BYTE_WIDTH: usize = 4;
-    const ALL_ONES: Self = -1;
-    const SIGN_MASK: Self = i32::MIN;
-    const MIN_VALUE: Self = i32::MIN;
-    const MAX_VALUE: Self = i32::MAX;
-
-    #[inline(always)]
-    fn abs(self) -> Self {
-        self.abs()
-    }
-    #[inline(always)]
-    fn scalar_fmadd(self, b: Self, c: Self) -> Self {
-        self.wrapping_mul(b).wrapping_add(c)
-    }
-    #[inline(always)]
-    fn sqrt(self) -> Self {
-        (self as f64).sqrt() as Self
-    }
-    #[inline(always)]
-    fn is_finite(self) -> bool {
-        true
-    }
-    #[inline(always)]
-    fn is_nan(self) -> bool {
-        false
-    }
-    #[inline(always)]
-    fn to_f64(self) -> f64 {
-        self as f64
-    }
-    #[inline(always)]
-    fn bitand(self, rhs: Self) -> Self {
-        self & rhs
-    }
-    #[inline(always)]
-    fn bitor(self, rhs: Self) -> Self {
-        self | rhs
-    }
-    #[inline(always)]
-    fn bitxor(self, rhs: Self) -> Self {
-        self ^ rhs
-    }
-    #[inline(always)]
-    fn count_ones(self) -> u32 {
-        self.count_ones()
-    }
-    #[inline(always)]
-    fn min_scalar(self, other: Self) -> Self {
-        if self <= other {
-            self
-        } else {
-            other
-        }
-    }
-    #[inline(always)]
-    fn max_scalar(self, other: Self) -> Self {
-        if self >= other {
-            self
-        } else {
-            other
-        }
-    }
-}
+impl_numeric_element_signed!(i8, 1);
+impl_numeric_element_signed!(i16, 2);
+impl_numeric_element_signed!(i32, 4);
+impl_numeric_element_signed!(i64, 8);
 
 impl FloatElement for f32 {
     #[inline(always)]
@@ -570,75 +429,6 @@ impl FloatElement for half::bf16 {
     }
 }
 
-impl NumericElement for i64 {
-    const ZERO: Self = 0;
-    const ONE: Self = 1;
-    const NAN: Self = 0;
-    const INFINITY: Self = 0;
-    const BYTE_WIDTH: usize = 8;
-    const ALL_ONES: Self = -1;
-    const SIGN_MASK: Self = i64::MIN;
-    const MIN_VALUE: Self = i64::MIN;
-    const MAX_VALUE: Self = i64::MAX;
-
-    #[inline(always)]
-    fn abs(self) -> Self {
-        self.abs()
-    }
-    #[inline(always)]
-    fn scalar_fmadd(self, b: Self, c: Self) -> Self {
-        self.wrapping_mul(b).wrapping_add(c)
-    }
-    #[inline(always)]
-    fn sqrt(self) -> Self {
-        (self as f64).sqrt() as Self
-    }
-    #[inline(always)]
-    fn is_finite(self) -> bool {
-        true
-    }
-    #[inline(always)]
-    fn is_nan(self) -> bool {
-        false
-    }
-    #[inline(always)]
-    fn to_f64(self) -> f64 {
-        self as f64
-    }
-    #[inline(always)]
-    fn bitand(self, rhs: Self) -> Self {
-        self & rhs
-    }
-    #[inline(always)]
-    fn bitor(self, rhs: Self) -> Self {
-        self | rhs
-    }
-    #[inline(always)]
-    fn bitxor(self, rhs: Self) -> Self {
-        self ^ rhs
-    }
-    #[inline(always)]
-    fn count_ones(self) -> u32 {
-        self.count_ones()
-    }
-    #[inline(always)]
-    fn min_scalar(self, other: Self) -> Self {
-        if self <= other {
-            self
-        } else {
-            other
-        }
-    }
-    #[inline(always)]
-    fn max_scalar(self, other: Self) -> Self {
-        if self >= other {
-            self
-        } else {
-            other
-        }
-    }
-}
-
 macro_rules! impl_numeric_element_unsigned {
     ($t:ty, $byte_width:expr, $min_value:expr, $max_value:expr) => {
         impl NumericElement for $t {
@@ -691,22 +481,6 @@ macro_rules! impl_numeric_element_unsigned {
             #[inline(always)]
             fn count_ones(self) -> u32 {
                 self.count_ones()
-            }
-            #[inline(always)]
-            fn min_scalar(self, other: Self) -> Self {
-                if self <= other {
-                    self
-                } else {
-                    other
-                }
-            }
-            #[inline(always)]
-            fn max_scalar(self, other: Self) -> Self {
-                if self >= other {
-                    self
-                } else {
-                    other
-                }
             }
         }
     };
