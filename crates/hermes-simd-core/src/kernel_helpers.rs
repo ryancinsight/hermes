@@ -80,16 +80,12 @@ where
     T: Scalar,
     Arch: SimdKernel<T>,
 {
-    // The `u64` bitmask and the 64-element `bools` buffer bound this default to
-    // 64 lanes; `bm >> i` for `i >= 64` is itself undefined. Checked at compile
-    // time per backend.
-    const {
-        assert!(
-            <Arch as SimdKernel<T>>::LANE_COUNT <= u64::BITS as usize,
-            "SimdKernel::LANE_COUNT exceeds the 64-lane u64 bitmask width"
-        )
-    };
-    let mut bools = [false; u64::BITS as usize];
+    // The `u64` bitmask (`bm >> i` is defined only for `i < 64`) and the
+    // `bools` buffer bound this default; both are covered by the shared
+    // `MAX_SIMD_LANES <= 64` scalar-fallback SSOT, checked at compile time
+    // per backend.
+    const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+    let mut bools = [false; MAX_SIMD_LANES];
     for i in 0..Arch::LANE_COUNT {
         bools[i] = (bm >> i) & 1 == 1;
     }

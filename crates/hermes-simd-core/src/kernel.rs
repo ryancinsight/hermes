@@ -39,9 +39,10 @@
 /// `SimdKernel` methods (`scan_vector`, `swap_adjacent`, `dup_even`/`dup_odd`,
 /// and the `kernel_helpers` scalar emulations). A backend's [`SimdKernel::LANE_COUNT`]
 /// must not exceed this, or `store_unaligned` into those buffers would overflow
-/// the stack. The current maximum is 64 (AVX-512 `i8`); the bound is checked at
-/// compile time by [`SimdKernel::LANE_BOUND_CHECK`].
-pub const MAX_SIMD_LANES: usize = 128;
+/// the stack. The current workspace maximum is 64 (AVX-512 `i8`, 64×`i8`); the
+/// bound is checked at compile time by [`SimdKernel::LANE_BOUND_CHECK`], so a
+/// future wider backend fails to build rather than silently overflowing the stack.
+pub const MAX_SIMD_LANES: usize = 64;
 
 /// Abstract trait defining low-level vector operations.
 ///

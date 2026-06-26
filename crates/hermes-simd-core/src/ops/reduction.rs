@@ -29,6 +29,23 @@ pub trait ReductionOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
     /// Processor must support the target feature of `Arch`.
     unsafe fn accumulate<Arch: SimdKernel<T>>(acc: Arch::Vector, v: Arch::Vector) -> Arch::Vector;
 
+    /// FMA-aware pairwise accumulation: `acc = fuse(acc, a, b)` where `fuse` may use
+    /// a single fused multiply-add instruction rather than a separate `mul` + `accumulate`.
+    ///
+    /// Default: `Self::accumulate(acc, Arch::mul(a, b))` — a correct two-instruction fallback.
+    /// Override this for `Dot` and similar operations that can exploit `Arch::fmadd`.
+    ///
+    /// # Safety
+    /// Processor must support the target feature of `Arch`.
+    #[inline(always)]
+    unsafe fn fma_pair_accumulate<Arch: SimdKernel<T>>(
+        acc: Arch::Vector,
+        a: Arch::Vector,
+        b: Arch::Vector,
+    ) -> Arch::Vector {
+        Self::accumulate::<Arch>(acc, Arch::mul(a, b))
+    }
+
     /// Reduce the final accumulator to a scalar.
     ///
     /// # Safety
@@ -204,6 +221,20 @@ impl<T: Scalar> ReductionOp<T> for Dot {
         // v already holds a[i]*b[i] product from the zip loop; just add to accumulator.
         Arch::add(acc, v)
     }
+
+    /// FMA-accelerated pairwise accumulation for dot product.
+    ///
+    /// Overrides the default `accumulate(acc, mul(a, b))` two-instruction sequence
+    /// with a single `fmadd(a, b, acc)` when the architecture supports it.
+    #[inline(always)]
+    unsafe fn fma_pair_accumulate<Arch: SimdKernel<T>>(
+        acc: Arch::Vector,
+        a: Arch::Vector,
+        b: Arch::Vector,
+    ) -> Arch::Vector {
+        Arch::fmadd(a, b, acc)
+    }
+
     #[inline(always)]
     unsafe fn finalize<Arch: SimdKernel<T>>(acc: Arch::Vector) -> T {
         Arch::sum_reduce(acc)
@@ -346,14 +377,10 @@ impl<T: Scalar> ReductionOp<T> for Product {
     /// Processor must support the target feature of `Arch`.
     #[inline(always)]
     unsafe fn finalize<Arch: SimdKernel<T>>(acc: Arch::Vector) -> T {
-        const MAX_LANE_COUNT: usize = 64;
-        debug_assert!(
-            Arch::LANE_COUNT <= MAX_LANE_COUNT,
-            "LANE_COUNT {} exceeds maximum stack buffer size {}",
-            Arch::LANE_COUNT,
-            MAX_LANE_COUNT
-        );
-        let mut buf = [T::ZERO; MAX_LANE_COUNT];
+        // Compile-time bound (per backend) against the shared scalar-fallback
+        // buffer SSOT, replacing a debug-only runtime assert.
+        const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+        let mut buf = [T::ZERO; crate::kernel::MAX_SIMD_LANES];
         Arch::store_unaligned(buf.as_mut_ptr(), acc);
         let mut result = T::ONE;
         for i in 0..Arch::LANE_COUNT {
