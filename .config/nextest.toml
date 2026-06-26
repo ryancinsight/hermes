@@ -1,0 +1,8 @@
+# Workspace test-runner configuration.
+#
+# A test is marked slow at 30s and terminated after a second 30s period (60s).
+# Crossing 30s is a performance defect in the code under test (profile and
+# optimize the real implementation — never raise the limit or shrink the
+# workload); a 60s termination is a hang/deadlock to root-cause.
+[profile.default]
+slow-timeout = { period = "30s", terminate-after = 2 }

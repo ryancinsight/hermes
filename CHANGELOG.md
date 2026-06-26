@@ -4,22 +4,54 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ## [Unreleased]
 
+### Added
+- `hermes-numeric` [minor]: `NumericElement` and `CastFrom` coverage for `i64`
+  and `u8`/`u16`/`u32`/`u64`, plus the crate's first test module — value-semantic
+  contract tests for every integer impl cross-checked against std (bitops,
+  popcount, wrapping fmadd, min/max, constants, `CastFrom` round-trips).
+
 ### Changed
 - `hermes-simd-core` [patch]: encode the scalar-fallback stack-buffer lane bound
-  at compile time. The default `SimdKernel` methods (`scan_vector`,
-  `swap_adjacent`, `dup_even`/`dup_odd`) and the `kernel_helpers` scalar
-  emulations store a full vector into a fixed `[MaybeUninit<T>; 128]` stack
-  buffer, so a backend whose `LANE_COUNT > 128` would silently overflow it
-  (UB). The magic `128` is now the named SSOT constant `MAX_SIMD_LANES`, and a
-  defaulted associated const `SimdKernel::LANE_BOUND_CHECK` (referenced via an
-  inline `const {}` in each buffer method) asserts `LANE_COUNT <= MAX_SIMD_LANES`
-  per backend at monomorphization — turning a would-be silent overflow into a
-  compile error (validated: lowering the bound makes AVX-512 fail to compile
-  with the assertion message). The misleading `LANE_COUNT.min(128)` half-guards
-  (which clamped the read loop but not the unclamped `store_unaligned`) are
-  replaced by the real invariant. `generic_mask_from_bitmask` gains the
-  analogous `LANE_COUNT <= u64::BITS` compile-time guard for its `u64` bitmask.
-  No behavioral change for existing backends (current max `LANE_COUNT` is 64).
+  at compile time and tighten it to the true maximum. The default `SimdKernel`
+  methods (`scan_vector`, `swap_adjacent`, `dup_even`/`dup_odd`) and the
+  `kernel_helpers` scalar emulations store a full vector into a fixed
+  `[MaybeUninit<T>; N]` stack buffer, so a backend whose `LANE_COUNT > N` would
+  silently overflow it (UB). `N` is the named SSOT constant `MAX_SIMD_LANES`,
+  now `64` (the workspace maximum, AVX-512 `i8`) rather than the previous
+  over-provisioned `128` — halving every fallback frame. A defaulted associated
+  const `SimdKernel::LANE_BOUND_CHECK` (referenced via inline `const {}` in each
+  buffer method) asserts `LANE_COUNT <= MAX_SIMD_LANES` per backend at
+  monomorphization, turning a would-be silent overflow into a compile error.
+  `reduction.rs::finalize` (formerly a divergent `MAX_LANE_COUNT = 64` + debug
+  assert) and `generic_mask_from_bitmask`'s bitmask buffer now both fold onto
+  this SSOT under the compile-time check.
+- `hermes-simd` [patch]: `dispatch_axpy` and `dispatch_scale` use a 4-accumulator
+  unrolled SIMD body to break the store-to-load dependency chain, matching the
+  throughput model used by `dot`.
+- `hermes-simd` [patch]: the three target-gated `impl SimdOps for T` blocks
+  (byte-identical 206-line bodies differing only in their `where` kernel bound)
+  collapse into one `impl_simd_ops_methods!` macro (`dispatch/mod.rs` 1217 → 845
+  lines); the per-call element-width flush limit in `view/reduce.rs` dedupes to a
+  single `const fn flush_limit_for::<T>()`.
+- `hermes-simd-macros` [patch]: `#![forbid(unsafe_code)]` (the crate executes no
+  unsafe; the unsafe it emits lives in generated token streams).
+- `hermes-simd-intrinsics` [patch]: magic-table init CAS success ordering relaxed
+  from `Acquire` to `Relaxed` (the 0→1 winner acquires no shared data).
+
+### Fixed
+- `hermes-simd-core` [patch]: harden the NUMA alloc-generation cross-thread
+  invalidation signal. The counter now publishes with `Release` and is read with
+  `Acquire` (was `Relaxed`, which gave no happens-before, so a reader could trust
+  a stale locality flag for a recycled address), and `verify_numa_locality`
+  captures the generation once before the OS residency probe instead of
+  re-reading it at store time — closing a TOCTOU window where a concurrent bump
+  stamped pre-bump probe data with the post-bump generation.
+
+### Safety
+- `hermes-simd-core` [patch]: `build_index_vector` binds its `IndexVector` layout
+  assumption with a `const` assert (`size_of::<IndexVector>() == LANE_COUNT *
+  size_of::<i32>()`), so a layout-mismatched backend is a build error rather than
+  an out-of-bounds unaligned read.
 
 ## [0.3.0] — 2026-06-21
 
@@ -119,6 +151,10 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   rustdoc warning-clean after the vertical tiling split.
 - README/backlog now include an operation-family coverage map that distinguishes
   delivered SIMD families from consumer-demand pending families.
+- Runtime FMA support probing now uses Rust's platform-aware feature detector
+  behind a cached `has_fma3` helper and `FmaSupport` trait impls.
+- GEMV dispatch docs now disambiguate function links from same-named modules,
+  keeping rustdoc warning-clean.
 
 ### Changed
 - `SveArch` is now a callable 512-bit-shape emulated backend for f32/f64

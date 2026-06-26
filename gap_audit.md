@@ -97,6 +97,11 @@ Evidence tier: value-semantic differential and boundary tests.
   length invariant is explicit in the panic message.
 - [patch] GEMM tiling rustdoc cleanup: private implementation names in module
   theorem prose no longer emit public rustdoc private-link warnings.
+- [patch] Runtime FMA capability probe: `has_fma3` no longer relies on the raw
+  CPUID FMA bit alone; it follows Rust's runtime feature detector and is tested
+  against `std::is_x86_feature_detected!("fma")` on x86 hosts.
+- [patch] GEMV rustdoc link cleanup: public dispatch docs no longer emit
+  ambiguous intra-doc links for same-named GEMV modules and functions.
 
 ## NumKong Reference Audit - 2026-06-17 <a id="numkong-2026-06-17"></a>
 
@@ -130,6 +135,35 @@ Next increments:
 - P2: Expose sub-byte sign-extension and unpacking/widening SIMD primitives (for `Bf4`/`F4`/`I8`).
 - P3: Arm SME target-feature feasibility study.
 
+## Internal Audit - 2026-06-26 <a id="audit-2026-06-26"></a>
+
+Four-dimension sweep (safety, contention-free perf, memory, redundancy).
+Evidence tier: compile-time invariant encoding and value-semantic tests for the
+fixes below; source audit for the deferred item.
+
+Resolved this sprint:
+- [patch] Scalar-fallback buffer over-provisioning: `MAX_SIMD_LANES` was `128`,
+  2× the true workspace maximum `LANE_COUNT` of `64` (AVX-512 `i8`). Lowered to
+  `64`, halving every fallback stack frame; the two divergent local bounds
+  (`reduction.rs::finalize` `MAX_LANE_COUNT = 64` debug-assert, and the
+  bitmask-buffer `u64::BITS` guard) now fold onto the SSOT under the compile-time
+  `LANE_BOUND_CHECK`. Evidence: const-eval catches a too-low bound (AVX-512 `i8`
+  fails to build), so the value is the verified tight maximum.
+- [patch] NUMA alloc-generation memory ordering: the cross-thread cache
+  invalidation counter used `Relaxed` (no happens-before — a reader could trust a
+  stale locality flag for a recycled address) and re-read the generation after
+  the OS probe (a TOCTOU window stamping pre-bump data with the post-bump
+  generation). Now `Release`/`Acquire` with a single pre-probe capture.
+- [patch] `build_index_vector` layout invariant: the `&[i32] → IndexVector`
+  unaligned read now carries a `const` size assert, so a layout-mismatched
+  backend is a build error, not an OOB read.
+- [patch] `#![forbid(unsafe_code)]` on `hermes-simd-macros` (no executable
+  unsafe — only generated tokens). Magic-table init CAS success ordering relaxed
+  to `Relaxed` (winner acquires no shared data).
+- [patch] Redundancy: three byte-identical target-gated `SimdOps` impls collapsed
+  to one `impl_simd_ops_methods!` macro (mod.rs 1217→845); `flush_limit` deduped
+  to a `const fn` SSOT.
+
 ## Resolved
 
 - [patch] Scalar-fallback stack-buffer lane bound (2026-06-24). The default
@@ -159,3 +193,13 @@ Next increments:
   builds.
 - The local `[patch]` graph warns that `mnemosyne-heap` is unused; this is not
   introduced by the Highway audit, but remains a supply-chain hygiene item.
+- [minor, deferred] NUMA alloc-generation is a single global counter bumped on
+  every dealloc/realloc. On a multi-NUMA + AMX host under heavy alloc churn this
+  is a true-sharing serialization point and over-broad (a free on any node
+  invalidates every node's thread-local cache). Sharding the generation per NUMA
+  node would remove both, but requires threading the node through the allocator
+  bump API; deferred as it only affects multi-node AMX hosts and needs careful
+  node attribution. The ordering/TOCTOU correctness fix landed this sprint.
+- `.config/nextest.toml` added this sprint (30s slow / 60s terminate), making the
+  mandated test-time budget enforced rather than implicit. The suite currently
+  runs in ~2.4s, well under the threshold.

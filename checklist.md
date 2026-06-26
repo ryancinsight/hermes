@@ -180,6 +180,17 @@
       Highway-derived coarse coverage gap into delivered families and
       consumer-demand pending families. Evidence tier: source audit, not a new
       implementation or benchmark claim.
+- [x] [patch] Runtime FMA capability probe: cached `has_fma3` and
+      `FmaSupport` impls now use the platform-aware runtime detector and have
+      host-capability coverage.
+- [x] [patch] GEMV rustdoc link cleanup: public docs now disambiguate
+      same-named dispatch modules and functions.
+- [x] [minor] Audit sprint (2026-06-26): numeric integer-type extension + first
+      `hermes-numeric` tests; `MAX_SIMD_LANES` 128→64 with SSOT unification;
+      NUMA alloc-generation ordering/TOCTOU hardening; `build_index_vector`
+      compile-time layout guard; `forbid(unsafe_code)` on macros; magic CAS
+      ordering; `SimdOps` macro-collapse; `flush_limit`/`axpy`/`scale` cleanup.
+      367 tests + clippy + fmt green. See [gap_audit](gap_audit.md#audit-2026-06-26).
 
 ## Next sprint candidates (from [backlog](backlog.md))
 

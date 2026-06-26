@@ -7,6 +7,17 @@ External gap findings live in [gap_audit.md](gap_audit.md).
 
 ## Delivered (2026-06-11)
 
+- [x] [minor] (2026-06-26) Audit sprint — safety, contention-free perf, memory.
+  `NumericElement` extended to `i64`/`u8`/`u16`/`u32`/`u64` (+ first
+  `hermes-numeric` tests). `MAX_SIMD_LANES` 128→64 (true max) halving fallback
+  buffers, with `reduction.rs`/bitmask buffers folded onto the SSOT under the
+  compile-time `LANE_BOUND_CHECK`. NUMA alloc-generation hardened
+  (Relaxed→Release/Acquire + single-capture, closing a stale-cache/TOCTOU
+  window). `build_index_vector` layout invariant made a `const` assert;
+  `#![forbid(unsafe_code)]` on `hermes-simd-macros`; magic-table CAS ordering
+  relaxed. Triplicated `SimdOps` impls collapsed to one macro (mod.rs
+  1217→845); `flush_limit` deduped to a `const fn`; `axpy`/`scale` 4×-unrolled.
+  367 tests + clippy `-D warnings` + fmt green.
 - [x] [patch] (2026-06-24) Compile-time `LANE_COUNT <= MAX_SIMD_LANES` guard on
   the scalar-fallback `[MaybeUninit<T>; 128]` stack buffers (kernel + kernel_helpers):
   named SSOT constant + `SimdKernel::LANE_BOUND_CHECK` asserted per backend,
@@ -42,6 +53,11 @@ External gap findings live in [gap_audit.md](gap_audit.md).
 - [x] [patch] GEMM tiling rustdoc cleanup: module theorem prose now references
   private implementation details as code text instead of public intra-doc
   links.
+- [x] [patch] Runtime FMA capability probe: `has_fma3` / `FmaSupport` now
+  route through Rust's platform-aware runtime detector and are covered by
+  host-capability tests.
+- [x] [patch] GEMV rustdoc link cleanup: same-named dispatch modules and
+  functions are disambiguated in public docs.
 - [x] [minor] Const-generic Blocked-COO dispatch: replaced fixed public
   `spmv_bcoo4x4`/`spmv_bcoo8x8` dispatch and fixed
   `SparseView::from_blocked_coo_4x4`/`from_blocked_coo_8x8` constructors with
