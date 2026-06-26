@@ -23,26 +23,66 @@ where
     }
 
     let lane_count = A::LANE_COUNT;
-    let simd_len = (len / lane_count) * lane_count;
+    let unroll_factor = A::UNROLL_FACTOR;
+    let chunk_size = lane_count * unroll_factor;
+    let unrolled_simd_len = (len / chunk_size) * chunk_size;
     let x_ptr = x.as_ptr();
     let out_ptr = out.as_mut_ptr();
 
-    // SAFETY: `simd_len <= len` bounds every vector load/store inside both
-    // equal-length slices; lanes are processed in disjoint `lane_count`
-    // chunks of the same index range, so the read-modify-write of `out`
-    // never overlaps a pending store.
+    // SAFETY: `chunk_size | lane_count` bounds every pointer inside both slices.
+    // The 4-accumulator loop hides store-to-load latency on modern micro-architectures
+    // and matches the throughput model used by `dot()` and `scale()`.
     unsafe {
         let valpha = A::splat(alpha);
         let mut i = 0usize;
+
+        // ── 4× unrolled FMA loop ─────────────────────────────────────────────
+        while i < unrolled_simd_len {
+            let px0 = x_ptr.add(i);
+            let px1 = x_ptr.add(i + lane_count);
+            let px2 = x_ptr.add(i + lane_count * 2);
+            let px3 = x_ptr.add(i + lane_count * 3);
+            let po0 = out_ptr.add(i);
+            let po1 = out_ptr.add(i + lane_count);
+            let po2 = out_ptr.add(i + lane_count * 2);
+            let po3 = out_ptr.add(i + lane_count * 3);
+            A::store_unaligned(
+                po0,
+                A::fmadd(A::load_unaligned(px0), valpha, A::load_unaligned(po0)),
+            );
+            A::store_unaligned(
+                po1,
+                A::fmadd(A::load_unaligned(px1), valpha, A::load_unaligned(po1)),
+            );
+            A::store_unaligned(
+                po2,
+                A::fmadd(A::load_unaligned(px2), valpha, A::load_unaligned(po2)),
+            );
+            A::store_unaligned(
+                po3,
+                A::fmadd(A::load_unaligned(px3), valpha, A::load_unaligned(po3)),
+            );
+            i += chunk_size;
+        }
+
+        // ── Remaining full SIMD vectors ──────────────────────────────────────
+        let simd_len = (len / lane_count) * lane_count;
         while i < simd_len {
-            let vx = A::load_unaligned(x_ptr.add(i));
-            let vo = A::load_unaligned(out_ptr.add(i));
-            A::store_unaligned(out_ptr.add(i), A::fmadd(vx, valpha, vo));
+            let p = out_ptr.add(i);
+            A::store_unaligned(
+                p,
+                A::fmadd(
+                    A::load_unaligned(x_ptr.add(i)),
+                    valpha,
+                    A::load_unaligned(p),
+                ),
+            );
             i += lane_count;
         }
     }
 
     // Scalar tail.
+    let simd_len = (len / lane_count) * lane_count;
     for i in simd_len..len {
         out[i] = out[i] + x[i] * alpha;
     }
