@@ -11,6 +11,11 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   popcount, wrapping fmadd, min/max, constants, `CastFrom` round-trips).
 
 ### Changed
+- `hermes-simd` [patch]: extract `axpy_rows_batch`'s type-independent extent
+  validation into a non-generic `#[inline(never)]` `check_axpy_rows_batch_extents`
+  so it is emitted once instead of re-monomorphized into every `(T, Arch)`
+  instantiation of the kernel (the validation runs once per call, not in the hot
+  loop, so the dedup has no hot-path cost).
 - `hermes-numeric` [patch]: consolidate the signed-integer `NumericElement`
   impls (`i8`/`i16`/`i32`/`i64` were four hand-copied blocks) into one
   `impl_numeric_element_signed!` macro mirroring the unsigned one, and drop the
@@ -68,6 +73,12 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   from `Acquire` to `Relaxed` (the 0→1 winner acquires no shared data).
 
 ### Fixed
+- `hermes-simd` [patch]: `spmv_bcoo` was hardcoded to `ScalarArch`, so the
+  runtime-dispatched SIMD BlockedCoo kernels (and their bounds guards) were dead
+  — every blocked-COO SpMV ran scalar regardless of host SIMD. It now routes
+  through a `#[runtime_dispatch]` `dispatch_spmv_bcoo` like the CSR/SELL-P/
+  dense-masked paths, selecting AVX-512/AVX2/NEON/scalar at runtime. Covered by a
+  differential test exercising the SIMD branch against a scalar reference.
 - `hermes-simd-core` [patch]: harden the NUMA alloc-generation cross-thread
   invalidation signal. The counter now publishes with `Release` and is read with
   `Acquire` (was `Relaxed`, which gave no happens-before, so a reader could trust

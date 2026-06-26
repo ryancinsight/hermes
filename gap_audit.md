@@ -184,6 +184,38 @@ Resolved later (2026-06-26, scope review):
   `simd` cargo feature was removed downstream — SIMD is the unconditional path via
   hermes's runtime dispatch).
 
+## Internal Audit - 2026-06-26 (round 5, monomorphization) <a id="audit-2026-06-26-r5"></a>
+
+Evidence tier: value-semantic differential test (BCOO SIMD) + source-grounded
+monomorphization analysis.
+
+Resolved this sprint:
+- [patch] hermes `spmv_bcoo` was hardcoded to `ScalarArch` (the only sparse op
+  not runtime-dispatched), leaving the SIMD BlockedCoo kernels dead at runtime —
+  a perf defect, not cleanup. Now routed through `#[runtime_dispatch]`
+  `dispatch_spmv_bcoo`; differential test added for the SIMD branch.
+- [patch] hermes `axpy_rows_batch`: extracted the type-independent extent
+  validation to a non-generic `#[inline(never)]` fn (emitted once vs. per
+  `(T, Arch)`). The validation is run-once-per-call (not the hot loop), so the
+  dedup carries no hot-path cost — the correct application of the inner-function
+  pattern here.
+
+Verified clean / not pursued (monomorphization):
+- Tiling const-generics (`<6,4>`/`<3,3>`/`<1,1>` …) are measured-win register
+  blocking dispatched by `LANE_COUNT` — must NOT be collapsed to runtime params.
+- Cross-crate inlining is complete (all `SimdKernel` methods `#[inline(always)]`);
+  no `dyn`/`Box<dyn>` on any compute path; the one in-loop branch and
+  `flush_limit_for::<T>()` are const-foldable (DCE handles per-instance).
+
+Deferred (needs measurement, not a clear win):
+- Mnemosyne page-list ops (`push_page_front`/`unlink_page_from_list`/`move_*`) are
+  `<B>`-generic but `B`-body-independent, emitted ~6× identically. Extracting a
+  non-generic inner fn dedups *only* if it is `#[inline(never)]` — but these are
+  on the allocator's hot free path, so that trades binary size for per-free call
+  overhead. `#[inline(always)]` (as one agent suggested) dedups nothing. This is a
+  size/speed tradeoff to settle with `cargo-bloat`/`cargo-llvm-lines` + a free
+  benchmark, not a blind change. Filed, not done.
+
 ## Internal Audit - 2026-06-26 (round 4) <a id="audit-2026-06-26-r4"></a>
 
 Evidence tier: value-semantic tests (hermes numeric contract; mnemosyne

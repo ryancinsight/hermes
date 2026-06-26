@@ -7,6 +7,13 @@ External gap findings live in [gap_audit.md](gap_audit.md).
 
 ## Delivered (2026-06-11)
 
+- [x] [patch] (2026-06-26) Audit round 5 — monomorphization + sparse defect fix.
+  Fixed `spmv_bcoo` (was hardcoded to ScalarArch → SIMD BlockedCoo kernels dead;
+  now runtime-dispatched, + differential SIMD-branch test). Extracted
+  `axpy_rows_batch` extent validation to a non-generic `#[inline(never)]` fn
+  (emitted once, not per `(T, Arch)`). 369 tests + clippy/fmt/doc clean.
+  Mnemosyne page-list inner-fn dedup deferred (hot-path size/speed tradeoff
+  needing measurement). See [gap_audit](gap_audit.md#audit-2026-06-26-r5).
 - [x] [patch] (2026-06-26) Audit round 4 — numeric DRY, AMX safety, allocator
   contention. Collapsed signed-integer `NumericElement` impls into one macro +
   removed dead `min_scalar`/`max_scalar` overrides (~275 lines); AMX raw wrappers
