@@ -192,13 +192,17 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     fn interleaved_complex_mul_assign<const CONJ_B: bool>(
         a: &mut [Self],
         b: &[Self],
-    ) -> Result<(), SimdError>;
+    ) -> Result<(), SimdError>
+    where
+        Self: core::ops::Neg<Output = Self>;
     /// Computes the interleaved complex dot product `(re, im)` of `sum(a[k] * b[k])`
     /// (`sum(a[k] * conj(b[k]))` when `CONJ_B`).
     fn interleaved_complex_dot<const CONJ_B: bool>(
         a: &[Self],
         b: &[Self],
-    ) -> Result<(Self, Self), SimdError>;
+    ) -> Result<(Self, Self), SimdError>
+    where
+        Self: core::ops::Neg<Output = Self>;
     /// Computes the horizontal sum of population counts of all elements.
     fn reduce_popcount(data: &[Self]) -> usize;
     /// Computes the horizontal sum of population counts of `a[i] & b[i]`.
@@ -207,6 +211,224 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     fn reduce_popcount_or(a: &[Self], b: &[Self]) -> Result<usize, SimdError>;
     /// Computes the horizontal sum of population counts of `a[i] ^ b[i]` (Hamming distance).
     fn reduce_popcount_xor(a: &[Self], b: &[Self]) -> Result<usize, SimdError>;
+}
+
+/// Method bodies shared verbatim by the three target-gated `SimdOps`
+/// blanket impls below, which differ only in the architecture-kernel
+/// bound each `where` clause requires. Defining them once keeps the
+/// dispatch facade DRY and behavior identical across targets.
+macro_rules! impl_simd_ops_methods {
+    () => {
+        #[inline(always)]
+        fn sum(data: &[Self]) -> Self {
+            sum::dispatch_sum::<Self>(data)
+        }
+        #[inline(always)]
+        fn abs_sum(data: &[Self]) -> Self {
+            abs_reduce::dispatch_abs_sum::<Self>(data)
+        }
+        #[inline(always)]
+        fn abs_max(data: &[Self]) -> Self {
+            abs_reduce::dispatch_abs_max::<Self>(data)
+        }
+        #[inline(always)]
+        fn min(data: &[Self]) -> Self {
+            min::dispatch_min::<Self>(data)
+        }
+        #[inline(always)]
+        fn max(data: &[Self]) -> Self {
+            max::dispatch_max::<Self>(data)
+        }
+        #[inline(always)]
+        fn scale(data: &mut [Self], scalar: Self) {
+            scale::dispatch_scale::<Self>(data, scalar)
+        }
+        #[inline(always)]
+        fn argmin(data: &[Self]) -> Option<(usize, Self)> {
+            argmin::dispatch_argmin::<Self>(data)
+        }
+        #[inline(always)]
+        fn argmax(data: &[Self]) -> Option<(usize, Self)> {
+            argmax::dispatch_argmax::<Self>(data)
+        }
+        #[inline(always)]
+        fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError> {
+            dot::dispatch_dot::<Self>(a, b)
+        }
+        #[inline(always)]
+        fn axpy(alpha: Self, x: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
+            axpy::dispatch_axpy::<Self>(alpha, x, out)
+        }
+        #[inline(always)]
+        fn axpy_rows(
+            alphas: &[Self],
+            x: &[Self],
+            out: &mut [Self],
+            row_stride: usize,
+            rows: usize,
+            cols: usize,
+        ) -> Result<(), SimdError> {
+            axpy::dispatch_axpy_rows::<Self>(alphas, x, out, row_stride, rows, cols)
+        }
+        #[inline(always)]
+        fn axpy_rows_batch(
+            alphas: &[Self],
+            x_panel: &[Self],
+            out: &mut [Self],
+            row_stride: usize,
+            rows: usize,
+            depth: usize,
+            cols: usize,
+        ) -> Result<(), SimdError> {
+            axpy::dispatch_axpy_rows_batch::<Self>(
+                alphas, x_panel, out, row_stride, rows, depth, cols,
+            )
+        }
+        #[inline(always)]
+        fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
+            binary::dispatch_elementwise_binary::<Self, Mul>(a, b, out, Mul)
+        }
+        #[inline(always)]
+        fn elementwise_add(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
+            binary::dispatch_elementwise_binary::<Self, Add>(a, b, out, Add)
+        }
+        #[inline(always)]
+        fn elementwise_sub(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
+            binary::dispatch_elementwise_binary::<Self, Sub>(a, b, out, Sub)
+        }
+        #[inline(always)]
+        fn elementwise_div(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
+            binary::dispatch_elementwise_binary::<Self, Div>(a, b, out, Div)
+        }
+        #[inline(always)]
+        fn masked_sum(data: &[Self], mask: &[bool]) -> Self {
+            masked::dispatch_masked_sum::<Self>(data, mask)
+        }
+        #[inline(always)]
+        fn masked_dot(a: &[Self], b: &[Self], mask: &[bool]) -> Result<Self, SimdError> {
+            masked::dispatch_masked_dot::<Self>(a, b, mask)
+        }
+        #[inline(always)]
+        fn masked_add(
+            a: &[Self],
+            b: &[Self],
+            mask: &[bool],
+            out: &mut [Self],
+        ) -> Result<(), SimdError> {
+            masked::dispatch_masked_add::<Self>(a, b, mask, out)
+        }
+        #[inline(always)]
+        fn spmv_csr(data: CsrData<'_, Self>, x: &[Self], y: &mut [Self]) {
+            sparse::dispatch_spmv_csr::<Self>(data, x, y)
+        }
+        #[inline(always)]
+        fn spmv_bcoo<const BM: usize, const BN: usize>(
+            data: BlockedCooData<'_, Self, BM, BN>,
+            x: &[Self],
+            y: &mut [Self],
+        ) {
+            SparseView::<Self, BlockedCoo<BM, BN>, ScalarArch>::from_blocked_coo(data).spmv(x, y);
+        }
+        #[inline(always)]
+        fn spmv_dense_masked(data: DenseWithMaskData<'_, Self>, x: &[Self], y: &mut [Self]) {
+            sparse::dispatch_spmv_dense_masked::<Self>(data, x, y)
+        }
+        #[inline(always)]
+        fn spmv_sellp<const C: usize>(data: SellPData<'_, Self, C>, x: &[Self], y: &mut [Self]) {
+            sparse::dispatch_spmv_sellp::<Self, C>(data, x, y)
+        }
+        #[inline(always)]
+        fn tiled_gemm(
+            a: &[Self],
+            b: &[Self],
+            c: &mut [Self],
+            m: usize,
+            n: usize,
+            k: usize,
+        ) -> Result<(), SimdError> {
+            gemm::dispatch_tiled_gemm::<Self>(a, b, c, m, n, k)
+        }
+        #[inline(always)]
+        fn gemv(
+            a: &[Self],
+            x: &[Self],
+            y: &mut [Self],
+            nrows: usize,
+            ncols: usize,
+        ) -> Result<(), SimdError> {
+            gemv::dispatch_gemv::<Self>(a, x, y, nrows, ncols)
+        }
+        #[inline(always)]
+        fn gemv_transpose(
+            a: &[Self],
+            x: &[Self],
+            y: &mut [Self],
+            nrows: usize,
+            ncols: usize,
+        ) -> Result<(), SimdError> {
+            gemv_transpose::dispatch_gemv_transpose::<Self>(a, x, y, nrows, ncols)
+        }
+        #[inline(always)]
+        fn gemv_strided(
+            a: &[Self],
+            x: &[Self],
+            y: &mut [Self],
+            nrows: usize,
+            ncols: usize,
+            lda: usize,
+        ) -> Result<(), SimdError> {
+            gemv_strided::dispatch_gemv_strided::<Self>(a, x, y, nrows, ncols, lda)
+        }
+        #[inline(always)]
+        fn gemv_transpose_strided(
+            a: &[Self],
+            x: &[Self],
+            y: &mut [Self],
+            nrows: usize,
+            ncols: usize,
+            lda: usize,
+        ) -> Result<(), SimdError> {
+            gemv_transpose_strided::dispatch_gemv_transpose_strided::<Self>(
+                a, x, y, nrows, ncols, lda,
+            )
+        }
+        #[inline(always)]
+        fn interleaved_complex_mul_assign<const CONJ_B: bool>(
+            a: &mut [Self],
+            b: &[Self],
+        ) -> Result<(), SimdError>
+        where
+            Self: core::ops::Neg<Output = Self>,
+        {
+            complex::dispatch_interleaved_complex_mul_assign::<Self, CONJ_B>(a, b)
+        }
+        #[inline(always)]
+        fn interleaved_complex_dot<const CONJ_B: bool>(
+            a: &[Self],
+            b: &[Self],
+        ) -> Result<(Self, Self), SimdError>
+        where
+            Self: core::ops::Neg<Output = Self>,
+        {
+            complex::dispatch_interleaved_complex_dot::<Self, CONJ_B>(a, b)
+        }
+        #[inline(always)]
+        fn reduce_popcount(data: &[Self]) -> usize {
+            dispatch_reduce_popcount::<Self>(data)
+        }
+        #[inline(always)]
+        fn reduce_popcount_and(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
+            dispatch_reduce_popcount_and::<Self>(a, b)
+        }
+        #[inline(always)]
+        fn reduce_popcount_or(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
+            dispatch_reduce_popcount_or::<Self>(a, b)
+        }
+        #[inline(always)]
+        fn reduce_popcount_xor(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
+            dispatch_reduce_popcount_xor::<Self>(a, b)
+        }
+    };
 }
 
 /// x86/x86_64 specialized generic implementation of SimdOps.
@@ -218,205 +440,7 @@ where
     Avx2: hermes_simd_core::kernel::SimdKernel<T>,
     Avx512: hermes_simd_core::kernel::SimdKernel<T>,
 {
-    #[inline(always)]
-    fn sum(data: &[Self]) -> Self {
-        sum::dispatch_sum::<Self>(data)
-    }
-    #[inline(always)]
-    fn abs_sum(data: &[Self]) -> Self {
-        abs_reduce::dispatch_abs_sum::<Self>(data)
-    }
-    #[inline(always)]
-    fn abs_max(data: &[Self]) -> Self {
-        abs_reduce::dispatch_abs_max::<Self>(data)
-    }
-    #[inline(always)]
-    fn min(data: &[Self]) -> Self {
-        min::dispatch_min::<Self>(data)
-    }
-    #[inline(always)]
-    fn max(data: &[Self]) -> Self {
-        max::dispatch_max::<Self>(data)
-    }
-    #[inline(always)]
-    fn scale(data: &mut [Self], scalar: Self) {
-        scale::dispatch_scale::<Self>(data, scalar)
-    }
-    #[inline(always)]
-    fn argmin(data: &[Self]) -> Option<(usize, Self)> {
-        argmin::dispatch_argmin::<Self>(data)
-    }
-    #[inline(always)]
-    fn argmax(data: &[Self]) -> Option<(usize, Self)> {
-        argmax::dispatch_argmax::<Self>(data)
-    }
-    #[inline(always)]
-    fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError> {
-        dot::dispatch_dot::<Self>(a, b)
-    }
-    #[inline(always)]
-    fn axpy(alpha: Self, x: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
-        axpy::dispatch_axpy::<Self>(alpha, x, out)
-    }
-    #[inline(always)]
-    fn axpy_rows(
-        alphas: &[Self],
-        x: &[Self],
-        out: &mut [Self],
-        row_stride: usize,
-        rows: usize,
-        cols: usize,
-    ) -> Result<(), SimdError> {
-        axpy::dispatch_axpy_rows::<Self>(alphas, x, out, row_stride, rows, cols)
-    }
-    #[inline(always)]
-    fn axpy_rows_batch(
-        alphas: &[Self],
-        x_panel: &[Self],
-        out: &mut [Self],
-        row_stride: usize,
-        rows: usize,
-        depth: usize,
-        cols: usize,
-    ) -> Result<(), SimdError> {
-        axpy::dispatch_axpy_rows_batch::<Self>(alphas, x_panel, out, row_stride, rows, depth, cols)
-    }
-    #[inline(always)]
-    fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
-        binary::dispatch_elementwise_binary::<Self, Mul>(a, b, out, Mul)
-    }
-    #[inline(always)]
-    fn elementwise_add(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
-        binary::dispatch_elementwise_binary::<Self, Add>(a, b, out, Add)
-    }
-    #[inline(always)]
-    fn elementwise_sub(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
-        binary::dispatch_elementwise_binary::<Self, Sub>(a, b, out, Sub)
-    }
-    #[inline(always)]
-    fn elementwise_div(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
-        binary::dispatch_elementwise_binary::<Self, Div>(a, b, out, Div)
-    }
-    #[inline(always)]
-    fn masked_sum(data: &[Self], mask: &[bool]) -> Self {
-        masked::dispatch_masked_sum::<Self>(data, mask)
-    }
-    #[inline(always)]
-    fn masked_dot(a: &[Self], b: &[Self], mask: &[bool]) -> Result<Self, SimdError> {
-        masked::dispatch_masked_dot::<Self>(a, b, mask)
-    }
-    #[inline(always)]
-    fn masked_add(
-        a: &[Self],
-        b: &[Self],
-        mask: &[bool],
-        out: &mut [Self],
-    ) -> Result<(), SimdError> {
-        masked::dispatch_masked_add::<Self>(a, b, mask, out)
-    }
-    #[inline(always)]
-    fn spmv_csr(data: CsrData<'_, Self>, x: &[Self], y: &mut [Self]) {
-        sparse::dispatch_spmv_csr::<Self>(data, x, y)
-    }
-    #[inline(always)]
-    fn spmv_bcoo<const BM: usize, const BN: usize>(
-        data: BlockedCooData<'_, Self, BM, BN>,
-        x: &[Self],
-        y: &mut [Self],
-    ) {
-        SparseView::<Self, BlockedCoo<BM, BN>, ScalarArch>::from_blocked_coo(data).spmv(x, y);
-    }
-    #[inline(always)]
-    fn spmv_dense_masked(data: DenseWithMaskData<'_, Self>, x: &[Self], y: &mut [Self]) {
-        sparse::dispatch_spmv_dense_masked::<Self>(data, x, y)
-    }
-    #[inline(always)]
-    fn spmv_sellp<const C: usize>(data: SellPData<'_, Self, C>, x: &[Self], y: &mut [Self]) {
-        sparse::dispatch_spmv_sellp::<Self, C>(data, x, y)
-    }
-    #[inline(always)]
-    fn tiled_gemm(
-        a: &[Self],
-        b: &[Self],
-        c: &mut [Self],
-        m: usize,
-        n: usize,
-        k: usize,
-    ) -> Result<(), SimdError> {
-        gemm::dispatch_tiled_gemm::<Self>(a, b, c, m, n, k)
-    }
-    #[inline(always)]
-    fn gemv(
-        a: &[Self],
-        x: &[Self],
-        y: &mut [Self],
-        nrows: usize,
-        ncols: usize,
-    ) -> Result<(), SimdError> {
-        gemv::dispatch_gemv::<Self>(a, x, y, nrows, ncols)
-    }
-    #[inline(always)]
-    fn gemv_transpose(
-        a: &[Self],
-        x: &[Self],
-        y: &mut [Self],
-        nrows: usize,
-        ncols: usize,
-    ) -> Result<(), SimdError> {
-        gemv_transpose::dispatch_gemv_transpose::<Self>(a, x, y, nrows, ncols)
-    }
-    #[inline(always)]
-    fn gemv_strided(
-        a: &[Self],
-        x: &[Self],
-        y: &mut [Self],
-        nrows: usize,
-        ncols: usize,
-        lda: usize,
-    ) -> Result<(), SimdError> {
-        gemv_strided::dispatch_gemv_strided::<Self>(a, x, y, nrows, ncols, lda)
-    }
-    #[inline(always)]
-    fn gemv_transpose_strided(
-        a: &[Self],
-        x: &[Self],
-        y: &mut [Self],
-        nrows: usize,
-        ncols: usize,
-        lda: usize,
-    ) -> Result<(), SimdError> {
-        gemv_transpose_strided::dispatch_gemv_transpose_strided::<Self>(a, x, y, nrows, ncols, lda)
-    }
-    #[inline(always)]
-    fn interleaved_complex_mul_assign<const CONJ_B: bool>(
-        a: &mut [Self],
-        b: &[Self],
-    ) -> Result<(), SimdError> {
-        complex::dispatch_interleaved_complex_mul_assign::<Self, CONJ_B>(a, b)
-    }
-    #[inline(always)]
-    fn interleaved_complex_dot<const CONJ_B: bool>(
-        a: &[Self],
-        b: &[Self],
-    ) -> Result<(Self, Self), SimdError> {
-        complex::dispatch_interleaved_complex_dot::<Self, CONJ_B>(a, b)
-    }
-    #[inline(always)]
-    fn reduce_popcount(data: &[Self]) -> usize {
-        dispatch_reduce_popcount::<Self>(data)
-    }
-    #[inline(always)]
-    fn reduce_popcount_and(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
-        dispatch_reduce_popcount_and::<Self>(a, b)
-    }
-    #[inline(always)]
-    fn reduce_popcount_or(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
-        dispatch_reduce_popcount_or::<Self>(a, b)
-    }
-    #[inline(always)]
-    fn reduce_popcount_xor(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
-        dispatch_reduce_popcount_xor::<Self>(a, b)
-    }
+    impl_simd_ops_methods!();
 }
 
 /// AArch64 specialized generic implementation of SimdOps.
@@ -427,205 +451,7 @@ where
     ScalarArch: hermes_simd_core::kernel::SimdKernel<T>,
     Neon: hermes_simd_core::kernel::SimdKernel<T>,
 {
-    #[inline(always)]
-    fn sum(data: &[Self]) -> Self {
-        sum::dispatch_sum::<Self>(data)
-    }
-    #[inline(always)]
-    fn abs_sum(data: &[Self]) -> Self {
-        abs_reduce::dispatch_abs_sum::<Self>(data)
-    }
-    #[inline(always)]
-    fn abs_max(data: &[Self]) -> Self {
-        abs_reduce::dispatch_abs_max::<Self>(data)
-    }
-    #[inline(always)]
-    fn min(data: &[Self]) -> Self {
-        min::dispatch_min::<Self>(data)
-    }
-    #[inline(always)]
-    fn max(data: &[Self]) -> Self {
-        max::dispatch_max::<Self>(data)
-    }
-    #[inline(always)]
-    fn scale(data: &mut [Self], scalar: Self) {
-        scale::dispatch_scale::<Self>(data, scalar)
-    }
-    #[inline(always)]
-    fn argmin(data: &[Self]) -> Option<(usize, Self)> {
-        argmin::dispatch_argmin::<Self>(data)
-    }
-    #[inline(always)]
-    fn argmax(data: &[Self]) -> Option<(usize, Self)> {
-        argmax::dispatch_argmax::<Self>(data)
-    }
-    #[inline(always)]
-    fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError> {
-        dot::dispatch_dot::<Self>(a, b)
-    }
-    #[inline(always)]
-    fn axpy(alpha: Self, x: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
-        axpy::dispatch_axpy::<Self>(alpha, x, out)
-    }
-    #[inline(always)]
-    fn axpy_rows(
-        alphas: &[Self],
-        x: &[Self],
-        out: &mut [Self],
-        row_stride: usize,
-        rows: usize,
-        cols: usize,
-    ) -> Result<(), SimdError> {
-        axpy::dispatch_axpy_rows::<Self>(alphas, x, out, row_stride, rows, cols)
-    }
-    #[inline(always)]
-    fn axpy_rows_batch(
-        alphas: &[Self],
-        x_panel: &[Self],
-        out: &mut [Self],
-        row_stride: usize,
-        rows: usize,
-        depth: usize,
-        cols: usize,
-    ) -> Result<(), SimdError> {
-        axpy::dispatch_axpy_rows_batch::<Self>(alphas, x_panel, out, row_stride, rows, depth, cols)
-    }
-    #[inline(always)]
-    fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
-        binary::dispatch_elementwise_binary::<Self, Mul>(a, b, out, Mul)
-    }
-    #[inline(always)]
-    fn elementwise_add(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
-        binary::dispatch_elementwise_binary::<Self, Add>(a, b, out, Add)
-    }
-    #[inline(always)]
-    fn elementwise_sub(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
-        binary::dispatch_elementwise_binary::<Self, Sub>(a, b, out, Sub)
-    }
-    #[inline(always)]
-    fn elementwise_div(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
-        binary::dispatch_elementwise_binary::<Self, Div>(a, b, out, Div)
-    }
-    #[inline(always)]
-    fn masked_sum(data: &[Self], mask: &[bool]) -> Self {
-        masked::dispatch_masked_sum::<Self>(data, mask)
-    }
-    #[inline(always)]
-    fn masked_dot(a: &[Self], b: &[Self], mask: &[bool]) -> Result<Self, SimdError> {
-        masked::dispatch_masked_dot::<Self>(a, b, mask)
-    }
-    #[inline(always)]
-    fn masked_add(
-        a: &[Self],
-        b: &[Self],
-        mask: &[bool],
-        out: &mut [Self],
-    ) -> Result<(), SimdError> {
-        masked::dispatch_masked_add::<Self>(a, b, mask, out)
-    }
-    #[inline(always)]
-    fn spmv_csr(data: CsrData<'_, Self>, x: &[Self], y: &mut [Self]) {
-        sparse::dispatch_spmv_csr::<Self>(data, x, y)
-    }
-    #[inline(always)]
-    fn spmv_bcoo<const BM: usize, const BN: usize>(
-        data: BlockedCooData<'_, Self, BM, BN>,
-        x: &[Self],
-        y: &mut [Self],
-    ) {
-        SparseView::<Self, BlockedCoo<BM, BN>, ScalarArch>::from_blocked_coo(data).spmv(x, y);
-    }
-    #[inline(always)]
-    fn spmv_dense_masked(data: DenseWithMaskData<'_, Self>, x: &[Self], y: &mut [Self]) {
-        sparse::dispatch_spmv_dense_masked::<Self>(data, x, y)
-    }
-    #[inline(always)]
-    fn spmv_sellp<const C: usize>(data: SellPData<'_, Self, C>, x: &[Self], y: &mut [Self]) {
-        sparse::dispatch_spmv_sellp::<Self, C>(data, x, y)
-    }
-    #[inline(always)]
-    fn tiled_gemm(
-        a: &[Self],
-        b: &[Self],
-        c: &mut [Self],
-        m: usize,
-        n: usize,
-        k: usize,
-    ) -> Result<(), SimdError> {
-        gemm::dispatch_tiled_gemm::<Self>(a, b, c, m, n, k)
-    }
-    #[inline(always)]
-    fn gemv(
-        a: &[Self],
-        x: &[Self],
-        y: &mut [Self],
-        nrows: usize,
-        ncols: usize,
-    ) -> Result<(), SimdError> {
-        gemv::dispatch_gemv::<Self>(a, x, y, nrows, ncols)
-    }
-    #[inline(always)]
-    fn gemv_transpose(
-        a: &[Self],
-        x: &[Self],
-        y: &mut [Self],
-        nrows: usize,
-        ncols: usize,
-    ) -> Result<(), SimdError> {
-        gemv_transpose::dispatch_gemv_transpose::<Self>(a, x, y, nrows, ncols)
-    }
-    #[inline(always)]
-    fn gemv_strided(
-        a: &[Self],
-        x: &[Self],
-        y: &mut [Self],
-        nrows: usize,
-        ncols: usize,
-        lda: usize,
-    ) -> Result<(), SimdError> {
-        gemv_strided::dispatch_gemv_strided::<Self>(a, x, y, nrows, ncols, lda)
-    }
-    #[inline(always)]
-    fn gemv_transpose_strided(
-        a: &[Self],
-        x: &[Self],
-        y: &mut [Self],
-        nrows: usize,
-        ncols: usize,
-        lda: usize,
-    ) -> Result<(), SimdError> {
-        gemv_transpose_strided::dispatch_gemv_transpose_strided::<Self>(a, x, y, nrows, ncols, lda)
-    }
-    #[inline(always)]
-    fn interleaved_complex_mul_assign<const CONJ_B: bool>(
-        a: &mut [Self],
-        b: &[Self],
-    ) -> Result<(), SimdError> {
-        complex::dispatch_interleaved_complex_mul_assign::<Self, CONJ_B>(a, b)
-    }
-    #[inline(always)]
-    fn interleaved_complex_dot<const CONJ_B: bool>(
-        a: &[Self],
-        b: &[Self],
-    ) -> Result<(Self, Self), SimdError> {
-        complex::dispatch_interleaved_complex_dot::<Self, CONJ_B>(a, b)
-    }
-    #[inline(always)]
-    fn reduce_popcount(data: &[Self]) -> usize {
-        dispatch_reduce_popcount::<Self>(data)
-    }
-    #[inline(always)]
-    fn reduce_popcount_and(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
-        dispatch_reduce_popcount_and::<Self>(a, b)
-    }
-    #[inline(always)]
-    fn reduce_popcount_or(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
-        dispatch_reduce_popcount_or::<Self>(a, b)
-    }
-    #[inline(always)]
-    fn reduce_popcount_xor(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
-        dispatch_reduce_popcount_xor::<Self>(a, b)
-    }
+    impl_simd_ops_methods!();
 }
 
 /// Fallback generic implementation of SimdOps.
@@ -635,205 +461,7 @@ where
     T: ScalarTrait + private::Sealed,
     ScalarArch: hermes_simd_core::kernel::SimdKernel<T>,
 {
-    #[inline(always)]
-    fn sum(data: &[Self]) -> Self {
-        sum::dispatch_sum::<Self>(data)
-    }
-    #[inline(always)]
-    fn abs_sum(data: &[Self]) -> Self {
-        abs_reduce::dispatch_abs_sum::<Self>(data)
-    }
-    #[inline(always)]
-    fn abs_max(data: &[Self]) -> Self {
-        abs_reduce::dispatch_abs_max::<Self>(data)
-    }
-    #[inline(always)]
-    fn min(data: &[Self]) -> Self {
-        min::dispatch_min::<Self>(data)
-    }
-    #[inline(always)]
-    fn max(data: &[Self]) -> Self {
-        max::dispatch_max::<Self>(data)
-    }
-    #[inline(always)]
-    fn scale(data: &mut [Self], scalar: Self) {
-        scale::dispatch_scale::<Self>(data, scalar)
-    }
-    #[inline(always)]
-    fn argmin(data: &[Self]) -> Option<(usize, Self)> {
-        argmin::dispatch_argmin::<Self>(data)
-    }
-    #[inline(always)]
-    fn argmax(data: &[Self]) -> Option<(usize, Self)> {
-        argmax::dispatch_argmax::<Self>(data)
-    }
-    #[inline(always)]
-    fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError> {
-        dot::dispatch_dot::<Self>(a, b)
-    }
-    #[inline(always)]
-    fn axpy(alpha: Self, x: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
-        axpy::dispatch_axpy::<Self>(alpha, x, out)
-    }
-    #[inline(always)]
-    fn axpy_rows(
-        alphas: &[Self],
-        x: &[Self],
-        out: &mut [Self],
-        row_stride: usize,
-        rows: usize,
-        cols: usize,
-    ) -> Result<(), SimdError> {
-        axpy::dispatch_axpy_rows::<Self>(alphas, x, out, row_stride, rows, cols)
-    }
-    #[inline(always)]
-    fn axpy_rows_batch(
-        alphas: &[Self],
-        x_panel: &[Self],
-        out: &mut [Self],
-        row_stride: usize,
-        rows: usize,
-        depth: usize,
-        cols: usize,
-    ) -> Result<(), SimdError> {
-        axpy::dispatch_axpy_rows_batch::<Self>(alphas, x_panel, out, row_stride, rows, depth, cols)
-    }
-    #[inline(always)]
-    fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
-        binary::dispatch_elementwise_binary::<Self, Mul>(a, b, out, Mul)
-    }
-    #[inline(always)]
-    fn elementwise_add(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
-        binary::dispatch_elementwise_binary::<Self, Add>(a, b, out, Add)
-    }
-    #[inline(always)]
-    fn elementwise_sub(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
-        binary::dispatch_elementwise_binary::<Self, Sub>(a, b, out, Sub)
-    }
-    #[inline(always)]
-    fn elementwise_div(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
-        binary::dispatch_elementwise_binary::<Self, Div>(a, b, out, Div)
-    }
-    #[inline(always)]
-    fn masked_sum(data: &[Self], mask: &[bool]) -> Self {
-        masked::dispatch_masked_sum::<Self>(data, mask)
-    }
-    #[inline(always)]
-    fn masked_dot(a: &[Self], b: &[Self], mask: &[bool]) -> Result<Self, SimdError> {
-        masked::dispatch_masked_dot::<Self>(a, b, mask)
-    }
-    #[inline(always)]
-    fn masked_add(
-        a: &[Self],
-        b: &[Self],
-        mask: &[bool],
-        out: &mut [Self],
-    ) -> Result<(), SimdError> {
-        masked::dispatch_masked_add::<Self>(a, b, mask, out)
-    }
-    #[inline(always)]
-    fn spmv_csr(data: CsrData<'_, Self>, x: &[Self], y: &mut [Self]) {
-        sparse::dispatch_spmv_csr::<Self>(data, x, y)
-    }
-    #[inline(always)]
-    fn spmv_bcoo<const BM: usize, const BN: usize>(
-        data: BlockedCooData<'_, Self, BM, BN>,
-        x: &[Self],
-        y: &mut [Self],
-    ) {
-        SparseView::<Self, BlockedCoo<BM, BN>, ScalarArch>::from_blocked_coo(data).spmv(x, y);
-    }
-    #[inline(always)]
-    fn spmv_dense_masked(data: DenseWithMaskData<'_, Self>, x: &[Self], y: &mut [Self]) {
-        sparse::dispatch_spmv_dense_masked::<Self>(data, x, y)
-    }
-    #[inline(always)]
-    fn spmv_sellp<const C: usize>(data: SellPData<'_, Self, C>, x: &[Self], y: &mut [Self]) {
-        sparse::dispatch_spmv_sellp::<Self, C>(data, x, y)
-    }
-    #[inline(always)]
-    fn tiled_gemm(
-        a: &[Self],
-        b: &[Self],
-        c: &mut [Self],
-        m: usize,
-        n: usize,
-        k: usize,
-    ) -> Result<(), SimdError> {
-        gemm::dispatch_tiled_gemm::<Self>(a, b, c, m, n, k)
-    }
-    #[inline(always)]
-    fn gemv(
-        a: &[Self],
-        x: &[Self],
-        y: &mut [Self],
-        nrows: usize,
-        ncols: usize,
-    ) -> Result<(), SimdError> {
-        gemv::dispatch_gemv::<Self>(a, x, y, nrows, ncols)
-    }
-    #[inline(always)]
-    fn gemv_transpose(
-        a: &[Self],
-        x: &[Self],
-        y: &mut [Self],
-        nrows: usize,
-        ncols: usize,
-    ) -> Result<(), SimdError> {
-        gemv_transpose::dispatch_gemv_transpose::<Self>(a, x, y, nrows, ncols)
-    }
-    #[inline(always)]
-    fn gemv_strided(
-        a: &[Self],
-        x: &[Self],
-        y: &mut [Self],
-        nrows: usize,
-        ncols: usize,
-        lda: usize,
-    ) -> Result<(), SimdError> {
-        gemv_strided::dispatch_gemv_strided::<Self>(a, x, y, nrows, ncols, lda)
-    }
-    #[inline(always)]
-    fn gemv_transpose_strided(
-        a: &[Self],
-        x: &[Self],
-        y: &mut [Self],
-        nrows: usize,
-        ncols: usize,
-        lda: usize,
-    ) -> Result<(), SimdError> {
-        gemv_transpose_strided::dispatch_gemv_transpose_strided::<Self>(a, x, y, nrows, ncols, lda)
-    }
-    #[inline(always)]
-    fn interleaved_complex_mul_assign<const CONJ_B: bool>(
-        a: &mut [Self],
-        b: &[Self],
-    ) -> Result<(), SimdError> {
-        complex::dispatch_interleaved_complex_mul_assign::<Self, CONJ_B>(a, b)
-    }
-    #[inline(always)]
-    fn interleaved_complex_dot<const CONJ_B: bool>(
-        a: &[Self],
-        b: &[Self],
-    ) -> Result<(Self, Self), SimdError> {
-        complex::dispatch_interleaved_complex_dot::<Self, CONJ_B>(a, b)
-    }
-    #[inline(always)]
-    fn reduce_popcount(data: &[Self]) -> usize {
-        dispatch_reduce_popcount::<Self>(data)
-    }
-    #[inline(always)]
-    fn reduce_popcount_and(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
-        dispatch_reduce_popcount_and::<Self>(a, b)
-    }
-    #[inline(always)]
-    fn reduce_popcount_or(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
-        dispatch_reduce_popcount_or::<Self>(a, b)
-    }
-    #[inline(always)]
-    fn reduce_popcount_xor(a: &[Self], b: &[Self]) -> Result<usize, SimdError> {
-        dispatch_reduce_popcount_xor::<Self>(a, b)
-    }
+    impl_simd_ops_methods!();
 }
 
 /// Computes the sum of elements in the slice using runtime-dispatched SIMD.
@@ -1035,7 +663,7 @@ pub fn tiled_gemm<T: SimdOps>(
 /// Computes register-blocked GEMV `y += A · x` with runtime backend selection.
 ///
 /// `a` is row-major `nrows × ncols`; the product **accumulates** into `y`
-/// (zero `y` first for `y = A·x`). See [`gemv`](crate::dispatch::gemv) for the
+/// (zero `y` first for `y = A·x`). See [`gemv()`] for the
 /// operand-reuse theorem.
 ///
 /// # Errors
@@ -1053,11 +681,11 @@ pub fn gemv<T: SimdOps>(
 }
 
 /// Computes register-blocked transposed GEMV `y += Aᵀ · x` with runtime backend
-/// selection — the complement of [`gemv`].
+/// selection — the complement of [`gemv()`].
 ///
 /// `a` is row-major `nrows × ncols`, `x` length `nrows`, `y` length `ncols`; the
 /// product **accumulates** into `y` (zero `y` first for `y = Aᵀ·x`). See
-/// [`gemv_transpose`](crate::dispatch::gemv_transpose) for the operand-reuse theorem.
+/// [`gemv_transpose()`] for the operand-reuse theorem.
 ///
 /// # Errors
 /// [`SimdError::LengthMismatch`] if `a.len() < nrows·ncols`, `x.len() < nrows`,
@@ -1075,7 +703,7 @@ pub fn gemv_transpose<T: SimdOps>(
 
 /// Computes register-blocked sub-matrix GEMV `y += A · x` with row stride `lda`,
 /// runtime backend selection. `A` is a row-major `nrows × ncols` block with
-/// leading dimension `lda ≥ ncols`; `lda = ncols` is the packed [`gemv`].
+/// leading dimension `lda ≥ ncols`; `lda = ncols` is the packed [`gemv()`].
 /// Accumulates into `y`.
 ///
 /// # Errors
@@ -1095,7 +723,7 @@ pub fn gemv_strided<T: SimdOps>(
 
 /// Computes register-blocked transposed sub-matrix GEMV `y += Aᵀ · x` with row
 /// stride `lda`, runtime backend selection. `lda = ncols` is the packed
-/// [`gemv_transpose`]. Accumulates into `y`.
+/// [`gemv_transpose()`]. Accumulates into `y`.
 ///
 /// # Errors
 /// [`SimdError::LengthMismatch`] if `lda < ncols`, `a.len() < (nrows−1)·lda +
@@ -1123,7 +751,7 @@ pub fn interleaved_complex_mul_assign<T, A, const CONJ_B: bool>(
     b: &[T],
 ) -> Result<(), SimdError>
 where
-    T: ScalarTrait,
+    T: ScalarTrait + core::ops::Neg<Output = T>,
     A: hermes_simd_core::arch::SimdArch + hermes_simd_core::kernel::SimdKernel<T>,
 {
     complex::interleaved_complex_mul_assign::<T, A, CONJ_B>(a, b)
@@ -1140,7 +768,7 @@ pub fn interleaved_complex_dot<T, A, const CONJ_B: bool>(
     b: &[T],
 ) -> Result<(T, T), SimdError>
 where
-    T: ScalarTrait,
+    T: ScalarTrait + core::ops::Neg<Output = T>,
     A: hermes_simd_core::arch::SimdArch + hermes_simd_core::kernel::SimdKernel<T>,
 {
     complex::interleaved_complex_dot::<T, A, CONJ_B>(a, b)
@@ -1153,7 +781,7 @@ pub fn interleaved_complex_mul_assign_runtime<T, const CONJ_B: bool>(
     b: &[T],
 ) -> Result<(), SimdError>
 where
-    T: SimdOps,
+    T: SimdOps + core::ops::Neg<Output = T>,
 {
     T::interleaved_complex_mul_assign::<CONJ_B>(a, b)
 }
@@ -1165,7 +793,7 @@ pub fn interleaved_complex_dot_runtime<T, const CONJ_B: bool>(
     b: &[T],
 ) -> Result<(T, T), SimdError>
 where
-    T: SimdOps,
+    T: SimdOps + core::ops::Neg<Output = T>,
 {
     T::interleaved_complex_dot::<CONJ_B>(a, b)
 }

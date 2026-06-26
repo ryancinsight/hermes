@@ -6,6 +6,19 @@ use crate::ops::ReductionOp;
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
 
+/// Periodic accumulator-flush interval for popcount-style horizontal reductions,
+/// sized by element width to bound intermediate-sum precision loss. 2-byte types
+/// (`f16`/`bf16`/`i16`) have a small exact-integer range (256/2048), so partials
+/// are flushed every 128 chunks; wider types tolerate 32768 chunks per flush.
+#[inline(always)]
+const fn flush_limit_for<T>() -> usize {
+    if core::mem::size_of::<T>() == 2 {
+        128
+    } else {
+        32768
+    }
+}
+
 impl<'a, T: 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode, Ref: 'a>
     SimdView<'a, T, Arch, Align, Mode, Ref>
 where
@@ -135,6 +148,8 @@ where
             let mut pa = s.as_ptr();
             let mut pb = o.as_ptr();
 
+            // Seed the four accumulators with the first pairwise products.
+            // (First chunk cannot use FMA into zero, so we use separate mul.)
             let pair = |pa: *const T, pb: *const T| -> Arch::Vector {
                 unsafe { Arch::mul(load(pa), load(pb)) }
             };
@@ -151,21 +166,29 @@ where
             pb = unsafe { pb.add(chunk_size) };
             i = chunk_size;
 
+            // Main unrolled loop — use `fma_pair_accumulate` so `Dot` can emit a
+            // single `vfmadd` instead of a separate `mul` + `add`.
             while i < unrolled_len {
-                acc0 = unsafe { Op::accumulate::<Arch>(acc0, pair(pa, pb)) };
+                acc0 = unsafe { Op::fma_pair_accumulate::<Arch>(acc0, load(pa), load(pb)) };
                 acc1 = unsafe {
-                    Op::accumulate::<Arch>(acc1, pair(pa.add(lane_count), pb.add(lane_count)))
+                    Op::fma_pair_accumulate::<Arch>(
+                        acc1,
+                        load(pa.add(lane_count)),
+                        load(pb.add(lane_count)),
+                    )
                 };
                 acc2 = unsafe {
-                    Op::accumulate::<Arch>(
+                    Op::fma_pair_accumulate::<Arch>(
                         acc2,
-                        pair(pa.add(lane_count * 2), pb.add(lane_count * 2)),
+                        load(pa.add(lane_count * 2)),
+                        load(pb.add(lane_count * 2)),
                     )
                 };
                 acc3 = unsafe {
-                    Op::accumulate::<Arch>(
+                    Op::fma_pair_accumulate::<Arch>(
                         acc3,
-                        pair(pa.add(lane_count * 3), pb.add(lane_count * 3)),
+                        load(pa.add(lane_count * 3)),
+                        load(pb.add(lane_count * 3)),
                     )
                 };
                 pa = unsafe { pa.add(chunk_size) };
@@ -178,15 +201,14 @@ where
             acc = unsafe { Op::accumulate::<Arch>(acc0, acc2) };
         }
 
-        // Remaining full SIMD vectors
+        // Remaining full SIMD vectors — use `fma_pair_accumulate` here too.
         let simd_len = (len / lane_count) * lane_count;
         let pa = s.as_ptr();
         let pb = o.as_ptr();
         while i < simd_len {
             let va = load(unsafe { pa.add(i) });
             let vb = load(unsafe { pb.add(i) });
-            let prod = unsafe { Arch::mul(va, vb) };
-            acc = unsafe { Op::accumulate::<Arch>(acc, prod) };
+            acc = unsafe { Op::fma_pair_accumulate::<Arch>(acc, va, vb) };
             i += lane_count;
         }
 
@@ -222,14 +244,7 @@ where
             }
         };
 
-        // Determine periodic reduction flush limit based on element size to prevent precision loss.
-        // For f16/bf16/i16 (2 bytes), exact integer range limit is low (256/2048), so we reduce every 128 chunks.
-        // For larger types, we can safely reduce every 32768 chunks.
-        let flush_limit = if core::mem::size_of::<T>() == 2 {
-            128
-        } else {
-            32768
-        };
+        let flush_limit = flush_limit_for::<T>();
 
         // Unrolled loop (4-way register accumulation)
         if unrolled_simd_len > 0 {
@@ -331,11 +346,7 @@ where
             }
         };
 
-        let flush_limit = if core::mem::size_of::<T>() == 2 {
-            128
-        } else {
-            32768
-        };
+        let flush_limit = flush_limit_for::<T>();
 
         if unrolled_simd_len > 0 {
             let mut acc0 = unsafe { Arch::zero() };
@@ -439,11 +450,7 @@ where
             }
         };
 
-        let flush_limit = if core::mem::size_of::<T>() == 2 {
-            128
-        } else {
-            32768
-        };
+        let flush_limit = flush_limit_for::<T>();
 
         if unrolled_simd_len > 0 {
             let mut acc0 = unsafe { Arch::zero() };
@@ -547,11 +554,7 @@ where
             }
         };
 
-        let flush_limit = if core::mem::size_of::<T>() == 2 {
-            128
-        } else {
-            32768
-        };
+        let flush_limit = flush_limit_for::<T>();
 
         if unrolled_simd_len > 0 {
             let mut acc0 = unsafe { Arch::zero() };
