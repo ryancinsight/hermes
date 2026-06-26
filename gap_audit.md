@@ -207,14 +207,19 @@ Verified clean / not pursued (monomorphization):
   no `dyn`/`Box<dyn>` on any compute path; the one in-loop branch and
   `flush_limit_for::<T>()` are const-foldable (DCE handles per-instance).
 
-Deferred (needs measurement, not a clear win):
-- Mnemosyne page-list ops (`push_page_front`/`unlink_page_from_list`/`move_*`) are
-  `<B>`-generic but `B`-body-independent, emitted ~6× identically. Extracting a
-  non-generic inner fn dedups *only* if it is `#[inline(never)]` — but these are
-  on the allocator's hot free path, so that trades binary size for per-free call
-  overhead. `#[inline(always)]` (as one agent suggested) dedups nothing. This is a
-  size/speed tradeoff to settle with `cargo-bloat`/`cargo-llvm-lines` + a free
-  benchmark, not a blind change. Filed, not done.
+Measured and closed (cargo-llvm-lines / cargo-bloat, 2026-06-26):
+- Mnemosyne page-list ops (`push_page_front`/`unlink_page_from_list`/`move_*`) —
+  **confirmed not worth deduping.** `cargo llvm-lines -p mnemosyne` does not list
+  them at all (they are `#[inline(always)]`, fully inlined), and the whole
+  `mnemosyne` crate is only ~3045 IR lines, so an `#[inline(never)]` inner-fn
+  extraction would save negligible IR while adding a call on the hot free path.
+  `#[inline(always)]` (as one agent suggested) dedups nothing. No change; the
+  earlier deferral was correct. Tier: empirical (IR measurement).
+- hermes monomorphization is lean — the round-5 inner-fn extractions
+  (`check_axpy_rows_batch_extents`, `validate_gemm_sizes`) show as **1 copy** in
+  `cargo llvm-lines -p hermes-simd` (deduped as intended); the lib's own IR is
+  ~593 lines, and an example binary's `.text` is dominated by std runtime glue
+  (`rust_eh_personality`), not hermes monomorphization. No bloat to attack.
 
 ## Internal Audit - 2026-06-26 (round 4) <a id="audit-2026-06-26-r4"></a>
 
