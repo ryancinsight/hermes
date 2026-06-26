@@ -11,6 +11,13 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   popcount, wrapping fmadd, min/max, constants, `CastFrom` round-trips).
 
 ### Changed
+- `hermes-numeric` [patch]: consolidate the signed-integer `NumericElement`
+  impls (`i8`/`i16`/`i32`/`i64` were four hand-copied blocks) into one
+  `impl_numeric_element_signed!` macro mirroring the unsigned one, and drop the
+  `min_scalar`/`max_scalar` overrides from every integer impl — they were
+  byte-for-byte identical to the `PartialOrd`-based trait defaults (the float/half
+  overrides stay for NaN semantics). Net ~275 fewer lines, behavior unchanged
+  (verified by the existing integer-contract tests).
 - `hermes-simd-core` [patch]: finish the `MAX_SIMD_LANES` SSOT migration in
   `view/vector_reg.rs` — the `Vector` scalar-fallback buffers (`Debug`,
   `PartialEq`, `to_bitmask`, `cast`, `extract`, `insert`, masked slice load/store)
@@ -70,6 +77,13 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   stamped pre-bump probe data with the post-bump generation.
 
 ### Safety
+- `hermes-simd-intrinsics` [patch]: the raw AMX tile wrappers
+  (`tilezero`/`tileloadd`/`tilestored`/`tdpbf16ps`/`tdpbssd`) replaced their
+  silent `_ => {}` fallthrough with `unreachable!` so an out-of-range tile index
+  is a loud panic rather than a silently-dropped compute step; documented the
+  AMX-availability precondition (CPU feature + OS tile-state enable) on
+  `AmxGemm::amx_gemm`'s `# Safety` (it is reached only via the `has_amx()`-gated
+  dispatch path).
 - `hermes-simd-core` [patch]: CSR `spmv` now validates every column index is
   `< ncols` (linear pre-loop scan) before the unchecked SIMD gather `x[cols[j]]`,
   making the safe `spmv_csr` sound on malformed input (negative/oversized indices

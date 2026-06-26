@@ -7,6 +7,14 @@ External gap findings live in [gap_audit.md](gap_audit.md).
 
 ## Delivered (2026-06-11)
 
+- [x] [patch] (2026-06-26) Audit round 4 — numeric DRY, AMX safety, allocator
+  contention. Collapsed signed-integer `NumericElement` impls into one macro +
+  removed dead `min_scalar`/`max_scalar` overrides (~275 lines); AMX raw wrappers
+  panic loudly on bad tile index + documented the AMX-availability precondition.
+  Upstream Mnemosyne (`perf/segment-purge-batch-detach`): batch-detach segment
+  purge/reset (one lock per node, not per segment) + `NUMA_BUCKETS` SSOT node
+  arrays. 368 hermes + 211 Mnemosyne tests green; clippy/fmt/doc clean. See
+  [gap_audit](gap_audit.md#audit-2026-06-26-r4).
 - [x] [patch] (2026-06-26) Audit round 3 — SSOT, hierarchy, allocator retention.
   Finished the `MAX_SIMD_LANES` SSOT migration in `view/vector_reg.rs` (dead
   runtime asserts → compile-time `LANE_BOUND_CHECK`, 128→64 buffers); split

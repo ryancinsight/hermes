@@ -184,6 +184,32 @@ Resolved later (2026-06-26, scope review):
   `simd` cargo feature was removed downstream — SIMD is the unconditional path via
   hermes's runtime dispatch).
 
+## Internal Audit - 2026-06-26 (round 4) <a id="audit-2026-06-26-r4"></a>
+
+Evidence tier: value-semantic tests (hermes numeric contract; mnemosyne
+`take_all`) + source-grounded contention analysis.
+
+Resolved this sprint:
+- [patch] hermes `hermes-numeric`: signed-integer `NumericElement` impls collapsed
+  into one `impl_numeric_element_signed!` macro; dead `min_scalar`/`max_scalar`
+  integer overrides removed (identical to trait defaults). ~275 fewer lines.
+- [patch] hermes `hermes-simd-intrinsics`: AMX raw tile wrappers no longer
+  silently no-op on an out-of-range tile (`unreachable!`); `AmxGemm::amx_gemm`
+  `# Safety` documents the AMX-availability precondition (already gated by the
+  `has_amx()` dispatch probe — not an unguarded hole).
+- [upstream, Mnemosyne `perf/segment-purge-batch-detach`] `purge`/`reset` segment
+  sweeps batch-detach each node's chain under one lock (`NodeSegmentPool::take_all`)
+  instead of one lock per segment — removes decay↔allocator serialization. Pool
+  node arrays now built from the `NUMA_BUCKETS` SSOT.
+
+Considered, deferred (recorded):
+- NEON `neon_f32`/`neon_f64` (~92% overlap) is seam-level, not a clean macro: the
+  divergent 8% (popcount reduction depth, `cmp_ne` u64 round-trip, `swap_adjacent`
+  instruction, mask construction) needs a `codegen.rs`-style template, not a thin
+  suffix macro. Route through the codegen generator if pursued.
+- scalar `f32`/`f64` kernels are a cleaner macro/const-generic candidate (no
+  intrinsics); deferred to keep this round focused.
+
 ## Internal Audit - 2026-06-26 (round 3) <a id="audit-2026-06-26-r3"></a>
 
 Evidence tier: compile-time invariant encoding + value-semantic tests (hermes);
