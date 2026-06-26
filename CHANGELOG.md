@@ -11,6 +11,15 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   popcount, wrapping fmadd, min/max, constants, `CastFrom` round-trips).
 
 ### Changed
+- `hermes-simd-core` [patch]: drop `adjust_layout_for_mnemosyne`, the small-alloc
+  padding that inflated every `<=8KB` NUMA allocation to `8192+align` bytes to
+  "bypass the thread-local cache". That routed small allocations into Mnemosyne's
+  ~2 MiB-per-allocation huge path; the small thread-cache path is correct,
+  NUMA-partitioned, and bounded. Combined with the Mnemosyne alignment-aware
+  small-path fix (`Mnemosyne perf/aligned-small-alloc-tcache`), 512 live
+  256-byte/64-aligned `AlignedVec` allocations drop from ~1056 MiB to ~4 MiB
+  mapped (measured). Also removed the no-op NUMA thread bind in `dealloc_on_node`
+  (a free routes by the pointer's owning segment, not the caller's node).
 - `hermes-simd-core` [patch]: encode the scalar-fallback stack-buffer lane bound
   at compile time and tighten it to the true maximum. The default `SimdKernel`
   methods (`scan_vector`, `swap_adjacent`, `dup_even`/`dup_odd`) and the
@@ -48,6 +57,12 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   stamped pre-bump probe data with the post-bump generation.
 
 ### Safety
+- `hermes-simd-core` [patch]: the BlockedCoo `spmv` and `elementwise_mul_dense`
+  kernels issued unchecked `load_unaligned` reads of `BN` lanes at each block's
+  column base with no guarantee the span stayed within `x`/`dense`. Added an
+  O(nblocks) pre-loop guard (every block's column span fits the input, row span
+  the output) plus dense/output buffer-size checks, so a malformed block
+  coordinate panics rather than reading out of bounds.
 - `hermes-simd-core` [patch]: `build_index_vector` binds its `IndexVector` layout
   assumption with a `const` assert (`size_of::<IndexVector>() == LANE_COUNT *
   size_of::<i32>()`), so a layout-mismatched backend is a build error rather than

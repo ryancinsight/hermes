@@ -7,6 +7,16 @@ External gap findings live in [gap_audit.md](gap_audit.md).
 
 ## Delivered (2026-06-11)
 
+- [x] [patch] (2026-06-26) Memory-efficiency cross-repo fix. Root-caused
+  `AlignedVec<_, Aligned<64>>` small allocations costing ~2 MiB each (Mnemosyne
+  routed `align > 16` to its huge path). Fixed upstream in Mnemosyne
+  (`perf/aligned-small-alloc-tcache`: alignment-aware size-class selection) and
+  removed the counterproductive hermes `adjust_layout_for_mnemosyne` 8 KiB
+  padding + no-op dealloc NUMA bind. Measured 512 × 256B/64-aligned `AlignedVec`:
+  **~1056 MiB → ~4 MiB** mapped. Plus O(nblocks) bounds guards on the BlockedCoo
+  `spmv`/`elementwise_mul_dense` SIMD column loads (safety). See
+  [gap_audit](gap_audit.md#alloc-audit-2026-06-26). 367 tests green; Mnemosyne
+  98+23 tests green.
 - [x] [minor] (2026-06-26) Audit sprint — safety, contention-free perf, memory.
   `NumericElement` extended to `i64`/`u8`/`u16`/`u32`/`u64` (+ first
   `hermes-numeric` tests). `MAX_SIMD_LANES` 128→64 (true max) halving fallback

@@ -135,6 +135,45 @@ Next increments:
 - P2: Expose sub-byte sign-extension and unpacking/widening SIMD primitives (for `Bf4`/`F4`/`I8`).
 - P3: Arm SME target-feature feasibility study.
 
+## Allocator / Cross-Repo Audit - 2026-06-26 <a id="alloc-audit-2026-06-26"></a>
+
+Memory-efficiency deep dive on the hermes ↔ Mnemosyne boundary. Evidence tier:
+empirical (measured mapped bytes via `mnemosyne::memory_stats`) + type-level
+soundness argument for the alignment guarantee.
+
+Root cause found: Mnemosyne routed every allocation with `align > 16` to its
+large/huge path, reserving a ~2 MiB segment each (committed on Windows). Because
+hermes allocates `AlignedVec<_, Aligned<64>>` pervasively, small SIMD buffers
+cost ~2 MiB apiece — **512 live 256-byte/64-aligned `AlignedVec`s mapped
+~1056 MiB**. The hermes-side `adjust_layout_for_mnemosyne` 8 KiB padding was a
+*counterproductive* workaround for a different (size-based) tcache concern: it
+inflated small unaligned allocations into the same huge path without the claimed
+benefit (live RSS unchanged in measurement, since the 2 MiB slack is decommitted
+for align ≤ 16).
+
+Resolved this sprint:
+- [upstream, Mnemosyne `perf/aligned-small-alloc-tcache`] Alignment-aware
+  size-class selection: small allocations whose chosen class block stride is a
+  multiple of the requested alignment now use the thread-cache path. Sound
+  because page starts are `PAGE_SIZE`-aligned and blocks are carved at
+  `block_size` stride. Non-power-of-two-stride classes still fall to huge.
+  Verified by a value-semantic alignment/usability test.
+- [patch] hermes: removed the `adjust_layout_for_mnemosyne` padding and the no-op
+  `dealloc_on_node` NUMA bind. With the upstream fix, the same 512-allocation
+  workload drops **~1056 MiB → ~4 MiB** mapped (264×).
+- [patch] hermes: BlockedCoo `spmv`/`elementwise_mul_dense` unchecked SIMD column
+  loads now bounds-guarded (O(nblocks), pre-loop).
+
+Deferred (recorded, not silently dropped):
+- The four GEMV dispatchers share a thin register-blocking skeleton, but each
+  carries a distinct theorem (operand-reuse vs output-reuse), tile orientation,
+  and test suite. The *kernels* are already deduplicated; collapsing the
+  dispatcher glue into a proc-macro-attributed `macro_rules!` would obscure the
+  per-variant documentation/tests for marginal gain. Left as four clear files.
+- CSR `spmv` SIMD gather still trusts column indices in range (round-1 finding);
+  the principled fix is index validation at `SparseView` construction, an O(nnz)
+  boundary check warranting its own design increment.
+
 ## Internal Audit - 2026-06-26 <a id="audit-2026-06-26"></a>
 
 Four-dimension sweep (safety, contention-free perf, memory, redundancy).
