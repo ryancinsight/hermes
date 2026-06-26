@@ -44,9 +44,8 @@ impl NumaAllocator for MnemosyneNumaAllocator {
     unsafe fn alloc_on_node(&self, layout: Layout, node: u32) -> *mut u8 {
         #[cfg(feature = "mnemosyne-memory")]
         {
-            let adjusted_layout = adjust_layout_for_mnemosyne(layout);
             let _binding = NumaBinding::bind(node);
-            unsafe { core::alloc::GlobalAlloc::alloc(&mnemosyne::Mnemosyne, adjusted_layout) }
+            unsafe { core::alloc::GlobalAlloc::alloc(&mnemosyne::Mnemosyne, layout) }
         }
         #[cfg(all(
             not(feature = "mnemosyne-memory"),
@@ -106,10 +105,11 @@ impl NumaAllocator for MnemosyneNumaAllocator {
         super::locality::bump_alloc_generation();
         #[cfg(feature = "mnemosyne-memory")]
         {
-            let adjusted_layout = adjust_layout_for_mnemosyne(layout);
-            let _binding = NumaBinding::bind(_node);
+            // No NUMA binding: Mnemosyne routes a free by the pointer's owning
+            // segment, not the calling thread's node, so binding here only adds
+            // an affinity round-trip with no placement effect.
             unsafe {
-                core::alloc::GlobalAlloc::dealloc(&mnemosyne::Mnemosyne, ptr, adjusted_layout);
+                core::alloc::GlobalAlloc::dealloc(&mnemosyne::Mnemosyne, ptr, layout);
             }
         }
         #[cfg(all(
@@ -163,16 +163,13 @@ impl NumaAllocator for MnemosyneNumaAllocator {
     ) -> *mut u8 {
         #[cfg(feature = "mnemosyne-memory")]
         {
-            let adjusted_layout = adjust_layout_for_mnemosyne(layout);
-            let adjusted_new_layout = adjust_layout_for_mnemosyne(new_layout);
-
             let _binding = NumaBinding::bind(node);
             let new_ptr = unsafe {
                 core::alloc::GlobalAlloc::realloc(
                     &mnemosyne::Mnemosyne,
                     ptr,
-                    adjusted_layout,
-                    adjusted_new_layout.size(),
+                    layout,
+                    new_layout.size(),
                 )
             };
             if !new_ptr.is_null() && new_ptr != ptr {
@@ -191,16 +188,4 @@ impl NumaAllocator for MnemosyneNumaAllocator {
             new_ptr
         }
     }
-}
-
-#[cfg(feature = "mnemosyne-memory")]
-#[inline(always)]
-fn adjust_layout_for_mnemosyne(layout: Layout) -> Layout {
-    let size = layout.size();
-    let align = layout.align();
-    // Mitigation for thread-local cache pollution:
-    // Pad small allocations (<= 8KB) to bypass the thread-local cache
-    // and allocate directly in the global huge pool.
-    let adjusted_size = if size <= 8192 { 8192 + align } else { size };
-    Layout::from_size_align(adjusted_size, align).unwrap()
 }
