@@ -56,12 +56,16 @@ static ALLOC_GENERATION: CacheAlignedAtomicU64 =
 ///
 /// This invalidates thread-local locality cache entries, preventing stale cache hits
 /// when virtual memory addresses are deallocated and subsequently reallocated.
+///
+/// `Release` publishes the dealloc that precedes the bump; the paired `Acquire`
+/// load in [`get_alloc_generation`] establishes the happens-before required for a
+/// reader to never trust a cache entry tagged with a superseded generation.
 #[inline]
 pub fn bump_alloc_generation() {
     #[cfg(feature = "std")]
     ALLOC_GENERATION
         .0
-        .fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+        .fetch_add(1, core::sync::atomic::Ordering::Release);
 }
 
 /// Returns the current global allocation generation counter.
@@ -71,7 +75,7 @@ pub fn get_alloc_generation() -> u64 {
     {
         ALLOC_GENERATION
             .0
-            .load(core::sync::atomic::Ordering::Relaxed)
+            .load(core::sync::atomic::Ordering::Acquire)
     }
     #[cfg(not(feature = "std"))]
     {
@@ -104,14 +108,15 @@ pub fn verify_numa_locality(ptr: *const u8, size: usize, expected_node: u32) -> 
         if let Some(local) = cached {
             return local;
         }
-    }
 
-    let local = verify_numa_locality_os(ptr, size, expected_node);
+        let local = verify_numa_locality_os(ptr, size, expected_node);
 
-    #[cfg(feature = "std")]
-    {
-        let ptr_val = ptr as usize;
-        let gen = get_alloc_generation();
+        // Tag the entry with the generation captured *before* the OS probe. A
+        // concurrent `bump_alloc_generation` during the probe then leaves this
+        // entry mismatched (its `gen` is already stale), so the next lookup
+        // re-probes instead of trusting probe data gathered under a superseded
+        // generation. Re-reading the counter here would (incorrectly) stamp the
+        // pre-bump data with the post-bump generation.
         LOCALITY_CACHE.with(|cache| {
             let mut cache_mut = cache.borrow_mut();
             let idx = cache_mut.next_idx;
@@ -125,9 +130,14 @@ pub fn verify_numa_locality(ptr: *const u8, size: usize, expected_node: u32) -> 
             });
             cache_mut.next_idx = (idx + 1) % 16;
         });
+
+        local
     }
 
-    local
+    #[cfg(not(feature = "std"))]
+    {
+        verify_numa_locality_os(ptr, size, expected_node)
+    }
 }
 
 fn verify_numa_locality_os(ptr: *const u8, size: usize, expected_node: u32) -> bool {
