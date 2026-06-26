@@ -88,6 +88,11 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   stamped pre-bump probe data with the post-bump generation.
 
 ### Safety
+- `hermes-simd` [patch]: documented the `# Panics` contract (`square >= 64`) and
+  added the `// SAFETY:` justification on the public `rook_attacks`/`bishop_attacks`/
+  `queen_attacks` wrappers over the `Magic` `unsafe` kernel — verified the kernel
+  uses bounds-checked table indexing (panics, never OOB), closing a round-1
+  finding; backed by a `#[should_panic]` test.
 - `hermes-simd-intrinsics` [patch]: the raw AMX tile wrappers
   (`tilezero`/`tileloadd`/`tilestored`/`tdpbf16ps`/`tdpbssd`) replaced their
   silent `_ => {}` fallthrough with `unreachable!` so an out-of-range tile index

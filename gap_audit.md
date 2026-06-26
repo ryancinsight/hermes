@@ -184,6 +184,23 @@ Resolved later (2026-06-26, scope review):
   `simd` cargo feature was removed downstream — SIMD is the unconditional path via
   hermes's runtime dispatch).
 
+## Internal Audit - 2026-06-26 (round 6, closure) <a id="audit-2026-06-26-r6"></a>
+
+Largely a verification/closure round — 5 prior passes + tool measurements show the
+workspace is lean (lib IRs: `mnemosyne` ~3045, `hermes-simd` ~593, `leto-ops` ~167
+lines; monomorphization deferred to leaf binaries as intended; no `dyn` on hot
+paths; inner-fn extractions confirmed 1-copy). No substantive perf/memory/mono
+change was warranted; manufacturing churn would violate the subtractive bias.
+
+Resolved this sprint:
+- [patch] Closed the lingering round-1 bitboard finding. `hermes_simd::{rook,
+  bishop,queen}_attacks` are safe wrappers over the `Magic` `unsafe` kernel.
+  Verified **not** an OOB/UB hole: the kernel indexes `[u64; 64]` magic/offset
+  tables and the attack `Vec` with bounds-checked indexing and a computed mask, so
+  `square >= 64` **panics**, never reads out of bounds. Added the missing
+  `// SAFETY:` justification and `# Panics` docs on the wrappers and a
+  `#[should_panic]` regression test. Evidence tier: source audit + test.
+
 ## Internal Audit - 2026-06-26 (round 5, monomorphization) <a id="audit-2026-06-26-r5"></a>
 
 Evidence tier: value-semantic differential test (BCOO SIMD) + source-grounded

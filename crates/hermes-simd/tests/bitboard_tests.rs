@@ -110,3 +110,12 @@ fn test_swar_utils_primitives() {
     assert_eq!((p8 >> 16) & 0xff, 0xff_u64.count_ones() as u64);
     assert_eq!((p8 >> 24) & 0xff, 0x00_u64.count_ones() as u64);
 }
+
+#[test]
+#[should_panic]
+fn rook_attacks_panics_on_out_of_range_square() {
+    // `square >= 64` is out of range; the magic tables are indexed by square, so
+    // the public wrapper panics (bounds check) rather than reading OOB — backs the
+    // documented `# Panics` contract.
+    let _ = rook_attacks(64, 0);
+}
