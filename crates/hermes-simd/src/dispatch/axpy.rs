@@ -149,6 +149,42 @@ where
     Ok(())
 }
 
+/// Type-independent extent validation for `axpy_rows_batch`, extracted so it is
+/// emitted once rather than re-monomorphized into every `(T, Arch)` instantiation
+/// of the kernel. Returns `Ok(true)` when the problem is empty (caller returns
+/// `Ok(())`), `Ok(false)` when the extents are valid, or a length error.
+#[inline(never)]
+fn check_axpy_rows_batch_extents(
+    alphas_len: usize,
+    x_panel_len: usize,
+    out_len: usize,
+    row_stride: usize,
+    rows: usize,
+    depth: usize,
+    cols: usize,
+) -> Result<bool, SimdError> {
+    if rows == 0 || depth == 0 || cols == 0 {
+        return Ok(true);
+    }
+    let alpha_len = rows.checked_mul(depth).ok_or(SimdError::LengthMismatch)?;
+    let panel_len = depth.checked_mul(cols).ok_or(SimdError::LengthMismatch)?;
+    let last_row_offset = rows
+        .checked_sub(1)
+        .and_then(|row| row.checked_mul(row_stride))
+        .ok_or(SimdError::LengthMismatch)?;
+    let required_out_len = last_row_offset
+        .checked_add(cols)
+        .ok_or(SimdError::LengthMismatch)?;
+    if alphas_len < alpha_len
+        || x_panel_len < panel_len
+        || row_stride < cols
+        || out_len < required_out_len
+    {
+        return Err(SimdError::LengthMismatch);
+    }
+    Ok(false)
+}
+
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
 pub(super) fn dispatch_axpy_rows_batch_kernel<T, A>(
     alphas: &[T],
@@ -163,30 +199,16 @@ where
     T: Scalar,
     A: SimdArch + SimdKernel<T>,
 {
-    if rows == 0 || depth == 0 || cols == 0 {
+    if check_axpy_rows_batch_extents(
+        alphas.len(),
+        x_panel.len(),
+        out.len(),
+        row_stride,
+        rows,
+        depth,
+        cols,
+    )? {
         return Ok(());
-    }
-    let Some(alpha_len) = rows.checked_mul(depth) else {
-        return Err(SimdError::LengthMismatch);
-    };
-    let Some(panel_len) = depth.checked_mul(cols) else {
-        return Err(SimdError::LengthMismatch);
-    };
-    let Some(last_row_offset) = rows
-        .checked_sub(1)
-        .and_then(|row| row.checked_mul(row_stride))
-    else {
-        return Err(SimdError::LengthMismatch);
-    };
-    let Some(required_out_len) = last_row_offset.checked_add(cols) else {
-        return Err(SimdError::LengthMismatch);
-    };
-    if alphas.len() < alpha_len
-        || x_panel.len() < panel_len
-        || row_stride < cols
-        || out.len() < required_out_len
-    {
-        return Err(SimdError::LengthMismatch);
     }
 
     let lane_count = A::LANE_COUNT;
