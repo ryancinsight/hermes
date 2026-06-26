@@ -56,6 +56,26 @@ fn target_id_support_matches_host_features() {
 }
 
 #[test]
+fn fma_support_matches_runtime_feature_detector() {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        let expected = std::is_x86_feature_detected!("fma");
+        assert_eq!(has_fma3(), expected);
+        assert_eq!(<f32 as FmaSupport>::has_fma(), expected);
+        assert_eq!(<f64 as FmaSupport>::has_fma(), expected);
+        assert_eq!(<half::bf16 as FmaSupport>::has_fma(), expected);
+    }
+
+    #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+    {
+        assert!(!has_fma3());
+        assert!(!<f32 as FmaSupport>::has_fma());
+        assert!(!<f64 as FmaSupport>::has_fma());
+        assert!(!<half::bf16 as FmaSupport>::has_fma());
+    }
+}
+
+#[test]
 fn forced_scalar_dispatch_view_preserves_slice_values() {
     let data = [1.0f32, -2.0, 3.5, 4.0];
     let view = dispatch_view_to::<f32, Unaligned>(TargetId::Scalar, &data)

@@ -1,7 +1,7 @@
 //! Generic runtime-dispatch transposed sub-matrix GEMV (`y += Aᵀ · x`, row
 //! stride `lda`).
 //!
-//! Generalizes [`super::gemv_transpose`] to a row-major **sub-matrix**:
+//! Generalizes [`super::gemv_transpose()`] to a row-major **sub-matrix**:
 //! `nrows × ncols` with leading dimension `lda ≥ ncols`. `lda = ncols` recovers
 //! the packed transpose. Computes `Σᵢ xᵢ·A[i,:]` (sum of the strided rows scaled
 //! by `x`), vectorizing across the `ncols` output lanes with no horizontal

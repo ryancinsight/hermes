@@ -1,7 +1,7 @@
 //! Generic runtime-dispatch register-blocked sub-matrix GEMV (`y += A · x`,
 //! row stride `lda`).
 //!
-//! Generalizes [`super::gemv`] to a row-major **sub-matrix**: `nrows × ncols`
+//! Generalizes [`super::gemv()`] to a row-major **sub-matrix**: `nrows × ncols`
 //! with leading dimension `lda ≥ ncols` (rows contiguous over `ncols`, spaced
 //! `lda` apart). `lda = ncols` recovers the packed `gemv`. This admits matvec
 //! over a trailing/leading block of a larger buffer — e.g. the column-major

@@ -2,7 +2,7 @@
 //!
 //! Plumbs the core register-blocked transposed-GEMV micro-kernel
 //! ([`hermes_simd_core::tiling::TilingStrategy::gemv_transpose`]) through runtime
-//! backend selection, the complement of [`super::gemv`]. `A` is row-major
+//! backend selection, the complement of [`super::gemv()`]. `A` is row-major
 //! `nrows × ncols`, `x` length `nrows`, `y` length `ncols`; the result
 //! **accumulates** into `y` (`y += Aᵀ·x`), so callers wanting `y = Aᵀ·x` zero
 //! `y` first.
