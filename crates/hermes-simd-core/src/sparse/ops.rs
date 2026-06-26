@@ -165,6 +165,34 @@ where
         let d = &self.data;
         let lane_count = Arch::LANE_COUNT;
 
+        // Bounds for the unchecked SIMD loads/stores below: the dense matrix and
+        // the block/output buffers must be large enough, and every block must lie
+        // within the `nrows x ncols` dense extent so each `dense[(br+i)*ncols+bc
+        // .. +BN]` read stays in bounds. O(nblocks), once per call.
+        let block_elems = d.nblocks * BM * BN;
+        assert!(
+            dense.len() >= d.nrows * d.ncols,
+            "dense buffer {} too small for {}x{}",
+            dense.len(),
+            d.nrows,
+            d.ncols
+        );
+        assert!(
+            out_values.len() >= block_elems && d.blocks.len() >= block_elems,
+            "block/output buffers too small for {} block elements",
+            block_elems
+        );
+        for b in 0..d.nblocks {
+            let br = d.block_row[b] as usize;
+            let bc = d.block_col[b] as usize;
+            assert!(
+                bc + BN <= d.ncols && br + BM <= d.nrows,
+                "BlockedCoo block {b} (row {br}+{BM}, col {bc}+{BN}) exceeds {}x{}",
+                d.nrows,
+                d.ncols
+            );
+        }
+
         if BN == lane_count {
             for b in 0..d.nblocks {
                 let br = d.block_row[b] as usize;

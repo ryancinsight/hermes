@@ -263,6 +263,21 @@ where
         let data = &self.data;
         validate_spmv_sizes(x.len(), y.len(), data.ncols, data.nrows, "BlockedCoo");
 
+        // Per-block bounds for the unchecked SIMD column loads (`x[bc..bc+BN]`)
+        // and row stores (`y[br..br+BM]`) below. O(nblocks), once per call, so a
+        // malformed block coordinate is a panic rather than an out-of-bounds
+        // vector read/write.
+        for b in 0..data.nblocks {
+            let br = data.block_row[b] as usize;
+            let bc = data.block_col[b] as usize;
+            assert!(
+                bc + BN <= x.len() && br + BM <= y.len(),
+                "BlockedCoo block {b} (row {br}+{BM}, col {bc}+{BN}) exceeds x.len()={} / y.len()={}",
+                x.len(),
+                y.len()
+            );
+        }
+
         let block_size = BM * BN;
         let lane_count = Arch::LANE_COUNT;
 
