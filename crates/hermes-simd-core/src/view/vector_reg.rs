@@ -3,7 +3,7 @@
 use super::mask_reg::Mask;
 use super::SimdError;
 use crate::arch::SimdArch;
-use crate::kernel::SimdKernel;
+use crate::kernel::{SimdKernel, MAX_SIMD_LANES};
 use crate::mask::BitMask;
 use crate::scalar::{CastFrom, Scalar};
 use core::marker::PhantomData;
@@ -44,12 +44,9 @@ where
     T: Scalar + core::fmt::Debug,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
         let lane_count = Arch::LANE_COUNT;
-        assert!(
-            lane_count <= 128,
-            "LANE_COUNT exceeds maximum debug buffer size of 128"
-        );
-        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         unsafe {
             Arch::store_unaligned(buf.as_mut_ptr() as *mut T, self.raw);
             let init_slice = core::slice::from_raw_parts(buf.as_ptr() as *const T, lane_count);
@@ -65,10 +62,10 @@ where
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
+        const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
         let lane_count = Arch::LANE_COUNT;
-        assert!(lane_count <= 128);
-        let mut buf_self = [core::mem::MaybeUninit::<T>::uninit(); 128];
-        let mut buf_other = [core::mem::MaybeUninit::<T>::uninit(); 128];
+        let mut buf_self = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let mut buf_other = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         unsafe {
             Arch::store_unaligned(buf_self.as_mut_ptr() as *mut T, self.raw);
             Arch::store_unaligned(buf_other.as_mut_ptr() as *mut T, other.raw);
@@ -247,7 +244,11 @@ where
     ) -> Result<Self, SimdError> {
         let len = data.len();
         let bm = unsafe { mask.to_bitmask().0 };
-        let is_out_of_bounds = if len < 64 { (bm >> len) != 0 } else { false };
+        let is_out_of_bounds = if len < u64::BITS as usize {
+            (bm >> len) != 0
+        } else {
+            false
+        };
         if is_out_of_bounds {
             return Err(SimdError::IndexOutOfBounds);
         }
@@ -258,11 +259,15 @@ where
             // Hence, it is safe to load directly.
             unsafe { Ok(Self::masked_load_unaligned(data.as_ptr(), mask, src)) }
         } else {
-            // Short slice path to prevent page faults: copy to stack-aligned buffer of size 128.
+            // Short slice path to prevent page faults: copy to a stack-aligned
+            // `MAX_SIMD_LANES`-lane buffer.
+            // The buffer holds `LANE_COUNT` lanes; `LANE_BOUND_CHECK` proves
+            // `LANE_COUNT <= MAX_SIMD_LANES` at compile time per backend.
+            const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
             #[repr(C, align(64))]
-            struct AlignedBuf<T>([core::mem::MaybeUninit<T>; 128]);
+            struct AlignedBuf<T>([core::mem::MaybeUninit<T>; MAX_SIMD_LANES]);
 
-            let mut buf = AlignedBuf([core::mem::MaybeUninit::uninit(); 128]);
+            let mut buf = AlignedBuf([core::mem::MaybeUninit::uninit(); MAX_SIMD_LANES]);
             for i in 0..len {
                 buf.0[i].write(data[i]);
             }
@@ -292,7 +297,11 @@ where
     ) -> Result<(), SimdError> {
         let len = data.len();
         let bm = unsafe { mask.to_bitmask().0 };
-        let is_out_of_bounds = if len < 64 { (bm >> len) != 0 } else { false };
+        let is_out_of_bounds = if len < u64::BITS as usize {
+            (bm >> len) != 0
+        } else {
+            false
+        };
         if is_out_of_bounds {
             return Err(SimdError::IndexOutOfBounds);
         }
@@ -307,10 +316,13 @@ where
         } else {
             // Short slice path to prevent page faults: copy to stack-aligned buffer, perform masked store,
             // then copy active elements back.
+            // The buffer holds `LANE_COUNT` lanes; `LANE_BOUND_CHECK` proves
+            // `LANE_COUNT <= MAX_SIMD_LANES` at compile time per backend.
+            const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
             #[repr(C, align(64))]
-            struct AlignedBuf<T>([core::mem::MaybeUninit<T>; 128]);
+            struct AlignedBuf<T>([core::mem::MaybeUninit<T>; MAX_SIMD_LANES]);
 
-            let mut buf = AlignedBuf([core::mem::MaybeUninit::uninit(); 128]);
+            let mut buf = AlignedBuf([core::mem::MaybeUninit::uninit(); MAX_SIMD_LANES]);
             for i in 0..len {
                 buf.0[i].write(data[i]);
             }
@@ -444,7 +456,8 @@ where
     /// Convert this vector mask representation (sign bits) into a portable `BitMask`.
     #[inline(always)]
     pub fn to_bitmask(self) -> BitMask<64> {
-        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
+        const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let lanes = <Arch as SimdKernel<T>>::LANE_COUNT;
         unsafe {
             self.store_unaligned(buf.as_mut_ptr() as *mut T);
@@ -504,8 +517,9 @@ where
         U: CastFrom<T>,
     {
         let _ = AssertLaneCountSame::<T, U, Arch>::OK;
-        let mut buf_t = [core::mem::MaybeUninit::<T>::uninit(); 128];
-        let mut buf_u = [core::mem::MaybeUninit::<U>::uninit(); 128];
+        const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+        let mut buf_t = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let mut buf_u = [core::mem::MaybeUninit::<U>::uninit(); MAX_SIMD_LANES];
         let lanes = <Arch as SimdKernel<T>>::LANE_COUNT;
         unsafe {
             self.store_unaligned(buf_t.as_mut_ptr() as *mut T);
@@ -521,7 +535,8 @@ where
     #[inline(always)]
     pub fn extract<const I: usize>(self) -> T {
         let _ = AssertLaneIndex::<T, Arch, I>::OK;
-        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
+        const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         unsafe {
             self.store_unaligned(buf.as_mut_ptr() as *mut T);
             buf[I].assume_init()
@@ -532,7 +547,8 @@ where
     #[inline(always)]
     pub fn insert<const I: usize>(self, val: T) -> Self {
         let _ = AssertLaneIndex::<T, Arch, I>::OK;
-        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 128];
+        const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         unsafe {
             self.store_unaligned(buf.as_mut_ptr() as *mut T);
             buf[I].write(val);
