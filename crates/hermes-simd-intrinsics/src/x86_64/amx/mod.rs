@@ -306,7 +306,7 @@ pub mod raw {
                 5 => core::arch::asm!("tilezero tmm5"),
                 6 => core::arch::asm!("tilezero tmm6"),
                 7 => core::arch::asm!("tilezero tmm7"),
-                _ => {}
+                _ => unreachable!("AMX tile index out of range (valid: tmm0-tmm7)"),
             }
         }
     }
@@ -346,7 +346,7 @@ pub mod raw {
                 7 => {
                     core::arch::asm!("tileloadd tmm7, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride)
                 }
-                _ => {}
+                _ => unreachable!("AMX tile index out of range (valid: tmm0-tmm7)"),
             }
         }
     }
@@ -386,7 +386,7 @@ pub mod raw {
                 7 => {
                     core::arch::asm!("tilestored [{base} + {stride}], tmm7", base = in(reg) base, stride = in(reg) stride)
                 }
-                _ => {}
+                _ => unreachable!("AMX tile index out of range (valid: tmm0-tmm7)"),
             }
         }
     }
@@ -413,7 +413,7 @@ pub mod raw {
                 (7, 1, 3) => core::arch::asm!("tdpbf16ps tmm7, tmm1, tmm3"),
                 (0, 1, 2) => core::arch::asm!("tdpbf16ps tmm0, tmm1, tmm2"),
                 (2, 0, 1) => core::arch::asm!("tdpbf16ps tmm2, tmm0, tmm1"),
-                _ => {}
+                _ => unreachable!("AMX tile index out of range (valid: tmm0-tmm7)"),
             }
         }
     }
@@ -440,7 +440,7 @@ pub mod raw {
                 (7, 1, 3) => core::arch::asm!("tdpbssd tmm7, tmm1, tmm3"),
                 (0, 1, 2) => core::arch::asm!("tdpbssd tmm0, tmm1, tmm2"),
                 (2, 0, 1) => core::arch::asm!("tdpbssd tmm2, tmm0, tmm1"),
-                _ => {}
+                _ => unreachable!("AMX tile index out of range (valid: tmm0-tmm7)"),
             }
         }
     }
@@ -452,6 +452,13 @@ pub trait AmxGemm<TA, TB, TC> {
     ///
     /// # Safety
     /// - Pointers must be valid and aligned as per backend requirements.
+    /// - AMX must be available and enabled before calling: the CPU must support
+    ///   the relevant AMX features (`amx-tile` plus `amx-bf16`/`amx-int8`) and,
+    ///   on OSes that gate tile state (e.g. Linux `arch_prctl(ARCH_REQ_XCOMP_PERM,
+    ///   XFEATURE_XTILEDATA)`), the process must have requested permission.
+    ///   Callers gate this behind a runtime probe (the dispatcher reaches this
+    ///   only via `DispatchDecision::Amx`, taken when `AmxSupport::has_amx()` is
+    ///   true); invoking it without that guarantee is a `#UD`/`#NM` fault.
     unsafe fn amx_gemm(
         m: usize,
         n: usize,
