@@ -25,8 +25,13 @@ fn mul_pair<T, const CONJ_B: bool>(ar: T, ai: T, br: T, bi: T) -> (T, T)
 where
     T: Scalar,
 {
-    let bi = if CONJ_B { -bi } else { bi };
-    (ar * br - ai * bi, ar * bi + ai * br)
+    if CONJ_B {
+        // a * conj(b): (ar+i·ai)(br-i·bi) = (ar·br + ai·bi) + i·(ai·br - ar·bi)
+        (ar * br + ai * bi, ai * br - ar * bi)
+    } else {
+        // a * b: (ar+i·ai)(br+i·bi) = (ar·br - ai·bi) + i·(ar·bi + ai·br)
+        (ar * br - ai * bi, ar * bi + ai * br)
+    }
 }
 
 /// Computes one register of interleaved complex products: `a[k] * b[k]`
