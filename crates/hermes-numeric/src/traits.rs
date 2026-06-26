@@ -20,7 +20,6 @@ pub trait NumericElement:
     + core::ops::Mul<Output = Self>
     + core::ops::MulAssign
     + core::ops::Div<Output = Self>
-    + core::ops::Neg<Output = Self>
     + CastFrom<i32>
 {
     /// Additive identity.

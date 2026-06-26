@@ -7,6 +7,11 @@ impl private::Sealed for half::bf16 {}
 impl private::Sealed for i8 {}
 impl private::Sealed for i16 {}
 impl private::Sealed for i32 {}
+impl private::Sealed for i64 {}
+impl private::Sealed for u8 {}
+impl private::Sealed for u16 {}
+impl private::Sealed for u32 {}
+impl private::Sealed for u64 {}
 
 impl NumericElement for f32 {
     const ZERO: Self = 0.0_f32;
@@ -564,3 +569,150 @@ impl FloatElement for half::bf16 {
         self.to_f32()
     }
 }
+
+impl NumericElement for i64 {
+    const ZERO: Self = 0;
+    const ONE: Self = 1;
+    const NAN: Self = 0;
+    const INFINITY: Self = 0;
+    const BYTE_WIDTH: usize = 8;
+    const ALL_ONES: Self = -1;
+    const SIGN_MASK: Self = i64::MIN;
+    const MIN_VALUE: Self = i64::MIN;
+    const MAX_VALUE: Self = i64::MAX;
+
+    #[inline(always)]
+    fn abs(self) -> Self {
+        self.abs()
+    }
+    #[inline(always)]
+    fn scalar_fmadd(self, b: Self, c: Self) -> Self {
+        self.wrapping_mul(b).wrapping_add(c)
+    }
+    #[inline(always)]
+    fn sqrt(self) -> Self {
+        (self as f64).sqrt() as Self
+    }
+    #[inline(always)]
+    fn is_finite(self) -> bool {
+        true
+    }
+    #[inline(always)]
+    fn is_nan(self) -> bool {
+        false
+    }
+    #[inline(always)]
+    fn to_f64(self) -> f64 {
+        self as f64
+    }
+    #[inline(always)]
+    fn bitand(self, rhs: Self) -> Self {
+        self & rhs
+    }
+    #[inline(always)]
+    fn bitor(self, rhs: Self) -> Self {
+        self | rhs
+    }
+    #[inline(always)]
+    fn bitxor(self, rhs: Self) -> Self {
+        self ^ rhs
+    }
+    #[inline(always)]
+    fn count_ones(self) -> u32 {
+        self.count_ones()
+    }
+    #[inline(always)]
+    fn min_scalar(self, other: Self) -> Self {
+        if self <= other {
+            self
+        } else {
+            other
+        }
+    }
+    #[inline(always)]
+    fn max_scalar(self, other: Self) -> Self {
+        if self >= other {
+            self
+        } else {
+            other
+        }
+    }
+}
+
+macro_rules! impl_numeric_element_unsigned {
+    ($t:ty, $byte_width:expr, $min_value:expr, $max_value:expr) => {
+        impl NumericElement for $t {
+            const ZERO: Self = 0;
+            const ONE: Self = 1;
+            const NAN: Self = 0;
+            const INFINITY: Self = 0;
+            const BYTE_WIDTH: usize = $byte_width;
+            const ALL_ONES: Self = !0;
+            const SIGN_MASK: Self = 0;
+            const MIN_VALUE: Self = $min_value;
+            const MAX_VALUE: Self = $max_value;
+
+            #[inline(always)]
+            fn abs(self) -> Self {
+                self
+            }
+            #[inline(always)]
+            fn scalar_fmadd(self, b: Self, c: Self) -> Self {
+                self.wrapping_mul(b).wrapping_add(c)
+            }
+            #[inline(always)]
+            fn sqrt(self) -> Self {
+                (self as f64).sqrt() as Self
+            }
+            #[inline(always)]
+            fn is_finite(self) -> bool {
+                true
+            }
+            #[inline(always)]
+            fn is_nan(self) -> bool {
+                false
+            }
+            #[inline(always)]
+            fn to_f64(self) -> f64 {
+                self as f64
+            }
+            #[inline(always)]
+            fn bitand(self, rhs: Self) -> Self {
+                self & rhs
+            }
+            #[inline(always)]
+            fn bitor(self, rhs: Self) -> Self {
+                self | rhs
+            }
+            #[inline(always)]
+            fn bitxor(self, rhs: Self) -> Self {
+                self ^ rhs
+            }
+            #[inline(always)]
+            fn count_ones(self) -> u32 {
+                self.count_ones()
+            }
+            #[inline(always)]
+            fn min_scalar(self, other: Self) -> Self {
+                if self <= other {
+                    self
+                } else {
+                    other
+                }
+            }
+            #[inline(always)]
+            fn max_scalar(self, other: Self) -> Self {
+                if self >= other {
+                    self
+                } else {
+                    other
+                }
+            }
+        }
+    };
+}
+
+impl_numeric_element_unsigned!(u8, 1, u8::MIN, u8::MAX);
+impl_numeric_element_unsigned!(u16, 2, u16::MIN, u16::MAX);
+impl_numeric_element_unsigned!(u32, 4, u32::MIN, u32::MAX);
+impl_numeric_element_unsigned!(u64, 8, u64::MIN, u64::MAX);
