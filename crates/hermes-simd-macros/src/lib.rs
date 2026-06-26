@@ -5,6 +5,10 @@
 //! - `#[runtime_dispatch(avx512f, avx2, neon, scalar)]` — generates a CPU-feature-dispatched
 //!   wrapper function that calls monomorphized specializations in priority order.
 //! - `#[derive(SparseData)]` — generates `SparseFormat` boilerplate for data structs.
+//!
+//! This crate executes no `unsafe` itself (the `unsafe` it emits lives in the
+//! generated token streams, compiled in the consumer crate), so it forbids it.
+#![forbid(unsafe_code)]
 
 extern crate proc_macro;
 use proc_macro::TokenStream;

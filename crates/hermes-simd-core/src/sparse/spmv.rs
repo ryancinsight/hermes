@@ -18,13 +18,25 @@ pub trait SparseSpMv<T> {
 ///
 /// # Safety
 /// All implementations of `SimdKernel` in this workspace define `IndexVector`
-/// as `[i32; LANE_COUNT]`. This function transmutes `&[i32]` of length `LANE_COUNT`
-/// to `Arch::IndexVector` — this is sound iff the workspace invariant holds.
-/// `debug_assert!` validates the length contract.
+/// with the layout `[i32; LANE_COUNT]`. This function reads `&[i32]` of length
+/// `>= LANE_COUNT` as one `Arch::IndexVector` via an unaligned read (so element
+/// alignment, not vector alignment, is the only requirement). The size half of
+/// the layout invariant is enforced at compile time per backend by the
+/// `const` assert below; the length contract is enforced at runtime.
 #[inline(always)]
 pub(crate) unsafe fn build_index_vector<T: Scalar, Arch: SimdKernel<T>>(
     cols: &[i32],
 ) -> Arch::IndexVector {
+    // Compile-time guard binding the soundness condition the SAFETY note relies
+    // on: a backend whose `IndexVector` is not `LANE_COUNT` packed `i32`s fails
+    // to build rather than reading out of bounds / forming an invalid value.
+    const {
+        assert!(
+            core::mem::size_of::<Arch::IndexVector>()
+                == Arch::LANE_COUNT * core::mem::size_of::<i32>(),
+            "IndexVector size must equal LANE_COUNT * size_of::<i32>()"
+        )
+    };
     assert!(
         cols.len() >= Arch::LANE_COUNT,
         "cols slice length {} is less than LANE_COUNT {}",

@@ -40,7 +40,10 @@ impl<T> OnceLock<T> {
             if current == 0 {
                 if self
                     .state
-                    .compare_exchange_weak(0, 1, Ordering::Acquire, Ordering::Relaxed)
+                    // Winner acquires no shared data on the 0->1 claim (it next
+                    // *writes* the value and publishes it via `store(2, Release)`),
+                    // so `Relaxed` success ordering is sufficient.
+                    .compare_exchange_weak(0, 1, Ordering::Relaxed, Ordering::Relaxed)
                     .is_ok()
                 {
                     unsafe {
