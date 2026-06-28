@@ -7,6 +7,12 @@ External gap findings live in [gap_audit.md](gap_audit.md).
 
 ## Delivered (2026-06-11)
 
+- [x] [patch] (2026-06-28) Integer `sqrt` exactness. `NumericElement::sqrt` for
+  integers used a lossy `(self as f64).sqrt() as Self` roundtrip (wrong for large
+  `i64`/`u64`); now exact `isqrt` with a documented negative contract. New
+  value-semantic tests (large-operand regressions + `r²≤n<(r+1)²` invariant +
+  negatives) over all 8 integer types — sqrt previously had zero coverage. 379
+  tests + clippy/fmt clean. See [gap_audit](gap_audit.md#resolved).
 - [x] [patch] (2026-06-28) Memory-safety: tiling dimension-product overflow.
   GEMV/GEMM operand-length checks used unchecked `usize` products
   (`(nrows−1)·lda+ncols`, `m·k`, …) as the sole guard before unsafe SIMD loads;

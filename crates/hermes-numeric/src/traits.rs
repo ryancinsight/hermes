@@ -45,7 +45,10 @@ pub trait NumericElement:
     fn abs(self) -> Self;
     /// Scalar fused multiply-add: (self * b) + c.
     fn scalar_fmadd(self, b: Self, c: Self) -> Self;
-    /// Square root.
+    /// Square root. Floats follow IEEE 754 (`NaN` for negative inputs); integers
+    /// return the exact floor integer square root (`isqrt`), with negative signed
+    /// inputs defined to return 0 (integers have no `NaN` to signal the domain
+    /// error). No `f64` round-trip, so the integer result is exact for all operands.
     fn sqrt(self) -> Self;
     /// Returns true if finite.
     fn is_finite(self) -> bool;

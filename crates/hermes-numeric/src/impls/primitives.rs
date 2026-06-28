@@ -330,7 +330,16 @@ macro_rules! impl_numeric_element_signed {
             }
             #[inline(always)]
             fn sqrt(self) -> Self {
-                (self as f64).sqrt() as Self
+                // Exact integer (floor) square root. The previous
+                // `(self as f64).sqrt() as Self` rounded operands above 2^53 to f64
+                // *before* taking the root, losing precision (e.g. `i64::MAX`).
+                // `isqrt` is exact. Negative inputs have no real root and integers
+                // have no NaN to signal it, so they return 0 (documented contract).
+                if self < 0 {
+                    0
+                } else {
+                    self.isqrt()
+                }
             }
             #[inline(always)]
             fn is_finite(self) -> bool {
@@ -452,7 +461,10 @@ macro_rules! impl_numeric_element_unsigned {
             }
             #[inline(always)]
             fn sqrt(self) -> Self {
-                (self as f64).sqrt() as Self
+                // Exact integer (floor) square root; no f64 round-trip (the old
+                // `(self as f64).sqrt() as Self` lost precision above 2^53, e.g.
+                // `u64::MAX`).
+                self.isqrt()
             }
             #[inline(always)]
             fn is_finite(self) -> bool {

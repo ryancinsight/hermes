@@ -395,6 +395,18 @@ Resolved this sprint:
   `tiling::dims` unit tests. Prior rounds closed per-element sparse-load overflow
   but never this dense dimension-product class.
 
+- [patch] Integer `sqrt` f64-roundtrip precision loss (2026-06-28). Integer
+  `NumericElement::sqrt` used `(self as f64).sqrt() as Self`, which rounds operands
+  above 2⁵³ to `f64` before the root — wrong for large `i64`/`u64` (`u64::MAX`
+  returned 2³² instead of 2³²−1; the result's square overflows). Replaced with
+  exact `isqrt`; signed negatives keep the documented degenerate contract (→ 0;
+  integers have no `NaN`), trait doc now states the contract. The audit's
+  companion flag (`f16`/`bf16` `to_f64` via `to_f32`) was assessed **benign** —
+  widening to a wider mantissa is lossless — and left unchanged. Evidence tier:
+  value-semantic regression tests (large-operand exact cases, the
+  `r² ≤ n < (r+1)²` invariant above 2⁵³, negative-input contract) over all eight
+  integer types; integer `sqrt` previously had zero test coverage and no callers.
+
 ## Residual Risks
 
 - AVX-512 and AMX runtime validation still depends on matching hardware.

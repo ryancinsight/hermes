@@ -88,6 +88,16 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   from `Acquire` to `Relaxed` (the 0→1 winner acquires no shared data).
 
 ### Fixed
+- `hermes-numeric` [patch]: integer `NumericElement::sqrt` computed
+  `(self as f64).sqrt() as Self`, rounding operands above 2⁵³ to `f64` *before*
+  taking the root — lossy for large `i64`/`u64` (e.g. `u64::MAX.sqrt()` returned
+  4_294_967_296, whose square overflows `u64`; the correct floor root is
+  4_294_967_295). Now uses exact integer `isqrt`; signed negatives keep the
+  defined degenerate contract (return 0 — integers have no `NaN`). Trait doc states
+  the integer/float/negative contract. Covered by new value-semantic tests: exact
+  small roots for all eight integer types, the large-operand regression cases
+  (`u64::MAX`, `i64::MAX`), the `r² ≤ n < (r+1)²` invariant above 2⁵³, and the
+  negative-input contract.
 - `hermes-simd-core` [patch]: **memory-safety** — the tiling GEMV/GEMM dimension
   checks computed the required operand span with unchecked `usize` arithmetic
   (`(nrows−1)·lda + ncols`, `m·k`, `k·n`, `m·n`) as the *sole* guard before
