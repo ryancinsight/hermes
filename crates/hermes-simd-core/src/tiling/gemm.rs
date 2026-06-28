@@ -85,7 +85,12 @@ fn check_tiled_gemm_dimensions(
     n: usize,
     k: usize,
 ) -> Result<(), SimdError> {
-    if a_len < m * k || b_len < k * n || c_len < m * n {
+    // Overflow in any operand area ⇒ reject, closing the OOB load/store path under
+    // release `overflow-checks = false` (see `tiling::dims`).
+    let a_needed = super::dims::checked_area(m, k).ok_or(SimdError::LengthMismatch)?;
+    let b_needed = super::dims::checked_area(k, n).ok_or(SimdError::LengthMismatch)?;
+    let c_needed = super::dims::checked_area(m, n).ok_or(SimdError::LengthMismatch)?;
+    if a_len < a_needed || b_len < b_needed || c_len < c_needed {
         return Err(SimdError::LengthMismatch);
     }
     Ok(())

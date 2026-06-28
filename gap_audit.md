@@ -378,6 +378,23 @@ Resolved this sprint:
   not monomorphization debt — each is now a single defaulted-method or
   strategy-ZST addition rather than an N-impl change.
 
+- [patch] Tiling dimension-product overflow → OOB SIMD load (2026-06-28). The
+  GEMV/GEMM operand-length checks (`tiling/gemv.rs`, `gemv_transpose.rs`,
+  `gemm.rs`) computed the required span with unchecked `usize` products as the
+  only guard before `unsafe` SIMD loads/stores. An adversarial dimension from the
+  public dispatch API (`lda = usize::MAX`, `nrows = 2`; or `m·k` etc.) overflowed:
+  release (`overflow-checks = false`) wrapped → guard passed → OOB read; dev
+  panicked undocumented. Fixed by an SSOT `tiling::dims` module
+  (`checked_strided_span`/`checked_area`) returning `SimdError::LengthMismatch` on
+  overflow — closes the OOB path in all profiles and consolidates the previously
+  duplicated forward/transpose span math. Added `[profile.dev] overflow-checks =
+  true` per the numerical-discipline mandate (release keeps default for hot-loop
+  speed; the checked guard makes safety profile-independent). Evidence tier:
+  value-semantic exact-variant regression tests on all three dispatchers passing
+  in both dev and release (release pass proves the OOB load unreachable) +
+  `tiling::dims` unit tests. Prior rounds closed per-element sparse-load overflow
+  but never this dense dimension-product class.
+
 ## Residual Risks
 
 - AVX-512 and AMX runtime validation still depends on matching hardware.

@@ -88,6 +88,24 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   from `Acquire` to `Relaxed` (the 0→1 winner acquires no shared data).
 
 ### Fixed
+- `hermes-simd-core` [patch]: **memory-safety** — the tiling GEMV/GEMM dimension
+  checks computed the required operand span with unchecked `usize` arithmetic
+  (`(nrows−1)·lda + ncols`, `m·k`, `k·n`, `m·n`) as the *sole* guard before
+  `unsafe` SIMD loads/stores. An adversarial dimension reachable from the public
+  dispatch API (e.g. `dispatch_gemv_strided(.., nrows=2, lda=usize::MAX)`)
+  overflowed the product: under release `overflow-checks = false` it wrapped to a
+  small value, the `a_len < a_needed` guard passed, and the kernel read out of
+  bounds (and panicked undocumented in dev, where checks default on). Span math is
+  now one SSOT module `tiling::dims` (`checked_strided_span`/`checked_area`,
+  shared by the forward and transpose GEMV checkers — previously duplicated) that
+  returns `SimdError::LengthMismatch` on overflow, closing the OOB path in every
+  profile independently of `overflow-checks`; the checked bound also proves the
+  kernels' own `row_idx·lda` index arithmetic cannot overflow. Added
+  `[profile.dev] overflow-checks = true` (explicit per the numerical-discipline
+  mandate; release keeps the default for hot-loop speed). Verified by exact-variant
+  overflow regression tests on all three dispatchers, passing in **both** dev and
+  release (the release pass is the proof the OOB load is unreachable), plus
+  `tiling::dims` unit tests.
 - `hermes-simd` [patch]: `spmv_bcoo` was hardcoded to `ScalarArch`, so the
   runtime-dispatched SIMD BlockedCoo kernels (and their bounds guards) were dead
   — every blocked-COO SpMV ran scalar regardless of host SIMD. It now routes

@@ -37,6 +37,7 @@ use crate::{
 };
 use core::marker::PhantomData;
 
+mod dims;
 pub mod dot;
 pub mod gemm;
 pub mod gemv;

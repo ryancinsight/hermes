@@ -117,4 +117,24 @@ mod tests {
                 .is_err()
         );
     }
+
+    #[test]
+    fn gemv_transpose_strided_rejects_dimension_overflow() {
+        use hermes_simd_core::view::SimdError;
+        // `(nrows-1)·lda + ncols` overflows `usize`; `x`/`y` are sized so only the
+        // A-span fails. Unchecked the product wraps and admits an OOB SIMD load —
+        // the checked span arithmetic rejects with the exact variant.
+        let a = vec![1.0f64; 40];
+        let x = vec![1.0f64; 2];
+        let mut y = vec![0.0f64; 6];
+        let r = gemv_transpose_strided::dispatch_gemv_transpose_strided::<f64>(
+            &a,
+            &x,
+            &mut y,
+            2,
+            6,
+            usize::MAX,
+        );
+        assert_eq!(r, Err(SimdError::LengthMismatch));
+    }
 }

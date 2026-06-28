@@ -24,6 +24,15 @@ half = { version = "2.3", default-features = false }
 mnemosyne = { git = "https://github.com/ryancinsight/Mnemosyne.git", rev = "1e014d25461b322345c15fb3cf9467b5388616dd", default-features = false }
 themis = { git = "https://github.com/ryancinsight/themis", version = "0.9.9", default-features = false }
 
+# Integer overflow must trap during development and tests (numerical-discipline
+# mandate): a silent wraparound can defeat a length/bounds check that gates an
+# unsafe SIMD load. The `test` profile inherits `dev`. Release keeps the default
+# (`overflow-checks = false`) for hot-loop performance; the tiling dimension
+# checks use explicit `checked_*` arithmetic (see `tiling::dims`) so operand-span
+# safety holds independently of this profile flag.
+[profile.dev]
+overflow-checks = true
+
 [profile.release]
 opt-level = 3
 lto = "fat"

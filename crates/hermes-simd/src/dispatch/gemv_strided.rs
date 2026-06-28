@@ -110,4 +110,19 @@ mod tests {
         let short = vec![1.0f64; 10];
         assert!(gemv_strided::dispatch_gemv_strided::<f64>(&short, &x, &mut y, 4, 6, 10).is_err());
     }
+
+    #[test]
+    fn gemv_strided_rejects_dimension_overflow() {
+        use hermes_simd_core::view::SimdError;
+        // Adversarial stride: `(nrows-1)·lda + ncols` overflows `usize`. Unchecked
+        // (release `overflow-checks = false`), the product wraps to a small value,
+        // the `a_len < a_needed` guard passes, and the kernel issues an OOB SIMD
+        // load. `x`/`y` are sized so the only failing condition is the A-span. The
+        // checked span arithmetic must reject with the exact variant.
+        let a = vec![1.0f64; 40];
+        let x = vec![1.0f64; 6];
+        let mut y = vec![0.0f64; 2];
+        let r = gemv_strided::dispatch_gemv_strided::<f64>(&a, &x, &mut y, 2, 6, usize::MAX);
+        assert_eq!(r, Err(SimdError::LengthMismatch));
+    }
 }

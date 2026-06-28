@@ -7,6 +7,15 @@ External gap findings live in [gap_audit.md](gap_audit.md).
 
 ## Delivered (2026-06-11)
 
+- [x] [patch] (2026-06-28) Memory-safety: tiling dimension-product overflow.
+  GEMV/GEMM operand-length checks used unchecked `usize` products
+  (`(nrows−1)·lda+ncols`, `m·k`, …) as the sole guard before unsafe SIMD loads;
+  an adversarial dim from the public dispatch API (`lda=usize::MAX`) wrapped under
+  release `overflow-checks=false` → OOB read. Fixed via SSOT `tiling::dims`
+  checked-span helpers (also dedups the forward/transpose span math) +
+  `[profile.dev] overflow-checks=true`. Exact-variant overflow regressions on all
+  three dispatchers pass in dev AND release; 377 tests + clippy/fmt/doc clean.
+  See [gap_audit](gap_audit.md#resolved).
 - [x] [minor] (2026-06-28) Masked-merge `SimdKernel` defaults — SIMD-capability
   monomorphization. Investigation found the kernel seam already mature (rsqrt,
   popcount, horizontal-bitwise, reductions, scans are all defaulted methods or

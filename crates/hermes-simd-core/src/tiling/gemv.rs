@@ -35,11 +35,10 @@ fn check_gemv_dimensions(
     lda: usize,
 ) -> Result<(), SimdError> {
     // Row `r` occupies `[r·lda, r·lda + ncols)`; the last row needs the most span.
-    let a_needed = if nrows == 0 {
-        0
-    } else {
-        (nrows - 1) * lda + ncols
-    };
+    // Overflow ⇒ no slice can satisfy it ⇒ reject, closing the OOB-load path under
+    // release `overflow-checks = false` (see `tiling::dims`).
+    let a_needed =
+        super::dims::checked_strided_span(nrows, ncols, lda).ok_or(SimdError::LengthMismatch)?;
     if lda < ncols || a_len < a_needed || x_len < ncols || y_len < nrows {
         return Err(SimdError::LengthMismatch);
     }

@@ -29,11 +29,10 @@ fn check_gemv_t_dimensions(
     ncols: usize,
     lda: usize,
 ) -> Result<(), SimdError> {
-    let a_needed = if nrows == 0 {
-        0
-    } else {
-        (nrows - 1) * lda + ncols
-    };
+    // Shared sub-matrix span (SSOT with the forward GEMV checker); overflow ⇒
+    // reject, closing the OOB-load path under release `overflow-checks = false`.
+    let a_needed =
+        super::dims::checked_strided_span(nrows, ncols, lda).ok_or(SimdError::LengthMismatch)?;
     if lda < ncols || a_len < a_needed || x_len < nrows || y_len < ncols {
         return Err(SimdError::LengthMismatch);
     }

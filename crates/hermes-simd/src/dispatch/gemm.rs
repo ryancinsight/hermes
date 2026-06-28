@@ -68,3 +68,23 @@ where
         _ => unsafe { core::hint::unreachable_unchecked() },
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::dispatch::gemm;
+    use hermes_simd_core::view::SimdError;
+
+    #[test]
+    fn tiled_gemm_rejects_dimension_overflow() {
+        // `m·k` overflows `usize`. Unchecked (release `overflow-checks = false`)
+        // the product wraps, the `a_len < a_needed` guard passes, and the kernel
+        // issues an OOB SIMD load/store. The checked area arithmetic must reject
+        // with the exact variant. (Operand correctness is covered in
+        // `tests/tiling_tests.rs`.)
+        let a = vec![1.0f64; 16];
+        let b = vec![1.0f64; 16];
+        let mut c = vec![0.0f64; 16];
+        let r = gemm::dispatch_tiled_gemm::<f64>(&a, &b, &mut c, 2, 8, usize::MAX);
+        assert_eq!(r, Err(SimdError::LengthMismatch));
+    }
+}
