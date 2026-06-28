@@ -214,17 +214,27 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     ///
     /// # Safety
     /// `ptr` must be valid for reading `LANE_COUNT` elements. Active lanes determined by `mask`.
+    ///
+    /// Default: scalar-emulated merge via `kernel_helpers::generic_masked_load`.
+    /// Backends with a native masked load (AVX-512, SVE) override this.
     unsafe fn masked_load_unaligned(
         ptr: *const T,
         mask: Self::Mask,
         src: Self::Vector,
-    ) -> Self::Vector;
+    ) -> Self::Vector {
+        crate::kernel_helpers::generic_masked_load::<T, Self>(ptr, mask, src)
+    }
 
     /// Masked store: active lanes written to `ptr`, inactive lanes left unchanged.
     ///
     /// # Safety
     /// `ptr` must be valid for writing `LANE_COUNT` elements.
-    unsafe fn masked_store_unaligned(ptr: *mut T, mask: Self::Mask, val: Self::Vector);
+    ///
+    /// Default: scalar-emulated merge via `kernel_helpers::generic_masked_store`.
+    /// Backends with a native masked store override this.
+    unsafe fn masked_store_unaligned(ptr: *mut T, mask: Self::Mask, val: Self::Vector) {
+        crate::kernel_helpers::generic_masked_store::<T, Self>(ptr, mask, val)
+    }
 
     // -------------------------------------------------------------------------
     // Masked Arithmetic (merge masking)
@@ -234,23 +244,33 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     ///
     /// # Safety
     /// Processor must support the required target feature.
+    ///
+    /// Default: `blend(mask_to_vector(mask), add(a, b), src)`. Backends with a
+    /// native masked add override this.
     unsafe fn masked_add(
         a: Self::Vector,
         b: Self::Vector,
         mask: Self::Mask,
         src: Self::Vector,
-    ) -> Self::Vector;
+    ) -> Self::Vector {
+        Self::blend(Self::mask_to_vector(mask), Self::add(a, b), src)
+    }
 
     /// Masked elementwise multiply: active lanes compute `a * b`, inactive lanes yield `src`.
     ///
     /// # Safety
     /// Processor must support the required target feature.
+    ///
+    /// Default: `blend(mask_to_vector(mask), mul(a, b), src)`. Backends with a
+    /// native masked multiply override this.
     unsafe fn masked_mul(
         a: Self::Vector,
         b: Self::Vector,
         mask: Self::Mask,
         src: Self::Vector,
-    ) -> Self::Vector;
+    ) -> Self::Vector {
+        Self::blend(Self::mask_to_vector(mask), Self::mul(a, b), src)
+    }
 
     /// Masked fused multiply-add: active lanes compute `(a * b) + c`, inactive lanes retain `c`.
     ///
@@ -259,18 +279,28 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     ///
     /// # Safety
     /// Processor must support the required target feature.
+    ///
+    /// Default: `blend(mask_to_vector(mask), fmadd(a, b, c), c)` — inactive lanes
+    /// retain the addend `c`. Backends with a native masked FMA override this.
     unsafe fn masked_fmadd(
         a: Self::Vector,
         b: Self::Vector,
         c: Self::Vector,
         mask: Self::Mask,
-    ) -> Self::Vector;
+    ) -> Self::Vector {
+        Self::blend(Self::mask_to_vector(mask), Self::fmadd(a, b, c), c)
+    }
 
     /// Masked horizontal sum: only lanes where `mask[i]=1` contribute.
     ///
     /// # Safety
     /// Processor must support the required target feature.
-    unsafe fn masked_sum_reduce(v: Self::Vector, mask: Self::Mask) -> T;
+    ///
+    /// Default: `sum_reduce(blend(mask_to_vector(mask), v, zero))` — inactive
+    /// lanes contribute zero. Backends with a native masked reduction override this.
+    unsafe fn masked_sum_reduce(v: Self::Vector, mask: Self::Mask) -> T {
+        Self::sum_reduce(Self::blend(Self::mask_to_vector(mask), v, Self::zero()))
+    }
 
     // -------------------------------------------------------------------------
     // Compress / Expand

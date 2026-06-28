@@ -3,6 +3,62 @@
 use crate::kernel::{SimdKernel, MAX_SIMD_LANES};
 use crate::scalar::Scalar;
 
+/// Generic merge-masked load default: active lanes (per `mask`) are loaded from
+/// `ptr`; inactive lanes keep their value from `src`.
+///
+/// Backends with a native masked load override [`SimdKernel::masked_load_unaligned`];
+/// new backends/types inherit this scalar-emulated default for free. The bitmask
+/// shift bounds it to `LANE_COUNT <= MAX_SIMD_LANES`, checked at compile time.
+///
+/// # Safety
+/// `ptr` must be valid for reading `Arch::LANE_COUNT` elements of `T`.
+#[inline(always)]
+pub unsafe fn generic_masked_load<T, Arch>(
+    ptr: *const T,
+    mask: Arch::Mask,
+    src: Arch::Vector,
+) -> Arch::Vector
+where
+    T: Scalar,
+    Arch: SimdKernel<T>,
+{
+    const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+    let bm = Arch::mask_to_bitmask(mask);
+    let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+    // Seed every lane from `src`, then overwrite the active lanes from memory.
+    Arch::store_unaligned(buf.as_mut_ptr() as *mut T, src);
+    for i in 0..Arch::LANE_COUNT {
+        if (bm >> i) & 1 == 1 {
+            buf[i].write(*ptr.add(i));
+        }
+    }
+    Arch::load_unaligned(buf.as_ptr() as *const T)
+}
+
+/// Generic merge-masked store default: active lanes (per `mask`) of `val` are
+/// written to `ptr`; inactive lanes of `ptr` are left unchanged.
+///
+/// Backends with a native masked store override [`SimdKernel::masked_store_unaligned`].
+///
+/// # Safety
+/// `ptr` must be valid for writing the active lanes' elements of `T`.
+#[inline(always)]
+pub unsafe fn generic_masked_store<T, Arch>(ptr: *mut T, mask: Arch::Mask, val: Arch::Vector)
+where
+    T: Scalar,
+    Arch: SimdKernel<T>,
+{
+    const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+    let bm = Arch::mask_to_bitmask(mask);
+    let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+    Arch::store_unaligned(buf.as_mut_ptr() as *mut T, val);
+    for i in 0..Arch::LANE_COUNT {
+        if (bm >> i) & 1 == 1 {
+            *ptr.add(i) = buf[i].assume_init();
+        }
+    }
+}
+
 #[inline(always)]
 pub unsafe fn generic_binary_op<T, Arch, F>(
     a: Arch::Vector,

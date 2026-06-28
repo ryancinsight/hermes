@@ -7,6 +7,19 @@ External gap findings live in [gap_audit.md](gap_audit.md).
 
 ## Delivered (2026-06-11)
 
+- [x] [minor] (2026-06-28) Masked-merge `SimdKernel` defaults — SIMD-capability
+  monomorphization. Investigation found the kernel seam already mature (rsqrt,
+  popcount, horizontal-bitwise, reductions, scans are all defaulted methods or
+  ZST strategies = one generic addition each). Closed the last `required`-on-every
+  -impl family: the six masked-merge methods (`masked_{load,store}_unaligned`,
+  `masked_{add,mul,fmadd}`, `masked_sum_reduce`, the NumKong P1 tail-free set) now
+  have scalar-emulated trait defaults (`blend(mask_to_vector(mask), …)` +
+  `kernel_helpers::generic_masked_{load,store}`), removed from
+  `impl_emulated_kernel!` (~66 lines, ~24 backends inherit). New backends/types
+  inherit the family free. Cross-backend differential property test (Scalar/SveArch
+  defaults vs AVX2/AVX-512 natives); 371 tests + clippy/fmt/doc clean. `gather`/
+  `compress`/`expand` stay required (no generic index/lane-introspection primitive).
+  See [gap_audit](gap_audit.md#resolved).
 - [x] [patch] (2026-06-26) Audit round 5 — monomorphization + sparse defect fix.
   Fixed `spmv_bcoo` (was hardcoded to ScalarArch → SIMD BlockedCoo kernels dead;
   now runtime-dispatched, + differential SIMD-branch test). Extracted

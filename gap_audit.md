@@ -354,6 +354,29 @@ Resolved this sprint:
 - [patch] rust-1.95 clippy workspace lints resolved (redundant `as` casts,
   `iter().flatten()`, needless borrow/return, `enumerate()` range loops);
   `cargo clippy --workspace --all-targets -- -D warnings` is clean again.
+- [minor] Masked-merge `SimdKernel` defaults (2026-06-28). Investigation of the
+  remaining monomorphization gaps for SIMD capability expansion found the seam
+  already mature: `rsqrt`, `popcount`, horizontal-bitwise reductions (NumKong
+  P1/P2 — see [numkong-2026-06-17](#numkong-2026-06-17)), and the
+  reduction/scan/unary op families are expressed as defaulted `SimdKernel`
+  methods (`kernel_helpers`) or sealed ZST strategies, so each is one generic
+  addition inherited by every backend. The single family still `required` on
+  every impl was the masked-merge set (`masked_load_unaligned`,
+  `masked_store_unaligned`, `masked_add`, `masked_mul`, `masked_fmadd`,
+  `masked_sum_reduce`) — the NumKong P1 tail-free family — which now has
+  scalar-emulated trait defaults (arithmetic via `blend(mask_to_vector(mask), …)`;
+  load/store via new `kernel_helpers::generic_masked_{load,store}`). A new
+  backend/type inherits the tail-masked family for free; the six redundant impls
+  are removed from `impl_emulated_kernel!` (inherited by ~24 emulated backends).
+  Bit-identical to the removed per-element loops, verified by a new cross-backend
+  differential property test (Scalar/SveArch defaults vs AVX2/AVX-512 native
+  overrides). Evidence tier: differential test across default and native paths.
+  Not defaulted: `gather`/`compress`/`expand` stay `required` — no generic
+  `IndexVector`/lane-introspection primitive exists to express them, and gather is
+  latency-bound so the value is low. Remaining NumKong families (native `rsqrt`
+  instruction override, sub-byte unpacking, Arm SME) are capability *additions*,
+  not monomorphization debt — each is now a single defaulted-method or
+  strategy-ZST addition rather than an N-impl change.
 
 ## Residual Risks
 

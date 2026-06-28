@@ -89,6 +89,74 @@ fn check_leading_k_masked_sum<A: SimdKernel<f32>>() {
     }
 }
 
+/// Masked merge ops (`masked_load`/`add`/`mul`/`fmadd`/`store`) must merge active
+/// lanes (per the mask) with the inactive source. Run across Scalar/SveArch (the
+/// scalar-emulated trait defaults) and AVX2/AVX-512 (native overrides), so this is
+/// a differential check that the defaults match the native implementations.
+/// Small-integer `f32` values keep `a*b+c` exact so native FMA == emulated.
+fn check_masked_merge_ops<A: SimdKernel<f32>>() {
+    let lanes = A::LANE_COUNT;
+    let a_vals: Vec<f32> = (0..lanes).map(|i| (i + 1) as f32).collect();
+    let b_vals: Vec<f32> = (0..lanes).map(|i| (2 * i + 3) as f32).collect();
+    let src_vals: Vec<f32> = (0..lanes).map(|i| -((i + 1) as f32)).collect();
+    let k = lanes / 2; // first half active
+    let mut buf = vec![0.0f32; lanes];
+    // SAFETY: caller gates on the required target features for `A`.
+    unsafe {
+        let a = A::load_unaligned(a_vals.as_ptr());
+        let b = A::load_unaligned(b_vals.as_ptr());
+        let src = A::load_unaligned(src_vals.as_ptr());
+        let mask = A::leading_k_mask(k);
+
+        A::store_unaligned(
+            buf.as_mut_ptr(),
+            A::masked_load_unaligned(a_vals.as_ptr(), mask, src),
+        );
+        for i in 0..lanes {
+            let want = if i < k { a_vals[i] } else { src_vals[i] };
+            assert_eq!(buf[i], want, "masked_load lane {i}");
+        }
+
+        A::store_unaligned(buf.as_mut_ptr(), A::masked_add(a, b, mask, src));
+        for i in 0..lanes {
+            let want = if i < k {
+                a_vals[i] + b_vals[i]
+            } else {
+                src_vals[i]
+            };
+            assert_eq!(buf[i], want, "masked_add lane {i}");
+        }
+
+        A::store_unaligned(buf.as_mut_ptr(), A::masked_mul(a, b, mask, src));
+        for i in 0..lanes {
+            let want = if i < k {
+                a_vals[i] * b_vals[i]
+            } else {
+                src_vals[i]
+            };
+            assert_eq!(buf[i], want, "masked_mul lane {i}");
+        }
+
+        // masked_fmadd merges inactive lanes from the addend `c` (= src here).
+        A::store_unaligned(buf.as_mut_ptr(), A::masked_fmadd(a, b, src, mask));
+        for i in 0..lanes {
+            let want = if i < k {
+                a_vals[i] * b_vals[i] + src_vals[i]
+            } else {
+                src_vals[i]
+            };
+            assert_eq!(buf[i], want, "masked_fmadd lane {i}");
+        }
+
+        let mut dst = src_vals.clone();
+        A::masked_store_unaligned(dst.as_mut_ptr(), mask, a);
+        for i in 0..lanes {
+            let want = if i < k { a_vals[i] } else { src_vals[i] };
+            assert_eq!(dst[i], want, "masked_store lane {i}");
+        }
+    }
+}
+
 /// Run every kernel-level check for one backend.
 fn check_all_kernel_invariants<A>(bm: u64, vals: &[f32])
 where
@@ -97,6 +165,7 @@ where
     check_bitmask_roundtrip::<A>(bm);
     check_compress_expand_identity::<A>(bm, vals);
     check_leading_k_masked_sum::<A>();
+    check_masked_merge_ops::<A>();
 }
 
 proptest! {

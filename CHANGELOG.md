@@ -11,6 +11,21 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   popcount, wrapping fmadd, min/max, constants, `CastFrom` round-trips).
 
 ### Changed
+- `hermes-simd-core` [minor]: give the six masked-merge `SimdKernel` methods
+  (`masked_load_unaligned`, `masked_store_unaligned`, `masked_add`, `masked_mul`,
+  `masked_fmadd`, `masked_sum_reduce`) scalar-emulated trait defaults — the
+  arithmetic via `blend(mask_to_vector(mask), …)` and the load/store via new
+  `kernel_helpers::generic_masked_{load,store}` — so a new backend or scalar type
+  inherits the tail-masked family for free instead of hand-implementing it. These
+  were the last capability family still `required` on every impl (rsqrt, popcount,
+  horizontal-bitwise, reductions, and scans were already defaulted), the one
+  paying an N-impl tax that gated cheap backend/type expansion. The six redundant
+  hand-written impls are removed from `impl_emulated_kernel!` (~66 lines, inherited
+  free by all ~24 emulated backends); native AVX2/AVX-512/NEON overrides are
+  unchanged. Behavior is bit-identical to the removed per-element loops, verified
+  by a new cross-backend differential property test (Scalar/SveArch defaults vs
+  AVX2/AVX-512 native overrides). `gather`/`compress`/`expand` stay `required`
+  (no generic `IndexVector`/lane-introspection primitive to default them).
 - `hermes-simd` [patch]: extract `axpy_rows_batch`'s type-independent extent
   validation into a non-generic `#[inline(never)]` `check_axpy_rows_batch_extents`
   so it is emitted once instead of re-monomorphized into every `(T, Arch)`

@@ -105,72 +105,10 @@ macro_rules! impl_emulated_kernel {
                 )
             }
 
-            #[inline(always)]
-            unsafe fn masked_load_unaligned(
-                ptr: *const $t,
-                mask: Self::Mask,
-                src: Self::Vector,
-            ) -> Self::Vector {
-                core::array::from_fn(|i| if mask[i] { *ptr.add(i) } else { src[i] })
-            }
-
-            #[inline(always)]
-            unsafe fn masked_store_unaligned(ptr: *mut $t, mask: Self::Mask, val: Self::Vector) {
-                for i in 0..$lanes {
-                    if mask[i] {
-                        *ptr.add(i) = val[i];
-                    }
-                }
-            }
-
-            #[inline(always)]
-            unsafe fn masked_add(
-                a: Self::Vector,
-                b: Self::Vector,
-                mask: Self::Mask,
-                src: Self::Vector,
-            ) -> Self::Vector {
-                core::array::from_fn(|i| if mask[i] { a[i] + b[i] } else { src[i] })
-            }
-
-            #[inline(always)]
-            unsafe fn masked_mul(
-                a: Self::Vector,
-                b: Self::Vector,
-                mask: Self::Mask,
-                src: Self::Vector,
-            ) -> Self::Vector {
-                core::array::from_fn(|i| if mask[i] { a[i] * b[i] } else { src[i] })
-            }
-
-            #[inline(always)]
-            unsafe fn masked_fmadd(
-                a: Self::Vector,
-                b: Self::Vector,
-                c: Self::Vector,
-                mask: Self::Mask,
-            ) -> Self::Vector {
-                core::array::from_fn(|i| {
-                    if mask[i] {
-                        <$t as hermes_simd_core::scalar::NumericElement>::scalar_fmadd(
-                            a[i], b[i], c[i],
-                        )
-                    } else {
-                        c[i]
-                    }
-                })
-            }
-
-            #[inline(always)]
-            unsafe fn masked_sum_reduce(v: Self::Vector, mask: Self::Mask) -> $t {
-                let mut s = <$t as hermes_simd_core::scalar::NumericElement>::ZERO;
-                for i in 0..$lanes {
-                    if mask[i] {
-                        s += v[i];
-                    }
-                }
-                s
-            }
+            // masked_load_unaligned / masked_store_unaligned / masked_add /
+            // masked_mul / masked_fmadd / masked_sum_reduce are inherited from the
+            // `SimdKernel` scalar-emulated defaults (blend / generic_masked_*),
+            // which are bit-identical to the per-element loops they replaced.
 
             #[inline(always)]
             unsafe fn compress(src: Self::Vector, mask: Self::Mask) -> Self::Vector {
