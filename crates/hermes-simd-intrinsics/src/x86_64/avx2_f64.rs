@@ -374,14 +374,11 @@ impl SimdKernel<f64> for Avx2 {
     #[target_feature(enable = "avx2")]
     #[inline]
     unsafe fn recip_sqrt(a: Self::Vector) -> Self::Vector {
-        use core::arch::x86_64::*;
-        let a_f32 = _mm256_cvtpd_ps(a.0);
-        let r_f32 = _mm_rsqrt_ps(a_f32);
-        let y0 = _mm256_cvtps_pd(r_f32);
-        let y0_sq = _mm256_mul_pd(y0, y0);
-        let half_y0 = _mm256_mul_pd(y0, _mm256_set1_pd(0.5));
-        let term = _mm256_fnmadd_pd(a.0, y0_sq, _mm256_set1_pd(3.0));
-        Avx2F64Vec(_mm256_mul_pd(half_y0, term))
+        // f64 has no hardware reciprocal-sqrt approximation accurate enough for its
+        // 52-bit mantissa: an rsqrt seed (~12 bits from the f32 `_mm_rsqrt_ps`) plus
+        // one Newton step reaches only ~24 bits. Use the correctly-rounded hardware
+        // sqrt + divide for full f64 precision (~1 ulp), matching the scalar path.
+        Avx2F64Vec(_mm256_div_pd(_mm256_set1_pd(1.0), _mm256_sqrt_pd(a.0)))
     }
 
     #[target_feature(enable = "avx2")]

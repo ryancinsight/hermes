@@ -326,11 +326,10 @@ impl SimdKernel<f64> for Avx512 {
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn recip_sqrt(a: Self::Vector) -> Self::Vector {
-        let y0 = _mm512_rsqrt14_pd(a.0);
-        let y0_sq = _mm512_mul_pd(y0, y0);
-        let half_y0 = _mm512_mul_pd(y0, _mm512_set1_pd(0.5));
-        let term = _mm512_fnmadd_pd(a.0, y0_sq, _mm512_set1_pd(3.0));
-        Avx512F64Vec(_mm512_mul_pd(half_y0, term))
+        // Full f64 precision via correctly-rounded sqrt + divide. The `rsqrt14` seed
+        // (~14 bits) plus one Newton step reaches only ~28 bits, far below f64's 52;
+        // see the avx2 f64 note.
+        Avx512F64Vec(_mm512_div_pd(_mm512_set1_pd(1.0), _mm512_sqrt_pd(a.0)))
     }
 
     #[target_feature(enable = "avx512f")]

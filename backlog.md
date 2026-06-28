@@ -7,6 +7,14 @@ External gap findings live in [gap_audit.md](gap_audit.md).
 
 ## Delivered (2026-06-11)
 
+- [x] [patch] (2026-06-28) `recip_sqrt` full native precision. The f64 SIMD paths
+  and NEON f32 under-refined a low-bit hardware `rsqrt` seed (one Newton step),
+  giving backend-dependent accuracy from ~1e-16 (scalar) to ~1.5e-5 (NEON) —
+  masked by perfect-square test inputs + magic tolerances. Now ~1 ulp everywhere:
+  f32 fast `rsqrt`+Newton (NEON two steps), f64 hardware `sqrt`+divide. New
+  cross-backend differential test with derived bounds (`8·ε_f32`/`4·ε_f64`) over
+  non-perfect-square inputs; old tests de-gamed. x86 verified locally, NEON on
+  aarch64 CI. 380 tests + clippy/fmt/doc clean. See [gap_audit](gap_audit.md#resolved).
 - [x] [patch] (2026-06-28) Integer `sqrt` exactness. `NumericElement::sqrt` for
   integers used a lossy `(self as f64).sqrt() as Self` roundtrip (wrong for large
   `i64`/`u64`); now exact `isqrt` with a documented negative contract. New

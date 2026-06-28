@@ -183,10 +183,11 @@ impl SimdKernel<f64> for Neon {
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn recip_sqrt(a: Self::Vector) -> Self::Vector {
-        let y0 = vrsqrteq_f64(a.0);
-        let y0_sq = vmulq_f64(y0, y0);
-        let step = vrsqrtsq_f64(a.0, y0_sq);
-        NeonF64Vec(vmulq_f64(y0, step))
+        // `vrsqrteq_f64` seeds only ~8 bits; reaching f64's 52-bit mantissa by
+        // Newton iteration would need ~3 steps. The correctly-rounded hardware
+        // sqrt + divide gives full f64 precision (~1 ulp) directly, matching the
+        // x86 and scalar paths.
+        NeonF64Vec(vdivq_f64(vdupq_n_f64(1.0), vsqrtq_f64(a.0)))
     }
 
     #[target_feature(enable = "neon")]

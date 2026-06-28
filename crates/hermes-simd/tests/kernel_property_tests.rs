@@ -233,3 +233,86 @@ fn gather_rejects_out_of_bounds_indices() {
         Err(hermes_simd_core::view::SimdError::IndexOutOfBounds)
     ));
 }
+
+/// `recip_sqrt` must reach full native precision on every backend — it is a
+/// full-precision `1/√x`, not a reduced-accuracy fast approximation. Inputs are
+/// deliberately **not** perfect squares so an under-refined seed (a single Newton
+/// step from a low-bit `rsqrt` estimate) is exposed rather than converging exactly
+/// by luck (the trap the old perfect-square tests fell into).
+///
+/// Derived relative bounds (regression tripwires, not fitted):
+/// - f32: a hardware `rsqrt` seed (≥12-bit on x86, 8-bit on NEON) refined by Newton
+///   steps to ≥23 bits, then rounded — worst case the x86 12-bit seed + one step is
+///   ≈2 ulp; `8·f32::EPSILON` (≈9.5e-7) covers the Newton-step rounding. A backend
+///   left at a single 8-bit-seed step (≈1.5e-2 *…* 1.5e-5) fails this.
+/// - f64: correctly-rounded hardware `sqrt` + divide ≈1 ulp; `4·f64::EPSILON`
+///   (≈8.9e-16). The old rsqrt-seed paths (≈6e-8 .. 1.5e-5) fail this.
+fn check_recip_sqrt_f32<A: SimdKernel<f32>>() {
+    let lanes = A::LANE_COUNT;
+    let inputs: Vec<f32> = (0..lanes).map(|i| 0.3 + 1.7 * i as f32).collect();
+    let mut out = vec![0.0f32; lanes];
+    // SAFETY: caller gates on the required target features for `A`; buffers cover
+    // exactly LANE_COUNT elements and all inputs are strictly positive.
+    unsafe {
+        A::store_unaligned(
+            out.as_mut_ptr(),
+            A::recip_sqrt(A::load_unaligned(inputs.as_ptr())),
+        );
+    }
+    let tol = 8.0 * f64::from(f32::EPSILON);
+    for (&y, &x) in out.iter().zip(inputs.iter()) {
+        let want = 1.0_f64 / f64::from(x).sqrt();
+        let rel = (f64::from(y) - want).abs() / want;
+        assert!(
+            rel <= tol,
+            "f32 recip_sqrt: x={x} got={y} want={want} rel={rel:e}"
+        );
+    }
+}
+
+fn check_recip_sqrt_f64<A: SimdKernel<f64>>() {
+    let lanes = A::LANE_COUNT;
+    let inputs: Vec<f64> = (0..lanes).map(|i| 0.3 + 1.7 * i as f64).collect();
+    let mut out = vec![0.0f64; lanes];
+    // SAFETY: as above; inputs strictly positive.
+    unsafe {
+        A::store_unaligned(
+            out.as_mut_ptr(),
+            A::recip_sqrt(A::load_unaligned(inputs.as_ptr())),
+        );
+    }
+    let tol = 4.0 * f64::EPSILON;
+    for (&y, &x) in out.iter().zip(inputs.iter()) {
+        let want = 1.0_f64 / x.sqrt();
+        let rel = (y - want).abs() / want;
+        assert!(
+            rel <= tol,
+            "f64 recip_sqrt: x={x} got={y} want={want} rel={rel:e}"
+        );
+    }
+}
+
+#[test]
+fn recip_sqrt_is_full_precision_all_backends() {
+    check_recip_sqrt_f32::<Scalar>();
+    check_recip_sqrt_f64::<Scalar>();
+    check_recip_sqrt_f32::<SveArch>();
+    check_recip_sqrt_f64::<SveArch>();
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+            check_recip_sqrt_f32::<hermes_simd::Avx2>();
+            check_recip_sqrt_f64::<hermes_simd::Avx2>();
+        }
+        if std::is_x86_feature_detected!("avx512f") {
+            check_recip_sqrt_f32::<hermes_simd::Avx512>();
+            check_recip_sqrt_f64::<hermes_simd::Avx512>();
+        }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        check_recip_sqrt_f32::<hermes_simd::Neon>();
+        check_recip_sqrt_f64::<hermes_simd::Neon>();
+    }
+}

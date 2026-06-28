@@ -407,6 +407,21 @@ Resolved this sprint:
   `r² ≤ n < (r+1)²` invariant above 2⁵³, negative-input contract) over all eight
   integer types; integer `sqrt` previously had zero test coverage and no callers.
 
+- [patch] `recip_sqrt` backend-inconsistent precision (2026-06-28). The f64 SIMD
+  paths (avx2/avx512/neon) and NEON f32 reused the f32 single-Newton-step pattern,
+  which under-refines a low-bit hardware `rsqrt` seed: `recip_sqrt::<f64>` ranged
+  ~1e-16 (scalar) → ~4e-9 (avx512) → ~6e-8 (avx2) → ~1.5e-5 (neon), and NEON f32
+  reached only ~16 bits — a native-precision violation masked by perfect-square
+  test inputs (Newton converges exactly by luck) + magic `1e-4`/`1e-6` tolerances.
+  Fixed to full native precision (~1 ulp) on all backends: f32 retains fast
+  `rsqrt`+Newton (NEON now two steps for full 23-bit); f64 uses correctly-rounded
+  hardware `sqrt`+divide (3 Newton steps would otherwise be needed). Contract
+  documented on the trait method. Evidence: cross-backend differential test with
+  analytically-derived relative bounds (`8·ε_f32`, `4·ε_f64`) over non-perfect-
+  square inputs — x86 backends runtime-verified locally; **NEON is verified only on
+  the aarch64 CI runner** (no local aarch64 target), though the new intrinsics are
+  the same ones already used by the NEON `sqrt`/`div`/`splat` primitives.
+
 ## Residual Risks
 
 - AVX-512 and AMX runtime validation still depends on matching hardware.

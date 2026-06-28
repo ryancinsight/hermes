@@ -184,10 +184,14 @@ impl SimdKernel<f32> for Neon {
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn recip_sqrt(a: Self::Vector) -> Self::Vector {
+        // `vrsqrteq_f32` seeds ~8 correct bits; each `vrsqrtsq`-refined Newton step
+        // roughly doubles them. One step (~16 bits) is below f32's 23-bit mantissa,
+        // so two steps (~32 bits) are required for full f32 precision (~1 ulp),
+        // matching the x86 and scalar paths.
         let y0 = vrsqrteq_f32(a.0);
-        let y0_sq = vmulq_f32(y0, y0);
-        let step = vrsqrtsq_f32(a.0, y0_sq);
-        NeonF32Vec(vmulq_f32(y0, step))
+        let y1 = vmulq_f32(y0, vrsqrtsq_f32(a.0, vmulq_f32(y0, y0)));
+        let y2 = vmulq_f32(y1, vrsqrtsq_f32(a.0, vmulq_f32(y1, y1)));
+        NeonF32Vec(y2)
     }
 
     #[target_feature(enable = "neon")]

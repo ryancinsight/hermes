@@ -517,7 +517,14 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
         crate::kernel_helpers::generic_unary_op::<T, Self, _>(a, |x| x.sqrt())
     }
 
-    /// Elementwise reciprocal square root.
+    /// Elementwise reciprocal square root, `1/√x`, to full `T` precision (~1 ulp).
+    ///
+    /// Native backends override this where a faster full-precision path exists: f32
+    /// uses a hardware `rsqrt` seed plus one Newton–Raphson step (which already
+    /// reaches f32's 23-bit mantissa); f64 has no `rsqrt` approximation accurate
+    /// enough for its 52-bit mantissa, so it uses the correctly-rounded hardware
+    /// `sqrt` + divide. The result is therefore precision-consistent across every
+    /// backend — not a reduced-accuracy fast approximation.
     ///
     /// # Safety
     /// Processor must support the required target feature.

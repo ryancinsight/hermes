@@ -313,50 +313,58 @@ fn test_fma_cow_length_mismatch() {
     assert_simd_error(ca.fma_cow(&cb, &cc), SimdError::LengthMismatch);
 }
 
+// Non-perfect-square inputs (so an under-refined backend can't pass by luck) with
+// a relative bound derived from the recip_sqrt accuracy contract (see
+// kernel_property_tests): f32 rsqrt+Newton ≈ 2 ulp → 8·ε_f32; f64 sqrt+div ≈ 1 ulp
+// → 4·ε_f64. These exercise the `map_unary`/`map_cow` plumbing on the `Scalar`
+// backend; backend-accuracy coverage proper lives in kernel_property_tests.
+const RSQRT_IN_F32: [f32; 4] = [0.3, 2.011, 3.722, 7.5];
+const RSQRT_IN_F64: [f64; 4] = [0.3, 2.011, 3.722, 7.5];
+
+fn assert_recip_sqrt_f32(out: &[f32], inp: &[f32]) {
+    let tol = 8.0 * f32::EPSILON;
+    for (&y, &x) in out.iter().zip(inp.iter()) {
+        let want = (1.0_f64 / f64::from(x).sqrt()) as f32;
+        assert!((y - want).abs() <= tol * want, "x={x} got={y} want={want}");
+    }
+}
+
+fn assert_recip_sqrt_f64(out: &[f64], inp: &[f64]) {
+    let tol = 4.0 * f64::EPSILON;
+    for (&y, &x) in out.iter().zip(inp.iter()) {
+        let want = 1.0_f64 / x.sqrt();
+        assert!((y - want).abs() <= tol * want, "x={x} got={y} want={want}");
+    }
+}
+
 #[test]
 fn test_map_unary_recip_sqrt_f32() {
-    let data = [4.0f32, 16.0, 64.0, 256.0];
-    let v = view(&data);
     let mut out = [0.0f32; 4];
-    v.map_unary(RecipSqrt, &mut out).unwrap();
-    let expected = [0.5f32, 0.25, 0.125, 0.0625];
-    for (a, b) in out.iter().zip(expected.iter()) {
-        assert!((a - b).abs() < 1e-4, "got={a}, expected={b}");
-    }
+    view(&RSQRT_IN_F32).map_unary(RecipSqrt, &mut out).unwrap();
+    assert_recip_sqrt_f32(&out, &RSQRT_IN_F32);
 }
 
 #[test]
 fn test_map_cow_recip_sqrt_f32() {
-    let data = [4.0f32, 16.0, 64.0, 256.0];
-    let cow = Cow::<f32>::borrow_slice(&data).unwrap();
-    let out = cow.map_cow(RecipSqrt);
-    let expected = [0.5f32, 0.25, 0.125, 0.0625];
-    for (a, b) in out.iter().zip(expected.iter()) {
-        assert!((a - b).abs() < 1e-4, "got={a}, expected={b}");
-    }
+    let out = Cow::<f32>::borrow_slice(&RSQRT_IN_F32)
+        .unwrap()
+        .map_cow(RecipSqrt);
+    assert_recip_sqrt_f32(&out, &RSQRT_IN_F32);
 }
 
 #[test]
 fn test_map_unary_recip_sqrt_f64() {
-    let data = [4.0f64, 16.0, 64.0, 256.0];
-    let v = view(&data);
     let mut out = [0.0f64; 4];
-    v.map_unary(RecipSqrt, &mut out).unwrap();
-    let expected = [0.5f64, 0.25, 0.125, 0.0625];
-    for (a, b) in out.iter().zip(expected.iter()) {
-        assert!((a - b).abs() < 1e-6, "got={a}, expected={b}");
-    }
+    view(&RSQRT_IN_F64).map_unary(RecipSqrt, &mut out).unwrap();
+    assert_recip_sqrt_f64(&out, &RSQRT_IN_F64);
 }
 
 #[test]
 fn test_map_cow_recip_sqrt_f64() {
-    let data = [4.0f64, 16.0, 64.0, 256.0];
-    let cow = Cow::<f64>::borrow_slice(&data).unwrap();
-    let out = cow.map_cow(RecipSqrt);
-    let expected = [0.5f64, 0.25, 0.125, 0.0625];
-    for (a, b) in out.iter().zip(expected.iter()) {
-        assert!((a - b).abs() < 1e-6, "got={a}, expected={b}");
-    }
+    let out = Cow::<f64>::borrow_slice(&RSQRT_IN_F64)
+        .unwrap()
+        .map_cow(RecipSqrt);
+    assert_recip_sqrt_f64(&out, &RSQRT_IN_F64);
 }
 
 #[test]

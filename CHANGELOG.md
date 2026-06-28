@@ -88,6 +88,22 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   from `Acquire` to `Relaxed` (the 0→1 winner acquires no shared data).
 
 ### Fixed
+- `hermes-simd-intrinsics` [patch]: **numeric precision** — `recip_sqrt` (`1/√x`)
+  gave reduced, backend-dependent accuracy on the SIMD f64 paths and NEON f32. All
+  copied the f32 "hardware `rsqrt` seed + one Newton step" pattern, but one step
+  only refines a ~8–14-bit seed to ~16–28 bits — fine for f32 from a ≥12-bit seed
+  (x86), but far below f64's 52-bit mantissa and below f32's 23 bits from NEON's
+  8-bit seed. The same `recip_sqrt::<f64>` thus ranged from ~1e-16 (scalar) to
+  ~1.5e-5 (NEON), a native-precision violation, hidden by tests using perfect-square
+  inputs (where Newton converges exactly by luck) and magic `1e-4`/`1e-6`
+  tolerances. Now full native precision (~1 ulp) on every backend: f32 keeps the
+  fast `rsqrt`+Newton (x86 one step; NEON two steps, 8→16→32 bits); f64 uses the
+  correctly-rounded hardware `sqrt`+divide (x86 via codegen, NEON via `vdivq`/
+  `vsqrtq`). Trait doc states the precision contract. Verified by a cross-backend
+  differential test (Scalar/SveArch/AVX2/AVX-512, NEON on aarch64 CI) over
+  non-perfect-square inputs with analytically-derived relative bounds (`8·ε_f32`,
+  `4·ε_f64`); the old per-backend tests were de-gamed (non-trivial inputs, derived
+  tolerances).
 - `hermes-numeric` [patch]: integer `NumericElement::sqrt` computed
   `(self as f64).sqrt() as Self`, rounding operands above 2⁵³ to `f64` *before*
   taking the root — lossy for large `i64`/`u64` (e.g. `u64::MAX.sqrt()` returned
