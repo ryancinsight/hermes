@@ -4,6 +4,32 @@ Persistent gap register. Evidence tiers follow the repository instruction
 hierarchy: machine-checked proof > type-level invariant > property/fuzz >
 differential/empirical > source audit.
 
+## Allocator Dependency Audit - 2026-06-28 (round 7) <a id="audit-2026-06-28-r7"></a>
+
+hermes is unchanged since round 6 and remains lean (no new findings). This round
+audited the upstream allocator (`mnemosyne`) that backs `AlignedVec`/the global
+path, which was concurrently rewritten lock-free (segment + huge pools as tagged
+Treiber stacks; bucket lock removed). Adversarial concurrency review found **no
+memory-safety bug**: 16-bit tagged pointers (address in low 48 bits, tag in high
+16) are masked before every deref; push/pop CAS loops pair Release/Acquire and
+bump the tag (ABA-immune); `take_all` is a single Acquire swap; the huge-pool
+first-fit scan **pops-before-touch** (CAS-removes each node before reading it),
+avoiding the classic lock-free use-after-free. **Verified hermes integration:
+371 workspace tests pass against the lock-free allocator.**
+
+Residual risks (upstream `mnemosyne`, surfaced for the owner — not reworked here,
+as it is another agent's fresh, tested code):
+- No `loom` model for the lock-free pools — correctness rests on design reasoning
+  + std-thread stress tests (empirical tier), not machine-checked interleavings.
+  The repo's own rule asks for `loom` alongside stress tests for lock-free code.
+- `take_all` head-swap and count-reset are separate atomics → a push interleaving
+  between them transiently skews the advisory `retained`/`total_count` counters
+  (telemetry only; no safety/correctness impact under the documented contracts).
+- Tag lives in the high 16 address bits, so addresses ≥ 2^48 (LA57 / AArch64
+  52-bit VA) trip a fail-safe `abort` rather than corrupting — a portability
+  limit, not UB. Low-bit tagging (segments are 2 MiB-aligned ⇒ 21 free low bits)
+  would remove the dependency and widen the tag.
+
 ## Highway Reference Audit - 2026-06-14 <a id="highway-2026-06-14"></a>
 
 Reference: `https://github.com/NikoMalik/highway.git` at
