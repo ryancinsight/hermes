@@ -17,7 +17,7 @@ mod types;
 pub use traits::{CastFrom, CastTo, FloatElement, NumericElement};
 
 // Re-export wrapper types
-pub use types::{Bf16, Bf4, Bf8, F16, F32, F4, F64, F8, I16, I32, I8};
+pub use types::{Bf16, Bf4, Bf8, Complex, F16, F32, F4, F64, F8, I16, I32, I8};
 
 // Re-export packed layout structures and functions
 pub use packed::{

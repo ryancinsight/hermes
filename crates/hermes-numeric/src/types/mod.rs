@@ -1,8 +1,15 @@
+mod complex;
 mod floats;
 mod ints;
 
+pub use complex::Complex;
 pub use floats::{Bf16, Bf4, Bf8, F16, F32, F4, F64, F8};
 pub use ints::{I16, I32, I8};
+
+// SAFETY: `Complex<T>` is `#[repr(C)]` with two `T` fields, so it is zeroable
+// and plain-old-data exactly when `T` is.
+unsafe impl<T: bytemuck::Zeroable> bytemuck::Zeroable for Complex<T> {}
+unsafe impl<T: bytemuck::Pod> bytemuck::Pod for Complex<T> {}
 
 // Bytemuck implementations
 unsafe impl bytemuck::Zeroable for F16 {}
