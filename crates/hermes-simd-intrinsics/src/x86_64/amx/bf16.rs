@@ -1,5 +1,5 @@
 use super::{raw, AmxBf16, AmxConfig, AmxSession};
-use hermes_numeric::{Bf16, F32};
+use eunomia::{Bf16, F32};
 use hermes_simd_core::view::TileMatrixMultiply;
 use hermes_simd_core::FloatElement;
 

@@ -10,7 +10,7 @@ description.workspace = true
 [dependencies]
 hermes-simd-core = { path = "../hermes-simd-core", version = "0.3.0", default-features = false }
 hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.3.0", default-features = false }
-hermes-numeric = { path = "../hermes-numeric", version = "0.3.0", default-features = false }
+eunomia = { workspace = true }
 hermes-simd-macros = { path = "../hermes-simd-macros", version = "0.3.0" }
 hermes-simd-types = { path = "../hermes-simd-types", version = "0.3.0", default-features = false }
 half = { workspace = true }
@@ -36,18 +36,18 @@ libnuma = ["hermes-simd-core/libnuma"]
 parallel = [
     "hermes-simd-core/parallel",
     "hermes-simd-intrinsics/parallel",
-    "hermes-numeric/parallel",
+    "eunomia/parallel",
     "hermes-simd-types/parallel",
 ]
 mnemosyne-memory = [
     "hermes-simd-core/mnemosyne-memory",
     "hermes-simd-intrinsics/mnemosyne-memory",
-    "hermes-numeric/mnemosyne-memory",
+    "eunomia/mnemosyne-memory",
     "hermes-simd-types/mnemosyne-memory",
 ]
 std = [
     "hermes-simd-core/std",
     "hermes-simd-intrinsics/std",
-    "hermes-numeric/std",
+    "eunomia/std",
     "hermes-simd-types/std",
 ]

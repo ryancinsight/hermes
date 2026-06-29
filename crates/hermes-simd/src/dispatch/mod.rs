@@ -54,17 +54,17 @@ impl private::Sealed for i8 {}
 impl private::Sealed for i16 {}
 impl private::Sealed for i32 {}
 
-impl private::Sealed for hermes_numeric::F16 {}
-impl private::Sealed for hermes_numeric::F32 {}
-impl private::Sealed for hermes_numeric::F64 {}
-impl private::Sealed for hermes_numeric::Bf16 {}
-impl private::Sealed for hermes_numeric::Bf8 {}
-impl private::Sealed for hermes_numeric::Bf4 {}
-impl private::Sealed for hermes_numeric::F8 {}
-impl private::Sealed for hermes_numeric::F4 {}
-impl private::Sealed for hermes_numeric::I8 {}
-impl private::Sealed for hermes_numeric::I16 {}
-impl private::Sealed for hermes_numeric::I32 {}
+impl private::Sealed for eunomia::F16 {}
+impl private::Sealed for eunomia::F32 {}
+impl private::Sealed for eunomia::F64 {}
+impl private::Sealed for eunomia::Bf16 {}
+impl private::Sealed for eunomia::Bf8 {}
+impl private::Sealed for eunomia::Bf4 {}
+impl private::Sealed for eunomia::F8 {}
+impl private::Sealed for eunomia::F4 {}
+impl private::Sealed for eunomia::I8 {}
+impl private::Sealed for eunomia::I16 {}
+impl private::Sealed for eunomia::I32 {}
 
 /// Sealed extension trait implementing dynamic runtime SIMD dispatch for any `T: Scalar`.
 pub trait SimdOps: ScalarTrait + private::Sealed {

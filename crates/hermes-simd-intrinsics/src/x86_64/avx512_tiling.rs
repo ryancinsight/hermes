@@ -3,7 +3,7 @@
 #![cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 
 use crate::Avx512;
-use hermes_numeric::{Bf16, Bf4, Bf8, F32, I32, I8};
+use eunomia::{Bf16, Bf4, Bf8, F32, I32, I8};
 use hermes_simd_core::view::TileMatrixMultiply;
 
 // ---------------------------------------------------------------------------
@@ -292,7 +292,7 @@ pub fn unpack_bf8_to_bf16(packed: &[Bf8], unpacked: &mut [Bf16]) {
                 && std::is_x86_feature_detected!("avx512vl")
             {
                 unsafe {
-                    hermes_numeric::unsafe_intrinsics::avx512::unpack_bf8_to_bf16(packed, unpacked);
+                    eunomia::unsafe_intrinsics::avx512::unpack_bf8_to_bf16(packed, unpacked);
                     return;
                 }
             }
@@ -301,13 +301,13 @@ pub fn unpack_bf8_to_bf16(packed: &[Bf8], unpacked: &mut [Bf16]) {
         {
             if cfg!(target_feature = "avx512bw") {
                 unsafe {
-                    hermes_numeric::unsafe_intrinsics::avx512::unpack_bf8_to_bf16(packed, unpacked);
+                    eunomia::unsafe_intrinsics::avx512::unpack_bf8_to_bf16(packed, unpacked);
                     return;
                 }
             }
         }
     }
-    hermes_numeric::unpack_bf8_to_bf16(packed, unpacked);
+    eunomia::unpack_bf8_to_bf16(packed, unpacked);
 }
 
 /// Unpacks Bf4 elements to Bf16 for accumulation.
@@ -321,7 +321,7 @@ pub fn unpack_bf4_to_bf16(packed: &[Bf4], unpacked: &mut [Bf16]) {
                 && std::is_x86_feature_detected!("avx512vl")
             {
                 unsafe {
-                    hermes_numeric::unsafe_intrinsics::avx512::unpack_bf4_to_bf16(packed, unpacked);
+                    eunomia::unsafe_intrinsics::avx512::unpack_bf4_to_bf16(packed, unpacked);
                     return;
                 }
             }
@@ -330,13 +330,13 @@ pub fn unpack_bf4_to_bf16(packed: &[Bf4], unpacked: &mut [Bf16]) {
         {
             if cfg!(target_feature = "avx512bw") {
                 unsafe {
-                    hermes_numeric::unsafe_intrinsics::avx512::unpack_bf4_to_bf16(packed, unpacked);
+                    eunomia::unsafe_intrinsics::avx512::unpack_bf4_to_bf16(packed, unpacked);
                     return;
                 }
             }
         }
     }
-    hermes_numeric::unpack_bf4_to_bf16(packed, unpacked);
+    eunomia::unpack_bf4_to_bf16(packed, unpacked);
 }
 
 /// Unpacks packed Bf4 elements (stored 2 per byte in `packed`) into a Bf16 slice.
@@ -350,7 +350,7 @@ pub fn unpack_packed_bf4_to_bf16(packed: &[u8], unpacked: &mut [Bf16]) {
                 && std::is_x86_feature_detected!("avx512vl")
             {
                 unsafe {
-                    hermes_numeric::unsafe_intrinsics::avx512::unpack_bf4_to_bf16_packed(
+                    eunomia::unsafe_intrinsics::avx512::unpack_bf4_to_bf16_packed(
                         packed, unpacked,
                     );
                     return;
@@ -361,7 +361,7 @@ pub fn unpack_packed_bf4_to_bf16(packed: &[u8], unpacked: &mut [Bf16]) {
         {
             if cfg!(target_feature = "avx512bw") {
                 unsafe {
-                    hermes_numeric::unsafe_intrinsics::avx512::unpack_bf4_to_bf16_packed(
+                    eunomia::unsafe_intrinsics::avx512::unpack_bf4_to_bf16_packed(
                         packed, unpacked,
                     );
                     return;
@@ -369,7 +369,7 @@ pub fn unpack_packed_bf4_to_bf16(packed: &[u8], unpacked: &mut [Bf16]) {
             }
         }
     }
-    hermes_numeric::unpack_bf4_to_bf16_packed(packed, unpacked);
+    eunomia::unpack_bf4_to_bf16_packed(packed, unpacked);
 }
 
 /// Unpacks packed F4 elements (stored 2 per byte in `packed`) into an F32 slice.
@@ -382,7 +382,7 @@ pub fn unpack_packed_f4_to_f32(packed: &[u8], unpacked: &mut [F32]) {
             if std::is_x86_feature_detected!("avx512f") && std::is_x86_feature_detected!("avx512vl")
             {
                 unsafe {
-                    hermes_numeric::unsafe_intrinsics::avx512::unpack_f4_to_f32_packed(
+                    eunomia::unsafe_intrinsics::avx512::unpack_f4_to_f32_packed(
                         packed, unpacked,
                     );
                     return;
@@ -393,7 +393,7 @@ pub fn unpack_packed_f4_to_f32(packed: &[u8], unpacked: &mut [F32]) {
         {
             if cfg!(target_feature = "avx512f") {
                 unsafe {
-                    hermes_numeric::unsafe_intrinsics::avx512::unpack_f4_to_f32_packed(
+                    eunomia::unsafe_intrinsics::avx512::unpack_f4_to_f32_packed(
                         packed, unpacked,
                     );
                     return;
@@ -401,5 +401,5 @@ pub fn unpack_packed_f4_to_f32(packed: &[u8], unpacked: &mut [F32]) {
             }
         }
     }
-    hermes_numeric::unpack_f4_to_f32_packed(packed, unpacked);
+    eunomia::unpack_f4_to_f32_packed(packed, unpacked);
 }

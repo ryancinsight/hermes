@@ -54,67 +54,67 @@ crate::impl_emulated_kernel!(
 );
 crate::impl_emulated_kernel!(
     crate::Avx2,
-    hermes_numeric::Bf16,
+    eunomia::Bf16,
     16,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx2,
-    hermes_numeric::I8,
+    eunomia::I8,
     32,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx2,
-    hermes_numeric::I16,
+    eunomia::I16,
     16,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx2,
-    hermes_numeric::I32,
+    eunomia::I32,
     8,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx2,
-    hermes_numeric::F16,
+    eunomia::F16,
     16,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx2,
-    hermes_numeric::F32,
+    eunomia::F32,
     8,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx2,
-    hermes_numeric::F64,
+    eunomia::F64,
     4,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx2,
-    hermes_numeric::Bf8,
+    eunomia::Bf8,
     32,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx2,
-    hermes_numeric::Bf4,
+    eunomia::Bf4,
     32,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx2,
-    hermes_numeric::F8,
+    eunomia::F8,
     32,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx2,
-    hermes_numeric::F4,
+    eunomia::F4,
     32,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
@@ -146,67 +146,67 @@ crate::impl_emulated_kernel!(
 );
 crate::impl_emulated_kernel!(
     crate::Avx512,
-    hermes_numeric::Bf16,
+    eunomia::Bf16,
     32,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx512,
-    hermes_numeric::I8,
+    eunomia::I8,
     64,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx512,
-    hermes_numeric::I16,
+    eunomia::I16,
     32,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx512,
-    hermes_numeric::I32,
+    eunomia::I32,
     16,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx512,
-    hermes_numeric::F16,
+    eunomia::F16,
     32,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx512,
-    hermes_numeric::F32,
+    eunomia::F32,
     16,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx512,
-    hermes_numeric::F64,
+    eunomia::F64,
     8,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx512,
-    hermes_numeric::Bf8,
+    eunomia::Bf8,
     64,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx512,
-    hermes_numeric::Bf4,
+    eunomia::Bf4,
     64,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx512,
-    hermes_numeric::F8,
+    eunomia::F8,
     64,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );
 crate::impl_emulated_kernel!(
     crate::Avx512,
-    hermes_numeric::F4,
+    eunomia::F4,
     64,
     cfg(any(target_arch = "x86", target_arch = "x86_64"))
 );

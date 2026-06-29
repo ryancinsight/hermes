@@ -29,6 +29,6 @@ pub mod rkyv;
 /// Unary op dispatch (map_cow), ternary FMA (fma_cow), and clamp_cow.
 pub mod unary;
 
-pub use hermes_numeric::{ArchivedPacked4Cow, Packed4CowResolver};
+pub use eunomia::{ArchivedPacked4Cow, Packed4CowResolver};
 pub use rkyv::{ArchivedSimdCow, SimdCowResolver};
 pub use types::SimdCow;
