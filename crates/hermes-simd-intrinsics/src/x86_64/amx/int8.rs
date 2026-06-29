@@ -1,5 +1,5 @@
 use super::{raw, AmxConfig, AmxInt8, AmxSession};
-use hermes_numeric::{I32, I8};
+use eunomia::{I32, I8};
 use hermes_simd_core::view::TileMatrixMultiply;
 
 macro_rules! impl_tile_matmul_int8 {

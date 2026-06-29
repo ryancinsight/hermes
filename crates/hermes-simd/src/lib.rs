@@ -146,7 +146,7 @@ pub use hermes_simd_intrinsics::{
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub use hermes_simd_intrinsics::{AmxBatchSession, AmxBf16, AmxConfig, AmxInt8, AmxSession};
 
-pub use hermes_numeric::{
+pub use eunomia::{
     unpack_bf4_to_bf16, unpack_bf4_to_bf16_packed, unpack_bf8_to_bf16, unpack_f4_to_f32,
     unpack_f4_to_f32_packed, unpack_f8_to_f32, Bf16, Bf4, Bf8, Packable4, Packed4Cow, Packed4Iter,
     Packed4Slice, Packed4SliceMut, Packed4Vec, PackedBf4Cow, PackedBf4Slice, PackedBf4SliceMut,

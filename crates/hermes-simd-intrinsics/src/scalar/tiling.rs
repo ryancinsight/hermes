@@ -58,9 +58,9 @@ impl<Backend, Arch, const M: usize, const N: usize, const K: usize>
 
 impl<Backend, Arch, const M: usize, const N: usize, const K: usize>
     TileMatrixMultiply<
-        hermes_numeric::Bf16,
-        hermes_numeric::Bf16,
-        hermes_numeric::F32,
+        eunomia::Bf16,
+        eunomia::Bf16,
+        eunomia::F32,
         Backend,
         Arch,
         M,
@@ -70,11 +70,11 @@ impl<Backend, Arch, const M: usize, const N: usize, const K: usize>
 {
     #[inline]
     unsafe fn tile_matmul(
-        c: *mut hermes_numeric::F32,
+        c: *mut eunomia::F32,
         c_stride: usize,
-        a: *const hermes_numeric::Bf16,
+        a: *const eunomia::Bf16,
         a_stride: usize,
-        b: *const hermes_numeric::Bf16,
+        b: *const eunomia::Bf16,
         b_stride: usize,
     ) {
         for i in 0..M {
@@ -85,7 +85,7 @@ impl<Backend, Arch, const M: usize, const N: usize, const K: usize>
                     let val_b = (*b.add(k * b_stride + j)).0.to_f32();
                     sum = val_a.scalar_fmadd(val_b, sum);
                 }
-                *c.add(i * c_stride + j) = hermes_numeric::F32(sum);
+                *c.add(i * c_stride + j) = eunomia::F32(sum);
             }
         }
     }
@@ -93,9 +93,9 @@ impl<Backend, Arch, const M: usize, const N: usize, const K: usize>
 
 impl<Backend, Arch, const M: usize, const N: usize, const K: usize>
     TileMatrixMultiply<
-        hermes_numeric::I8,
-        hermes_numeric::I8,
-        hermes_numeric::I32,
+        eunomia::I8,
+        eunomia::I8,
+        eunomia::I32,
         Backend,
         Arch,
         M,
@@ -105,11 +105,11 @@ impl<Backend, Arch, const M: usize, const N: usize, const K: usize>
 {
     #[inline]
     unsafe fn tile_matmul(
-        c: *mut hermes_numeric::I32,
+        c: *mut eunomia::I32,
         c_stride: usize,
-        a: *const hermes_numeric::I8,
+        a: *const eunomia::I8,
         a_stride: usize,
-        b: *const hermes_numeric::I8,
+        b: *const eunomia::I8,
         b_stride: usize,
     ) {
         for i in 0..M {
@@ -120,7 +120,7 @@ impl<Backend, Arch, const M: usize, const N: usize, const K: usize>
                     let val_b = (*b.add(k * b_stride + j)).0 as i32;
                     sum = sum.wrapping_add(val_a * val_b);
                 }
-                *c.add(i * c_stride + j) = hermes_numeric::I32(sum);
+                *c.add(i * c_stride + j) = eunomia::I32(sum);
             }
         }
     }

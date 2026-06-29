@@ -1,7 +1,7 @@
 use super::{tile_loop_generic, validate_gemm_sizes, TiledGemm};
 #[cfg(target_arch = "x86_64")]
 use crate::cpu::{AmxSupport, Avx512Support};
-use hermes_numeric::{Bf16, F32};
+use eunomia::{Bf16, F32};
 use hermes_simd_core::view::{SimdError, TileMatrixMultiply};
 use hermes_simd_intrinsics::Scalar;
 #[cfg(target_arch = "x86_64")]

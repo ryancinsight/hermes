@@ -948,7 +948,7 @@ fn test_new_wrapper_types_simd_ops() {
 
 #[test]
 fn test_low_precision_unpacking() {
-    use hermes_numeric::{unpack_bf4_to_bf16, unpack_bf4_to_bf16_packed, unpack_bf8_to_bf16};
+    use eunomia::{unpack_bf4_to_bf16, unpack_bf4_to_bf16_packed, unpack_bf8_to_bf16};
 
     // Bf8 to Bf16
     let bf8_inputs = [
@@ -995,7 +995,7 @@ fn test_low_precision_unpacking() {
     assert_eq!(unpacked_bf16_pairs[3].to_f32(), 0.0);
 
     // F4 Unpacked
-    use hermes_numeric::{unpack_f4_to_f32, unpack_f4_to_f32_packed, F32, F4};
+    use eunomia::{unpack_f4_to_f32, unpack_f4_to_f32_packed, F32, F4};
     let f4_inputs = [
         F4::from_f32(0.0),
         F4::from_f32(1.0),
@@ -1122,7 +1122,7 @@ fn test_numa_locality_robustness_and_cache_pollution_prevention() {
 
 #[test]
 fn test_packed_bf4_slice() {
-    use hermes_numeric::{Bf16, Bf4, PackedBf4Slice, PackedBf4SliceMut};
+    use eunomia::{Bf16, Bf4, PackedBf4Slice, PackedBf4SliceMut};
 
     let mut raw_bytes = [0u8; 4];
     {
@@ -1198,7 +1198,7 @@ fn test_adaptive_dispatcher_and_amx_session() {
 
 #[test]
 fn test_generic_packed_vector_and_f4_slice() {
-    use hermes_numeric::{
+    use eunomia::{
         Bf4, PackedBf4Vec, PackedF4Slice, PackedF4SliceMut, PackedF4Vec, F32, F4,
     };
 
@@ -1267,7 +1267,7 @@ fn test_generic_packed_vector_and_f4_slice() {
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[test]
 fn test_vectorized_packed_unpackers() {
-    use hermes_numeric::{Bf16, Bf4, F32, F4};
+    use eunomia::{Bf16, Bf4, F32, F4};
 
     let n = 67;
     let mut packed_bytes = vec![0u8; (n + 1) / 2];
@@ -1343,7 +1343,7 @@ fn test_vectorized_packed_unpackers() {
 
 #[test]
 fn test_packed4_cow() {
-    use hermes_numeric::{Bf16, Bf4, F32, F4};
+    use eunomia::{Bf16, Bf4, F32, F4};
     use hermes_simd::{
         Packed4Cow, Packed4CowExt, PackedBf4Cow, PackedF4Cow, Scalar, SimdCow, Unaligned,
     };
@@ -1443,7 +1443,7 @@ fn test_packed4_cow() {
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[test]
 fn test_bf8_and_f8_unpacking() {
-    use hermes_numeric::{unpack_f8_to_f32, Bf16, Bf8, F32, F8};
+    use eunomia::{unpack_f8_to_f32, Bf16, Bf8, F32, F8};
 
     // 1. Test Bf8 to Bf16 unpacking (using AVX-512 when available, via hermes-simd-intrinsics)
     let bf8_inputs = [
@@ -1471,7 +1471,7 @@ fn test_bf8_and_f8_unpacking() {
         println!("Skipping direct AVX-512 unpack_bf8_to_bf16 test (avx512bw not detected)");
     }
 
-    // 2. Test F8 to F32 unpacking (using AVX2 gather when available, via hermes_numeric)
+    // 2. Test F8 to F32 unpacking (using AVX2 gather when available, via eunomia)
     let f8_inputs = [
         F8::from_f32(0.0),
         F8::from_f32(1.0),
@@ -1492,7 +1492,7 @@ fn test_bf8_and_f8_unpacking() {
 
 #[test]
 fn test_packed_cow_rkyv_serialization() {
-    use hermes_numeric::{Bf4, Packed4Cow, PackedBf4Cow, PackedF4Cow, F4};
+    use eunomia::{Bf4, Packed4Cow, PackedBf4Cow, PackedF4Cow, F4};
     use rkyv::Deserialize;
 
     // 1. PackedBf4Cow test
@@ -1551,7 +1551,7 @@ fn test_preferred_and_monomorphized_types() {
 
 #[test]
 fn test_simd_view_slicing_and_alignment_transitions() {
-    use hermes_numeric::F32;
+    use eunomia::F32;
     use hermes_simd::{Scalar, SimdView, Unaligned};
 
     let data = vec![F32(1.0), F32(2.0), F32(3.0), F32(4.0), F32(5.0), F32(6.0)];
@@ -1578,7 +1578,7 @@ fn test_simd_view_slicing_and_alignment_transitions() {
 
 #[test]
 fn test_simd_cow_slicing_and_alignment_transitions() {
-    use hermes_numeric::F32;
+    use eunomia::F32;
     use hermes_simd::{Scalar, SimdCow, Unaligned};
 
     // 1. Borrowed SimdCow
@@ -1606,7 +1606,7 @@ fn test_simd_cow_slicing_and_alignment_transitions() {
 
 #[test]
 fn test_simd_cow_mutable_views_and_slicing() {
-    use hermes_numeric::F32;
+    use eunomia::F32;
     use hermes_simd::{Scalar, SimdCow, Unaligned};
 
     let data = vec![F32(1.0), F32(2.0), F32(3.0), F32(4.0)];
@@ -1642,7 +1642,7 @@ fn test_simd_cow_mutable_views_and_slicing() {
 
 #[test]
 fn test_packed_4bit_zero_copy_slicing() {
-    use hermes_numeric::{Bf4, Packed4Cow, PackedBf4Cow, PackedBf4Slice, PackedBf4SliceMut};
+    use eunomia::{Bf4, Packed4Cow, PackedBf4Cow, PackedBf4Slice, PackedBf4SliceMut};
 
     // Pack: elements are low, high per byte.
     // 0x12 -> low = 2, high = 1
@@ -1787,7 +1787,7 @@ fn test_select_ops_neon() {
 
 #[test]
 fn test_insufficient_alignment_view_rejection() {
-    use hermes_numeric::F32;
+    use eunomia::F32;
     use hermes_simd::{Avx2, Avx512, Scalar};
     use hermes_simd_core::align::{Aligned, Unaligned};
     use hermes_simd_core::view::SimdView;
