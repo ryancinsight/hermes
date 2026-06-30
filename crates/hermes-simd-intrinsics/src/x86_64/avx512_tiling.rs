@@ -350,9 +350,7 @@ pub fn unpack_packed_bf4_to_bf16(packed: &[u8], unpacked: &mut [Bf16]) {
                 && std::is_x86_feature_detected!("avx512vl")
             {
                 unsafe {
-                    eunomia::unsafe_intrinsics::avx512::unpack_bf4_to_bf16_packed(
-                        packed, unpacked,
-                    );
+                    eunomia::unsafe_intrinsics::avx512::unpack_bf4_to_bf16_packed(packed, unpacked);
                     return;
                 }
             }
@@ -361,9 +359,7 @@ pub fn unpack_packed_bf4_to_bf16(packed: &[u8], unpacked: &mut [Bf16]) {
         {
             if cfg!(target_feature = "avx512bw") {
                 unsafe {
-                    eunomia::unsafe_intrinsics::avx512::unpack_bf4_to_bf16_packed(
-                        packed, unpacked,
-                    );
+                    eunomia::unsafe_intrinsics::avx512::unpack_bf4_to_bf16_packed(packed, unpacked);
                     return;
                 }
             }
@@ -382,9 +378,7 @@ pub fn unpack_packed_f4_to_f32(packed: &[u8], unpacked: &mut [F32]) {
             if std::is_x86_feature_detected!("avx512f") && std::is_x86_feature_detected!("avx512vl")
             {
                 unsafe {
-                    eunomia::unsafe_intrinsics::avx512::unpack_f4_to_f32_packed(
-                        packed, unpacked,
-                    );
+                    eunomia::unsafe_intrinsics::avx512::unpack_f4_to_f32_packed(packed, unpacked);
                     return;
                 }
             }
@@ -393,9 +387,7 @@ pub fn unpack_packed_f4_to_f32(packed: &[u8], unpacked: &mut [F32]) {
         {
             if cfg!(target_feature = "avx512f") {
                 unsafe {
-                    eunomia::unsafe_intrinsics::avx512::unpack_f4_to_f32_packed(
-                        packed, unpacked,
-                    );
+                    eunomia::unsafe_intrinsics::avx512::unpack_f4_to_f32_packed(packed, unpacked);
                     return;
                 }
             }

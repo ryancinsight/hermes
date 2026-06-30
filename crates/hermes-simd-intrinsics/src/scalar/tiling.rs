@@ -57,16 +57,8 @@ impl<Backend, Arch, const M: usize, const N: usize, const K: usize>
 }
 
 impl<Backend, Arch, const M: usize, const N: usize, const K: usize>
-    TileMatrixMultiply<
-        eunomia::Bf16,
-        eunomia::Bf16,
-        eunomia::F32,
-        Backend,
-        Arch,
-        M,
-        N,
-        K,
-    > for Scalar
+    TileMatrixMultiply<eunomia::Bf16, eunomia::Bf16, eunomia::F32, Backend, Arch, M, N, K>
+    for Scalar
 {
     #[inline]
     unsafe fn tile_matmul(
@@ -92,16 +84,7 @@ impl<Backend, Arch, const M: usize, const N: usize, const K: usize>
 }
 
 impl<Backend, Arch, const M: usize, const N: usize, const K: usize>
-    TileMatrixMultiply<
-        eunomia::I8,
-        eunomia::I8,
-        eunomia::I32,
-        Backend,
-        Arch,
-        M,
-        N,
-        K,
-    > for Scalar
+    TileMatrixMultiply<eunomia::I8, eunomia::I8, eunomia::I32, Backend, Arch, M, N, K> for Scalar
 {
     #[inline]
     unsafe fn tile_matmul(
