@@ -88,6 +88,29 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   from `Acquire` to `Relaxed` (the 0→1 winner acquires no shared data).
 
 ### Fixed
+- `hermes-simd` [patch]: **detection soundness** — AMX/AVX-512 tile-kernel
+  dispatch used hand-rolled `__cpuid_count(7, _)` probes that (a) never checked
+  XCR0/OSXSAVE, so a host advertising the CPUID bit without the OS enabling the
+  XSAVE state (ZMM/opmask, TILECFG/TILEDATA) would `#UD`/`#NM` on the first wide
+  instruction; (b) had no leaf-7 max-leaf guard, so on a pre-leaf-7 x86_64 CPU
+  leaf-1 bits (FXSR/ACPI) aliased as AMX support; and (c) on Linux, AMX tile data
+  is gated per-thread by XFD until `arch_prctl(ARCH_REQ_XCOMP_PERM,
+  XFEATURE_XTILEDATA)`, which CPUID/XCR0 do not reflect. **AVX-512** bf16/vnni tile
+  probes are now `is_x86_feature_detected!` for the exact set each kernel's
+  `#[target_feature]` enables (`avx512f,avx512bw,avx512vl` and
+  `avx512f,avx512vnni,avx512vl`) — the macro handles XCR0 and the max-leaf, and
+  this also corrects the bf16 probe, which previously required the unrelated
+  `avx512bf16` dot-product bit (a `#UD` window *and* a false skip on capable
+  non-bf16 parts, since the kernel widens to f32 and never uses `dpbf16`).
+  `widen_i8_to_i16`'s AVX-512 branch is now gated on `avx512bw` (the
+  `_mm512_cvtepi8_epi16`/`vpmovsxbw` requirement) rather than `TargetId::Avx512`
+  (`avx512f`-only), which would `#UD` on Knights Landing. **AMX** dispatch is
+  disabled (probes return `false`) until a stable, permission-aware probe exists
+  that verifies hardware + XCR0 + the Linux XTILEDATA `arch_prctl` — the stable
+  toolchain does not accept the AMX feature strings in `is_x86_feature_detected!`
+  (`x86_amx_intrinsics` is unstable), so returning `false` preserves the
+  safe-dispatch contract instead of risking the fault. Restoring AMX behind a
+  correct probe is filed (needs an AMX host to verify).
 - `hermes-simd-core` [patch]: **memory safety** — SELL-p vectorized SpMV and
   `elementwise_mul_dense` read out of bounds from safe code. On the
   `Arch::LANE_COUNT == C` fast path, `sellp_spmv_vectorized` gathered

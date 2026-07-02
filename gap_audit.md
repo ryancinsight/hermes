@@ -25,22 +25,27 @@ order (correctness → architecture → tests → docs → PM).
   `spmv::assert_sellp_validated` before the unsafe kernel; two `#[should_panic]`
   regressions on the Scalar-backed vectorized path (`LANE_COUNT 4 == C`). See
   [Resolved](#resolved).
-- **[open] AMX dispatched on CPUID-only; OS tile-data permission never requested
-  (PROVEN).** `cpu.rs` `has_amx` checks only CPUID leaf 7; no `arch_prctl(
-  ARCH_REQ_XCOMP_PERM, XFEATURE_XTILEDATA)` (Linux) anywhere in the tree, so the
-  first `tileloadd`/`tdpbf16ps` from `tile_matmul::gemm` `#NM`-faults on capable
-  Sapphire-Rapids Linux hosts. `amx/mod.rs:455` documents the requirement as a
-  caller precondition the auto-dispatcher never satisfies. Also `__cpuid_count(7,_)`
-  lacks a max-leaf guard (false-positive AMX aliasing leaf-1 data on pre-leaf-7
-  x86_64). Fix: one-time `OnceLock` requesting+verifying OS permission (and XCR0),
-  AND-gate `has_amx()`; guard `__cpuid(0).eax >= 7`. `[patch]` robustness.
-- **[open] AVX-512 sub-feature gating gaps (PROVEN/SUSPECTED).** `cpu.rs`
-  `Avx512Support` reads raw CPUID (AVX512_BF16 / VNNI) without OSXSAVE/XCR0 →
-  `#UD` where the OS hasn't enabled ZMM state. `tile_matmul/unpack.rs`
-  `widen_i8_to_i16` runs AVX-512**BW** `_mm512_cvtepi8_epi16` under an
-  AVX-512**F**-only guard (`TargetId::Avx512` = `avx512f` only) → SIGILL on KNL.
-  Fix: use `is_x86_feature_detected!` for the exact features (`avx512bw`,
-  `avx512vnni`, `avx512bf16`) the kernels enable. `[patch]`.
+- **[MITIGATED 2026-07-02] AMX dispatched on CPUID-only; OS tile-data permission
+  never requested (PROVEN).** `cpu.rs` `has_amx` checked only CPUID leaf 7; no
+  `arch_prctl(ARCH_REQ_XCOMP_PERM, XFEATURE_XTILEDATA)` (Linux) anywhere, so the
+  first `tileloadd`/`tdpbf16ps` from `tile_matmul::gemm` `#NM`-faulted on capable
+  Sapphire-Rapids Linux hosts; `__cpuid_count(7,_)` also lacked a max-leaf guard
+  (leaf-1 aliasing). Interim: the AMX probes now return `false` (AMX dispatch
+  disabled), preserving the safe-dispatch contract — the fault can no longer
+  occur. **Still open:** restoring AMX behind a permission-aware probe (hardware +
+  XCR0 TILECFG/TILEDATA + a one-time Linux XTILEDATA `arch_prctl`). Blocked on: the
+  stable toolchain rejects the AMX strings in `is_x86_feature_detected!`
+  (`x86_amx_intrinsics` unstable), and verifying the raw `arch_prctl` syscall
+  needs an AMX-capable Linux host. `[minor]` DoR: acceptance = AMX GEMM dispatches
+  and matches the scalar reference on a Sapphire-Rapids Linux runner.
+- **[RESOLVED 2026-07-02] AVX-512 sub-feature gating gaps (PROVEN/SUSPECTED).**
+  `cpu.rs` `Avx512Support` read raw CPUID (AVX512_BF16 / VNNI) without OSXSAVE/XCR0
+  and, for bf16, probed the unrelated `avx512bf16` bit while the tile kernel
+  enables `avx512f,avx512bw,avx512vl` and never uses `dpbf16`. `unpack.rs`
+  `widen_i8_to_i16` ran AVX-512**BW** `_mm512_cvtepi8_epi16` under an
+  AVX-512**F**-only guard → SIGILL on KNL. Fixed: the two AVX-512 tile probes now
+  use `is_x86_feature_detected!` for the exact enabled set (macro handles
+  XCR0/max-leaf); `widen_i8_to_i16` gated on `avx512bw`. See [Resolved](#resolved).
 - **[open] Unsound safe API surfaces (PROVEN).** `AmxSession::new` (safe `fn`)
   runs `ldtilecfg` with no detection; `Vector::<T, Avx512>::{splat,zero}` +
   operator impls run ISA intrinsics from safe code. In-repo callers all guard,
@@ -481,6 +486,18 @@ Resolved this sprint:
 
 ## Resolved
 
+- [patch] AVX-512 tile-kernel detection soundness (2026-07-02). The `Avx512Support`
+  probes read raw CPUID without OSXSAVE/XCR0 (a host advertising the bit without OS
+  XSAVE enablement would `#UD`) and, for bf16, tested the unrelated `avx512bf16`
+  dot-product bit while the tile kernel enables `avx512f,avx512bw,avx512vl` and
+  never issues `dpbf16` — both a fault window and a false skip on capable non-bf16
+  parts. Now `is_x86_feature_detected!` for the exact enabled set per kernel
+  (`avx512f,avx512bw,avx512vl`; `avx512f,avx512vnni,avx512vl`), which handles XCR0
+  and the leaf-7 max-leaf internally. `widen_i8_to_i16`'s AVX-512 branch now gates
+  on `avx512bw` (the `_mm512_cvtepi8_epi16` requirement) instead of the
+  `avx512f`-only `TargetId::Avx512`, closing a KNL `#UD`. AMX detection is
+  conservatively disabled in the same change (see round 8, MITIGATED). Evidence
+  tier: source audit + toolchain feature-availability (AMX strings unstable).
 - [patch] SELL-p vectorized SpMV / elementwise OOB read (2026-07-02). The
   `LANE_COUNT == C` fast path in `sparse/spmv.rs::sellp_spmv_vectorized` and
   `sparse/ops.rs::elementwise_mul_dense` gathered `x[col_idx]` and loaded

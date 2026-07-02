@@ -65,17 +65,7 @@ impl AmxSupport for half::bf16 {
     fn has_amx() -> bool {
         #[cfg(target_arch = "x86_64")]
         {
-            // Cache the result — CPU capabilities are immutable at runtime and
-            // `cpuid` is a serializing instruction (~50-200 cycles).  A one-time
-            // `OnceLock` init pays the cost once per process lifetime; steady-state
-            // calls pay a single relaxed-atomic load.
-            static CACHED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-            *CACHED.get_or_init(|| {
-                let res = core::arch::x86_64::__cpuid_count(7, 0);
-                let amx_tile = (res.edx & (1 << 24)) != 0;
-                let amx_bf16 = (res.edx & (1 << 22)) != 0;
-                amx_tile && amx_bf16
-            })
+            has_amx_bf16()
         }
         #[cfg(not(target_arch = "x86_64"))]
         {
@@ -89,13 +79,7 @@ impl AmxSupport for i8 {
     fn has_amx() -> bool {
         #[cfg(target_arch = "x86_64")]
         {
-            static CACHED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-            *CACHED.get_or_init(|| {
-                let res = core::arch::x86_64::__cpuid_count(7, 0);
-                let amx_tile = (res.edx & (1 << 24)) != 0;
-                let amx_int8 = (res.edx & (1 << 25)) != 0;
-                amx_tile && amx_int8
-            })
+            has_amx_int8()
         }
         #[cfg(not(target_arch = "x86_64"))]
         {
@@ -109,11 +93,7 @@ impl Avx512Support for half::bf16 {
     fn has_avx512() -> bool {
         #[cfg(target_arch = "x86_64")]
         {
-            static CACHED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-            *CACHED.get_or_init(|| {
-                let res = core::arch::x86_64::__cpuid_count(7, 1);
-                (res.eax & (1 << 5)) != 0
-            })
+            has_avx512_bf16_tile()
         }
         #[cfg(not(target_arch = "x86_64"))]
         {
@@ -127,15 +107,69 @@ impl Avx512Support for i8 {
     fn has_avx512() -> bool {
         #[cfg(target_arch = "x86_64")]
         {
-            static CACHED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-            *CACHED.get_or_init(|| {
-                let res = core::arch::x86_64::__cpuid_count(7, 0);
-                (res.ecx & (1 << 11)) != 0
-            })
+            has_avx512_vnni_tile()
         }
         #[cfg(not(target_arch = "x86_64"))]
         {
             false
         }
     }
+}
+
+// AMX / AVX-512 tile-kernel capability probes.
+//
+// AMX dispatch is disabled until Hermes has a stable, permission-aware probe
+// that verifies hardware support, XCR0 OS state, and Linux XTILEDATA process
+// permission before reporting true. Raw CPUID is insufficient because it misses
+// OS enablement and can alias unsupported leaves; the stable Rust feature macro
+// does not currently accept AMX feature strings on this toolchain. Returning
+// false preserves the safe-dispatch contract instead of risking a #UD/#NM fault.
+
+/// AMX bf16 tile GEMM (`tdpbf16ps` inline asm) requires `amx-tile` + `amx-bf16`.
+#[cfg(target_arch = "x86_64")]
+#[inline]
+fn has_amx_bf16() -> bool {
+    use std::sync::OnceLock;
+    static CACHED: OnceLock<bool> = OnceLock::new();
+    *CACHED.get_or_init(|| false)
+}
+
+/// AMX int8 tile GEMM (`tdpbssd` inline asm) requires `amx-tile` + `amx-int8`.
+#[cfg(target_arch = "x86_64")]
+#[inline]
+fn has_amx_int8() -> bool {
+    use std::sync::OnceLock;
+    static CACHED: OnceLock<bool> = OnceLock::new();
+    *CACHED.get_or_init(|| false)
+}
+
+/// The AVX-512 bf16 tile kernels (`avx512_tiling`) enable
+/// `avx512f,avx512bw,avx512vl` — they widen bf16 to f32 and FMA in f32, so they
+/// need the base 512-bit + byte/word + 128/256-bit-lane extensions, **not** the
+/// `avx512bf16` dot-product ISA. Detecting the exact enabled set (rather than the
+/// old, mismatched `avx512bf16` bit) both closes the `#UD` window and stops
+/// falsely skipping the kernel on capable non-bf16 parts.
+#[cfg(target_arch = "x86_64")]
+#[inline]
+fn has_avx512_bf16_tile() -> bool {
+    use std::sync::OnceLock;
+    static CACHED: OnceLock<bool> = OnceLock::new();
+    *CACHED.get_or_init(|| {
+        std::is_x86_feature_detected!("avx512f")
+            && std::is_x86_feature_detected!("avx512bw")
+            && std::is_x86_feature_detected!("avx512vl")
+    })
+}
+
+/// The AVX-512 int8 tile kernels enable `avx512f,avx512vnni,avx512vl`.
+#[cfg(target_arch = "x86_64")]
+#[inline]
+fn has_avx512_vnni_tile() -> bool {
+    use std::sync::OnceLock;
+    static CACHED: OnceLock<bool> = OnceLock::new();
+    *CACHED.get_or_init(|| {
+        std::is_x86_feature_detected!("avx512f")
+            && std::is_x86_feature_detected!("avx512vnni")
+            && std::is_x86_feature_detected!("avx512vl")
+    })
 }
