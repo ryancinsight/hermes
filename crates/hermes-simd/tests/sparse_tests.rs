@@ -187,6 +187,58 @@ fn test_sellp_spmv_correctness() {
 }
 
 #[test]
+#[should_panic(expected = "failed structural validation")]
+fn test_sellp_spmv_rejects_out_of_range_column() {
+    // Column index 4 is out of range for a 4-column matrix. The vectorized SELL-p
+    // path (engaged because `Scalar::LANE_COUNT == 4 == C`) gathers `x[col]`
+    // without a per-lane bounds check, so it must reject the matrix up front
+    // rather than read out of bounds. Regression for the SELL-p gather OOB.
+    let values = [1.0f32, 2.0, 3.0, 4.0];
+    let col_indices_bad = [0i32, 1, 4, 3];
+    let slice_ptr = [0i32, 4];
+    let slice_col_count = [1i32];
+    let data = SellPData::new(
+        &values[..],
+        &col_indices_bad[..],
+        &slice_ptr[..],
+        &slice_col_count[..],
+        4,
+        4,
+    );
+    let x = [10.0f32, 10.0, 10.0, 10.0];
+    let mut y = [0.0f32; 4];
+
+    let view = SparseView::<f32, SellP<4>, Scalar>::from_sellp(data);
+    view.spmv(&x, &mut y);
+}
+
+#[test]
+#[should_panic(expected = "failed structural validation")]
+fn test_sellp_spmv_rejects_bad_slice_geometry() {
+    // `slice_col_count = 2` with `C = 4` and only 4 values makes the second
+    // column's load `values[4..8]` read past the 4-element array. The vectorized
+    // load is full-width and unchecked, so the matrix must be rejected. Regression
+    // for the SELL-p `values[offset..]` over-read.
+    let values = [1.0f32, 2.0, 3.0, 4.0];
+    let col_indices = [0i32, 1, 2, 3];
+    let slice_ptr = [0i32, 4];
+    let slice_col_count = [2i32]; // 0 + 2*4 = 8 > values.len() == 4
+    let data = SellPData::new(
+        &values[..],
+        &col_indices[..],
+        &slice_ptr[..],
+        &slice_col_count[..],
+        8,
+        4,
+    );
+    let x = [10.0f32, 10.0, 10.0, 10.0];
+    let mut y = [0.0f32; 8];
+
+    let view = SparseView::<f32, SellP<4>, Scalar>::from_sellp(data);
+    view.spmv(&x, &mut y);
+}
+
+#[test]
 fn test_sellp_spmv_dispatch() {
     let values = [1.0f32, 2.0, 3.0, 4.0];
     let col_indices = [0i32, 1, 2, 3];

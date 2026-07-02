@@ -88,6 +88,23 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   from `Acquire` to `Relaxed` (the 0→1 winner acquires no shared data).
 
 ### Fixed
+- `hermes-simd-core` [patch]: **memory safety** — SELL-p vectorized SpMV and
+  `elementwise_mul_dense` read out of bounds from safe code. On the
+  `Arch::LANE_COUNT == C` fast path, `sellp_spmv_vectorized` gathered
+  `x[col_idx]` and loaded `values[offset..]` (and the elementwise path stored
+  `out_values[offset..]`) at full vector width with no bounds check — unlike the
+  sibling CSR/BlockedCoo paths, which scan their indices up front, and unlike the
+  SELL-p scalar fallback, which guards per lane. Because `SellPMatrix` has `pub`
+  fields, a no-op `new`, and an opt-in `validate()` the SpMV path never called, a
+  caller could drive a safe `SparseView::<SellP<C>>::spmv` to read past `x`,
+  `values`, or `out_values`. Fixed by validating the structure through the SSOT
+  `SparseValidate::validate()` (via `spmv::assert_sellp_validated`) before the
+  unsafe kernel — proving `col < ncols`, `col_indices.len() == values.len()`, and
+  `slice_ptr[s] + slice_col_count[s]·C <= values.len()` — plus an
+  `out_values.len() >= values.len()` guard on the elementwise store. Two
+  `#[should_panic]` regressions exercise the Scalar-backed vectorized path
+  (`Scalar::LANE_COUNT 4 == C`, host-independent) with an out-of-range column and
+  with over-long slice geometry.
 - `hermes-simd-intrinsics` [patch]: **numeric precision** — `recip_sqrt` (`1/√x`)
   gave reduced, backend-dependent accuracy on the SIMD f64 paths and NEON f32. All
   copied the f32 "hardware `rsqrt` seed + one Newton step" pattern, but one step

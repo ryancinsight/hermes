@@ -4,6 +4,148 @@ Persistent gap register. Evidence tiers follow the repository instruction
 hierarchy: machine-checked proof > type-level invariant > property/fuzz >
 differential/empirical > source audit.
 
+## Comprehensive Audit - 2026-07-02 (round 8, 5-agent sweep) <a id="audit-2026-07-02-r8"></a>
+
+Five parallel read-only audits (performance, memory/zero-copy, unsafe soundness,
+architecture/redundancy, tests/benches/docs) plus two deep soundness sub-audits.
+Evidence tier per item; source-audit unless a differential/property test is named.
+Findings are the register below; fixes land as tracked backlog items in triage
+order (correctness → architecture → tests → docs → PM).
+
+### Correctness / soundness (HARD)
+
+- **[RESOLVED 2026-07-02] SELL-p vectorized SpMV OOB read (PROVEN, 3 agents).**
+  `sparse/spmv.rs` `sellp_spmv_vectorized` gathered `x[col_idx]` and loaded
+  `values[offset..]` full-width with no bounds check, reachable from the safe
+  `SparseView::<SellP<C>>::spmv` when `LANE_COUNT == C`; the sibling CSR/BCOO
+  paths self-defend, SELL-p did not. `SellPMatrix` `pub` fields + no-op `new` +
+  opt-in `validate()` let a caller drive both reads out of bounds. Same over-read
+  in `sparse/ops.rs` `elementwise_mul_dense`. Fixed by routing both vectorized
+  paths through the SSOT `SparseValidate::validate()` via
+  `spmv::assert_sellp_validated` before the unsafe kernel; two `#[should_panic]`
+  regressions on the Scalar-backed vectorized path (`LANE_COUNT 4 == C`). See
+  [Resolved](#resolved).
+- **[open] AMX dispatched on CPUID-only; OS tile-data permission never requested
+  (PROVEN).** `cpu.rs` `has_amx` checks only CPUID leaf 7; no `arch_prctl(
+  ARCH_REQ_XCOMP_PERM, XFEATURE_XTILEDATA)` (Linux) anywhere in the tree, so the
+  first `tileloadd`/`tdpbf16ps` from `tile_matmul::gemm` `#NM`-faults on capable
+  Sapphire-Rapids Linux hosts. `amx/mod.rs:455` documents the requirement as a
+  caller precondition the auto-dispatcher never satisfies. Also `__cpuid_count(7,_)`
+  lacks a max-leaf guard (false-positive AMX aliasing leaf-1 data on pre-leaf-7
+  x86_64). Fix: one-time `OnceLock` requesting+verifying OS permission (and XCR0),
+  AND-gate `has_amx()`; guard `__cpuid(0).eax >= 7`. `[patch]` robustness.
+- **[open] AVX-512 sub-feature gating gaps (PROVEN/SUSPECTED).** `cpu.rs`
+  `Avx512Support` reads raw CPUID (AVX512_BF16 / VNNI) without OSXSAVE/XCR0 →
+  `#UD` where the OS hasn't enabled ZMM state. `tile_matmul/unpack.rs`
+  `widen_i8_to_i16` runs AVX-512**BW** `_mm512_cvtepi8_epi16` under an
+  AVX-512**F**-only guard (`TargetId::Avx512` = `avx512f` only) → SIGILL on KNL.
+  Fix: use `is_x86_feature_detected!` for the exact features (`avx512bw`,
+  `avx512vnni`, `avx512bf16`) the kernels enable. `[patch]`.
+- **[open] Unsound safe API surfaces (PROVEN).** `AmxSession::new` (safe `fn`)
+  runs `ldtilecfg` with no detection; `Vector::<T, Avx512>::{splat,zero}` +
+  operator impls run ISA intrinsics from safe code. In-repo callers all guard,
+  but the *API* admits `#UD` from safe code. Fix: unforgeable detection-minted
+  arch token, or make these `unsafe fn`/probed. `[minor]`.
+
+### Performance (source-audit tier; each needs a criterion baseline before/after)
+
+- **[open] SELL-P/BCOO silent scalar fallback when widest ISA lane ≠ chunk size
+  (HIGH).** `spmv.rs` dispatch selects the vectorized kernel only when
+  `Arch::LANE_COUNT == C`/`BN`; `#[runtime_dispatch]` always picks the widest ISA
+  first, so a SELL-8 f32 matrix on an AVX-512 host (`LANE_COUNT 16 ≠ 8`) silently
+  runs scalar — slower than the AVX2 kernel in the same binary, and a silent
+  capability downgrade. Fix: pick the arch whose `LANE_COUNT` matches `C`/`BN`, or
+  generalize the kernel to `C = k·LANE_COUNT`. `[minor]`.
+- **[open] Per-call CSR/BCOO index re-validation (HIGH, 2 agents).** The soundness
+  scans in CSR/BCOO (and now SELL-p) re-read `col_indices` every `spmv`; iterative
+  solvers call spmv thousands of times on one immutable matrix (+~17-50% index
+  traffic per call). Root-cause fix: a `Validated` sparse typestate constructed
+  once, kernels trust the type — removes all four per-call scans and closes the
+  soundness holes structurally. `[minor]` (supersedes the per-call scans).
+- **[open] GEMM/GEMV scalar column tails (HIGH).** `tiling/gemm.rs:284`,
+  `gemv.rs:135` compute the `n % block_n` trailing columns in a scalar triple
+  loop — up to ~50% of FLOPs on `n` not a multiple of 64/24. Fix: masked-vector
+  tail via existing `leading_k_mask` + `masked_fmadd`. `[minor]`.
+- **[open] AVX-512 bf16 tile kernel: 32 scalar bf16→f32 converts + stack
+  round-trip per k-step (HIGH on that path).** `avx512_tiling.rs:35`; vectorize as
+  `loadu_si256 + cvtepu16_epi32 + slli_epi32(,16)`, and use `_mm512_dpbf16_ps`
+  (AVX512-BF16 already probed, never issued). `[minor]`.
+- **[open] Scalar tails on every hot kernel (MED-HIGH).** `view/reduce.rs`,
+  `view/ops.rs`, `dispatch/axpy.rs`, etc. end in element-at-a-time loops although
+  `leading_k_mask` exists on every backend; up to 15 scalar iters on AVX-512 f32
+  tails, dominating short/odd-length vectors. `[minor]`.
+- **[open] No K/M cache blocking in GEMM (MED-HIGH).** Register blocking + B-panel
+  pack only; a 512 KiB packed panel overflows L1, A never packed. BLIS-style KC
+  loop + A-pack is the fix for large GEMM. `[minor]`.
+- **[open] No software prefetch in gather-bound SpMV (MED); no streaming/NT stores
+  for out-of-LLC writes (MED); `Aligned` typestate dead at the dispatch facade —
+  every op uses unaligned loads and NT stores are blocked on it (LOW-MED);
+  uniform `UNROLL_FACTOR=4` under-fills the FMA pipeline for cache-resident
+  reductions (LOW-MED); integer/bf16 AVX kernels are lane-emulated arrays relying
+  on autovectorization, unverified by codegen (MED); per-call detection branch
+  chain, no cached dispatch decision (LOW-MED).** Each `[patch]`/`[minor]`, all
+  measurement-gated.
+
+### Memory / zero-copy
+
+- **[open] `DenseWithMask` stores `[bool]` mask, converts per-chunk per-call
+  (MED-HIGH)** — 8× footprint; bit-pack once at the boundary (a `BitMask` type
+  already exists). **`cmp_*_mask`/`cast` round-trip through stack buffers with
+  64-iter scalar loops (MED)** — route through native backend mask ops.
+  **`SimdCow::scale` copies-then-rescales (2n traffic) vs the fused
+  `mul_scalar_cow` sibling (MED)** — delegate/delete one (consolidation).
+  **`AlignedVec` lacks `reserve`/`extend_from_slice`; `Extend for SimdCow`
+  pushes item-wise dropping `size_hint` (MED).** **`compress` zero-inits a
+  64-elem stack buffer per chunk (MED); argmin/argmax two-pass (LOW-MED).** All
+  `[patch]`/`[minor]`.
+
+### Architecture / redundancy / hygiene
+
+- **[open] Tracked scratch at repo root** — `apply_changes.ps1`, `do_changes.ps1`,
+  `check_errors.txt` are git-tracked stale scratch (targets paths that no longer
+  exist); `benchmarks.log`/`benchmarks_utf8.log`/`check_output.txt` untracked on
+  disk. `benchmarks_baseline.json`/`benchmarks_results.md` are the live criterion
+  baseline — keep. `[patch]` hygiene.
+- **[open] `codegen.rs` ungoverned SSOT (1334 lines, live generator of the 4 x86
+  kernel files).** Not dead — regenerates `avx2_f32/f64`, `avx512_f32/f64`; but no
+  `@generated` banner, no CI regeneration-diff gate. `[patch→minor]` process.
+- **[open] ~150-200 lines cross-backend scaffold duplication** — compress/expand
+  emulation, AVX-512 cmp-mask blend, popcount LUT, masked-reduce, NEON sign-flip
+  constants; hoist into `kernel_helpers`/codegen templates per ADR-005. `[minor]`.
+- **[open] README documents removed `hermes-numeric` crate** (migrated to
+  eunomia); stale backlog/checklist refs; ADR number collisions (two each of
+  001/002/003). `[patch]` docs. **`dispatch/mod.rs` (828) splits into
+  trait/impls/facade; 5 unused deps** (`divan`, 2×`bytemuck`, 2×`rkyv`). `[patch]`.
+- **[open] `widen_I8_*` type-named duplicate API + undocumented unsafe + SIMD
+  branch untestable at n=5** — collapse to one generic (`#[repr(transparent)]`),
+  add SAFETY, differential test at n ∈ {31,32,33,47,1024}. `[patch→minor]`.
+
+### Tests / benches / docs
+
+- **[open] CI runs bare `cargo test` — bypasses the committed nextest timeout
+  instrument.** Switch to `cargo nextest run` + `cargo test --doc`. `[patch]`.
+- **[open] ~25 magic-tolerance assertion sites** vs the repo's own demonstrated
+  derivation discipline (complex_tests derives the bound); derive+cite each.
+  **AVX-512 differential suite silently skips on CI hosts (unreported).**
+  **Stale criterion baseline** — newest GEMM/AMX groups ungated; axpy/gemv/complex
+  unbenched. **`missing_docs` absent on `hermes-simd-macros`; ~5 doctests for ~60
+  facade fns; `# Errors`/`# Safety` gaps.** **No `cargo build --examples`,
+  semver-checks, or bench-compile CI gates.** Each `[patch]`/`[minor]`.
+
+### Verified clean (negative results — do not re-chase)
+
+- Proc-macro `#[runtime_dispatch]` ladder: every `#[target_feature]` helper is
+  called only behind a compile-time `cfg!` arm or a runtime `is_x86_feature_detected!`
+  gate; no bypass, no env override.
+- CSR & BlockedCoo SpMV self-defend on adversarial input.
+- `tiling/` dims fully checked (prior overflow fix holds in dev+release);
+  `AlignedVec` init paths panic-safe (no uninit read); `SimdView` borrow lifetime
+  precludes aliased in-place APIs from safe code.
+- AMX inline asm operand/clobber model + `AmxSession` Drop under `panic=abort`
+  are sound (tile state released on unwind→abort).
+- Sparse formats are SoA with `i32` indices; no `Arc/Rc/Box` nesting; SimdCow
+  promotion single-allocation; dispatch facade is out-slice/in-place throughout.
+
 ## Allocator Dependency Audit - 2026-06-28 (round 7) <a id="audit-2026-06-28-r7"></a>
 
 hermes is unchanged since round 6 and remains lean (no new findings). This round
@@ -339,6 +481,23 @@ Resolved this sprint:
 
 ## Resolved
 
+- [patch] SELL-p vectorized SpMV / elementwise OOB read (2026-07-02). The
+  `LANE_COUNT == C` fast path in `sparse/spmv.rs::sellp_spmv_vectorized` and
+  `sparse/ops.rs::elementwise_mul_dense` gathered `x[col_idx]` and loaded
+  `values[offset..]`/stored `out_values[offset..]` at full vector width with no
+  bounds check, reachable from the safe `SparseView::<SellP<C>>::{spmv,
+  elementwise_mul_dense}` — a proven OOB read from safe code on a
+  caller-constructed matrix (`pub` fields, no-op `new`, opt-in `validate()`).
+  Unlike the sibling CSR/BlockedCoo paths, SELL-p never validated. Fixed by
+  routing both vectorized paths through the SSOT `SparseValidate::validate()` via
+  the new `spmv::assert_sellp_validated` before the unsafe kernel (checks
+  `col < ncols`, `col_indices.len() == values.len()`, and
+  `slice_ptr[s] + slice_col_count[s]·C <= values.len()`), plus an
+  `out_values.len() >= values.len()` guard on the elementwise store. Two
+  `#[should_panic]` regressions drive the Scalar-backed vectorized path
+  (`Scalar::LANE_COUNT 4 == C`, host-independent) with an out-of-range column and
+  with over-long slice geometry. Evidence tier: type-level precondition + value
+  regression. See [round 8](#audit-2026-07-02-r8).
 - [patch] Scalar-fallback stack-buffer lane bound (2026-06-24). The default
   `SimdKernel` methods and `kernel_helpers` emulations stored a full vector into
   a fixed `[MaybeUninit<T>; 128]` buffer with the `LANE_COUNT <= 128` invariant
