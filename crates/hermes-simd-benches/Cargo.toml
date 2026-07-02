@@ -47,8 +47,7 @@ name = "tiled_gemm_bench"
 harness = false
 
 [features]
-default = ["parallel", "mnemosyne-memory"]
-parallel = ["hermes-simd/parallel"]
+default = ["mnemosyne-memory"]
 mnemosyne-memory = [
     "hermes-simd/mnemosyne-memory",
     "hermes-simd-core/mnemosyne-memory",

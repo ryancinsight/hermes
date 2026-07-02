@@ -15,10 +15,6 @@ bytemuck = { version = "1.14" }
 rkyv = { version = "0.7" }
 
 [features]
-default = ["std", "parallel", "mnemosyne-memory"]
+default = ["std", "mnemosyne-memory"]
 std = ["hermes-simd-core/std", "eunomia/std"]
-parallel = ["eunomia/parallel"]
-mnemosyne-memory = [
-    "hermes-simd-core/mnemosyne-memory",
-    "eunomia/mnemosyne-memory",
-]
+mnemosyne-memory = ["hermes-simd-core/mnemosyne-memory"]

@@ -24,6 +24,5 @@ name = "complex_dot"
 path = "examples/complex_dot.rs"
 
 [features]
-default = ["parallel", "mnemosyne-memory"]
-parallel = ["hermes-simd/parallel"]
+default = ["mnemosyne-memory"]
 mnemosyne-memory = ["hermes-simd/mnemosyne-memory"]
