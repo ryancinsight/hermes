@@ -1198,9 +1198,7 @@ fn test_adaptive_dispatcher_and_amx_session() {
 
 #[test]
 fn test_generic_packed_vector_and_f4_slice() {
-    use eunomia::{
-        Bf4, PackedBf4Vec, PackedF4Slice, PackedF4SliceMut, PackedF4Vec, F32, F4,
-    };
+    use eunomia::{Bf4, PackedBf4Vec, PackedF4Slice, PackedF4SliceMut, PackedF4Vec, F32, F4};
 
     // 1. Test F4 slice operations
     let mut raw_bytes = [0u8; 4];
