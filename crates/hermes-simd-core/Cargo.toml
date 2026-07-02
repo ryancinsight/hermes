@@ -19,9 +19,8 @@ themis = { workspace = true }
 hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.3.0" }
 
 [features]
-default = ["std", "parallel", "mnemosyne-memory"]
+default = ["std", "mnemosyne-memory"]
 std = ["eunomia/std", "themis/std"]
-parallel = []
 mnemosyne-memory = ["dep:mnemosyne"]
 # Linux NUMA node placement via libnuma (links -lnuma); off by default.
 libnuma = []

@@ -48,7 +48,7 @@ harness = false
 
 [features]
 default = ["parallel", "mnemosyne-memory"]
-parallel = ["hermes-simd/parallel", "hermes-simd-core/parallel"]
+parallel = ["hermes-simd/parallel"]
 mnemosyne-memory = [
     "hermes-simd/mnemosyne-memory",
     "hermes-simd-core/mnemosyne-memory",

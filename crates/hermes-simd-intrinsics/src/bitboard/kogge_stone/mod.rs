@@ -118,6 +118,12 @@ impl BitBoardKernel for KoggeStone {
     unsafe fn rook_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
 
+        // SAFETY: each ISA-specific fill (`kogge_stone_rook_avx512`/`_avx2`) is
+        // `#[target_feature]`-gated and is only reached inside the matching
+        // `is_x86_feature_detected!` branch (or the `cfg!(target_feature)` guard in
+        // no-std), so its ISA precondition holds at the call. The NEON path is baseline
+        // on AArch64, and the scalar fallback is safe. Inputs are `u64` bitboards with
+        // no memory access, so no bounds obligation applies.
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
             #[cfg(feature = "std")]
@@ -153,6 +159,12 @@ impl BitBoardKernel for KoggeStone {
     unsafe fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
 
+        // SAFETY: each ISA-specific fill (`kogge_stone_bishop_avx512`/`_avx2`) is
+        // `#[target_feature]`-gated and is only reached inside the matching
+        // `is_x86_feature_detected!` branch (or the `cfg!(target_feature)` guard in
+        // no-std), so its ISA precondition holds at the call. The NEON path is baseline
+        // on AArch64, and the scalar fallback is safe. Inputs are `u64` bitboards with
+        // no memory access, so no bounds obligation applies.
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
             #[cfg(feature = "std")]
@@ -188,6 +200,12 @@ impl BitBoardKernel for KoggeStone {
     unsafe fn queen_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
 
+        // SAFETY: each ISA-specific fill (`kogge_stone_queen_avx512`/`_avx2`) is
+        // `#[target_feature]`-gated and is only reached inside the matching
+        // `is_x86_feature_detected!` branch (or the `cfg!(target_feature)` guard in
+        // no-std), so its ISA precondition holds at the call. The NEON path is baseline
+        // on AArch64, and the scalar fallback is safe. Inputs are `u64` bitboards with
+        // no memory access, so no bounds obligation applies.
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
             #[cfg(feature = "std")]

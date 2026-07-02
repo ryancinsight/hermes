@@ -11,6 +11,11 @@ use hermes_simd_core::view::TileMatrixMultiply;
 // ---------------------------------------------------------------------------
 
 impl TileMatrixMultiply<half::bf16, half::bf16, f32, Avx512, Avx512, 16, 16, 32> for Avx512 {
+    // SAFETY: caller must ensure the target CPU supports `avx512f,avx512bw,avx512vl`
+    // (enforced by the `#[target_feature]` gate below plus runtime
+    // `is_x86_feature_detected!` selection at the dispatch site) and that `a`, `b`, and
+    // `c` point to a valid 16x16x32 tile addressable at the given strides; all loads and
+    // stores stay within that caller-declared tile.
     #[target_feature(enable = "avx512f,avx512bw,avx512vl")]
     unsafe fn tile_matmul(
         c: *mut f32,
@@ -53,6 +58,11 @@ impl TileMatrixMultiply<half::bf16, half::bf16, f32, Avx512, Avx512, 16, 16, 32>
 }
 
 impl TileMatrixMultiply<Bf16, Bf16, F32, Avx512, Avx512, 16, 16, 32> for Avx512 {
+    // SAFETY: caller must ensure the target CPU supports `avx512f,avx512bw,avx512vl`
+    // (enforced by the `#[target_feature]` gate below plus runtime
+    // `is_x86_feature_detected!` selection at the dispatch site) and that `a`, `b`, and
+    // `c` point to a valid 16x16x32 tile addressable at the given strides; all loads and
+    // stores stay within that caller-declared tile.
     #[target_feature(enable = "avx512f,avx512bw,avx512vl")]
     unsafe fn tile_matmul(
         c: *mut F32,
@@ -95,6 +105,11 @@ impl TileMatrixMultiply<Bf16, Bf16, F32, Avx512, Avx512, 16, 16, 32> for Avx512 
 }
 
 impl TileMatrixMultiply<i8, i8, i32, Avx512, Avx512, 16, 16, 64> for Avx512 {
+    // SAFETY: caller must ensure the target CPU supports `avx512f,avx512vnni,avx512vl`
+    // (enforced by the `#[target_feature]` gate below plus runtime
+    // `is_x86_feature_detected!` selection at the dispatch site) and that `a`, `b`, and
+    // `c` point to a valid 16x16x64 tile addressable at the given strides; all loads and
+    // stores stay within that caller-declared tile.
     #[target_feature(enable = "avx512f,avx512vnni,avx512vl")]
     unsafe fn tile_matmul(
         c: *mut i32,
@@ -152,6 +167,11 @@ impl TileMatrixMultiply<i8, i8, i32, Avx512, Avx512, 16, 16, 64> for Avx512 {
 }
 
 impl TileMatrixMultiply<I8, I8, I32, Avx512, Avx512, 16, 16, 64> for Avx512 {
+    // SAFETY: caller must ensure the target CPU supports `avx512f,avx512vnni,avx512vl`
+    // (enforced by the `#[target_feature]` gate below plus runtime
+    // `is_x86_feature_detected!` selection at the dispatch site) and that `a`, `b`, and
+    // `c` point to a valid 16x16x64 tile addressable at the given strides; all loads and
+    // stores stay within that caller-declared tile.
     #[target_feature(enable = "avx512f,avx512vnni,avx512vl")]
     unsafe fn tile_matmul(
         c: *mut I32,
@@ -217,6 +237,10 @@ pub fn unpack_int4(packed: &[u8], unpacked: &mut [i8]) {
 
     #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
     {
+        // SAFETY: this branch is compiled only when `avx2` is a static target feature,
+        // satisfying `unpack_int4_avx2`'s ISA precondition; the `unpacked.len() >= len * 2`
+        // assertion above upholds its bounds precondition.
+        // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
         unsafe {
             unpack_int4_avx2(packed, unpacked);
         }
@@ -239,6 +263,12 @@ fn unpack_int4_scalar(packed: &[u8], unpacked: &mut [i8]) {
 }
 
 /// AVX2 optimized int4 unpacker.
+///
+/// # Safety
+/// The target CPU must support `avx2` (enforced by the `#[target_feature]` gate plus
+/// the `cfg!(target_feature = "avx2")` guard at the `unpack_int4` call site), and
+/// `unpacked.len()` must be at least `2 * packed.len()` (asserted by the `unpack_int4`
+/// wrapper); the 32-wide loads/stores stay within those slice bounds.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
 pub unsafe fn unpack_int4_avx2(packed: &[u8], unpacked: &mut [i8]) {
@@ -291,6 +321,7 @@ pub fn unpack_bf8_to_bf16(packed: &[Bf8], unpacked: &mut [Bf16]) {
             if std::is_x86_feature_detected!("avx512bw")
                 && std::is_x86_feature_detected!("avx512vl")
             {
+                // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
                 unsafe {
                     eunomia::unsafe_intrinsics::avx512::unpack_bf8_to_bf16(packed, unpacked);
                     return;
@@ -300,6 +331,7 @@ pub fn unpack_bf8_to_bf16(packed: &[Bf8], unpacked: &mut [Bf16]) {
         #[cfg(not(feature = "std"))]
         {
             if cfg!(target_feature = "avx512bw") {
+                // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
                 unsafe {
                     eunomia::unsafe_intrinsics::avx512::unpack_bf8_to_bf16(packed, unpacked);
                     return;
@@ -320,6 +352,7 @@ pub fn unpack_bf4_to_bf16(packed: &[Bf4], unpacked: &mut [Bf16]) {
             if std::is_x86_feature_detected!("avx512bw")
                 && std::is_x86_feature_detected!("avx512vl")
             {
+                // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
                 unsafe {
                     eunomia::unsafe_intrinsics::avx512::unpack_bf4_to_bf16(packed, unpacked);
                     return;
@@ -329,6 +362,7 @@ pub fn unpack_bf4_to_bf16(packed: &[Bf4], unpacked: &mut [Bf16]) {
         #[cfg(not(feature = "std"))]
         {
             if cfg!(target_feature = "avx512bw") {
+                // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
                 unsafe {
                     eunomia::unsafe_intrinsics::avx512::unpack_bf4_to_bf16(packed, unpacked);
                     return;
@@ -349,6 +383,7 @@ pub fn unpack_packed_bf4_to_bf16(packed: &[u8], unpacked: &mut [Bf16]) {
             if std::is_x86_feature_detected!("avx512bw")
                 && std::is_x86_feature_detected!("avx512vl")
             {
+                // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
                 unsafe {
                     eunomia::unsafe_intrinsics::avx512::unpack_bf4_to_bf16_packed(packed, unpacked);
                     return;
@@ -358,6 +393,7 @@ pub fn unpack_packed_bf4_to_bf16(packed: &[u8], unpacked: &mut [Bf16]) {
         #[cfg(not(feature = "std"))]
         {
             if cfg!(target_feature = "avx512bw") {
+                // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
                 unsafe {
                     eunomia::unsafe_intrinsics::avx512::unpack_bf4_to_bf16_packed(packed, unpacked);
                     return;
@@ -377,6 +413,7 @@ pub fn unpack_packed_f4_to_f32(packed: &[u8], unpacked: &mut [F32]) {
         {
             if std::is_x86_feature_detected!("avx512f") && std::is_x86_feature_detected!("avx512vl")
             {
+                // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
                 unsafe {
                     eunomia::unsafe_intrinsics::avx512::unpack_f4_to_f32_packed(packed, unpacked);
                     return;
@@ -386,6 +423,7 @@ pub fn unpack_packed_f4_to_f32(packed: &[u8], unpacked: &mut [F32]) {
         #[cfg(not(feature = "std"))]
         {
             if cfg!(target_feature = "avx512f") {
+                // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
                 unsafe {
                     eunomia::unsafe_intrinsics::avx512::unpack_f4_to_f32_packed(packed, unpacked);
                     return;

@@ -12,6 +12,12 @@ members = [
 
 [workspace.package]
 version = "0.3.0"
+# Stays on edition 2021: edition 2024 makes `unsafe_op_in_unsafe_fn` warn-by-default,
+# and `cargo fix --edition` discharges it across the ~750 SIMD intrinsic `unsafe fn`s
+# by wrapping each body in a blanket `unsafe { .. }` — an unverifiable rubber-stamp that
+# states no real per-operation invariant. Migrating correctly requires hand-authored
+# SAFETY blocks per intrinsic (a dedicated, separately-verified effort); until then a
+# half-migration is worse than staying on 2021. Revisit as a tracked [arch] item.
 edition = "2021"
 authors = ["Ryan Clanton <ryanclanton@outlook.com>"]
 description = "High-performance, zero-overhead SIMD abstraction library"

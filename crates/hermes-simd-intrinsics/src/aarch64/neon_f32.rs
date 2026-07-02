@@ -47,24 +47,28 @@ impl SimdKernel<f32> for Neon {
     // Load / store
     // -----------------------------------------------------------------------
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn load_aligned(ptr: *const f32) -> Self::Vector {
         NeonF32Vec(vld1q_f32(ptr))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn load_unaligned(ptr: *const f32) -> Self::Vector {
         NeonF32Vec(vld1q_f32(ptr))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn store_aligned(ptr: *mut f32, val: Self::Vector) {
         vst1q_f32(ptr, val.0);
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn store_unaligned(ptr: *mut f32, val: Self::Vector) {
@@ -75,24 +79,28 @@ impl SimdKernel<f32> for Neon {
     // Arithmetic
     // -----------------------------------------------------------------------
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn add(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         NeonF32Vec(vaddq_f32(a.0, b.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn mul(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         NeonF32Vec(vmulq_f32(a.0, b.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn sub(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         NeonF32Vec(vsubq_f32(a.0, b.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn div(a: Self::Vector, b: Self::Vector) -> Self::Vector {
@@ -100,6 +108,7 @@ impl SimdKernel<f32> for Neon {
     }
 
     /// NEON FMA: `vfmaq_f32(c, a, b)` computes `a*b + c`.
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn fmadd(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
@@ -107,18 +116,21 @@ impl SimdKernel<f32> for Neon {
     }
 
     /// `vrev64q_f32` swaps 32-bit lanes within each 64-bit doubleword.
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn swap_adjacent(v: Self::Vector) -> Self::Vector {
         NeonF32Vec(vrev64q_f32(v.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn dup_even(v: Self::Vector) -> Self::Vector {
         NeonF32Vec(vtrn1q_f32(v.0, v.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn dup_odd(v: Self::Vector) -> Self::Vector {
@@ -128,6 +140,7 @@ impl SimdKernel<f32> for Neon {
     /// NEON has no alternating-FMA instruction; sign-flip the even lanes of
     /// `c` (one XOR) then fuse with `vfmaq_f32`, which is rounding-identical
     /// to a native `fmaddsub`.
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn fmaddsub(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
@@ -140,6 +153,7 @@ impl SimdKernel<f32> for Neon {
     }
 
     /// Sign-flips the odd lanes of `c` then fuses; see [`Self::fmaddsub`].
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn fmsubadd(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
@@ -151,36 +165,42 @@ impl SimdKernel<f32> for Neon {
         NeonF32Vec(vfmaq_f32(flipped, a.0, b.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn sum_reduce(v: Self::Vector) -> f32 {
         vaddvq_f32(v.0)
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn abs(a: Self::Vector) -> Self::Vector {
         NeonF32Vec(vabsq_f32(a.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn min(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         NeonF32Vec(vminq_f32(a.0, b.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn max(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         NeonF32Vec(vmaxq_f32(a.0, b.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn sqrt(a: Self::Vector) -> Self::Vector {
         NeonF32Vec(vsqrtq_f32(a.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn recip_sqrt(a: Self::Vector) -> Self::Vector {
@@ -194,6 +214,7 @@ impl SimdKernel<f32> for Neon {
         NeonF32Vec(y2)
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn popcount(a: Self::Vector) -> Self::Vector {
@@ -205,6 +226,7 @@ impl SimdKernel<f32> for Neon {
         NeonF32Vec(pop_f32)
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn bitand(a: Self::Vector, b: Self::Vector) -> Self::Vector {
@@ -214,6 +236,7 @@ impl SimdKernel<f32> for Neon {
         )))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn bitor(a: Self::Vector, b: Self::Vector) -> Self::Vector {
@@ -223,6 +246,7 @@ impl SimdKernel<f32> for Neon {
         )))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn bitxor(a: Self::Vector, b: Self::Vector) -> Self::Vector {
@@ -232,42 +256,49 @@ impl SimdKernel<f32> for Neon {
         )))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn cmp_eq(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         NeonF32Vec(vreinterpretq_f32_u32(vceqq_f32(a.0, b.0)))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn cmp_ne(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         NeonF32Vec(vreinterpretq_f32_u32(vmvnq_u32(vceqq_f32(a.0, b.0))))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn cmp_lt(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         NeonF32Vec(vreinterpretq_f32_u32(vcltq_f32(a.0, b.0)))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn cmp_le(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         NeonF32Vec(vreinterpretq_f32_u32(vcleq_f32(a.0, b.0)))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn cmp_gt(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         NeonF32Vec(vreinterpretq_f32_u32(vcgtq_f32(a.0, b.0)))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn cmp_ge(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         NeonF32Vec(vreinterpretq_f32_u32(vcgeq_f32(a.0, b.0)))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn blend(
@@ -286,6 +317,7 @@ impl SimdKernel<f32> for Neon {
     // Masked load / store
     // -----------------------------------------------------------------------
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn masked_load_unaligned(
@@ -297,6 +329,7 @@ impl SimdKernel<f32> for Neon {
         NeonF32Vec(vbslq_f32(mask.0, vld1q_f32(ptr), src.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn masked_store_unaligned(ptr: *mut f32, mask: Self::Mask, val: Self::Vector) {
@@ -309,6 +342,7 @@ impl SimdKernel<f32> for Neon {
     // Masked arithmetic
     // -----------------------------------------------------------------------
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn masked_add(
@@ -320,6 +354,7 @@ impl SimdKernel<f32> for Neon {
         NeonF32Vec(vbslq_f32(mask.0, vaddq_f32(a.0, b.0), src.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn masked_mul(
@@ -331,6 +366,7 @@ impl SimdKernel<f32> for Neon {
         NeonF32Vec(vbslq_f32(mask.0, vmulq_f32(a.0, b.0), src.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn masked_fmadd(
@@ -343,6 +379,7 @@ impl SimdKernel<f32> for Neon {
         NeonF32Vec(vbslq_f32(mask.0, vfmaq_f32(c.0, a.0, b.0), c.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn masked_sum_reduce(v: Self::Vector, mask: Self::Mask) -> f32 {
@@ -353,6 +390,7 @@ impl SimdKernel<f32> for Neon {
     // Compress / Expand (emulated)
     // -----------------------------------------------------------------------
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn compress(src: Self::Vector, mask: Self::Mask) -> Self::Vector {
@@ -375,6 +413,7 @@ impl SimdKernel<f32> for Neon {
         NeonF32Vec(vld1q_f32(out.as_ptr()))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn expand(src: Self::Vector, mask: Self::Mask, fill: Self::Vector) -> Self::Vector {
@@ -402,6 +441,7 @@ impl SimdKernel<f32> for Neon {
     // Gather (emulated — NEON has no native scatter/gather)
     // -----------------------------------------------------------------------
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn gather(base: *const f32, indices: Self::IndexVector) -> Self::Vector {
@@ -414,6 +454,7 @@ impl SimdKernel<f32> for Neon {
         NeonF32Vec(vld1q_f32(arr.as_ptr()))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn gather_masked(
@@ -459,6 +500,7 @@ impl SimdKernel<f32> for Neon {
     // Mask construction
     // -----------------------------------------------------------------------
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn mask_from_bools(bits: &[bool]) -> Self::Mask {
@@ -467,6 +509,7 @@ impl SimdKernel<f32> for Neon {
         NeonF32Mask(vld1q_u32(vals.as_ptr()))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn leading_k_mask(k: usize) -> Self::Mask {
@@ -479,18 +522,21 @@ impl SimdKernel<f32> for Neon {
     // Broadcast / zero
     // -----------------------------------------------------------------------
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn zero() -> Self::Vector {
         NeonF32Vec(vdupq_n_f32(0.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn splat(val: f32) -> Self::Vector {
         NeonF32Vec(vdupq_n_f32(val))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn mask_to_bitmask(mask: Self::Mask) -> u64 {
@@ -502,6 +548,7 @@ impl SimdKernel<f32> for Neon {
         m
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn mask_to_vector(mask: Self::Mask) -> Self::Vector {

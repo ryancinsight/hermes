@@ -17,7 +17,7 @@ rkyv = { version = "0.7" }
 [features]
 default = ["std", "parallel", "mnemosyne-memory"]
 std = ["hermes-simd-core/std", "eunomia/std"]
-parallel = ["hermes-simd-core/parallel", "eunomia/parallel"]
+parallel = ["eunomia/parallel"]
 mnemosyne-memory = [
     "hermes-simd-core/mnemosyne-memory",
     "eunomia/mnemosyne-memory",

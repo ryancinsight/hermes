@@ -34,7 +34,6 @@ default = ["std", "parallel", "mnemosyne-memory"]
 # Linux NUMA node placement via libnuma (links -lnuma); off by default.
 libnuma = ["hermes-simd-core/libnuma"]
 parallel = [
-    "hermes-simd-core/parallel",
     "hermes-simd-intrinsics/parallel",
     "eunomia/parallel",
     "hermes-simd-types/parallel",

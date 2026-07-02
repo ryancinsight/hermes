@@ -39,24 +39,28 @@ impl SimdKernel<f64> for Avx512 {
     // Load / store
     // -----------------------------------------------------------------------
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn load_aligned(ptr: *const f64) -> Self::Vector {
         Avx512F64Vec(_mm512_load_pd(ptr))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn load_unaligned(ptr: *const f64) -> Self::Vector {
         Avx512F64Vec(_mm512_loadu_pd(ptr))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn store_aligned(ptr: *mut f64, val: Self::Vector) {
         _mm512_store_pd(ptr, val.0);
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn store_unaligned(ptr: *mut f64, val: Self::Vector) {
@@ -67,60 +71,70 @@ impl SimdKernel<f64> for Avx512 {
     // Arithmetic
     // -----------------------------------------------------------------------
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn add(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         Avx512F64Vec(_mm512_add_pd(a.0, b.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn mul(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         Avx512F64Vec(_mm512_mul_pd(a.0, b.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn sub(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         Avx512F64Vec(_mm512_sub_pd(a.0, b.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn fmadd(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
         Avx512F64Vec(_mm512_fmadd_pd(a.0, b.0, c.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn swap_adjacent(v: Self::Vector) -> Self::Vector {
         Avx512F64Vec(_mm512_permute_pd(v.0, 0b0101_0101))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn dup_even(v: Self::Vector) -> Self::Vector {
         Avx512F64Vec(_mm512_movedup_pd(v.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn dup_odd(v: Self::Vector) -> Self::Vector {
         Avx512F64Vec(_mm512_permute_pd(v.0, 0b1111_1111))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn fmaddsub(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
         Avx512F64Vec(_mm512_fmaddsub_pd(a.0, b.0, c.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn fmsubadd(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
         Avx512F64Vec(_mm512_fmsubadd_pd(a.0, b.0, c.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn sum_reduce(v: Self::Vector) -> f64 {
@@ -131,6 +145,7 @@ impl SimdKernel<f64> for Avx512 {
     // Native masked load / store
     // -----------------------------------------------------------------------
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn masked_load_unaligned(
@@ -141,6 +156,7 @@ impl SimdKernel<f64> for Avx512 {
         Avx512F64Vec(_mm512_mask_loadu_pd(src.0, mask, ptr))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn masked_store_unaligned(ptr: *mut f64, mask: Self::Mask, val: Self::Vector) {
@@ -151,6 +167,7 @@ impl SimdKernel<f64> for Avx512 {
     // Native masked arithmetic
     // -----------------------------------------------------------------------
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn masked_add(
@@ -162,6 +179,7 @@ impl SimdKernel<f64> for Avx512 {
         Avx512F64Vec(_mm512_mask_add_pd(src.0, mask, a.0, b.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn masked_mul(
@@ -174,6 +192,7 @@ impl SimdKernel<f64> for Avx512 {
     }
 
     /// `mask3_fmadd`: inactive lanes retain `c` (the addend / 3rd operand).
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn masked_fmadd(
@@ -185,6 +204,7 @@ impl SimdKernel<f64> for Avx512 {
         Avx512F64Vec(_mm512_mask3_fmadd_pd(a.0, b.0, c.0, mask))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn masked_sum_reduce(v: Self::Vector, mask: Self::Mask) -> f64 {
@@ -196,12 +216,14 @@ impl SimdKernel<f64> for Avx512 {
     // Native compress / expand
     // -----------------------------------------------------------------------
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn compress(src: Self::Vector, mask: Self::Mask) -> Self::Vector {
         Avx512F64Vec(_mm512_maskz_compress_pd(mask, src.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn expand(src: Self::Vector, mask: Self::Mask, fill: Self::Vector) -> Self::Vector {
@@ -212,12 +234,14 @@ impl SimdKernel<f64> for Avx512 {
     // Gather
     // -----------------------------------------------------------------------
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn gather(base: *const f64, indices: Self::IndexVector) -> Self::Vector {
         Avx512F64Vec(_mm512_i32gather_pd(indices, base, 8))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn gather_masked(
@@ -233,6 +257,7 @@ impl SimdKernel<f64> for Avx512 {
     // Mask construction
     // -----------------------------------------------------------------------
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn mask_from_bools(bits: &[bool]) -> Self::Mask {
@@ -246,6 +271,7 @@ impl SimdKernel<f64> for Avx512 {
         mask as Self::Mask
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn leading_k_mask(k: usize) -> Self::Mask {
@@ -262,42 +288,49 @@ impl SimdKernel<f64> for Avx512 {
     // Broadcast / zero
     // -----------------------------------------------------------------------
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn zero() -> Self::Vector {
         Avx512F64Vec(_mm512_setzero_pd())
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn splat(val: f64) -> Self::Vector {
         Avx512F64Vec(_mm512_set1_pd(val))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn div(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         Avx512F64Vec(_mm512_div_pd(a.0, b.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn bitand(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         Avx512F64Vec(_mm512_and_pd(a.0, b.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn bitor(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         Avx512F64Vec(_mm512_or_pd(a.0, b.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn bitxor(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         Avx512F64Vec(_mm512_xor_pd(a.0, b.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn abs(a: Self::Vector) -> Self::Vector {
@@ -305,24 +338,28 @@ impl SimdKernel<f64> for Avx512 {
         Avx512F64Vec(_mm512_andnot_pd(sign_mask, a.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn min(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         Avx512F64Vec(_mm512_min_pd(a.0, b.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn max(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         Avx512F64Vec(_mm512_max_pd(a.0, b.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn sqrt(a: Self::Vector) -> Self::Vector {
         Avx512F64Vec(_mm512_sqrt_pd(a.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn recip_sqrt(a: Self::Vector) -> Self::Vector {
@@ -332,6 +369,7 @@ impl SimdKernel<f64> for Avx512 {
         Avx512F64Vec(_mm512_div_pd(_mm512_set1_pd(1.0), _mm512_sqrt_pd(a.0)))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn popcount(a: Self::Vector) -> Self::Vector {
@@ -367,6 +405,7 @@ impl SimdKernel<f64> for Avx512 {
         Avx512F64Vec(merged)
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn cmp_eq(a: Self::Vector, b: Self::Vector) -> Self::Vector {
@@ -378,6 +417,7 @@ impl SimdKernel<f64> for Avx512 {
         ))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn cmp_ne(a: Self::Vector, b: Self::Vector) -> Self::Vector {
@@ -389,6 +429,7 @@ impl SimdKernel<f64> for Avx512 {
         ))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn cmp_lt(a: Self::Vector, b: Self::Vector) -> Self::Vector {
@@ -400,6 +441,7 @@ impl SimdKernel<f64> for Avx512 {
         ))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn cmp_le(a: Self::Vector, b: Self::Vector) -> Self::Vector {
@@ -411,6 +453,7 @@ impl SimdKernel<f64> for Avx512 {
         ))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn cmp_gt(a: Self::Vector, b: Self::Vector) -> Self::Vector {
@@ -422,6 +465,7 @@ impl SimdKernel<f64> for Avx512 {
         ))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn cmp_ge(a: Self::Vector, b: Self::Vector) -> Self::Vector {
@@ -433,6 +477,7 @@ impl SimdKernel<f64> for Avx512 {
         ))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn blend(
@@ -444,12 +489,14 @@ impl SimdKernel<f64> for Avx512 {
         Avx512F64Vec(_mm512_mask_blend_pd(m, false_val.0, true_val.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn mask_to_bitmask(mask: Self::Mask) -> u64 {
         mask as u64
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn mask_to_vector(mask: Self::Mask) -> Self::Vector {
