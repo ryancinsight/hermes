@@ -38,6 +38,12 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   popcount, wrapping fmadd, min/max, constants, `CastFrom` round-trips).
 
 ### Changed
+- `hermes-simd-benches` [patch]: extend the `Tiled GEMM f32` bench to 256³/512³
+  and report throughput as FLOPs (`2·size³`) rather than output elements. Closes
+  the "GEMM benched only to n=64" coverage gap and establishes the large-`k`
+  baseline (256³ = 78.4 GFLOP/s ≈ 61% of AVX2 f32 peak; 512³ = 69.8 GFLOP/s, the
+  −11% dip as the packed `k × block_n` panel reaches L1d) — the regression gate
+  for the DoR-ready KC cache-blocking item (gap_audit round 8).
 - `hermes-simd-core`/`hermes-simd-benches` [patch]: **masked-vector GEMV column
   tail** + the workspace's first GEMV benchmark (`gemv_bench.rs`, tail-isolating:
   each size pairs a tail-free `ncols` with a tail-having one at matched scale).

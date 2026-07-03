@@ -97,9 +97,22 @@ order (correctness → architecture → tests → docs → PM).
   `view/ops.rs`, `dispatch/axpy.rs`, etc. end in element-at-a-time loops although
   `leading_k_mask` exists on every backend; up to 15 scalar iters on AVX-512 f32
   tails, dominating short/odd-length vectors. `[minor]`.
-- **[open] No K/M cache blocking in GEMM (MED-HIGH).** Register blocking + B-panel
-  pack only; a 512 KiB packed panel overflows L1, A never packed. BLIS-style KC
-  loop + A-pack is the fix for large GEMM. `[minor]`.
+- **[MEASURED 2026-07-03, DoR-ready] No K/M cache blocking in GEMM (MED-HIGH).**
+  The packed path packs the full `k × block_n` B panel and keeps each C tile
+  register-resident across all of `k`. For AVX2 f32 (`TilingPolicy<3,3>`,
+  block_n = 24) the panel is `k·96` bytes: 24 KiB at k=256 (fits this CPU's
+  48 KiB Golden-Cove L1d), 48 KiB at k=512 (at the L1d boundary), 96 KiB at
+  k=1024 (spills). Measured (criterion, new bench rows): **256³ = 78.4 GFLOP/s
+  (61% of ~128 GFLOP/s AVX2 f32 peak), 512³ = 69.8 GFLOP/s (−11%)** — a real but
+  moderate degradation as the panel reaches L1d, expected to widen at k ≥ 1024.
+  Fix: a BLIS KC loop bounding the packed panel to `KC × block_n ≤ L1d` (KC ≈
+  256), the register kernel taking a `(kc_start, KC)` sub-range (A-access
+  `a[(r+i)·k + kc_start + kk]`, its `# Safety`/Theorem 1 span updated), C
+  loaded/stored once per kc-block — the C-traffic-vs-B-locality tradeoff must
+  net positive, so it is measurement-gated. DoR acceptance: 1024³ criterion A/B
+  showing a win, no regression at ≤ 512³, bitwise-exact differential on
+  dyadic operands (packing invariance Theorem 2 extended to the kc-blocked
+  order). A-panel packing is a separate follow-on. `[minor]`.
 - **[open] No software prefetch in gather-bound SpMV (MED); no streaming/NT stores
   for out-of-LLC writes (MED); `Aligned` typestate dead at the dispatch facade —
   every op uses unaligned loads and NT stores are blocked on it (LOW-MED);

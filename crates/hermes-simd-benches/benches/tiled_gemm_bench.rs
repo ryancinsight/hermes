@@ -11,15 +11,18 @@ fn bench_tiled_gemm(c: &mut Criterion) {
 
     // 63 is deliberately just under the AVX2 f32 block width (TILE_N·LANE_COUNT
     // = 32): 32 columns take the register-tiled path and 31 run the column-tail
-    // path, making this row the tail-handling throughput gate.
-    for &size in &[32usize, 63, 64] {
-        let a: Vec<f32> = (0..size * size).map(|i| i as f32 * 0.0001).collect();
+    // path, making this row the tail-handling throughput gate. 256/512 exercise
+    // the size-gated B-panel packing path at large `k`, where the packed
+    // `k × block_n` panel exceeds L1 — the KC-blocking regression gate.
+    for &size in &[32usize, 63, 64, 256, 512] {
+        let a: Vec<f32> = (0..size * size).map(|i| (i % 71) as f32 * 0.001).collect();
         let b: Vec<f32> = (0..size * size)
-            .map(|i| (size * size - i) as f32 * 0.0001)
+            .map(|i| ((size * size - i) % 67) as f32 * 0.001)
             .collect();
         let mut out = vec![0.0f32; size * size];
 
-        group.throughput(Throughput::Elements((size * size * size) as u64));
+        // FLOPs = 2·size³ (one multiply + one add per inner-product term).
+        group.throughput(Throughput::Elements(2 * (size as u64).pow(3)));
 
         group.bench_with_input(BenchmarkId::new("tiled_gemm", size), &size, |bencher, _| {
             bencher.iter(|| {
