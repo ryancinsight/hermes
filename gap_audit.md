@@ -167,9 +167,11 @@ order (correctness → architecture → tests → docs → PM).
 - **[PARTIAL 2026-07-02] Doc drift** — README `hermes-numeric` entry replaced
   with the eunomia provenance note; the fictional lib.rs feature table replaced
   with the real set; `gemm_int8` example corrected to `gemm::<i8,i8,i32>`.
-  **Still open:** ADR number collisions (two each of 001/002/003), stale
-  backlog/checklist `hermes-numeric` refs, `dispatch/mod.rs` (828) split into
-  trait/impls/facade. `[patch]`.
+  ADR number collisions resolved 2026-07-03 (the duplicate 001/002/003 —
+  refined-simd-view, target-feature-inlining, numa-memory — renumbered to
+  008/009/010 via `git mv` + title fix; 001–010 now unique, no cross-refs
+  affected). **Still open:** stale backlog/checklist `hermes-numeric` refs,
+  `dispatch/mod.rs` (828) split into trait/impls/facade. `[patch]`.
 - **[open] `widen_I8_*` type-named duplicate API + undocumented unsafe + SIMD
   branch untestable at n=5** — collapse to one generic (`#[repr(transparent)]`),
   add SAFETY, differential test at n ∈ {31,32,33,47,1024}. `[patch→minor]`.
