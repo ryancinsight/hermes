@@ -38,6 +38,20 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   popcount, wrapping fmadd, min/max, constants, `CastFrom` round-trips).
 
 ### Changed
+- `hermes-simd-benches` [patch]: dense sum/dot benches gain `i32` groups and the
+  four per-type scalar baselines consolidate into two generic `scalar_sum`/
+  `scalar_dot`. The integer rows are the evidence gate for the "emulated
+  integer kernels rely on auto-vectorization, unverified" audit finding — and
+  the verdict is a **verified negative result**: inside the
+  `#[target_feature(enable="avx2,fma")]` dispatch wrappers LLVM fully
+  auto-vectorizes the `[i32; 8]` emulated kernels (sum 50–62 Gelem/s vs 4.5
+  scalar ≈ 12×, L1-resident; dot 20.3 Gelem/s at 16 Ki ≈ 7.4×,
+  memory-bandwidth-bound). Hand-written AVX2 integer `SimdKernel` impls for the
+  dense op families are therefore rejected as duplication with no measurable
+  win; the bench rows stand as the regression gate for that conclusion.
+  (Residual: emulated `gather`/`compress`/mask ops compile to scalar loops
+  auto-vectorization cannot rescue — revisit only when a sparse-integer
+  consumer exists.)
 - `hermes-simd` [patch]: conservatively disable AMX auto-dispatch by reporting
   no AMX support until the crate has a stable, permission-aware probe for
   hardware bits, XCR0 OS state, and Linux XTILEDATA process permission. This
