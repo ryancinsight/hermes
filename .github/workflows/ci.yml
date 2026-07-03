@@ -25,8 +25,16 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Tests (dev profile; release uses panic=abort which conflicts with the test harness)
-        run: cargo test --workspace
+      - uses: taiki-e/install-action@nextest
+      # nextest applies the committed .config/nextest.toml timeout instrument
+      # (30s slow / 60s terminate) — bare `cargo test` bypasses it. Doctests are
+      # not executed by nextest, so they run as a separate step.
+      - name: Tests (nextest, dev profile; release uses panic=abort which conflicts with the test harness)
+        run: cargo nextest run --workspace
+      - name: Doctests
+        run: cargo test --doc --workspace
+      - name: Examples build (rot gate)
+        run: cargo build --examples --workspace
       - name: Docs (warning-clean)
         run: cargo doc --no-deps --workspace
         env:
@@ -58,8 +66,11 @@ jobs:
         with:
           toolchain: 1.95.0
       - uses: Swatinem/rust-cache@v2
-      - name: Tests
-        run: cargo test --workspace
+      - uses: taiki-e/install-action@nextest
+      - name: Tests (nextest, committed timeout config)
+        run: cargo nextest run --workspace
+      - name: Doctests
+        run: cargo test --doc --workspace
 
   cross-check:
     name: cross-compile check (aarch64 target from x86_64)
