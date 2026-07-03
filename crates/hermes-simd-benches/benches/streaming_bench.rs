@@ -75,20 +75,19 @@ fn bench_streaming(c: &mut Criterion) {
 
     // 16 Mi f32 = 64 MiB per buffer (192 MiB working set) — past any consumer L3,
     // so the write path is DRAM-bound and the RFO the NT store avoids is visible.
-    for &len in &[1usize << 24] {
-        let a = aligned_filled(len, |i| (i % 97) as f32 * 0.5);
-        let b = aligned_filled(len, |i| (i % 89) as f32 * 0.25);
-        let mut out = aligned_filled(len, |_| 0.0);
+    let len = 1usize << 24;
+    let a = aligned_filled(len, |i| (i % 97) as f32 * 0.5);
+    let b = aligned_filled(len, |i| (i % 89) as f32 * 0.25);
+    let mut out = aligned_filled(len, |_| 0.0);
 
-        group.throughput(Throughput::Bytes((len * 4 * 3) as u64)); // 2 reads + 1 write
+    group.throughput(Throughput::Bytes((len * 4 * 3) as u64)); // 2 reads + 1 write
 
-        group.bench_with_input(BenchmarkId::new("regular", len), &len, |bencher, _| {
-            bencher.iter(|| unsafe { add_regular(a.as_ptr(), b.as_ptr(), out.as_mut_ptr(), len) })
-        });
-        group.bench_with_input(BenchmarkId::new("streaming", len), &len, |bencher, _| {
-            bencher.iter(|| unsafe { add_streaming(a.as_ptr(), b.as_ptr(), out.as_mut_ptr(), len) })
-        });
-    }
+    group.bench_with_input(BenchmarkId::new("regular", len), &len, |bencher, _| {
+        bencher.iter(|| unsafe { add_regular(a.as_ptr(), b.as_ptr(), out.as_mut_ptr(), len) })
+    });
+    group.bench_with_input(BenchmarkId::new("streaming", len), &len, |bencher, _| {
+        bencher.iter(|| unsafe { add_streaming(a.as_ptr(), b.as_ptr(), out.as_mut_ptr(), len) })
+    });
     group.finish();
 }
 

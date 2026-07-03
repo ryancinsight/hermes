@@ -38,6 +38,21 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   popcount, wrapping fmadd, min/max, constants, `CastFrom` round-trips).
 
 ### Added
+- `hermes-simd-core`/`hermes-simd-intrinsics` [minor]: **non-temporal
+  (streaming) stores for out-of-LLC elementwise writes.** New `SimdKernel`
+  seam — `SUPPORTS_NT_STORE` (const gate, default `false`), `store_streaming`
+  (default = `store_aligned`; x86 f32/f64 override to `vmovntps`/`vmovntpd` via
+  the codegen template), and `stream_write_barrier` (default no-op; x86 =
+  `sfence`). `SimdView::zip_into` (the elementwise `Add`/`Sub`/`Mul`/`Div` SSOT)
+  routes outputs ≥ `NT_STORE_MIN_BYTES` (8 MiB, past every consumer L2) through
+  a prefix-peeled-to-alignment streaming path that bypasses the cache, avoiding
+  the read-for-ownership traffic a normal write-allocate pays. The store
+  instruction is the only change, so results are byte-identical to the regular
+  path — verified by a facade differential at 8.4 MiB with a mis-aligned output
+  (forces the peel head) asserting `to_bits()` equality. Motivated and gated by
+  the measured 1.71× (`streaming_bench`: 18.3 → 31.3 GiB/s on 64 MiB AVX2 f32).
+  Backends without a non-temporal store (NEON, scalar, integer/half) inherit the
+  safe default and never take the path.
 - `hermes-simd-core` [minor]: `AlignedVec::reserve(additional)` and
   `extend_from_slice(&[T])` (`T: Copy`). `reserve` grows to at least the request
   (never below doubling, preserving geometric-growth amortization) in a single

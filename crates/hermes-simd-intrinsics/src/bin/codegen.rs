@@ -390,6 +390,21 @@ impl SimdKernel<__SCALAR_TYPE__> for Avx2 {
         __PREFIX___storeu___SUFFIX__(ptr, val.0);
     }
 
+    const SUPPORTS_NT_STORE: bool = true;
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (as above) and that `ptr` is aligned to the __LANE_COUNT__-lane width; `__PREFIX___stream___SUFFIX__` (`vmovntps`/`vmovntpd`) faults on misalignment.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn store_streaming(ptr: *mut __SCALAR_TYPE__, val: Self::Vector) {
+        __PREFIX___stream___SUFFIX__(ptr, val.0);
+    }
+
+    #[inline]
+    fn stream_write_barrier() {
+        // SAFETY: `_mm_sfence` (SSE) is unconditionally available on x86_64.
+        unsafe { core::arch::x86_64::_mm_sfence() };
+    }
+
     // -----------------------------------------------------------------------
     // Arithmetic
     // -----------------------------------------------------------------------
@@ -895,6 +910,21 @@ impl SimdKernel<__SCALAR_TYPE__> for Avx512 {
     #[inline]
     unsafe fn store_unaligned(ptr: *mut __SCALAR_TYPE__, val: Self::Vector) {
         __PREFIX___storeu___SUFFIX__(ptr, val.0);
+    }
+
+    const SUPPORTS_NT_STORE: bool = true;
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (as above) and that `ptr` is aligned to the __LANE_COUNT__-lane width; `__PREFIX___stream___SUFFIX__` (`vmovntps`/`vmovntpd`) faults on misalignment.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn store_streaming(ptr: *mut __SCALAR_TYPE__, val: Self::Vector) {
+        __PREFIX___stream___SUFFIX__(ptr, val.0);
+    }
+
+    #[inline]
+    fn stream_write_barrier() {
+        // SAFETY: `_mm_sfence` (SSE) is unconditionally available on x86_64.
+        unsafe { core::arch::x86_64::_mm_sfence() };
     }
 
     // -----------------------------------------------------------------------

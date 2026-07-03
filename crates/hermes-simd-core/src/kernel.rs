@@ -153,6 +153,39 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     /// `ptr` must be valid for writes.
     unsafe fn store_unaligned(ptr: *mut T, val: Self::Vector);
 
+    /// Whether this backend provides a *non-temporal* (cache-bypassing) store
+    /// via [`store_streaming`](Self::store_streaming). Backends leaving this
+    /// `false` keep the regular store default; callers gate the streaming path
+    /// on this const so it is a compile-time branch, dead-code-eliminated where
+    /// unsupported.
+    const SUPPORTS_NT_STORE: bool = false;
+
+    /// Store a vector with a non-temporal (streaming) hint that bypasses the
+    /// cache, avoiding the read-for-ownership traffic a normal write-allocate
+    /// pays for write-only data larger than the last-level cache (measured 1.71×
+    /// on out-of-LLC AVX2 f32 elementwise writes; see `streaming_bench`).
+    ///
+    /// The default is a normal aligned store — correct but not cache-bypassing —
+    /// so a backend without a non-temporal instruction inherits safe behavior.
+    /// After a run of streaming stores the caller must issue
+    /// [`stream_write_barrier`](Self::stream_write_barrier) before the results
+    /// are read, since non-temporal stores are weakly ordered.
+    ///
+    /// # Safety
+    /// `ptr` must be valid for writes and aligned to `LANE_COUNT * size_of::<T>()`
+    /// bytes (non-temporal stores fault on misalignment).
+    #[inline(always)]
+    unsafe fn store_streaming(ptr: *mut T, val: Self::Vector) {
+        Self::store_aligned(ptr, val);
+    }
+
+    /// Fence ordering this backend's non-temporal stores before subsequent
+    /// reads. No-op by default (only meaningful where
+    /// [`store_streaming`](Self::store_streaming) is a weakly ordered
+    /// non-temporal store).
+    #[inline(always)]
+    fn stream_write_barrier() {}
+
     // -------------------------------------------------------------------------
     // Dense Arithmetic
     // -------------------------------------------------------------------------

@@ -45,6 +45,33 @@ fn test_elementwise_add_sub_div_f32() {
     assert_eq!(out, [2.0, 1.5, 4.0 / 3.0, 1.25, 1.2]);
 }
 
+/// Non-temporal store path differential. An output ≥ 8 MiB engages the
+/// cache-bypassing streaming store on AVX2/AVX-512 f32; a mis-aligned output
+/// slice (offset by one element) forces the alignment-peel head. Streaming
+/// changes only the store instruction, not the arithmetic, so the result must
+/// be byte-identical to a sequential scalar reference (add is exact for these
+/// dyadic inputs). On backends without a non-temporal store the regular path
+/// runs and the same assertion holds.
+#[test]
+fn test_elementwise_add_streaming_matches_scalar() {
+    // 2_100_003 f32 = 8.4 MiB > the 8 MiB NT threshold; not a lane multiple so
+    // the tail path is exercised too.
+    let n = 2_100_003usize;
+    let a: Vec<f32> = (0..n).map(|i| (i % 101) as f32 * 0.5).collect();
+    let b: Vec<f32> = (0..n).map(|i| (i % 103) as f32 * 0.25).collect();
+    let mut out_buf = vec![0.0f32; n + 8];
+    let out = &mut out_buf[1..1 + n]; // 4-byte-offset start → nonzero peel head
+    elementwise_add::<f32>(&a, &b, out).unwrap();
+
+    for i in 0..n {
+        assert_eq!(
+            out[i].to_bits(),
+            (a[i] + b[i]).to_bits(),
+            "streaming add mismatch at {i}"
+        );
+    }
+}
+
 /// Differential check across sizes spanning the SIMD lane/tail boundary:
 /// vectorized add/sub/mul/div must match a plain scalar reference bit-for-bit
 /// (each is a single per-lane IEEE op — no reassociation).

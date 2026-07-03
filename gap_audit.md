@@ -142,8 +142,8 @@ order (correctness → architecture → tests → docs → PM).
   64-iter scalar loops (MED)** — route through native backend mask ops.
   **`compress` zero-inits a 64-elem stack buffer per chunk (MED); argmin/argmax
   two-pass (LOW-MED).** All `[patch]`/`[minor]`.
-- **[MEASURED 2026-07-03, productionizing] Non-temporal (streaming) stores for
-  out-of-LLC writes — strongly beneficial.** Focused experiment
+- **[RESOLVED 2026-07-03] Non-temporal (streaming) stores for out-of-LLC writes
+  — strongly beneficial, productionized.** Focused experiment
   (`streaming_bench.rs`): `out = a + b` over 16 Mi f32 (192 MiB working set, past
   L3), identical AVX2 loads+add, differing only in the store — normal
   `_mm256_store_ps` vs `_mm256_stream_ps` + `sfence`. **Regular 10.24 ms
