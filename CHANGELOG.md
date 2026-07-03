@@ -38,6 +38,23 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   popcount, wrapping fmadd, min/max, constants, `CastFrom` round-trips).
 
 ### Changed
+- `hermes-simd-core` [patch]: `SimdCow::scale` now delegates to the fused
+  `mul_scalar_cow` broadcast kernel. The previous body copied the buffer
+  (`from_slice`) and then rescaled in place — two full read+write passes (4n
+  element traffic) for a result bitwise-identical to the single fused pass
+  (2n). Consolidates two parallel implementations of the same operation onto
+  the `broadcast_op` SSOT.
+- `hermes-simd` [patch]: **measured negative result** — chunk-width-aware
+  SELL-p/BCOO dispatch (routing to the widest ISA whose `LANE_COUNT` matches
+  `C`/`BN`) was implemented, A/B-benchmarked, and **reverted**: on an AVX2 host
+  the `sellp4` 100k-row/10%-density case ran 2.4× slower via the lane-matched
+  4-lane kernel (17.6 ms) than via the existing widest-first path (7.5 ms),
+  because the "scalar fallback" loop auto-vectorizes at full width inside the
+  AVX2 `#[target_feature]` dispatch helper. The widest-first ladder stands; the
+  AVX-512-host variant of the original finding stays open in gap_audit.md,
+  gated on AVX-512 hardware for its A/B. A dispatcher-independent SELL-8
+  multislice differential test (non-uniform values, per-slice padding, dense
+  reference) is kept from the experiment.
 - `hermes-simd-intrinsics` [patch]: **F16C hardware-conversion arithmetic core
   for the AVX2 `f16` kernel.** The 16-lane `f16` kernel's `add`/`sub`/`mul`/
   `fmadd` performed per-element software f16↔f32 conversion (measured: `dot`

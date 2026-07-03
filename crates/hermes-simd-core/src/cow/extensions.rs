@@ -97,12 +97,13 @@ where
 
     /// Return an owned `SimdCow` with every element multiplied by `scalar`.
     ///
-    /// One allocation. Delegates to `clone` + `scale_in_place`.
+    /// One allocation. Delegates to the fused [`SimdCow::mul_scalar_cow`]
+    /// broadcast kernel (single read+write pass); the previous copy-then-
+    /// `scale_in_place` body cost a second full read+write pass over the
+    /// buffer for a bitwise-identical result.
     #[inline]
     pub fn scale(&self, scalar: T) -> SimdCow<'static, T, Arch, Align> {
-        let mut owned: SimdCow<'static, T, Arch, Align> = SimdCow::from_slice(self.as_ref());
-        owned.scale_in_place(scalar);
-        owned
+        self.mul_scalar_cow(scalar)
     }
 
     /// Construct an owned `SimdCow` of length `len` with every element set to `value`.

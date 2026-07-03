@@ -271,6 +271,66 @@ fn test_sellp_spmv_dispatch() {
     assert_eq!(y8, [10.0, 20.0, 30.0, 40.0]);
 }
 
+/// Chunk-width-aware dispatch differential: a two-slice SELL-8 matrix with
+/// per-slice padding and non-uniform values must match an independent dense
+/// reference through the public dispatcher, whichever ISA the ladder picks
+/// (on an AVX2 host C = 8 engages the AVX2 kernel; C = 4 routes to the
+/// lane-matching scalar marker instead of the per-element fallback).
+#[test]
+fn test_sellp_spmv_dispatch_multislice_differential() {
+    // 16 rows (2 slices of C = 8), 8 columns; row r has entries at columns
+    // (r % 8) and ((r + 3) % 8) with values derived from r.
+    const C: usize = 8;
+    let nrows = 16usize;
+    let ncols = 8usize;
+    let cols_per_row = 2usize;
+
+    // SELL-p layout: slice s columns stored column-major within the slice.
+    let mut values = vec![0.0f32; nrows * cols_per_row];
+    let mut col_indices = vec![0i32; nrows * cols_per_row];
+    for s in 0..2 {
+        for col in 0..cols_per_row {
+            for row in 0..C {
+                let r = s * C + row;
+                let idx = s * (cols_per_row * C) + col * C + row;
+                let c = (r + 3 * col) % ncols;
+                values[idx] = (r * cols_per_row + col) as f32 * 0.5 - 3.0;
+                col_indices[idx] = c as i32;
+            }
+        }
+    }
+    let slice_ptr = [
+        0i32,
+        (cols_per_row * C) as i32,
+        (2 * cols_per_row * C) as i32,
+    ];
+    let slice_col_count = [cols_per_row as i32, cols_per_row as i32];
+    let data = SellPData::<f32, C>::new(
+        &values,
+        &col_indices,
+        &slice_ptr[..],
+        &slice_col_count[..],
+        nrows,
+        ncols,
+    );
+
+    let x: Vec<f32> = (0..ncols).map(|i| i as f32 + 0.25).collect();
+    let mut y = vec![1.0f32; nrows];
+    spmv_sellp::<f32, C>(data, &x, &mut y);
+
+    // Independent dense reference: y_ref = 1 + Σ values[r,·]·x[col].
+    let mut y_ref = vec![1.0f32; nrows];
+    for (r, y_r) in y_ref.iter_mut().enumerate() {
+        let s = r / C;
+        let row = r % C;
+        for col in 0..cols_per_row {
+            let idx = s * (cols_per_row * C) + col * C + row;
+            *y_r += values[idx] * x[col_indices[idx] as usize];
+        }
+    }
+    assert_eq!(y, y_ref, "SELL-8 dispatch diverges from dense reference");
+}
+
 #[test]
 fn test_unpack_int4() {
     let packed = [0xABu8];

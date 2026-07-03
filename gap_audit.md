@@ -54,13 +54,23 @@ order (correctness → architecture → tests → docs → PM).
 
 ### Performance (source-audit tier; each needs a criterion baseline before/after)
 
-- **[open] SELL-P/BCOO silent scalar fallback when widest ISA lane ≠ chunk size
-  (HIGH).** `spmv.rs` dispatch selects the vectorized kernel only when
-  `Arch::LANE_COUNT == C`/`BN`; `#[runtime_dispatch]` always picks the widest ISA
-  first, so a SELL-8 f32 matrix on an AVX-512 host (`LANE_COUNT 16 ≠ 8`) silently
-  runs scalar — slower than the AVX2 kernel in the same binary, and a silent
-  capability downgrade. Fix: pick the arch whose `LANE_COUNT` matches `C`/`BN`, or
-  generalize the kernel to `C = k·LANE_COUNT`. `[minor]`.
+- **[REVISED 2026-07-02, measured] SELL-P/BCOO chunk-width dispatch — the
+  simple fix is a measured regression; only the AVX-512 case remains open.**
+  A chunk-aware ladder routing to the widest ISA whose `LANE_COUNT == C` was
+  implemented and A/B-benchmarked on this AVX2 host: for `sellp4` (C=4,
+  100k rows, 10% density) the *old* widest-first path ran 7.48 ms
+  (13.7 Gelem/s) vs 17.6 ms (5.8 Gelem/s) for lane-matched routing to the
+  4-lane scalar-marker kernel — **2.4× slower**, because the "scalar fallback"
+  loop executes inside the AVX2 `#[target_feature]` dispatch helper and LLVM
+  auto-vectorizes it at full 8-lane width, beating the narrow emulated-gather
+  kernel. The change was reverted; a dispatcher-independent SELL-8 multislice
+  differential test was kept. Still open, hardware-gated: on an AVX-512 host a
+  SELL-8 f32 matrix runs the auto-vectorized fallback where the *native* AVX2
+  8-lane gather kernel in the same binary might win — unmeasurable without
+  AVX-512. DoR: acceptance = criterion A/B of sellp8 widest-first vs
+  AVX2-routed on an AVX-512 runner; do not re-implement without that number.
+  The `C = k·LANE_COUNT` kernel generalization remains a separate `[minor]`
+  candidate under the same measurement gate.
 - **[open] Per-call CSR/BCOO index re-validation (HIGH, 2 agents).** The soundness
   scans in CSR/BCOO (and now SELL-p) re-read `col_indices` every `spmv`; iterative
   solvers call spmv thousands of times on one immutable matrix (+~17-50% index
