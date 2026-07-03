@@ -86,10 +86,23 @@ order (correctness → architecture → tests → docs → PM).
   for out-of-LLC writes (MED); `Aligned` typestate dead at the dispatch facade —
   every op uses unaligned loads and NT stores are blocked on it (LOW-MED);
   uniform `UNROLL_FACTOR=4` under-fills the FMA pipeline for cache-resident
-  reductions (LOW-MED); integer/bf16 AVX kernels are lane-emulated arrays relying
-  on autovectorization, unverified by codegen (MED); per-call detection branch
-  chain, no cached dispatch decision (LOW-MED).** Each `[patch]`/`[minor]`, all
-  measurement-gated.
+  reductions (LOW-MED); per-call detection branch chain, no cached dispatch
+  decision (LOW-MED).** Each `[patch]`/`[minor]`, all measurement-gated.
+- **[RESOLVED 2026-07-02] Integer/half emulated-kernel throughput — measured,
+  split verdict (host-capability sweep, criterion).** (a) *Integer dense ops*:
+  LLVM fully auto-vectorizes the emulated `[i32; 8]` kernels inside the
+  `#[target_feature]` wrappers — `sum::<i32>` ~12× scalar (50–62 Gelem/s),
+  `dot::<i32>` ~7.4× (bandwidth-bound); hand-written AVX2 integer kernels
+  REJECTED as no-win duplication; i32 bench rows are the regression gate.
+  (b) *int8 GEMM*: new 256-bit **AVX-VNNI** tile backend (`vpdpbusd` + exact
+  +128 bias correction) — 17.3–20.2× measured over scalar tiles; dispatch
+  ladder now AMX → AVX-512 VNNI → AVX-VNNI → scalar. (c) *f16*: AVX2 kernel's
+  arithmetic core upgraded to **F16C** hardware conversion (bitwise-identical
+  to the software semantics) — `dot::<f16>` 221 Melem/s → 7.22 Gelem/s
+  (31.7×). (d) *bf16*: ~2 Gelem/s emulated (shift conversion partially
+  auto-vectorizes); hardware core deferred until a consumer needs it —
+  remaining emulated gap is gather/compress/mask ops (scalar loops), deferred
+  until a sparse-integer consumer exists. See CHANGELOG [Unreleased].
 
 ### Memory / zero-copy
 
