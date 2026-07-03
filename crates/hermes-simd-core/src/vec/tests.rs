@@ -113,3 +113,68 @@ fn test_aligned_vec_alignment_casting() {
     let v_unaligned = v_aligned.into_unaligned();
     assert_eq!(v_unaligned.len(), 0);
 }
+
+#[test]
+fn test_aligned_vec_reserve_single_realloc() {
+    use crate::align::Aligned;
+    // From empty: one reserve to an explicit target allocates exactly once and
+    // never shrinks below the request.
+    let mut v = AlignedVec::<i32, Aligned<64>>::new();
+    v.reserve(100);
+    let cap_after = v.capacity();
+    assert!(
+        cap_after >= 100,
+        "reserve must satisfy the request: {cap_after}"
+    );
+    let ptr_after = v.as_ptr() as usize;
+
+    // Pushing up to the reserved capacity must not reallocate (pointer stable).
+    for i in 0..100 {
+        v.push(i);
+    }
+    assert_eq!(v.len(), 100);
+    assert_eq!(
+        v.capacity(),
+        cap_after,
+        "no realloc within reserved capacity"
+    );
+    assert_eq!(
+        v.as_ptr() as usize,
+        ptr_after,
+        "pointer stable within capacity"
+    );
+    for i in 0..100 {
+        assert_eq!(v[i as usize], i);
+    }
+
+    // reserve is a no-op when capacity already suffices.
+    v.reserve(0);
+    assert_eq!(v.capacity(), cap_after);
+    v.reserve(50); // 100 + 50 = 150 > cap → grows (still one call)
+    assert!(v.capacity() >= 150);
+}
+
+#[test]
+fn test_aligned_vec_extend_from_slice() {
+    use crate::align::Aligned;
+    let mut v = AlignedVec::<i32, Aligned<64>>::new();
+    v.extend_from_slice(&[1, 2, 3]);
+    v.extend_from_slice(&[]); // empty is a no-op
+    v.extend_from_slice(&[4, 5]);
+    assert_eq!(v.as_slice(), &[1, 2, 3, 4, 5]);
+
+    // Extending a pre-sized vec copies in place without reallocating.
+    let mut w = AlignedVec::<f32, Aligned<64>>::with_capacity(8);
+    let ptr = w.as_ptr() as usize;
+    w.extend_from_slice(&[1.5, 2.5, 3.5, 4.5]);
+    assert_eq!(w.as_slice(), &[1.5, 2.5, 3.5, 4.5]);
+    assert_eq!(w.as_ptr() as usize, ptr, "no realloc within capacity");
+}
+
+#[test]
+fn test_aligned_vec_extend_from_slice_zst() {
+    let mut v = AlignedVec::<(), Unaligned>::new();
+    v.extend_from_slice(&[(), (), ()]);
+    assert_eq!(v.len(), 3);
+    assert_eq!(v[2], ());
+}

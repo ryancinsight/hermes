@@ -140,10 +140,13 @@ order (correctness → architecture → tests → docs → PM).
   (MED-HIGH)** — 8× footprint; bit-pack once at the boundary (a `BitMask` type
   already exists). **`cmp_*_mask`/`cast` round-trip through stack buffers with
   64-iter scalar loops (MED)** — route through native backend mask ops.
-  **`AlignedVec` lacks `reserve`/`extend_from_slice`; `Extend for SimdCow`
-  pushes item-wise dropping `size_hint` (MED).** **`compress` zero-inits a
-  64-elem stack buffer per chunk (MED); argmin/argmax two-pass (LOW-MED).** All
-  `[patch]`/`[minor]`.
+  **`compress` zero-inits a 64-elem stack buffer per chunk (MED); argmin/argmax
+  two-pass (LOW-MED).** All `[patch]`/`[minor]`.
+- **[RESOLVED 2026-07-03] `AlignedVec` growth churn.** Added `reserve` +
+  `extend_from_slice` (single realloc via the shared `grow_to` SSOT); `Extend for
+  SimdCow` now reserves `size_hint().0` up front instead of a push loop's
+  ⌈log₂ n⌉ reallocations. Tests cover request-satisfaction, pointer-stability,
+  no-op-when-sufficient, and value/empty/pre-sized/ZST extend paths.
 - **[RESOLVED 2026-07-02] `SimdCow::scale` copy-then-rescale** — now delegates
   to the fused `mul_scalar_cow` (`broadcast_op` SSOT); halves traffic, removes
   the duplicate implementation.

@@ -37,6 +37,18 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   contract tests for every integer impl cross-checked against std (bitops,
   popcount, wrapping fmadd, min/max, constants, `CastFrom` round-trips).
 
+### Added
+- `hermes-simd-core` [minor]: `AlignedVec::reserve(additional)` and
+  `extend_from_slice(&[T])` (`T: Copy`). `reserve` grows to at least the request
+  (never below doubling, preserving geometric-growth amortization) in a single
+  reallocation via the new SSOT `grow_to(new_cap)` that `grow`/`reserve` share;
+  `extend_from_slice` is one reserve + one `copy_nonoverlapping`. `Extend for
+  SimdCow` now reserves the iterator's `size_hint().0` up front, replacing a
+  push loop's ⌈log₂ n⌉ reallocations (each copying the live prefix) with one —
+  the `AlignedVec` growth-churn gap flagged in the memory audit. Verified:
+  reserve satisfies-request + pointer-stable-within-capacity + no-op-when-
+  sufficient, extend_from_slice value/empty/pre-sized/ZST paths.
+
 ### Changed
 - `hermes-simd-benches` [patch]: extend the `Tiled GEMM f32` bench to 256³–768³
   and report throughput as FLOPs (`2·size³`) rather than output elements. Closes
