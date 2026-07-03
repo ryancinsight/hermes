@@ -77,10 +77,16 @@ order (correctness → architecture → tests → docs → PM).
   traffic per call). Root-cause fix: a `Validated` sparse typestate constructed
   once, kernels trust the type — removes all four per-call scans and closes the
   soundness holes structurally. `[minor]` (supersedes the per-call scans).
-- **[open] GEMM/GEMV scalar column tails (HIGH).** `tiling/gemm.rs:284`,
-  `gemv.rs:135` compute the `n % block_n` trailing columns in a scalar triple
-  loop — up to ~50% of FLOPs on `n` not a multiple of 64/24. Fix: masked-vector
-  tail via existing `leading_k_mask` + `masked_fmadd`. `[minor]`.
+- **[PARTIAL 2026-07-03] GEMM/GEMV scalar column tails (HIGH).** **GEMM
+  resolved:** `tiled_gemm`'s `n % block_n` trailing columns now run
+  `leading_k_mask`-guarded fmadd lane groups (same contraction as the register
+  tiles); measured 3.43× at n=63 (25.17 → 7.33 µs, 9.9 → 34.1 Gelem/s), bitwise
+  differential at m=7/n=45/k=13, Theorem 1 updated. **GEMV still open:**
+  `gemv.rs:135` runs ≤ `lane_count−1` scalar iterations per row — same masked
+  mechanism applies, but the win is per-row-constant (small) and gemv has no
+  bench yet. DoR: add the gemv criterion rows first (also an F7 item), then A/B
+  the masked tail; acceptance = no regression at `ncols % lane == 0`, measured
+  win at `ncols % lane != 0`, exact differential on dyadic operands. `[minor]`.
 - **[open] AVX-512 bf16 tile kernel: 32 scalar bf16→f32 converts + stack
   round-trip per k-step (HIGH on that path).** `avx512_tiling.rs:35`; vectorize as
   `loadu_si256 + cvtepu16_epi32 + slli_epi32(,16)`, and use `_mm512_dpbf16_ps`
