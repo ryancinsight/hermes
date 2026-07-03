@@ -120,38 +120,43 @@ order (correctness → architecture → tests → docs → PM).
   (MED-HIGH)** — 8× footprint; bit-pack once at the boundary (a `BitMask` type
   already exists). **`cmp_*_mask`/`cast` round-trip through stack buffers with
   64-iter scalar loops (MED)** — route through native backend mask ops.
-  **`SimdCow::scale` copies-then-rescales (2n traffic) vs the fused
-  `mul_scalar_cow` sibling (MED)** — delegate/delete one (consolidation).
   **`AlignedVec` lacks `reserve`/`extend_from_slice`; `Extend for SimdCow`
   pushes item-wise dropping `size_hint` (MED).** **`compress` zero-inits a
   64-elem stack buffer per chunk (MED); argmin/argmax two-pass (LOW-MED).** All
   `[patch]`/`[minor]`.
+- **[RESOLVED 2026-07-02] `SimdCow::scale` copy-then-rescale** — now delegates
+  to the fused `mul_scalar_cow` (`broadcast_op` SSOT); halves traffic, removes
+  the duplicate implementation.
 
 ### Architecture / redundancy / hygiene
 
-- **[open] Tracked scratch at repo root** — `apply_changes.ps1`, `do_changes.ps1`,
-  `check_errors.txt` are git-tracked stale scratch (targets paths that no longer
-  exist); `benchmarks.log`/`benchmarks_utf8.log`/`check_output.txt` untracked on
-  disk. `benchmarks_baseline.json`/`benchmarks_results.md` are the live criterion
-  baseline — keep. `[patch]` hygiene.
+- **[RESOLVED 2026-07-02] Tracked scratch at repo root** — `apply_changes.ps1`,
+  `do_changes.ps1`, `check_errors.txt` deleted from git; untracked logs removed;
+  `check_errors.txt` gitignored. Dead dep declarations dropped (`divan`,
+  2×`bytemuck`, intrinsics `rkyv`; facade `rkyv` corrected to dev-dependency).
+  `benchmarks_baseline.json`/`benchmarks_results.md` kept (live baseline).
 - **[open] `codegen.rs` ungoverned SSOT (1334 lines, live generator of the 4 x86
   kernel files).** Not dead — regenerates `avx2_f32/f64`, `avx512_f32/f64`; but no
   `@generated` banner, no CI regeneration-diff gate. `[patch→minor]` process.
 - **[open] ~150-200 lines cross-backend scaffold duplication** — compress/expand
   emulation, AVX-512 cmp-mask blend, popcount LUT, masked-reduce, NEON sign-flip
   constants; hoist into `kernel_helpers`/codegen templates per ADR-005. `[minor]`.
-- **[open] README documents removed `hermes-numeric` crate** (migrated to
-  eunomia); stale backlog/checklist refs; ADR number collisions (two each of
-  001/002/003). `[patch]` docs. **`dispatch/mod.rs` (828) splits into
-  trait/impls/facade; 5 unused deps** (`divan`, 2×`bytemuck`, 2×`rkyv`). `[patch]`.
+- **[PARTIAL 2026-07-02] Doc drift** — README `hermes-numeric` entry replaced
+  with the eunomia provenance note; the fictional lib.rs feature table replaced
+  with the real set; `gemm_int8` example corrected to `gemm::<i8,i8,i32>`.
+  **Still open:** ADR number collisions (two each of 001/002/003), stale
+  backlog/checklist `hermes-numeric` refs, `dispatch/mod.rs` (828) split into
+  trait/impls/facade. `[patch]`.
 - **[open] `widen_I8_*` type-named duplicate API + undocumented unsafe + SIMD
   branch untestable at n=5** — collapse to one generic (`#[repr(transparent)]`),
   add SAFETY, differential test at n ∈ {31,32,33,47,1024}. `[patch→minor]`.
 
 ### Tests / benches / docs
 
-- **[open] CI runs bare `cargo test` — bypasses the committed nextest timeout
-  instrument.** Switch to `cargo nextest run` + `cargo test --doc`. `[patch]`.
+- **[RESOLVED 2026-07-02] CI runs bare `cargo test`** — both test jobs now run
+  `cargo nextest run --workspace` (committed timeout instrument applies) plus
+  explicit `cargo test --doc`; x86_64 job gains a `cargo build --examples`
+  rot gate (verified green locally; CI run pending next push).
 - **[open] ~25 magic-tolerance assertion sites** vs the repo's own demonstrated
   derivation discipline (complex_tests derives the bound); derive+cite each.
   **AVX-512 differential suite silently skips on CI hosts (unreported).**
