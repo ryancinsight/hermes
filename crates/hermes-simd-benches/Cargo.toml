@@ -49,6 +49,10 @@ harness = false
 name = "gemv_bench"
 harness = false
 
+[[bench]]
+name = "streaming_bench"
+harness = false
+
 [features]
 default = ["mnemosyne-memory"]
 mnemosyne-memory = [

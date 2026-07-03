@@ -142,6 +142,19 @@ order (correctness → architecture → tests → docs → PM).
   64-iter scalar loops (MED)** — route through native backend mask ops.
   **`compress` zero-inits a 64-elem stack buffer per chunk (MED); argmin/argmax
   two-pass (LOW-MED).** All `[patch]`/`[minor]`.
+- **[MEASURED 2026-07-03, productionizing] Non-temporal (streaming) stores for
+  out-of-LLC writes — strongly beneficial.** Focused experiment
+  (`streaming_bench.rs`): `out = a + b` over 16 Mi f32 (192 MiB working set, past
+  L3), identical AVX2 loads+add, differing only in the store — normal
+  `_mm256_store_ps` vs `_mm256_stream_ps` + `sfence`. **Regular 10.24 ms
+  (18.3 GiB/s) → streaming 5.98 ms (31.3 GiB/s) = 1.71×**, far above the ~25%
+  RFO-avoidance estimate. Productionizing: a `SimdKernel::store_streaming` seam
+  (default = `store_aligned`; `SUPPORTS_NT_STORE` const gate; x86 f32/f64
+  override via the codegen template's `__PREFIX___stream___SUFFIX__`) plus
+  `stream_write_barrier` (sfence), and a size-gated (`len·sizeof(T) ≥ LLC-ish
+  threshold), prefix-peeled-to-alignment streaming path in the elementwise
+  `zip_into` SSOT. Differential test: streaming result is byte-identical to the
+  regular store (same op, cache bypass only).
 - **[RESOLVED 2026-07-03] `AlignedVec` growth churn.** Added `reserve` +
   `extend_from_slice` (single realloc via the shared `grow_to` SSOT); `Extend for
   SimdCow` now reserves `size_hint().0` up front instead of a push loop's
