@@ -38,6 +38,25 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   popcount, wrapping fmadd, min/max, constants, `CastFrom` round-trips).
 
 ### Changed
+- `hermes-simd-core`/`hermes-simd-benches` [patch]: **masked-vector GEMV column
+  tail** + the workspace's first GEMV benchmark (`gemv_bench.rs`, tail-isolating:
+  each size pairs a tail-free `ncols` with a tail-having one at matched scale).
+  The `ncols % LANE_COUNT` trailing columns of `gemv_strided_impl` (both the
+  `TILE_M`-blocked and row-remainder paths) ran a per-row scalar loop; they now
+  fold into the same vector accumulator via one masked fmadd — `x`'s tail lanes
+  loaded once and reused across every row — replacing ~`lane_count−1` scalar
+  ops/row with a single masked op and giving the tail the main loop's
+  fused-multiply reduction. Inactive lanes load zero (`a·0` contributes
+  nothing). Bench-gated per its Definition of Ready: at cache-resident 256×256
+  (compute-visible) the 7-lane-tail row measured **3.58 µs → 2.83 µs (+27%
+  throughput**, 18.2 → 23.1 Gelem/s), the tail-free row unchanged within
+  run-to-run noise (2.4–2.6 µs); the DRAM 3000×1504 rows are bandwidth-bound and
+  tail-neutral (retained as regression rows). Reduction order shifts (tail folded
+  into the lane reduction vs a trailing scalar add), within the documented
+  backend reduction-order envelope; verified by a new f32 facade differential
+  (`n=21` = two full groups + 5-lane tail, `nrows=11` covering blocked + remainder
+  rows, dyadic-exact ⇒ bitwise-equal) plus the existing dyadic f64 tail-shape
+  suite.
 - `hermes-simd-core` [patch]: **masked-vector GEMM column tails.** The
   `n % (TILE_N·LANE_COUNT)` trailing columns of `tiled_gemm` ran a strided
   scalar triple loop — up to `block_n − 1` columns (≈ half the FLOPs for `n`

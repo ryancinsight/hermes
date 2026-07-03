@@ -45,6 +45,10 @@ harness = false
 name = "tiled_gemm_bench"
 harness = false
 
+[[bench]]
+name = "gemv_bench"
+harness = false
+
 [features]
 default = ["mnemosyne-memory"]
 mnemosyne-memory = [

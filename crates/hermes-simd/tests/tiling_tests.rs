@@ -37,6 +37,35 @@ fn test_tiled_gemv_correctness() {
     assert_eq!(y, [30.0, 70.0, 110.0, 150.0]);
 }
 
+/// f32 GEMV column-tail differential through the public dispatcher. `ncols = 21`
+/// on an AVX2 host is two full 8-lane groups plus a 5-lane masked tail, and
+/// `nrows = 11` gives both TILE_M-blocked rows and a row remainder — every
+/// masked-tail path in one shape. Dyadic-exact operands keep the fused-multiply
+/// masked-tail reduction bitwise-equal to the sequential scalar reference.
+#[test]
+fn test_gemv_f32_column_tail_differential() {
+    let nrows = 11usize;
+    let ncols = 21usize;
+    let a: Vec<f32> = (0..nrows * ncols)
+        .map(|i| ((i % 9) as f32 - 4.0) * 0.25)
+        .collect();
+    let x: Vec<f32> = (0..ncols).map(|i| ((i % 5) as f32 - 2.0) * 0.5).collect();
+    let y_init: Vec<f32> = (0..nrows).map(|i| (i % 3) as f32 - 1.0).collect();
+
+    let mut y = y_init.clone();
+    gemv::<f32>(&a, &x, &mut y, nrows, ncols).unwrap();
+
+    let mut want = y_init;
+    for (row, w) in want.iter_mut().enumerate() {
+        let mut sum = 0.0f32;
+        for col in 0..ncols {
+            sum += a[row * ncols + col] * x[col];
+        }
+        *w += sum;
+    }
+    assert_eq!(y, want, "gemv f32 column tail diverges from reference");
+}
+
 #[test]
 fn test_tiled_gemm() {
     let a = vec![

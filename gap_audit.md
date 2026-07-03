@@ -77,16 +77,18 @@ order (correctness → architecture → tests → docs → PM).
   traffic per call). Root-cause fix: a `Validated` sparse typestate constructed
   once, kernels trust the type — removes all four per-call scans and closes the
   soundness holes structurally. `[minor]` (supersedes the per-call scans).
-- **[PARTIAL 2026-07-03] GEMM/GEMV scalar column tails (HIGH).** **GEMM
-  resolved:** `tiled_gemm`'s `n % block_n` trailing columns now run
-  `leading_k_mask`-guarded fmadd lane groups (same contraction as the register
-  tiles); measured 3.43× at n=63 (25.17 → 7.33 µs, 9.9 → 34.1 Gelem/s), bitwise
-  differential at m=7/n=45/k=13, Theorem 1 updated. **GEMV still open:**
-  `gemv.rs:135` runs ≤ `lane_count−1` scalar iterations per row — same masked
-  mechanism applies, but the win is per-row-constant (small) and gemv has no
-  bench yet. DoR: add the gemv criterion rows first (also an F7 item), then A/B
-  the masked tail; acceptance = no regression at `ncols % lane == 0`, measured
-  win at `ncols % lane != 0`, exact differential on dyadic operands. `[minor]`.
+- **[RESOLVED 2026-07-03] GEMM/GEMV scalar column tails (HIGH).** **GEMM:**
+  `tiled_gemm`'s `n % block_n` trailing columns run `leading_k_mask`-guarded
+  fmadd lane groups; measured 3.43× at n=63 (25.17 → 7.33 µs), bitwise
+  differential m=7/n=45/k=13, Theorem 1 updated. **GEMV:** the `ncols % lane`
+  tail (both blocked and remainder paths) folds into the vector accumulator via
+  one masked fmadd (x-tail loaded once, reused across rows). Added the
+  workspace's first GEMV bench (`gemv_bench.rs`, tail-isolating); measured at
+  cache-resident 256×256 the tail row improved 3.58 → 2.83 µs (+27% throughput),
+  aligned neutral within noise, DRAM rows bandwidth-bound/neutral. f32 facade
+  differential (n=21, nrows=11, dyadic-exact ⇒ bitwise) + existing f64 tail-shape
+  suite. Follow-on candidate: same masked-tail treatment for `gemv_transpose`
+  and `axpy` (both still scalar-tailed, both now benchmarkable).
 - **[open] AVX-512 bf16 tile kernel: 32 scalar bf16→f32 converts + stack
   round-trip per k-step (HIGH on that path).** `avx512_tiling.rs:35`; vectorize as
   `loadu_si256 + cvtepu16_epi32 + slli_epi32(,16)`, and use `_mm512_dpbf16_ps`
