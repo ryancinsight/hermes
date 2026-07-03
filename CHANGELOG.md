@@ -38,6 +38,21 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   popcount, wrapping fmadd, min/max, constants, `CastFrom` round-trips).
 
 ### Changed
+- `hermes-simd-core` [patch]: **masked-vector GEMM column tails.** The
+  `n % (TILE_N·LANE_COUNT)` trailing columns of `tiled_gemm` ran a strided
+  scalar triple loop — up to `block_n − 1` columns (≈ half the FLOPs for `n`
+  just under a block multiple, e.g. 31 of 63 on AVX2 f32). They now run the
+  same fmadd contraction as the register tiles through `leading_k_mask`-guarded
+  lane groups (`masked_load` → fmadd over k, B row-loads reused across a
+  `TILE_M` row block → `masked_store`); inactive lanes load zero, accumulate
+  `a·0`, and are excluded from the store, so Theorem 1's exactly-once cell
+  coverage is preserved (proof text updated). Tail columns thereby also gain
+  the tiles' fused-multiply rounding instead of separate mul+add. Verified by a
+  new bitwise differential at `m=7, n=45, k=13` (one full block + one full
+  masked group + a 5-lane partial group, dyadic-exact operands) plus the
+  existing suite. Measured (criterion, AVX2 f32, new `n=63` bench row): 25.17 µs
+  → 7.33 µs (**3.43×**, 9.9 → 34.1 Gelem/s, change −72%, p=0.00); full-block
+  sizes are structurally unaffected.
 - `hermes-simd-core` [patch]: `SimdCow::scale` now delegates to the fused
   `mul_scalar_cow` broadcast kernel. The previous body copied the buffer
   (`from_slice`) and then rescaled in place — two full read+write passes (4n

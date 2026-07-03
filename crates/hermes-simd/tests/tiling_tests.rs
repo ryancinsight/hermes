@@ -133,6 +133,38 @@ fn test_gemm_int8_high_level() {
     }
 }
 
+/// Column-tail differential: `n = 45` on an AVX2 host splits into one full
+/// 32-column register block, one full 8-lane masked group, and a 5-lane
+/// partial-mask group — every tail case in one shape. Dyadic-exact entries
+/// (multiples of 0.5 with k ≤ 16) keep each product and partial sum exactly
+/// representable in f32, so the fused-multiply tail must match the sequential
+/// scalar reference **bitwise**.
+#[test]
+fn test_tiled_gemm_column_tail_differential() {
+    let m = 7usize;
+    let n = 45usize;
+    let k = 13usize;
+    let a: Vec<f32> = (0..m * k).map(|i| ((i % 9) as f32 - 4.0) * 0.5).collect();
+    let b: Vec<f32> = (0..k * n).map(|i| ((i % 7) as f32 - 3.0) * 0.5).collect();
+    // Nonzero C exercises the accumulate contract on both tile and tail paths.
+    let c_init: Vec<f32> = (0..m * n).map(|i| (i % 11) as f32 - 5.0).collect();
+
+    let mut c = c_init.clone();
+    tiled_gemm(&a, &b, &mut c, m, n, k).unwrap();
+
+    let mut c_ref = c_init;
+    for row in 0..m {
+        for col in 0..n {
+            let mut sum = 0.0f32;
+            for kk in 0..k {
+                sum += a[row * k + kk] * b[kk * n + col];
+            }
+            c_ref[row * n + col] += sum;
+        }
+    }
+    assert_eq!(c, c_ref, "tiled GEMM column tail diverges from reference");
+}
+
 /// Differential: the dispatched int8 GEMM (whatever backend the host selects —
 /// AMX, AVX-512 VNNI, 256-bit AVX-VNNI, or scalar tiles) must equal an
 /// independent wrapping scalar triple loop **bitwise**. Integer accumulation is

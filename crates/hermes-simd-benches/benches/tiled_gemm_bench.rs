@@ -9,7 +9,10 @@ use hermes_simd::{gemm, tiled_gemm, Scalar, TileMatrixMultiply};
 fn bench_tiled_gemm(c: &mut Criterion) {
     let mut group = c.benchmark_group("Tiled GEMM f32");
 
-    for &size in &[32usize, 64] {
+    // 63 is deliberately just under the AVX2 f32 block width (TILE_N·LANE_COUNT
+    // = 32): 32 columns take the register-tiled path and 31 run the column-tail
+    // path, making this row the tail-handling throughput gate.
+    for &size in &[32usize, 63, 64] {
         let a: Vec<f32> = (0..size * size).map(|i| i as f32 * 0.0001).collect();
         let b: Vec<f32> = (0..size * size)
             .map(|i| (size * size - i) as f32 * 0.0001)
