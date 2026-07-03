@@ -97,22 +97,21 @@ order (correctness → architecture → tests → docs → PM).
   `view/ops.rs`, `dispatch/axpy.rs`, etc. end in element-at-a-time loops although
   `leading_k_mask` exists on every backend; up to 15 scalar iters on AVX-512 f32
   tails, dominating short/odd-length vectors. `[minor]`.
-- **[MEASURED 2026-07-03, DoR-ready] No K/M cache blocking in GEMM (MED-HIGH).**
-  The packed path packs the full `k × block_n` B panel and keeps each C tile
-  register-resident across all of `k`. For AVX2 f32 (`TilingPolicy<3,3>`,
-  block_n = 24) the panel is `k·96` bytes: 24 KiB at k=256 (fits this CPU's
-  48 KiB Golden-Cove L1d), 48 KiB at k=512 (at the L1d boundary), 96 KiB at
-  k=1024 (spills). Measured (criterion, new bench rows): **256³ = 78.4 GFLOP/s
-  (61% of ~128 GFLOP/s AVX2 f32 peak), 512³ = 69.8 GFLOP/s (−11%)** — a real but
-  moderate degradation as the panel reaches L1d, expected to widen at k ≥ 1024.
-  Fix: a BLIS KC loop bounding the packed panel to `KC × block_n ≤ L1d` (KC ≈
-  256), the register kernel taking a `(kc_start, KC)` sub-range (A-access
-  `a[(r+i)·k + kc_start + kk]`, its `# Safety`/Theorem 1 span updated), C
-  loaded/stored once per kc-block — the C-traffic-vs-B-locality tradeoff must
-  net positive, so it is measurement-gated. DoR acceptance: 1024³ criterion A/B
-  showing a win, no regression at ≤ 512³, bitwise-exact differential on
-  dyadic operands (packing invariance Theorem 2 extended to the kc-blocked
-  order). A-panel packing is a separate follow-on. `[minor]`.
+- **[REJECTED 2026-07-03, measured] No K/M cache blocking in GEMM.** Hypothesis:
+  the full `k × block_n` B panel spilling L1d degrades large-`k` GEMM, and a
+  BLIS KC loop bounding the panel to L1d would recover it. **Falsified by
+  measurement.** For AVX2 f32 (`TilingPolicy<3,3>`, block_n = 24) the panel is
+  `k·96` bytes — 24 KiB at k=256, 48 KiB at k=512, 72 KiB at k=768, 96 KiB at
+  k=1024 (2× this CPU's 48 KiB L1d). Measured square-GEMM throughput (criterion):
+  256³ = 78.4, **512³ = 69.8**, 768³ = 79.9, 1024³ = **85.6 GFLOP/s** — flat to
+  *rising* with `k`, with the largest (most-spilled) panel the fastest. The 512³
+  dip is a power-of-two cache-set-conflict artifact (768³, non-power-of-two,
+  recovers to 79.9), not L1 spill. The current full-panel pack + L2-residency
+  design is correct for this microarchitecture (large fast L2 holds the panel,
+  and packing amortizes better over more row blocks as `m` grows); KC-blocking
+  would add `⌈k/KC⌉` passes of C load/store to fix a non-problem. Bench rows
+  256/512/768 retained as the scaling-regression gate. Not re-opened without a
+  microarchitecture whose L2 cannot hold the panel (measured, not assumed).
 - **[open] No software prefetch in gather-bound SpMV (MED); no streaming/NT stores
   for out-of-LLC writes (MED); `Aligned` typestate dead at the dispatch facade —
   every op uses unaligned loads and NT stores are blocked on it (LOW-MED);

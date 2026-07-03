@@ -11,10 +11,13 @@ fn bench_tiled_gemm(c: &mut Criterion) {
 
     // 63 is deliberately just under the AVX2 f32 block width (TILE_N·LANE_COUNT
     // = 32): 32 columns take the register-tiled path and 31 run the column-tail
-    // path, making this row the tail-handling throughput gate. 256/512 exercise
-    // the size-gated B-panel packing path at large `k`, where the packed
-    // `k × block_n` panel exceeds L1 — the KC-blocking regression gate.
-    for &size in &[32usize, 63, 64, 256, 512] {
+    // path, making this row the tail-handling throughput gate. 256–768 exercise
+    // the size-gated B-panel packing path across the range where the packed
+    // `k × block_n` panel grows past L1d; measured throughput is flat-to-rising
+    // (78→80→86 GFLOP/s at 256/768/1024), refuting the KC-blocking hypothesis —
+    // the 512 dip is a power-of-two cache-set-conflict artifact, not L1 spill.
+    // 512 (power of two) and 768 (not) are both kept to keep that visible.
+    for &size in &[32usize, 63, 64, 256, 512, 768] {
         let a: Vec<f32> = (0..size * size).map(|i| (i % 71) as f32 * 0.001).collect();
         let b: Vec<f32> = (0..size * size)
             .map(|i| ((size * size - i) % 67) as f32 * 0.001)
