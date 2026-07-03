@@ -139,8 +139,8 @@ pub use hermes_simd_core::tensor::{ColMajor, RowMajor, TensorCow, TensorError, T
 
 // Re-export concrete ZST architecture markers
 pub use hermes_simd_intrinsics::{
-    Avx2, Avx512, HybridSwarMagic, Hyperbola, KoggeStone, Magic, Neon, Scalar, SveArch, Swar,
-    SwarUtils,
+    Avx2, Avx512, AvxVnni, HybridSwarMagic, Hyperbola, KoggeStone, Magic, Neon, Scalar, SveArch,
+    Swar, SwarUtils,
 };
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]

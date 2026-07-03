@@ -133,6 +133,52 @@ fn test_gemm_int8_high_level() {
     }
 }
 
+/// Differential: the dispatched int8 GEMM (whatever backend the host selects —
+/// AMX, AVX-512 VNNI, 256-bit AVX-VNNI, or scalar tiles) must equal an
+/// independent wrapping scalar triple loop **bitwise**. Integer accumulation is
+/// associative mod 2^32, so reordering across backends cannot change the
+/// result; any divergence is a kernel defect. Full-range signed inputs
+/// (including -128) exercise the AVX-VNNI `vpdpbusd` +128 bias correction, and
+/// the non-multiple shape (m,n % 16 != 0, k % 64 != 0) covers every tile-tail
+/// combination.
+#[test]
+fn test_gemm_int8_signed_differential() {
+    let m = 37;
+    let n = 29;
+    let k = 130;
+    let a: Vec<i8> = (0..m * k)
+        .map(|i| ((i * 89 + 3) % 256) as u8 as i8)
+        .collect();
+    let b: Vec<i8> = (0..k * n)
+        .map(|i| ((i * 41 + 128) % 256) as u8 as i8)
+        .collect();
+    // Nonzero C exercises the accumulate contract end-to-end.
+    let c_init: Vec<i32> = (0..m * n)
+        .map(|i| (i as i32).wrapping_mul(7919) - 40000)
+        .collect();
+
+    let mut c = c_init.clone();
+    unsafe {
+        gemm::<i8, i8, i32>(m, n, k, &a, k, &b, n, &mut c, n).unwrap();
+    }
+
+    let mut c_ref = c_init;
+    for r in 0..m {
+        for col in 0..n {
+            let mut sum = 0i32;
+            for kk in 0..k {
+                sum = sum.wrapping_add((a[r * k + kk] as i32) * (b[kk * n + col] as i32));
+            }
+            c_ref[r * n + col] += sum;
+        }
+    }
+
+    assert_eq!(
+        c, c_ref,
+        "dispatched int8 GEMM diverges from scalar reference"
+    );
+}
+
 #[test]
 fn test_gemm_bf16_size_16() {
     use half::bf16;

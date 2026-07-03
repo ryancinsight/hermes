@@ -10,7 +10,7 @@ The project is structured as a multi-crate workspace (dependencies flow strictly
 
 - **`crates/hermes-numeric`**: Numeric type foundation — the precision ladder (`Bf4`/`F4`/`Bf8`/`F8`/`F16`/`Bf16`/`F32`/`F64`/`I8`/`I16`/`I32`), packed 4-bit storage (two values per byte), cast traits, and rkyv zero-copy serialization. No SIMD dependencies.
 - **`crates/hermes-simd-core`**: Core abstractions — `SimdView<'a, T, Arch, Align, Mode, Ref>` typestate views, the `SimdKernel<T>` operation trait, `SimdCow` dense copy-on-write, generic `SparseCow<T, Format, Arch>`, `BitMask<N>`, reduction/element/scan op strategy ZSTs, const-generic tiling, and N-D tensor views.
-- **`crates/hermes-simd-intrinsics`**: Architecture-specific kernels (`Scalar`, `Avx2`, `Avx512`, `Neon` ZST markers implementing `SimdKernel<T>`), Intel AMX engine, AVX-512 VNNI tile multipliers, packed 4-bit hardware unpacking, and sliding-attack bitboard backends.
+- **`crates/hermes-simd-intrinsics`**: Architecture-specific kernels (`Scalar`, `Avx2`, `Avx512`, `AvxVnni`, `Neon` ZST markers implementing `SimdKernel<T>` / tile traits), Intel AMX engine, AVX-512 VNNI and 256-bit AVX-VNNI tile multipliers, packed 4-bit hardware unpacking, and sliding-attack bitboard backends.
 - **`crates/hermes-simd-types`**: Monomorphized convenience aliases and the compile-time `PreferredArch` selection.
 - **`crates/hermes-simd-macros`**: Procedural macros — `#[runtime_dispatch]` generates compile-time-gated plus runtime-detected dispatchers from one generic kernel function.
 - **`crates/hermes-simd`**: Public facade — the sealed `SimdOps` extension trait, runtime-dispatched free functions (`sum`, `dot`, `spmv_*`, `interleaved_complex_*`, …), and `dispatch_view` CPUID routing.
@@ -136,16 +136,17 @@ assert_eq!((re, im), (70.0, 8.0));
 
 ### High-level GEMM (AMX / VNNI Fallback)
 ```rust
-use hermes_simd::gemm_int8;
+use hermes_simd::gemm;
 
 let (m, n, k) = (32, 32, 64);
 let a = vec![1i8; m * k];
 let b = vec![2i8; k * n];
 let mut c = vec![0i32; m * n];
 
-// Automatically dispatches to Intel AMX (if available), AVX-512 VNNI, or scalar loops
+// Automatically dispatches down the ladder: Intel AMX → AVX-512 VNNI →
+// 256-bit AVX-VNNI (client CPUs without AVX-512) → scalar tiles.
 unsafe {
-    gemm_int8(m, n, k, &a, k, &b, n, &mut c, n).unwrap();
+    gemm::<i8, i8, i32>(m, n, k, &a, k, &b, n, &mut c, n).unwrap();
 }
 ```
 

@@ -108,6 +108,60 @@ fn bench_bf16_gemm_batch_sensitivity(c: &mut Criterion) {
     group.finish();
 }
 
+/// Square int8 GEMM over 16×16×64 tiles with the scalar remainder — one body
+/// shared by every forced-backend bench row so rows differ only in the tile
+/// kernel under measurement.
+///
+/// # Safety
+/// Caller must ensure the CPU supports `Arch`'s ISA (bench rows gate on the
+/// matching `is_x86_feature_detected!`) and that `a`, `b`, `out` are
+/// `size * size` element buffers.
+unsafe fn forced_backend_int8_gemm<Arch>(size: usize, a: &[i8], b: &[i8], out: &mut [i32])
+where
+    Arch: TileMatrixMultiply<i8, i8, i32, Arch, Arch, 16, 16, 64>,
+{
+    let mut i = 0;
+    while i + 16 <= size {
+        let mut j = 0;
+        while j + 16 <= size {
+            let mut kk = 0;
+            while kk + 64 <= size {
+                Arch::tile_matmul(
+                    out.as_mut_ptr().add(i * size + j),
+                    size,
+                    a.as_ptr().add(i * size + kk),
+                    size,
+                    b.as_ptr().add(kk * size + j),
+                    size,
+                );
+                kk += 64;
+            }
+            j += 16;
+        }
+        i += 16;
+    }
+    // remainder
+    let bound = (size / 16) * 16;
+    let k_bound = (size / 64) * 64;
+    for r in 0..size {
+        for col in 0..size {
+            if r >= bound || col >= bound {
+                let mut sum = 0i32;
+                for kk in 0..size {
+                    sum = sum.wrapping_add((a[r * size + kk] as i32) * (b[kk * size + col] as i32));
+                }
+                out[r * size + col] += sum;
+            } else if k_bound < size {
+                let mut sum = 0i32;
+                for kk in k_bound..size {
+                    sum = sum.wrapping_add((a[r * size + kk] as i32) * (b[kk * size + col] as i32));
+                }
+                out[r * size + col] += sum;
+            }
+        }
+    }
+}
+
 fn bench_int8_gemm_batch_sensitivity(c: &mut Criterion) {
     let mut group = c.benchmark_group("INT8 GEMM Batch Sensitivity");
 
@@ -123,65 +177,27 @@ fn bench_int8_gemm_batch_sensitivity(c: &mut Criterion) {
             BenchmarkId::new("scalar_fallback", size),
             &size,
             |bencher, _| {
-                bencher.iter(|| unsafe {
-                    let mut i = 0;
-                    while i + 16 <= size {
-                        let mut j = 0;
-                        while j + 16 <= size {
-                            let mut kk = 0;
-                            while kk + 64 <= size {
-                                <Scalar as TileMatrixMultiply<
-                                    i8,
-                                    i8,
-                                    i32,
-                                    Scalar,
-                                    Scalar,
-                                    16,
-                                    16,
-                                    64,
-                                >>::tile_matmul(
-                                    out.as_mut_ptr().add(i * size + j),
-                                    size,
-                                    a.as_ptr().add(i * size + kk),
-                                    size,
-                                    b.as_ptr().add(kk * size + j),
-                                    size,
-                                );
-                                kk += 64;
-                            }
-                            j += 16;
-                        }
-                        i += 16;
-                    }
-                    // remainder
-                    let bound = (size / 16) * 16;
-                    let k_bound = (size / 64) * 64;
-                    for r in 0..size {
-                        for col in 0..size {
-                            if r >= bound || col >= bound {
-                                let mut sum = 0i32;
-                                for kk in 0..size {
-                                    sum = sum.wrapping_add(
-                                        (a[r * size + kk] as i32) * (b[kk * size + col] as i32),
-                                    );
-                                }
-                                out[r * size + col] += sum;
-                            } else if k_bound < size {
-                                let mut sum = 0i32;
-                                for kk in k_bound..size {
-                                    sum = sum.wrapping_add(
-                                        (a[r * size + kk] as i32) * (b[kk * size + col] as i32),
-                                    );
-                                }
-                                out[r * size + col] += sum;
-                            }
-                        }
-                    }
-                })
+                bencher
+                    .iter(|| unsafe { forced_backend_int8_gemm::<Scalar>(size, &a, &b, &mut out) })
             },
         );
 
-        // Dynamic dispatch: VNNI or AMX depending on CPU and batch size heuristics
+        // Forced 256-bit AVX-VNNI tiles (client CPUs without AVX-512).
+        #[cfg(target_arch = "x86_64")]
+        if std::is_x86_feature_detected!("avxvnni") {
+            group.bench_with_input(
+                BenchmarkId::new("avx_vnni_tiles", size),
+                &size,
+                |bencher, _| {
+                    bencher.iter(|| unsafe {
+                        forced_backend_int8_gemm::<hermes_simd::AvxVnni>(size, &a, &b, &mut out)
+                    })
+                },
+            );
+        }
+
+        // Dynamic dispatch: AMX / AVX-512 VNNI / AVX-VNNI / scalar by CPU and
+        // batch-size heuristics.
         group.bench_with_input(BenchmarkId::new("dispatch", size), &size, |bencher, _| {
             bencher.iter(|| unsafe {
                 gemm::<i8, i8, i32>(size, size, size, &a, size, &b, size, &mut out, size).unwrap();

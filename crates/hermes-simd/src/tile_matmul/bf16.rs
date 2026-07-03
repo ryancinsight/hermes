@@ -141,7 +141,10 @@ impl TiledGemm<half::bf16, half::bf16, f32> for (half::bf16, half::bf16, f32) {
                     }
                     return Ok(());
                 }
-                crate::dispatcher::DispatchDecision::Scalar => {}
+                // No bf16 AVX-VNNI tile kernel exists; the 256-bit VNNI tier falls
+                // through to the scalar path alongside Scalar.
+                crate::dispatcher::DispatchDecision::AvxVnni
+                | crate::dispatcher::DispatchDecision::Scalar => {}
             }
         }
 
@@ -308,7 +311,10 @@ impl TiledGemm<Bf16, Bf16, F32> for (Bf16, Bf16, F32) {
                     }
                     return Ok(());
                 }
-                crate::dispatcher::DispatchDecision::Scalar => {}
+                // No bf16 AVX-VNNI tile kernel exists; the 256-bit VNNI tier falls
+                // through to the scalar path alongside Scalar.
+                crate::dispatcher::DispatchDecision::AvxVnni
+                | crate::dispatcher::DispatchDecision::Scalar => {}
             }
         }
 

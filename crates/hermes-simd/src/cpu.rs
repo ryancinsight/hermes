@@ -161,6 +161,21 @@ fn has_avx512_bf16_tile() -> bool {
     })
 }
 
+/// 256-bit VEX-encoded AVX-VNNI (`vpdpbusd`/`vpdpwssd` on YMM without AVX-512).
+///
+/// Present on Intel Alder Lake+ client parts and AMD Zen 5 — hardware that has
+/// no AVX-512. The int8 tile kernel gated on this probe requires only the
+/// `avxvnni` feature (the signed-signed `vpdpbssd` from `avxvnniint8` is NOT
+/// assumed; the kernel bias-corrects `vpdpbusd` instead). The macro handles
+/// XCR0/OSXSAVE and the CPUID max-leaf internally.
+#[cfg(target_arch = "x86_64")]
+#[inline]
+pub fn has_avx_vnni() -> bool {
+    use std::sync::OnceLock;
+    static CACHED: OnceLock<bool> = OnceLock::new();
+    *CACHED.get_or_init(|| std::is_x86_feature_detected!("avxvnni"))
+}
+
 /// The AVX-512 int8 tile kernels enable `avx512f,avx512vnni,avx512vl`.
 #[cfg(target_arch = "x86_64")]
 #[inline]

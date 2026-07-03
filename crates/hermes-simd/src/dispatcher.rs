@@ -15,6 +15,10 @@ pub enum DispatchDecision {
     Amx,
     /// AVX-512 backend.
     Avx512,
+    /// 256-bit VEX-encoded AVX-VNNI backend (client CPUs without AVX-512).
+    /// Currently consumed by the int8 tile GEMM; kernels without an AVX-VNNI
+    /// implementation treat this tier as scalar.
+    AvxVnni,
     /// Standard scalar execution path.
     Scalar,
 }
@@ -105,6 +109,13 @@ impl AdaptiveDispatcher {
 
             if has_avx512 {
                 return DispatchDecision::Avx512;
+            }
+
+            // 256-bit VNNI tier: client parts (Alder Lake+, Zen 5) that have
+            // `vpdpbusd` on YMM but no AVX-512. Kernels lacking an AVX-VNNI
+            // implementation (e.g. bf16 tiles) treat this decision as scalar.
+            if crate::cpu::has_avx_vnni() {
+                return DispatchDecision::AvxVnni;
             }
         }
 

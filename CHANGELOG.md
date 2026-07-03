@@ -5,12 +5,46 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 ## [Unreleased]
 
 ### Added
+- `hermes-simd-intrinsics`/`hermes-simd` [minor]: **256-bit AVX-VNNI int8 tile
+  GEMM backend** (`AvxVnni` arch marker + `x86_64/avx_vnni_tiling.rs`). Client
+  CPUs (Intel Alder Lake+, AMD Zen 5) have VEX-encoded `vpdpbusd` on YMM
+  registers but no AVX-512, so int8 GEMM previously fell all the way to scalar
+  tiles on that hardware. The new 16×16×64 kernel slots into the dispatch ladder
+  as AMX → AVX-512 VNNI → **AVX-VNNI** → scalar (new `DispatchDecision::AvxVnni`
+  variant; probe = `is_x86_feature_detected!("avxvnni")`, cached). Base AVX-VNNI
+  has no signed-signed `vpdpbssd` (that is `avxvnniint8`), so the kernel computes
+  signed×signed exactly via the unsigned-signed instruction with a bias
+  identity — `Σ a·b = Σ (a XOR 0x80)·b − 128·Σ b`, the correction accumulated
+  in-register per column group (`vpdpbusd(bias, splat(0x80), b_vec)`) and
+  subtracted once after the K loop; wrapping i32 semantics make the identity
+  exact mod 2^32, so results are **bitwise-equal** to the wrapping scalar
+  reference. Register-blocked 2×(8 rows × 8 cols): 8 accumulators + bias + 
+  operands fit the 16 YMM registers spill-free. Verified: kernel-level
+  differential tests (full-range signed tile incl. −128 wraparound extremes,
+  exact equality) + an end-to-end dispatched-GEMM differential on a
+  non-multiple shape (37×29×130) vs an independent scalar triple loop — all
+  executed on real `avxvnni` hardware. The int8 GEMM dispatch body and its
+  4×-copy-pasted scalar remainder consolidated into one shared
+  `gemm_i8_dispatched`/`gemm_i8_remainder` (the `I8`/`I32` newtype impl now
+  delegates via `#[repr(transparent)]` casts); bench gains a forced
+  `avx_vnni_tiles` row via a backend-generic `forced_backend_int8_gemm` helper.
+  Measured (criterion, 100 samples, avxvnni client host): 64³ scalar tiles
+  53.98 µs → AVX-VNNI 3.12 µs (**17.3×**, 84.1 Gelem/s); 128³ 437.1 µs →
+  21.6 µs (**20.2×**, 97.1 Gelem/s); dispatched `gemm::<i8,i8,i32>` 22.7 µs at
+  128³ (was scalar-routed before this change).
 - `hermes-numeric` [minor]: `NumericElement` and `CastFrom` coverage for `i64`
   and `u8`/`u16`/`u32`/`u64`, plus the crate's first test module — value-semantic
   contract tests for every integer impl cross-checked against std (bitops,
   popcount, wrapping fmadd, min/max, constants, `CastFrom` round-trips).
 
 ### Changed
+- `hermes-simd` [patch]: conservatively disable AMX auto-dispatch by reporting
+  no AMX support until the crate has a stable, permission-aware probe for
+  hardware bits, XCR0 OS state, and Linux XTILEDATA process permission. This
+  removes unstable Rust AMX feature-detection macro usage and avoids CPUID-only
+  dispatch risk. AVX-512 tile probes remain exact stable
+  `is_x86_feature_detected!` checks. Evidence: `cargo check -p hermes-simd` and
+  `cargo clippy -p hermes-simd --all-targets -- -D warnings` pass.
 - `hermes-simd-core` [minor]: give the six masked-merge `SimdKernel` methods
   (`masked_load_unaligned`, `masked_store_unaligned`, `masked_add`, `masked_mul`,
   `masked_fmadd`, `masked_sum_reduce`) scalar-emulated trait defaults — the

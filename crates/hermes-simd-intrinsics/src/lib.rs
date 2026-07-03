@@ -241,6 +241,17 @@ pub struct Avx2;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Avx512;
 
+/// x86/x86_64 AVX-VNNI (256-bit VEX-encoded VNNI) instruction set marker.
+///
+/// Distinct from [`Avx512`]: AVX-VNNI provides `vpdpbusd`/`vpdpwssd` on 256-bit
+/// YMM registers without requiring AVX-512, so it accelerates integer dot/GEMM
+/// on client CPUs (Alder Lake and newer) that lack AVX-512. The int8 tile kernel
+/// uses the unsigned-signed `vpdpbusd` with a `+128` operand bias correction
+/// (base AVX-VNNI has no signed-signed `vpdpbssd`; that is the separate
+/// `avxvnniint8` feature).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AvxVnni;
+
 /// AArch64 NEON instruction set architecture marker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Neon;
@@ -270,6 +281,14 @@ impl SimdArch for Avx512 {
     const FMA_THROUGHPUT_HINT: u32 = 8;
 }
 
+impl SimdArch for AvxVnni {
+    const NAME: &'static str = "avx_vnni";
+    const REGISTER_WIDTH_BITS: u32 = 256;
+    const ISA_FAMILY: hermes_simd_core::arch::IsaFamily = hermes_simd_core::arch::IsaFamily::X86;
+    // Two 256-bit `vpdpbusd` per cycle on current client cores (Golden Cove / Zen 4).
+    const FMA_THROUGHPUT_HINT: u32 = 4;
+}
+
 impl SimdArch for Neon {
     const NAME: &'static str = "neon";
     const REGISTER_WIDTH_BITS: u32 = 128;
@@ -281,5 +300,6 @@ impl SimdArch for Neon {
 impl hermes_simd_core::private::Sealed for Scalar {}
 impl hermes_simd_core::private::Sealed for Avx2 {}
 impl hermes_simd_core::private::Sealed for Avx512 {}
+impl hermes_simd_core::private::Sealed for AvxVnni {}
 impl hermes_simd_core::private::Sealed for Neon {}
 impl hermes_simd_core::private::Sealed for SveArch {}
