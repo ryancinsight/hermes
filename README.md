@@ -8,7 +8,7 @@ The workspace is designed for extreme runtime efficiency, using traits, ZST mark
 
 The project is structured as a multi-crate workspace (dependencies flow strictly downward):
 
-- **`crates/hermes-numeric`**: Numeric type foundation — the precision ladder (`Bf4`/`F4`/`Bf8`/`F8`/`F16`/`Bf16`/`F32`/`F64`/`I8`/`I16`/`I32`), packed 4-bit storage (two values per byte), cast traits, and rkyv zero-copy serialization. No SIMD dependencies.
+- **Numeric vocabulary (external)**: the precision ladder (`Bf4`/`F4`/`Bf8`/`F8`/`F16`/`Bf16`/`F32`/`F64`/`I8`/`I16`/`I32`), packed 4-bit storage, and cast traits live in the [`eunomia`](https://github.com/ryancinsight/eunomia) crate — the Atlas numeric SSOT — and are re-exported through `hermes-simd`. (The former `hermes-numeric` member crate was migrated upstream.)
 - **`crates/hermes-simd-core`**: Core abstractions — `SimdView<'a, T, Arch, Align, Mode, Ref>` typestate views, the `SimdKernel<T>` operation trait, `SimdCow` dense copy-on-write, generic `SparseCow<T, Format, Arch>`, `BitMask<N>`, reduction/element/scan op strategy ZSTs, const-generic tiling, and N-D tensor views.
 - **`crates/hermes-simd-intrinsics`**: Architecture-specific kernels (`Scalar`, `Avx2`, `Avx512`, `AvxVnni`, `Neon` ZST markers implementing `SimdKernel<T>` / tile traits), Intel AMX engine, AVX-512 VNNI and 256-bit AVX-VNNI tile multipliers, packed 4-bit hardware unpacking, and sliding-attack bitboard backends.
 - **`crates/hermes-simd-types`**: Monomorphized convenience aliases and the compile-time `PreferredArch` selection.

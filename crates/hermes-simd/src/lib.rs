@@ -12,13 +12,9 @@
 //!
 //! | Feature | Description |
 //! |---------|-------------|
-//! | `std` (default) | Enables runtime CPU feature detection |
-//! | `avx512` | Build hint: compile with `-C target-feature=+avx512f` |
-//! | `sparse` | Enable `SparseView` and SpMV kernels |
-//! | `tiling` | Enable const-generic tiled dot product |
-//! | `macros` | Enable proc-macro code generation helpers |
-//! | `bytemuck` | Enable safe type casting via `bytemuck` |
-//! | `portable-simd` | Enable nightly `std::simd` backend |
+//! | `std` (default) | Runtime CPU feature detection (`is_x86_feature_detected!`); without it dispatch uses compile-time `cfg!(target_feature)` only |
+//! | `mnemosyne-memory` (default) | Route `AlignedVec` allocation through the mnemosyne allocator |
+//! | `libnuma` | Linux NUMA node placement via libnuma (links `-lnuma`) |
 //!
 //! # Usage Examples
 //!

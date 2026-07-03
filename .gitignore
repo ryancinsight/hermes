@@ -17,3 +17,4 @@ Thumbs.db
 *.bak
 *.bk
 check_output.txt
+check_errors.txt
