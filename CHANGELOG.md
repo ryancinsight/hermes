@@ -65,6 +65,13 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   sufficient, extend_from_slice value/empty/pre-sized/ZST paths.
 
 ### Changed
+- `hermes-simd-core` [patch]: consolidate `reduce_popcount_{and,or,xor}` — three
+  byte-identical ~104-line 4-accumulator popcount reductions differing only in
+  the bitwise combining op — into one generic `reduce_popcount_op<Op:
+  ElementOp<T>>` plus three thin wrappers passing the existing `BitAnd`/`BitOr`/
+  `BitXor` ZST markers. The op monomorphizes away (zero-cost), so codegen is
+  unchanged; `view/reduce.rs` drops 153 lines and the canonical-implementation
+  rule is satisfied. Verified by the existing popcount tests.
 - `hermes-simd-benches` [patch]: extend the `Tiled GEMM f32` bench to 256³–768³
   and report throughput as FLOPs (`2·size³`) rather than output elements. Closes
   the "GEMM benched only to n=64" coverage gap and delivers a **measured negative

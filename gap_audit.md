@@ -155,6 +155,10 @@ order (correctness → architecture → tests → docs → PM).
   threshold), prefix-peeled-to-alignment streaming path in the elementwise
   `zip_into` SSOT. Differential test: streaming result is byte-identical to the
   regular store (same op, cache bypass only).
+- **[RESOLVED 2026-07-03] `reduce_popcount_{and,or,xor}` triplication.** Three
+  byte-identical ~104-line popcount reductions differing only in the bitwise op
+  collapsed to one generic `reduce_popcount_op<Op: ElementOp<T>>` + three ZST
+  wrappers (`BitAnd`/`BitOr`/`BitXor`); −153 lines, zero-cost (op monomorphized).
 - **[RESOLVED 2026-07-03] `AlignedVec` growth churn.** Added `reserve` +
   `extend_from_slice` (single realloc via the shared `grow_to` SSOT); `Extend for
   SimdCow` now reserves `size_hint().0` up front instead of a push loop's

@@ -314,17 +314,27 @@ where
         total
     }
 
-    /// Computes the horizontal sum of population counts of `self[i] & other[i]`.
+    /// Horizontal sum of population counts of `op(self[i], other[i])` for a
+    /// bitwise [`ElementOp`] (`BitAnd`/`BitOr`/`BitXor`).
+    ///
+    /// One generic 4-accumulator popcount reduction shared by
+    /// [`reduce_popcount_and`](Self::reduce_popcount_and),
+    /// [`reduce_popcount_or`](Self::reduce_popcount_or) and
+    /// [`reduce_popcount_xor`](Self::reduce_popcount_xor). The combining op is a
+    /// ZST monomorphized away, so each wrapper compiles to exactly the code its
+    /// former hand-written body did — the three ~100-line bodies collapse to one.
     ///
     /// # Errors
     /// Returns [`SimdError::LengthMismatch`] if slice lengths differ.
     #[inline]
-    pub fn reduce_popcount_and<ORef>(
+    fn reduce_popcount_op<ORef, Op>(
         &self,
         other: &SimdView<'_, T, Arch, Align, Mode, ORef>,
+        op: Op,
     ) -> Result<usize, SimdError>
     where
         ORef: 'a,
+        Op: crate::ops::ElementOp<T>,
     {
         super::check_lengths_equal(self.len(), other.len())?;
         let s = self.as_slice();
@@ -366,10 +376,10 @@ where
                     let va3 = load(s.as_ptr().add(i + lane_count * 3));
                     let vb3 = load(o.as_ptr().add(i + lane_count * 3));
 
-                    acc0 = Arch::add(acc0, Arch::popcount(Arch::bitand(va0, vb0)));
-                    acc1 = Arch::add(acc1, Arch::popcount(Arch::bitand(va1, vb1)));
-                    acc2 = Arch::add(acc2, Arch::popcount(Arch::bitand(va2, vb2)));
-                    acc3 = Arch::add(acc3, Arch::popcount(Arch::bitand(va3, vb3)));
+                    acc0 = Arch::add(acc0, Arch::popcount(op.apply::<Arch>(va0, vb0)));
+                    acc1 = Arch::add(acc1, Arch::popcount(op.apply::<Arch>(va1, vb1)));
+                    acc2 = Arch::add(acc2, Arch::popcount(op.apply::<Arch>(va2, vb2)));
+                    acc3 = Arch::add(acc3, Arch::popcount(op.apply::<Arch>(va3, vb3)));
                 }
                 i += chunk_size;
                 count += 1;
@@ -403,7 +413,7 @@ where
                 unsafe {
                     let va = load(s.as_ptr().add(i));
                     let vb = load(o.as_ptr().add(i));
-                    acc = Arch::add(acc, Arch::popcount(Arch::bitand(va, vb)));
+                    acc = Arch::add(acc, Arch::popcount(op.apply::<Arch>(va, vb)));
                 }
                 i += lane_count;
             }
@@ -411,11 +421,26 @@ where
         }
 
         while i < len {
-            total += s[i].bitand(o[i]).count_ones() as usize;
+            total += op.apply_scalar(s[i], o[i]).count_ones() as usize;
             i += 1;
         }
 
         Ok(total)
+    }
+
+    /// Computes the horizontal sum of population counts of `self[i] & other[i]`.
+    ///
+    /// # Errors
+    /// Returns [`SimdError::LengthMismatch`] if slice lengths differ.
+    #[inline]
+    pub fn reduce_popcount_and<ORef>(
+        &self,
+        other: &SimdView<'_, T, Arch, Align, Mode, ORef>,
+    ) -> Result<usize, SimdError>
+    where
+        ORef: 'a,
+    {
+        self.reduce_popcount_op(other, crate::ops::BitAnd)
     }
 
     /// Computes the horizontal sum of population counts of `self[i] | other[i]`.
@@ -430,99 +455,10 @@ where
     where
         ORef: 'a,
     {
-        super::check_lengths_equal(self.len(), other.len())?;
-        let s = self.as_slice();
-        let o = other.as_slice();
-        let len = s.len();
-        let lane_count = Arch::LANE_COUNT;
-        let unroll_factor = Arch::UNROLL_FACTOR;
-        let chunk_size = lane_count * unroll_factor;
-        let unrolled_simd_len = (len / chunk_size) * chunk_size;
-        let simd_len = (len / lane_count) * lane_count;
-        let mut total: usize = 0;
-        let mut i = 0usize;
-
-        let load = |p: *const T| -> Arch::Vector {
-            if crate::align::is_aligned_for_arch::<Arch, Align>() {
-                unsafe { Arch::load_aligned(p) }
-            } else {
-                unsafe { Arch::load_unaligned(p) }
-            }
-        };
-
-        let flush_limit = flush_limit_for::<T>();
-
-        if unrolled_simd_len > 0 {
-            let mut acc0 = unsafe { Arch::zero() };
-            let mut acc1 = unsafe { Arch::zero() };
-            let mut acc2 = unsafe { Arch::zero() };
-            let mut acc3 = unsafe { Arch::zero() };
-            let mut count = 0;
-
-            while i < unrolled_simd_len {
-                unsafe {
-                    let va0 = load(s.as_ptr().add(i));
-                    let vb0 = load(o.as_ptr().add(i));
-                    let va1 = load(s.as_ptr().add(i + lane_count));
-                    let vb1 = load(o.as_ptr().add(i + lane_count));
-                    let va2 = load(s.as_ptr().add(i + lane_count * 2));
-                    let vb2 = load(o.as_ptr().add(i + lane_count * 2));
-                    let va3 = load(s.as_ptr().add(i + lane_count * 3));
-                    let vb3 = load(o.as_ptr().add(i + lane_count * 3));
-
-                    acc0 = Arch::add(acc0, Arch::popcount(Arch::bitor(va0, vb0)));
-                    acc1 = Arch::add(acc1, Arch::popcount(Arch::bitor(va1, vb1)));
-                    acc2 = Arch::add(acc2, Arch::popcount(Arch::bitor(va2, vb2)));
-                    acc3 = Arch::add(acc3, Arch::popcount(Arch::bitor(va3, vb3)));
-                }
-                i += chunk_size;
-                count += 1;
-
-                if count == flush_limit {
-                    unsafe {
-                        let mut acc = Arch::add(acc0, acc1);
-                        acc = Arch::add(acc, acc2);
-                        acc = Arch::add(acc, acc3);
-                        total += Arch::sum_reduce(acc).to_f64() as usize;
-                        acc0 = Arch::zero();
-                        acc1 = Arch::zero();
-                        acc2 = Arch::zero();
-                        acc3 = Arch::zero();
-                    }
-                    count = 0;
-                }
-            }
-
-            unsafe {
-                let mut acc = Arch::add(acc0, acc1);
-                acc = Arch::add(acc, acc2);
-                acc = Arch::add(acc, acc3);
-                total += Arch::sum_reduce(acc).to_f64() as usize;
-            }
-        }
-
-        if i < simd_len {
-            let mut acc = unsafe { Arch::zero() };
-            while i < simd_len {
-                unsafe {
-                    let va = load(s.as_ptr().add(i));
-                    let vb = load(o.as_ptr().add(i));
-                    acc = Arch::add(acc, Arch::popcount(Arch::bitor(va, vb)));
-                }
-                i += lane_count;
-            }
-            total += unsafe { Arch::sum_reduce(acc) }.to_f64() as usize;
-        }
-
-        while i < len {
-            total += s[i].bitor(o[i]).count_ones() as usize;
-            i += 1;
-        }
-
-        Ok(total)
+        self.reduce_popcount_op(other, crate::ops::BitOr)
     }
 
-    /// Computes the horizontal sum of population counts of `self[i] ^ other[i]` (Hamming distance).
+    /// Computes the horizontal sum of population counts of `self[i] ^ other[i]`.
     ///
     /// # Errors
     /// Returns [`SimdError::LengthMismatch`] if slice lengths differ.
@@ -534,96 +470,7 @@ where
     where
         ORef: 'a,
     {
-        super::check_lengths_equal(self.len(), other.len())?;
-        let s = self.as_slice();
-        let o = other.as_slice();
-        let len = s.len();
-        let lane_count = Arch::LANE_COUNT;
-        let unroll_factor = Arch::UNROLL_FACTOR;
-        let chunk_size = lane_count * unroll_factor;
-        let unrolled_simd_len = (len / chunk_size) * chunk_size;
-        let simd_len = (len / lane_count) * lane_count;
-        let mut total: usize = 0;
-        let mut i = 0usize;
-
-        let load = |p: *const T| -> Arch::Vector {
-            if crate::align::is_aligned_for_arch::<Arch, Align>() {
-                unsafe { Arch::load_aligned(p) }
-            } else {
-                unsafe { Arch::load_unaligned(p) }
-            }
-        };
-
-        let flush_limit = flush_limit_for::<T>();
-
-        if unrolled_simd_len > 0 {
-            let mut acc0 = unsafe { Arch::zero() };
-            let mut acc1 = unsafe { Arch::zero() };
-            let mut acc2 = unsafe { Arch::zero() };
-            let mut acc3 = unsafe { Arch::zero() };
-            let mut count = 0;
-
-            while i < unrolled_simd_len {
-                unsafe {
-                    let va0 = load(s.as_ptr().add(i));
-                    let vb0 = load(o.as_ptr().add(i));
-                    let va1 = load(s.as_ptr().add(i + lane_count));
-                    let vb1 = load(o.as_ptr().add(i + lane_count));
-                    let va2 = load(s.as_ptr().add(i + lane_count * 2));
-                    let vb2 = load(o.as_ptr().add(i + lane_count * 2));
-                    let va3 = load(s.as_ptr().add(i + lane_count * 3));
-                    let vb3 = load(o.as_ptr().add(i + lane_count * 3));
-
-                    acc0 = Arch::add(acc0, Arch::popcount(Arch::bitxor(va0, vb0)));
-                    acc1 = Arch::add(acc1, Arch::popcount(Arch::bitxor(va1, vb1)));
-                    acc2 = Arch::add(acc2, Arch::popcount(Arch::bitxor(va2, vb2)));
-                    acc3 = Arch::add(acc3, Arch::popcount(Arch::bitxor(va3, vb3)));
-                }
-                i += chunk_size;
-                count += 1;
-
-                if count == flush_limit {
-                    unsafe {
-                        let mut acc = Arch::add(acc0, acc1);
-                        acc = Arch::add(acc, acc2);
-                        acc = Arch::add(acc, acc3);
-                        total += Arch::sum_reduce(acc).to_f64() as usize;
-                        acc0 = Arch::zero();
-                        acc1 = Arch::zero();
-                        acc2 = Arch::zero();
-                        acc3 = Arch::zero();
-                    }
-                    count = 0;
-                }
-            }
-
-            unsafe {
-                let mut acc = Arch::add(acc0, acc1);
-                acc = Arch::add(acc, acc2);
-                acc = Arch::add(acc, acc3);
-                total += Arch::sum_reduce(acc).to_f64() as usize;
-            }
-        }
-
-        if i < simd_len {
-            let mut acc = unsafe { Arch::zero() };
-            while i < simd_len {
-                unsafe {
-                    let va = load(s.as_ptr().add(i));
-                    let vb = load(o.as_ptr().add(i));
-                    acc = Arch::add(acc, Arch::popcount(Arch::bitxor(va, vb)));
-                }
-                i += lane_count;
-            }
-            total += unsafe { Arch::sum_reduce(acc) }.to_f64() as usize;
-        }
-
-        while i < len {
-            total += s[i].bitxor(o[i]).count_ones() as usize;
-            i += 1;
-        }
-
-        Ok(total)
+        self.reduce_popcount_op(other, crate::ops::BitXor)
     }
 }
 
