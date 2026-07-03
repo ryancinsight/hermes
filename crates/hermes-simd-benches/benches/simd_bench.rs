@@ -125,6 +125,33 @@ fn bench_dot(c: &mut Criterion) {
         });
     }
     group.finish();
+
+    // Half-precision rows: the f16/bf16 kernels are lane-emulated arrays whose
+    // per-element arithmetic round-trips through software f32 conversion — the
+    // evidence gate for a hardware-conversion (F16C / shift-based bf16) kernel.
+    let mut group = c.benchmark_group("Dense Dot f16");
+    for &size in &[256usize, 16384, 65536] {
+        let a = vec![half::f16::from_f32(1.5); size];
+        let b = vec![half::f16::from_f32(0.5); size];
+        group.throughput(Throughput::Elements(size as u64));
+
+        group.bench_with_input(BenchmarkId::new("dispatch", size), &size, |bencher, _| {
+            bencher.iter(|| dot::<half::f16>(black_box(&a), black_box(&b)).unwrap())
+        });
+    }
+    group.finish();
+
+    let mut group = c.benchmark_group("Dense Dot bf16");
+    for &size in &[256usize, 16384, 65536] {
+        let a = vec![half::bf16::from_f32(1.5); size];
+        let b = vec![half::bf16::from_f32(0.5); size];
+        group.throughput(Throughput::Elements(size as u64));
+
+        group.bench_with_input(BenchmarkId::new("dispatch", size), &size, |bencher, _| {
+            bencher.iter(|| dot::<half::bf16>(black_box(&a), black_box(&b)).unwrap())
+        });
+    }
+    group.finish();
 }
 
 criterion_group!(benches, bench_sum, bench_dot);

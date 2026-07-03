@@ -38,6 +38,28 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   popcount, wrapping fmadd, min/max, constants, `CastFrom` round-trips).
 
 ### Changed
+- `hermes-simd-intrinsics` [patch]: **F16C hardware-conversion arithmetic core
+  for the AVX2 `f16` kernel.** The 16-lane `f16` kernel's `add`/`sub`/`mul`/
+  `fmadd` performed per-element software f16↔f32 conversion (measured: `dot`
+  ~220 Melem/s, ~90× below f32-class throughput). `half::f16` arithmetic is
+  definitionally convert→f32-op→round-back per operation, and F16C
+  (`vcvtph2ps`/`vcvtps2ph`, round-to-nearest-even) performs the identical IEEE
+  conversions in hardware — so the upgraded methods (two 8-lane converts → AVX
+  op → convert back) are **bitwise-equal** to the software path on all numeric
+  values; NaN payloads follow the hardware quieting convention like every
+  native backend. Each method gates on a cached
+  `is_x86_feature_detected!("f16c") && ("fma")` probe (compile-time `cfg!`
+  under `no_std`) and keeps the per-lane software loop as the documented
+  fallback, so an AVX2-without-F16C host stays sound. Verified by new
+  differential tests over an adversarial lane corpus (subnormals,
+  overflow→inf, round-to-even ties, ±0, mixed signs — exact bit equality) plus
+  NaN propagation, executed on F16C hardware. Loads/stores/masks/gather stay
+  conversion-free array form. Measured (criterion, f16c host): `dot::<f16>`
+  221 Melem/s → 7.22 Gelem/s at 16 Ki (**31.7×**, criterion change +3074%,
+  p=0.00; 9.2× at n=256 where the software `sum_reduce` tail weighs more).
+  bf16 measured separately at ~2 Gelem/s (shift-conversion partially
+  auto-vectorizes); a bf16 hardware core is not justified until a consumer
+  needs more.
 - `hermes-simd-benches` [patch]: dense sum/dot benches gain `i32` groups and the
   four per-type scalar baselines consolidate into two generic `scalar_sum`/
   `scalar_dot`. The integer rows are the evidence gate for the "emulated
