@@ -140,8 +140,15 @@ order (correctness → architecture → tests → docs → PM).
   (MED-HIGH)** — 8× footprint; bit-pack once at the boundary (a `BitMask` type
   already exists). **`cmp_*_mask`/`cast` round-trip through stack buffers with
   64-iter scalar loops (MED)** — route through native backend mask ops.
-  **`compress` zero-inits a 64-elem stack buffer per chunk (MED); argmin/argmax
-  two-pass (LOW-MED).** All `[patch]`/`[minor]`.
+  **argmin/argmax two-pass (LOW-MED)** — bandwidth-bound-only win; a correct
+  single-pass needs SIMD index-vector tracking with first-occurrence
+  tie-breaking (non-trivial). All `[patch]`/`[minor]`.
+- **[RESOLVED 2026-07-04] `compress` per-chunk buffer zero-init.** The hot
+  compaction loop re-declared `[T::ZERO; 64]` each chunk (256–512 B of zero
+  stores) though the vector store writes `lane_count` lanes and the copy reads
+  only `pop ≤ lane_count`. Now a single hoisted `MaybeUninit<T>` array
+  (`MAX_SIMD_LANES`, `LANE_BOUND_CHECK`-guarded) with the loop-invariant popcount
+  hoisted; behavior unchanged (compress + `expand∘compress` identity tests pass).
 - **[RESOLVED 2026-07-03] Non-temporal (streaming) stores for out-of-LLC writes
   — strongly beneficial, productionized.** Focused experiment
   (`streaming_bench.rs`): `out = a + b` over 16 Mi f32 (192 MiB working set, past

@@ -1,7 +1,7 @@
 use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
-use crate::kernel::SimdKernel;
+use crate::kernel::{SimdKernel, MAX_SIMD_LANES};
 use crate::mask::BitMask;
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
@@ -259,15 +259,25 @@ where
             };
 
             let native_mask = mask.to_native_mask::<T, Arch>();
+            // The same mask applies to every chunk, so its popcount is loop-invariant.
+            let pop = mask.popcount() as usize;
+
+            // Scratch for one compacted vector, hoisted out of the loop. The
+            // store writes `lane_count` lanes and the copy reads only `pop ≤
+            // lane_count`, so no lane is read before the store initializes it —
+            // `MaybeUninit` avoids re-zeroing a full `MAX_SIMD_LANES` buffer every
+            // chunk (the previous `[T::ZERO; 64]` per iteration). The compile-time
+            // `LANE_BOUND_CHECK` guarantees `lane_count ≤ MAX_SIMD_LANES`, so the
+            // store stays in bounds (referencing it forces the per-backend assert).
+            let _ = <Arch as SimdKernel<T>>::LANE_BOUND_CHECK;
+            let mut temp = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
 
             for _ in 0..(simd_len / lane_count) {
                 let v = load(ptr);
                 let compressed = Arch::compress(v, native_mask);
-                let pop = mask.popcount() as usize;
 
-                let mut temp = [T::ZERO; 64];
-                Arch::store_unaligned(temp.as_mut_ptr(), compressed);
-                core::ptr::copy_nonoverlapping(temp.as_ptr(), ptr_out, pop);
+                Arch::store_unaligned(temp.as_mut_ptr() as *mut T, compressed);
+                core::ptr::copy_nonoverlapping(temp.as_ptr() as *const T, ptr_out, pop);
 
                 ptr = ptr.add(lane_count);
                 ptr_out = ptr_out.add(pop);

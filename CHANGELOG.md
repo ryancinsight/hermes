@@ -65,6 +65,14 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   sufficient, extend_from_slice value/empty/pre-sized/ZST paths.
 
 ### Changed
+- `hermes-simd-core` [patch]: `SimdView::compress` no longer re-zeroes a
+  `[T::ZERO; 64]` scratch buffer on every chunk. The store writes `lane_count`
+  lanes and the copy reads only `pop ≤ lane_count`, so no lane is read before the
+  store initializes it — the buffer is now a single `MaybeUninit<T>` array
+  hoisted out of the loop (sized `MAX_SIMD_LANES` with the `LANE_BOUND_CHECK`
+  compile-time guard), removing 256–512 B of per-chunk zero-init stores from the
+  hot compaction loop. The loop-invariant `mask.popcount()` is hoisted too.
+  Behavior unchanged (verified by the existing compress tests).
 - `hermes-simd-core` [patch]: consolidate `reduce_popcount_{and,or,xor}` — three
   byte-identical ~104-line 4-accumulator popcount reductions differing only in
   the bitwise combining op — into one generic `reduce_popcount_op<Op:
