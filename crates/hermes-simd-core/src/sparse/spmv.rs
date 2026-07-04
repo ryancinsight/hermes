@@ -47,6 +47,31 @@ pub(crate) unsafe fn build_index_vector<T: Scalar, Arch: SimdKernel<T>>(
     core::ptr::read_unaligned(ptr)
 }
 
+/// Assert a SELL-p matrix is structurally sound before its vectorized kernels
+/// run.
+///
+/// The vectorized SELL-p paths (`sellp_spmv_vectorized`,
+/// `elementwise_mul_dense`) load `values[offset..]` as one full `C`-lane vector
+/// and `gather(x, col_idx)` **without** the per-lane bounds checks that the
+/// scalar fallback performs. Because `SellPMatrix` exposes `pub` fields and its
+/// `new` performs no validation, a caller can construct a matrix whose slice
+/// geometry (`slice_ptr`/`slice_col_count`) or `col_indices` drive those
+/// unchecked reads out of bounds from a fully safe `spmv`/`elementwise_mul_dense`
+/// call. This routes the structure through the SSOT [`SparseValidate`] checks —
+/// `col < ncols`, `col_indices.len() == values.len()`, and
+/// `slice_ptr[s] + slice_col_count[s]·C <= values.len()` — so the kernel runs on
+/// a proven structure. Mirrors the up-front column scan the CSR and BlockedCOO
+/// `spmv` paths already perform inline.
+#[inline(never)]
+pub(crate) fn assert_sellp_validated<T, const C: usize>(data: &SellPData<'_, T, C>)
+where
+    T: Scalar,
+{
+    use super::types::SparseValidate;
+    data.validate()
+        .expect("SELL-p matrix failed structural validation before vectorized kernel");
+}
+
 #[inline(never)]
 fn validate_spmv_sizes(x_len: usize, y_len: usize, ncols: usize, nrows: usize, format_name: &str) {
     assert!(
@@ -476,6 +501,13 @@ where
         validate_spmv_sizes(x.len(), y.len(), self.data.ncols, self.data.nrows, "SellP");
 
         if Arch::LANE_COUNT == C {
+            // SAFETY: `assert_sellp_validated` proves every `col_indices[k] <
+            // ncols` (so each gathered `x[col]` is in bounds given
+            // `validate_spmv_sizes` guarantees `x.len() >= ncols`) and every
+            // slice load `values[offset..offset + C]` stays within `values` — the
+            // exact preconditions `sellp_spmv_vectorized`'s unchecked loads rely
+            // on.
+            assert_sellp_validated(&self.data);
             unsafe { sellp_spmv_vectorized::<T, C, Arch>(&self.data, x, y) };
         } else {
             sellp_spmv_scalar::<T, C>(&self.data, x, y);

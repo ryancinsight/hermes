@@ -5,12 +5,178 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 ## [Unreleased]
 
 ### Added
+- `hermes-simd-intrinsics`/`hermes-simd` [minor]: **256-bit AVX-VNNI int8 tile
+  GEMM backend** (`AvxVnni` arch marker + `x86_64/avx_vnni_tiling.rs`). Client
+  CPUs (Intel Alder Lake+, AMD Zen 5) have VEX-encoded `vpdpbusd` on YMM
+  registers but no AVX-512, so int8 GEMM previously fell all the way to scalar
+  tiles on that hardware. The new 16×16×64 kernel slots into the dispatch ladder
+  as AMX → AVX-512 VNNI → **AVX-VNNI** → scalar (new `DispatchDecision::AvxVnni`
+  variant; probe = `is_x86_feature_detected!("avxvnni")`, cached). Base AVX-VNNI
+  has no signed-signed `vpdpbssd` (that is `avxvnniint8`), so the kernel computes
+  signed×signed exactly via the unsigned-signed instruction with a bias
+  identity — `Σ a·b = Σ (a XOR 0x80)·b − 128·Σ b`, the correction accumulated
+  in-register per column group (`vpdpbusd(bias, splat(0x80), b_vec)`) and
+  subtracted once after the K loop; wrapping i32 semantics make the identity
+  exact mod 2^32, so results are **bitwise-equal** to the wrapping scalar
+  reference. Register-blocked 2×(8 rows × 8 cols): 8 accumulators + bias + 
+  operands fit the 16 YMM registers spill-free. Verified: kernel-level
+  differential tests (full-range signed tile incl. −128 wraparound extremes,
+  exact equality) + an end-to-end dispatched-GEMM differential on a
+  non-multiple shape (37×29×130) vs an independent scalar triple loop — all
+  executed on real `avxvnni` hardware. The int8 GEMM dispatch body and its
+  4×-copy-pasted scalar remainder consolidated into one shared
+  `gemm_i8_dispatched`/`gemm_i8_remainder` (the `I8`/`I32` newtype impl now
+  delegates via `#[repr(transparent)]` casts); bench gains a forced
+  `avx_vnni_tiles` row via a backend-generic `forced_backend_int8_gemm` helper.
+  Measured (criterion, 100 samples, avxvnni client host): 64³ scalar tiles
+  53.98 µs → AVX-VNNI 3.12 µs (**17.3×**, 84.1 Gelem/s); 128³ 437.1 µs →
+  21.6 µs (**20.2×**, 97.1 Gelem/s); dispatched `gemm::<i8,i8,i32>` 22.7 µs at
+  128³ (was scalar-routed before this change).
 - `hermes-numeric` [minor]: `NumericElement` and `CastFrom` coverage for `i64`
   and `u8`/`u16`/`u32`/`u64`, plus the crate's first test module — value-semantic
   contract tests for every integer impl cross-checked against std (bitops,
   popcount, wrapping fmadd, min/max, constants, `CastFrom` round-trips).
 
+### Added
+- `hermes-simd-core`/`hermes-simd-intrinsics` [minor]: **non-temporal
+  (streaming) stores for out-of-LLC elementwise writes.** New `SimdKernel`
+  seam — `SUPPORTS_NT_STORE` (const gate, default `false`), `store_streaming`
+  (default = `store_aligned`; x86 f32/f64 override to `vmovntps`/`vmovntpd` via
+  the codegen template), and `stream_write_barrier` (default no-op; x86 =
+  `sfence`). `SimdView::zip_into` (the elementwise `Add`/`Sub`/`Mul`/`Div` SSOT)
+  routes outputs ≥ `NT_STORE_MIN_BYTES` (8 MiB, past every consumer L2) through
+  a prefix-peeled-to-alignment streaming path that bypasses the cache, avoiding
+  the read-for-ownership traffic a normal write-allocate pays. The store
+  instruction is the only change, so results are byte-identical to the regular
+  path — verified by a facade differential at 8.4 MiB with a mis-aligned output
+  (forces the peel head) asserting `to_bits()` equality. Motivated and gated by
+  the measured 1.71× (`streaming_bench`: 18.3 → 31.3 GiB/s on 64 MiB AVX2 f32).
+  Backends without a non-temporal store (NEON, scalar, integer/half) inherit the
+  safe default and never take the path.
+- `hermes-simd-core` [minor]: `AlignedVec::reserve(additional)` and
+  `extend_from_slice(&[T])` (`T: Copy`). `reserve` grows to at least the request
+  (never below doubling, preserving geometric-growth amortization) in a single
+  reallocation via the new SSOT `grow_to(new_cap)` that `grow`/`reserve` share;
+  `extend_from_slice` is one reserve + one `copy_nonoverlapping`. `Extend for
+  SimdCow` now reserves the iterator's `size_hint().0` up front, replacing a
+  push loop's ⌈log₂ n⌉ reallocations (each copying the live prefix) with one —
+  the `AlignedVec` growth-churn gap flagged in the memory audit. Verified:
+  reserve satisfies-request + pointer-stable-within-capacity + no-op-when-
+  sufficient, extend_from_slice value/empty/pre-sized/ZST paths.
+
 ### Changed
+- `hermes-simd-core` [patch]: consolidate `reduce_popcount_{and,or,xor}` — three
+  byte-identical ~104-line 4-accumulator popcount reductions differing only in
+  the bitwise combining op — into one generic `reduce_popcount_op<Op:
+  ElementOp<T>>` plus three thin wrappers passing the existing `BitAnd`/`BitOr`/
+  `BitXor` ZST markers. The op monomorphizes away (zero-cost), so codegen is
+  unchanged; `view/reduce.rs` drops 153 lines and the canonical-implementation
+  rule is satisfied. Verified by the existing popcount tests.
+- `hermes-simd-benches` [patch]: extend the `Tiled GEMM f32` bench to 256³–768³
+  and report throughput as FLOPs (`2·size³`) rather than output elements. Closes
+  the "GEMM benched only to n=64" coverage gap and delivers a **measured negative
+  result** that retires the audit's KC-cache-blocking item: throughput is
+  flat-to-rising with `k` (256³ = 78.4, 512³ = 69.8, 768³ = 79.9, 1024³ = 85.6
+  GFLOP/s ≈ 67% of AVX2 f32 peak), so the packed `k × block_n` B panel spilling
+  L1d does **not** degrade large-`k` GEMM — the current full-panel-pack +
+  L2-residency design is correct for this microarchitecture, and the 512³ dip is
+  a power-of-two cache-conflict artifact (768³ recovers). BLIS KC-blocking is
+  rejected as fixing a non-problem; the 256/512/768 rows stay as the
+  scaling-regression gate. See gap_audit round 8.
+- `hermes-simd-core`/`hermes-simd-benches` [patch]: **masked-vector GEMV column
+  tail** + the workspace's first GEMV benchmark (`gemv_bench.rs`, tail-isolating:
+  each size pairs a tail-free `ncols` with a tail-having one at matched scale).
+  The `ncols % LANE_COUNT` trailing columns of `gemv_strided_impl` (both the
+  `TILE_M`-blocked and row-remainder paths) ran a per-row scalar loop; they now
+  fold into the same vector accumulator via one masked fmadd — `x`'s tail lanes
+  loaded once and reused across every row — replacing ~`lane_count−1` scalar
+  ops/row with a single masked op and giving the tail the main loop's
+  fused-multiply reduction. Inactive lanes load zero (`a·0` contributes
+  nothing). Bench-gated per its Definition of Ready: at cache-resident 256×256
+  (compute-visible) the 7-lane-tail row measured **3.58 µs → 2.83 µs (+27%
+  throughput**, 18.2 → 23.1 Gelem/s), the tail-free row unchanged within
+  run-to-run noise (2.4–2.6 µs); the DRAM 3000×1504 rows are bandwidth-bound and
+  tail-neutral (retained as regression rows). Reduction order shifts (tail folded
+  into the lane reduction vs a trailing scalar add), within the documented
+  backend reduction-order envelope; verified by a new f32 facade differential
+  (`n=21` = two full groups + 5-lane tail, `nrows=11` covering blocked + remainder
+  rows, dyadic-exact ⇒ bitwise-equal) plus the existing dyadic f64 tail-shape
+  suite.
+- `hermes-simd-core` [patch]: **masked-vector GEMM column tails.** The
+  `n % (TILE_N·LANE_COUNT)` trailing columns of `tiled_gemm` ran a strided
+  scalar triple loop — up to `block_n − 1` columns (≈ half the FLOPs for `n`
+  just under a block multiple, e.g. 31 of 63 on AVX2 f32). They now run the
+  same fmadd contraction as the register tiles through `leading_k_mask`-guarded
+  lane groups (`masked_load` → fmadd over k, B row-loads reused across a
+  `TILE_M` row block → `masked_store`); inactive lanes load zero, accumulate
+  `a·0`, and are excluded from the store, so Theorem 1's exactly-once cell
+  coverage is preserved (proof text updated). Tail columns thereby also gain
+  the tiles' fused-multiply rounding instead of separate mul+add. Verified by a
+  new bitwise differential at `m=7, n=45, k=13` (one full block + one full
+  masked group + a 5-lane partial group, dyadic-exact operands) plus the
+  existing suite. Measured (criterion, AVX2 f32, new `n=63` bench row): 25.17 µs
+  → 7.33 µs (**3.43×**, 9.9 → 34.1 Gelem/s, change −72%, p=0.00); full-block
+  sizes are structurally unaffected.
+- `hermes-simd-core` [patch]: `SimdCow::scale` now delegates to the fused
+  `mul_scalar_cow` broadcast kernel. The previous body copied the buffer
+  (`from_slice`) and then rescaled in place — two full read+write passes (4n
+  element traffic) for a result bitwise-identical to the single fused pass
+  (2n). Consolidates two parallel implementations of the same operation onto
+  the `broadcast_op` SSOT.
+- `hermes-simd` [patch]: **measured negative result** — chunk-width-aware
+  SELL-p/BCOO dispatch (routing to the widest ISA whose `LANE_COUNT` matches
+  `C`/`BN`) was implemented, A/B-benchmarked, and **reverted**: on an AVX2 host
+  the `sellp4` 100k-row/10%-density case ran 2.4× slower via the lane-matched
+  4-lane kernel (17.6 ms) than via the existing widest-first path (7.5 ms),
+  because the "scalar fallback" loop auto-vectorizes at full width inside the
+  AVX2 `#[target_feature]` dispatch helper. The widest-first ladder stands; the
+  AVX-512-host variant of the original finding stays open in gap_audit.md,
+  gated on AVX-512 hardware for its A/B. A dispatcher-independent SELL-8
+  multislice differential test (non-uniform values, per-slice padding, dense
+  reference) is kept from the experiment.
+- `hermes-simd-intrinsics` [patch]: **F16C hardware-conversion arithmetic core
+  for the AVX2 `f16` kernel.** The 16-lane `f16` kernel's `add`/`sub`/`mul`/
+  `fmadd` performed per-element software f16↔f32 conversion (measured: `dot`
+  ~220 Melem/s, ~90× below f32-class throughput). `half::f16` arithmetic is
+  definitionally convert→f32-op→round-back per operation, and F16C
+  (`vcvtph2ps`/`vcvtps2ph`, round-to-nearest-even) performs the identical IEEE
+  conversions in hardware — so the upgraded methods (two 8-lane converts → AVX
+  op → convert back) are **bitwise-equal** to the software path on all numeric
+  values; NaN payloads follow the hardware quieting convention like every
+  native backend. Each method gates on a cached
+  `is_x86_feature_detected!("f16c") && ("fma")` probe (compile-time `cfg!`
+  under `no_std`) and keeps the per-lane software loop as the documented
+  fallback, so an AVX2-without-F16C host stays sound. Verified by new
+  differential tests over an adversarial lane corpus (subnormals,
+  overflow→inf, round-to-even ties, ±0, mixed signs — exact bit equality) plus
+  NaN propagation, executed on F16C hardware. Loads/stores/masks/gather stay
+  conversion-free array form. Measured (criterion, f16c host): `dot::<f16>`
+  221 Melem/s → 7.22 Gelem/s at 16 Ki (**31.7×**, criterion change +3074%,
+  p=0.00; 9.2× at n=256 where the software `sum_reduce` tail weighs more).
+  bf16 measured separately at ~2 Gelem/s (shift-conversion partially
+  auto-vectorizes); a bf16 hardware core is not justified until a consumer
+  needs more.
+- `hermes-simd-benches` [patch]: dense sum/dot benches gain `i32` groups and the
+  four per-type scalar baselines consolidate into two generic `scalar_sum`/
+  `scalar_dot`. The integer rows are the evidence gate for the "emulated
+  integer kernels rely on auto-vectorization, unverified" audit finding — and
+  the verdict is a **verified negative result**: inside the
+  `#[target_feature(enable="avx2,fma")]` dispatch wrappers LLVM fully
+  auto-vectorizes the `[i32; 8]` emulated kernels (sum 50–62 Gelem/s vs 4.5
+  scalar ≈ 12×, L1-resident; dot 20.3 Gelem/s at 16 Ki ≈ 7.4×,
+  memory-bandwidth-bound). Hand-written AVX2 integer `SimdKernel` impls for the
+  dense op families are therefore rejected as duplication with no measurable
+  win; the bench rows stand as the regression gate for that conclusion.
+  (Residual: emulated `gather`/`compress`/mask ops compile to scalar loops
+  auto-vectorization cannot rescue — revisit only when a sparse-integer
+  consumer exists.)
+- `hermes-simd` [patch]: conservatively disable AMX auto-dispatch by reporting
+  no AMX support until the crate has a stable, permission-aware probe for
+  hardware bits, XCR0 OS state, and Linux XTILEDATA process permission. This
+  removes unstable Rust AMX feature-detection macro usage and avoids CPUID-only
+  dispatch risk. AVX-512 tile probes remain exact stable
+  `is_x86_feature_detected!` checks. Evidence: `cargo check -p hermes-simd` and
+  `cargo clippy -p hermes-simd --all-targets -- -D warnings` pass.
 - `hermes-simd-core` [minor]: give the six masked-merge `SimdKernel` methods
   (`masked_load_unaligned`, `masked_store_unaligned`, `masked_add`, `masked_mul`,
   `masked_fmadd`, `masked_sum_reduce`) scalar-emulated trait defaults — the
@@ -88,6 +254,46 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   from `Acquire` to `Relaxed` (the 0→1 winner acquires no shared data).
 
 ### Fixed
+- `hermes-simd` [patch]: **detection soundness** — AMX/AVX-512 tile-kernel
+  dispatch used hand-rolled `__cpuid_count(7, _)` probes that (a) never checked
+  XCR0/OSXSAVE, so a host advertising the CPUID bit without the OS enabling the
+  XSAVE state (ZMM/opmask, TILECFG/TILEDATA) would `#UD`/`#NM` on the first wide
+  instruction; (b) had no leaf-7 max-leaf guard, so on a pre-leaf-7 x86_64 CPU
+  leaf-1 bits (FXSR/ACPI) aliased as AMX support; and (c) on Linux, AMX tile data
+  is gated per-thread by XFD until `arch_prctl(ARCH_REQ_XCOMP_PERM,
+  XFEATURE_XTILEDATA)`, which CPUID/XCR0 do not reflect. **AVX-512** bf16/vnni tile
+  probes are now `is_x86_feature_detected!` for the exact set each kernel's
+  `#[target_feature]` enables (`avx512f,avx512bw,avx512vl` and
+  `avx512f,avx512vnni,avx512vl`) — the macro handles XCR0 and the max-leaf, and
+  this also corrects the bf16 probe, which previously required the unrelated
+  `avx512bf16` dot-product bit (a `#UD` window *and* a false skip on capable
+  non-bf16 parts, since the kernel widens to f32 and never uses `dpbf16`).
+  `widen_i8_to_i16`'s AVX-512 branch is now gated on `avx512bw` (the
+  `_mm512_cvtepi8_epi16`/`vpmovsxbw` requirement) rather than `TargetId::Avx512`
+  (`avx512f`-only), which would `#UD` on Knights Landing. **AMX** dispatch is
+  disabled (probes return `false`) until a stable, permission-aware probe exists
+  that verifies hardware + XCR0 + the Linux XTILEDATA `arch_prctl` — the stable
+  toolchain does not accept the AMX feature strings in `is_x86_feature_detected!`
+  (`x86_amx_intrinsics` is unstable), so returning `false` preserves the
+  safe-dispatch contract instead of risking the fault. Restoring AMX behind a
+  correct probe is filed (needs an AMX host to verify).
+- `hermes-simd-core` [patch]: **memory safety** — SELL-p vectorized SpMV and
+  `elementwise_mul_dense` read out of bounds from safe code. On the
+  `Arch::LANE_COUNT == C` fast path, `sellp_spmv_vectorized` gathered
+  `x[col_idx]` and loaded `values[offset..]` (and the elementwise path stored
+  `out_values[offset..]`) at full vector width with no bounds check — unlike the
+  sibling CSR/BlockedCoo paths, which scan their indices up front, and unlike the
+  SELL-p scalar fallback, which guards per lane. Because `SellPMatrix` has `pub`
+  fields, a no-op `new`, and an opt-in `validate()` the SpMV path never called, a
+  caller could drive a safe `SparseView::<SellP<C>>::spmv` to read past `x`,
+  `values`, or `out_values`. Fixed by validating the structure through the SSOT
+  `SparseValidate::validate()` (via `spmv::assert_sellp_validated`) before the
+  unsafe kernel — proving `col < ncols`, `col_indices.len() == values.len()`, and
+  `slice_ptr[s] + slice_col_count[s]·C <= values.len()` — plus an
+  `out_values.len() >= values.len()` guard on the elementwise store. Two
+  `#[should_panic]` regressions exercise the Scalar-backed vectorized path
+  (`Scalar::LANE_COUNT 4 == C`, host-independent) with an out-of-range column and
+  with over-long slice geometry.
 - `hermes-simd-intrinsics` [patch]: **numeric precision** — `recip_sqrt` (`1/√x`)
   gave reduced, backend-dependent accuracy on the SIMD f64 paths and NEON f32. All
   copied the f32 "hardware `rsqrt` seed + one Newton step" pattern, but one step

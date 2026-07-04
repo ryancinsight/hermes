@@ -253,7 +253,12 @@ where
     /// `AlignedVec` has sufficient capacity.
     #[inline]
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        let iter = iter.into_iter();
         let vec = self.to_mut();
+        // Reserve the iterator's lower-bound size up front so a bulk extend does
+        // one reallocation rather than the ⌈log₂ n⌉ a push loop would incur
+        // (`size_hint().0` is exact for the common sized-iterator sources).
+        vec.reserve(iter.size_hint().0);
         for item in iter {
             vec.push(item);
         }

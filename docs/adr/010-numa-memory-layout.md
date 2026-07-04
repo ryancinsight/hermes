@@ -1,4 +1,4 @@
-# ADR 003: NUMA Memory Layout and Topology Integration
+# ADR 010: NUMA Memory Layout and Topology Integration
 
 ## Context
 

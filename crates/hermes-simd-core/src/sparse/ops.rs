@@ -86,6 +86,19 @@ where
         let lane_count = Arch::LANE_COUNT;
 
         if lane_count == C {
+            // SOUNDNESS: the vectorized path loads `values[offset..]` and stores
+            // `out_values[offset..]` as full `C`-lane vectors. Validate SELL-p
+            // slice geometry via the SSOT checker (bounds `offset + C <=
+            // values.len()`) and require the output to be at least as long as the
+            // values array, so both unchecked accesses stay in bounds even for a
+            // caller-constructed matrix with `pub` fields.
+            super::spmv::assert_sellp_validated(d);
+            assert!(
+                out_values.len() >= d.values.len(),
+                "SELL-p elementwise_mul_dense: out_values len {} < values len {}",
+                out_values.len(),
+                d.values.len()
+            );
             for s in 0..nslices {
                 let col_count = d.slice_col_count[s] as usize;
                 let start_offset = d.slice_ptr[s] as usize;

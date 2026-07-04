@@ -187,6 +187,58 @@ fn test_sellp_spmv_correctness() {
 }
 
 #[test]
+#[should_panic(expected = "failed structural validation")]
+fn test_sellp_spmv_rejects_out_of_range_column() {
+    // Column index 4 is out of range for a 4-column matrix. The vectorized SELL-p
+    // path (engaged because `Scalar::LANE_COUNT == 4 == C`) gathers `x[col]`
+    // without a per-lane bounds check, so it must reject the matrix up front
+    // rather than read out of bounds. Regression for the SELL-p gather OOB.
+    let values = [1.0f32, 2.0, 3.0, 4.0];
+    let col_indices_bad = [0i32, 1, 4, 3];
+    let slice_ptr = [0i32, 4];
+    let slice_col_count = [1i32];
+    let data = SellPData::new(
+        &values[..],
+        &col_indices_bad[..],
+        &slice_ptr[..],
+        &slice_col_count[..],
+        4,
+        4,
+    );
+    let x = [10.0f32, 10.0, 10.0, 10.0];
+    let mut y = [0.0f32; 4];
+
+    let view = SparseView::<f32, SellP<4>, Scalar>::from_sellp(data);
+    view.spmv(&x, &mut y);
+}
+
+#[test]
+#[should_panic(expected = "failed structural validation")]
+fn test_sellp_spmv_rejects_bad_slice_geometry() {
+    // `slice_col_count = 2` with `C = 4` and only 4 values makes the second
+    // column's load `values[4..8]` read past the 4-element array. The vectorized
+    // load is full-width and unchecked, so the matrix must be rejected. Regression
+    // for the SELL-p `values[offset..]` over-read.
+    let values = [1.0f32, 2.0, 3.0, 4.0];
+    let col_indices = [0i32, 1, 2, 3];
+    let slice_ptr = [0i32, 4];
+    let slice_col_count = [2i32]; // 0 + 2*4 = 8 > values.len() == 4
+    let data = SellPData::new(
+        &values[..],
+        &col_indices[..],
+        &slice_ptr[..],
+        &slice_col_count[..],
+        8,
+        4,
+    );
+    let x = [10.0f32, 10.0, 10.0, 10.0];
+    let mut y = [0.0f32; 8];
+
+    let view = SparseView::<f32, SellP<4>, Scalar>::from_sellp(data);
+    view.spmv(&x, &mut y);
+}
+
+#[test]
 fn test_sellp_spmv_dispatch() {
     let values = [1.0f32, 2.0, 3.0, 4.0];
     let col_indices = [0i32, 1, 2, 3];
@@ -217,6 +269,66 @@ fn test_sellp_spmv_dispatch() {
     );
     spmv_sellp::<f32, 8>(data8, &x, &mut y8);
     assert_eq!(y8, [10.0, 20.0, 30.0, 40.0]);
+}
+
+/// Chunk-width-aware dispatch differential: a two-slice SELL-8 matrix with
+/// per-slice padding and non-uniform values must match an independent dense
+/// reference through the public dispatcher, whichever ISA the ladder picks
+/// (on an AVX2 host C = 8 engages the AVX2 kernel; C = 4 routes to the
+/// lane-matching scalar marker instead of the per-element fallback).
+#[test]
+fn test_sellp_spmv_dispatch_multislice_differential() {
+    // 16 rows (2 slices of C = 8), 8 columns; row r has entries at columns
+    // (r % 8) and ((r + 3) % 8) with values derived from r.
+    const C: usize = 8;
+    let nrows = 16usize;
+    let ncols = 8usize;
+    let cols_per_row = 2usize;
+
+    // SELL-p layout: slice s columns stored column-major within the slice.
+    let mut values = vec![0.0f32; nrows * cols_per_row];
+    let mut col_indices = vec![0i32; nrows * cols_per_row];
+    for s in 0..2 {
+        for col in 0..cols_per_row {
+            for row in 0..C {
+                let r = s * C + row;
+                let idx = s * (cols_per_row * C) + col * C + row;
+                let c = (r + 3 * col) % ncols;
+                values[idx] = (r * cols_per_row + col) as f32 * 0.5 - 3.0;
+                col_indices[idx] = c as i32;
+            }
+        }
+    }
+    let slice_ptr = [
+        0i32,
+        (cols_per_row * C) as i32,
+        (2 * cols_per_row * C) as i32,
+    ];
+    let slice_col_count = [cols_per_row as i32, cols_per_row as i32];
+    let data = SellPData::<f32, C>::new(
+        &values,
+        &col_indices,
+        &slice_ptr[..],
+        &slice_col_count[..],
+        nrows,
+        ncols,
+    );
+
+    let x: Vec<f32> = (0..ncols).map(|i| i as f32 + 0.25).collect();
+    let mut y = vec![1.0f32; nrows];
+    spmv_sellp::<f32, C>(data, &x, &mut y);
+
+    // Independent dense reference: y_ref = 1 + Σ values[r,·]·x[col].
+    let mut y_ref = vec![1.0f32; nrows];
+    for (r, y_r) in y_ref.iter_mut().enumerate() {
+        let s = r / C;
+        let row = r % C;
+        for col in 0..cols_per_row {
+            let idx = s * (cols_per_row * C) + col * C + row;
+            *y_r += values[idx] * x[col_indices[idx] as usize];
+        }
+    }
+    assert_eq!(y, y_ref, "SELL-8 dispatch diverges from dense reference");
 }
 
 #[test]

@@ -67,6 +67,21 @@ impl SimdKernel<f64> for Avx512 {
         _mm512_storeu_pd(ptr, val.0);
     }
 
+    const SUPPORTS_NT_STORE: bool = true;
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (as above) and that `ptr` is aligned to the 8-lane width; `_mm512_stream_pd` (`vmovntps`/`vmovntpd`) faults on misalignment.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn store_streaming(ptr: *mut f64, val: Self::Vector) {
+        _mm512_stream_pd(ptr, val.0);
+    }
+
+    #[inline]
+    fn stream_write_barrier() {
+        // SAFETY: `_mm_sfence` (SSE) is unconditionally available on x86_64.
+        unsafe { core::arch::x86_64::_mm_sfence() };
+    }
+
     // -----------------------------------------------------------------------
     // Arithmetic
     // -----------------------------------------------------------------------

@@ -4,6 +4,223 @@ Persistent gap register. Evidence tiers follow the repository instruction
 hierarchy: machine-checked proof > type-level invariant > property/fuzz >
 differential/empirical > source audit.
 
+## Comprehensive Audit - 2026-07-02 (round 8, 5-agent sweep) <a id="audit-2026-07-02-r8"></a>
+
+Five parallel read-only audits (performance, memory/zero-copy, unsafe soundness,
+architecture/redundancy, tests/benches/docs) plus two deep soundness sub-audits.
+Evidence tier per item; source-audit unless a differential/property test is named.
+Findings are the register below; fixes land as tracked backlog items in triage
+order (correctness → architecture → tests → docs → PM).
+
+### Correctness / soundness (HARD)
+
+- **[RESOLVED 2026-07-02] SELL-p vectorized SpMV OOB read (PROVEN, 3 agents).**
+  `sparse/spmv.rs` `sellp_spmv_vectorized` gathered `x[col_idx]` and loaded
+  `values[offset..]` full-width with no bounds check, reachable from the safe
+  `SparseView::<SellP<C>>::spmv` when `LANE_COUNT == C`; the sibling CSR/BCOO
+  paths self-defend, SELL-p did not. `SellPMatrix` `pub` fields + no-op `new` +
+  opt-in `validate()` let a caller drive both reads out of bounds. Same over-read
+  in `sparse/ops.rs` `elementwise_mul_dense`. Fixed by routing both vectorized
+  paths through the SSOT `SparseValidate::validate()` via
+  `spmv::assert_sellp_validated` before the unsafe kernel; two `#[should_panic]`
+  regressions on the Scalar-backed vectorized path (`LANE_COUNT 4 == C`). See
+  [Resolved](#resolved).
+- **[MITIGATED 2026-07-02] AMX dispatched on CPUID-only; OS tile-data permission
+  never requested (PROVEN).** `cpu.rs` `has_amx` checked only CPUID leaf 7; no
+  `arch_prctl(ARCH_REQ_XCOMP_PERM, XFEATURE_XTILEDATA)` (Linux) anywhere, so the
+  first `tileloadd`/`tdpbf16ps` from `tile_matmul::gemm` `#NM`-faulted on capable
+  Sapphire-Rapids Linux hosts; `__cpuid_count(7,_)` also lacked a max-leaf guard
+  (leaf-1 aliasing). Interim: the AMX probes now return `false` (AMX dispatch
+  disabled), preserving the safe-dispatch contract — the fault can no longer
+  occur. **Still open:** restoring AMX behind a permission-aware probe (hardware +
+  XCR0 TILECFG/TILEDATA + a one-time Linux XTILEDATA `arch_prctl`). Blocked on: the
+  stable toolchain rejects the AMX strings in `is_x86_feature_detected!`
+  (`x86_amx_intrinsics` unstable), and verifying the raw `arch_prctl` syscall
+  needs an AMX-capable Linux host. `[minor]` DoR: acceptance = AMX GEMM dispatches
+  and matches the scalar reference on a Sapphire-Rapids Linux runner.
+- **[RESOLVED 2026-07-02] AVX-512 sub-feature gating gaps (PROVEN/SUSPECTED).**
+  `cpu.rs` `Avx512Support` read raw CPUID (AVX512_BF16 / VNNI) without OSXSAVE/XCR0
+  and, for bf16, probed the unrelated `avx512bf16` bit while the tile kernel
+  enables `avx512f,avx512bw,avx512vl` and never uses `dpbf16`. `unpack.rs`
+  `widen_i8_to_i16` ran AVX-512**BW** `_mm512_cvtepi8_epi16` under an
+  AVX-512**F**-only guard → SIGILL on KNL. Fixed: the two AVX-512 tile probes now
+  use `is_x86_feature_detected!` for the exact enabled set (macro handles
+  XCR0/max-leaf); `widen_i8_to_i16` gated on `avx512bw`. See [Resolved](#resolved).
+- **[open] Unsound safe API surfaces (PROVEN).** `AmxSession::new` (safe `fn`)
+  runs `ldtilecfg` with no detection; `Vector::<T, Avx512>::{splat,zero}` +
+  operator impls run ISA intrinsics from safe code. In-repo callers all guard,
+  but the *API* admits `#UD` from safe code. Fix: unforgeable detection-minted
+  arch token, or make these `unsafe fn`/probed. `[minor]`.
+
+### Performance (source-audit tier; each needs a criterion baseline before/after)
+
+- **[REVISED 2026-07-02, measured] SELL-P/BCOO chunk-width dispatch — the
+  simple fix is a measured regression; only the AVX-512 case remains open.**
+  A chunk-aware ladder routing to the widest ISA whose `LANE_COUNT == C` was
+  implemented and A/B-benchmarked on this AVX2 host: for `sellp4` (C=4,
+  100k rows, 10% density) the *old* widest-first path ran 7.48 ms
+  (13.7 Gelem/s) vs 17.6 ms (5.8 Gelem/s) for lane-matched routing to the
+  4-lane scalar-marker kernel — **2.4× slower**, because the "scalar fallback"
+  loop executes inside the AVX2 `#[target_feature]` dispatch helper and LLVM
+  auto-vectorizes it at full 8-lane width, beating the narrow emulated-gather
+  kernel. The change was reverted; a dispatcher-independent SELL-8 multislice
+  differential test was kept. Still open, hardware-gated: on an AVX-512 host a
+  SELL-8 f32 matrix runs the auto-vectorized fallback where the *native* AVX2
+  8-lane gather kernel in the same binary might win — unmeasurable without
+  AVX-512. DoR: acceptance = criterion A/B of sellp8 widest-first vs
+  AVX2-routed on an AVX-512 runner; do not re-implement without that number.
+  The `C = k·LANE_COUNT` kernel generalization remains a separate `[minor]`
+  candidate under the same measurement gate.
+- **[open] Per-call CSR/BCOO index re-validation (HIGH, 2 agents).** The soundness
+  scans in CSR/BCOO (and now SELL-p) re-read `col_indices` every `spmv`; iterative
+  solvers call spmv thousands of times on one immutable matrix (+~17-50% index
+  traffic per call). Root-cause fix: a `Validated` sparse typestate constructed
+  once, kernels trust the type — removes all four per-call scans and closes the
+  soundness holes structurally. `[minor]` (supersedes the per-call scans).
+- **[RESOLVED 2026-07-03] GEMM/GEMV scalar column tails (HIGH).** **GEMM:**
+  `tiled_gemm`'s `n % block_n` trailing columns run `leading_k_mask`-guarded
+  fmadd lane groups; measured 3.43× at n=63 (25.17 → 7.33 µs), bitwise
+  differential m=7/n=45/k=13, Theorem 1 updated. **GEMV:** the `ncols % lane`
+  tail (both blocked and remainder paths) folds into the vector accumulator via
+  one masked fmadd (x-tail loaded once, reused across rows). Added the
+  workspace's first GEMV bench (`gemv_bench.rs`, tail-isolating); measured at
+  cache-resident 256×256 the tail row improved 3.58 → 2.83 µs (+27% throughput),
+  aligned neutral within noise, DRAM rows bandwidth-bound/neutral. f32 facade
+  differential (n=21, nrows=11, dyadic-exact ⇒ bitwise) + existing f64 tail-shape
+  suite. Follow-on candidate: same masked-tail treatment for `gemv_transpose`
+  and `axpy` (both still scalar-tailed, both now benchmarkable).
+- **[open] AVX-512 bf16 tile kernel: 32 scalar bf16→f32 converts + stack
+  round-trip per k-step (HIGH on that path).** `avx512_tiling.rs:35`; vectorize as
+  `loadu_si256 + cvtepu16_epi32 + slli_epi32(,16)`, and use `_mm512_dpbf16_ps`
+  (AVX512-BF16 already probed, never issued). `[minor]`.
+- **[open] Scalar tails on every hot kernel (MED-HIGH).** `view/reduce.rs`,
+  `view/ops.rs`, `dispatch/axpy.rs`, etc. end in element-at-a-time loops although
+  `leading_k_mask` exists on every backend; up to 15 scalar iters on AVX-512 f32
+  tails, dominating short/odd-length vectors. `[minor]`.
+- **[REJECTED 2026-07-03, measured] No K/M cache blocking in GEMM.** Hypothesis:
+  the full `k × block_n` B panel spilling L1d degrades large-`k` GEMM, and a
+  BLIS KC loop bounding the panel to L1d would recover it. **Falsified by
+  measurement.** For AVX2 f32 (`TilingPolicy<3,3>`, block_n = 24) the panel is
+  `k·96` bytes — 24 KiB at k=256, 48 KiB at k=512, 72 KiB at k=768, 96 KiB at
+  k=1024 (2× this CPU's 48 KiB L1d). Measured square-GEMM throughput (criterion):
+  256³ = 78.4, **512³ = 69.8**, 768³ = 79.9, 1024³ = **85.6 GFLOP/s** — flat to
+  *rising* with `k`, with the largest (most-spilled) panel the fastest. The 512³
+  dip is a power-of-two cache-set-conflict artifact (768³, non-power-of-two,
+  recovers to 79.9), not L1 spill. The current full-panel pack + L2-residency
+  design is correct for this microarchitecture (large fast L2 holds the panel,
+  and packing amortizes better over more row blocks as `m` grows); KC-blocking
+  would add `⌈k/KC⌉` passes of C load/store to fix a non-problem. Bench rows
+  256/512/768 retained as the scaling-regression gate. Not re-opened without a
+  microarchitecture whose L2 cannot hold the panel (measured, not assumed).
+- **[open] No software prefetch in gather-bound SpMV (MED); no streaming/NT stores
+  for out-of-LLC writes (MED); `Aligned` typestate dead at the dispatch facade —
+  every op uses unaligned loads and NT stores are blocked on it (LOW-MED);
+  uniform `UNROLL_FACTOR=4` under-fills the FMA pipeline for cache-resident
+  reductions (LOW-MED); per-call detection branch chain, no cached dispatch
+  decision (LOW-MED).** Each `[patch]`/`[minor]`, all measurement-gated.
+- **[RESOLVED 2026-07-02] Integer/half emulated-kernel throughput — measured,
+  split verdict (host-capability sweep, criterion).** (a) *Integer dense ops*:
+  LLVM fully auto-vectorizes the emulated `[i32; 8]` kernels inside the
+  `#[target_feature]` wrappers — `sum::<i32>` ~12× scalar (50–62 Gelem/s),
+  `dot::<i32>` ~7.4× (bandwidth-bound); hand-written AVX2 integer kernels
+  REJECTED as no-win duplication; i32 bench rows are the regression gate.
+  (b) *int8 GEMM*: new 256-bit **AVX-VNNI** tile backend (`vpdpbusd` + exact
+  +128 bias correction) — 17.3–20.2× measured over scalar tiles; dispatch
+  ladder now AMX → AVX-512 VNNI → AVX-VNNI → scalar. (c) *f16*: AVX2 kernel's
+  arithmetic core upgraded to **F16C** hardware conversion (bitwise-identical
+  to the software semantics) — `dot::<f16>` 221 Melem/s → 7.22 Gelem/s
+  (31.7×). (d) *bf16*: ~2 Gelem/s emulated (shift conversion partially
+  auto-vectorizes); hardware core deferred until a consumer needs it —
+  remaining emulated gap is gather/compress/mask ops (scalar loops), deferred
+  until a sparse-integer consumer exists. See CHANGELOG [Unreleased].
+
+### Memory / zero-copy
+
+- **[open] `DenseWithMask` stores `[bool]` mask, converts per-chunk per-call
+  (MED-HIGH)** — 8× footprint; bit-pack once at the boundary (a `BitMask` type
+  already exists). **`cmp_*_mask`/`cast` round-trip through stack buffers with
+  64-iter scalar loops (MED)** — route through native backend mask ops.
+  **`compress` zero-inits a 64-elem stack buffer per chunk (MED); argmin/argmax
+  two-pass (LOW-MED).** All `[patch]`/`[minor]`.
+- **[RESOLVED 2026-07-03] Non-temporal (streaming) stores for out-of-LLC writes
+  — strongly beneficial, productionized.** Focused experiment
+  (`streaming_bench.rs`): `out = a + b` over 16 Mi f32 (192 MiB working set, past
+  L3), identical AVX2 loads+add, differing only in the store — normal
+  `_mm256_store_ps` vs `_mm256_stream_ps` + `sfence`. **Regular 10.24 ms
+  (18.3 GiB/s) → streaming 5.98 ms (31.3 GiB/s) = 1.71×**, far above the ~25%
+  RFO-avoidance estimate. Productionizing: a `SimdKernel::store_streaming` seam
+  (default = `store_aligned`; `SUPPORTS_NT_STORE` const gate; x86 f32/f64
+  override via the codegen template's `__PREFIX___stream___SUFFIX__`) plus
+  `stream_write_barrier` (sfence), and a size-gated (`len·sizeof(T) ≥ LLC-ish
+  threshold), prefix-peeled-to-alignment streaming path in the elementwise
+  `zip_into` SSOT. Differential test: streaming result is byte-identical to the
+  regular store (same op, cache bypass only).
+- **[RESOLVED 2026-07-03] `reduce_popcount_{and,or,xor}` triplication.** Three
+  byte-identical ~104-line popcount reductions differing only in the bitwise op
+  collapsed to one generic `reduce_popcount_op<Op: ElementOp<T>>` + three ZST
+  wrappers (`BitAnd`/`BitOr`/`BitXor`); −153 lines, zero-cost (op monomorphized).
+- **[RESOLVED 2026-07-03] `AlignedVec` growth churn.** Added `reserve` +
+  `extend_from_slice` (single realloc via the shared `grow_to` SSOT); `Extend for
+  SimdCow` now reserves `size_hint().0` up front instead of a push loop's
+  ⌈log₂ n⌉ reallocations. Tests cover request-satisfaction, pointer-stability,
+  no-op-when-sufficient, and value/empty/pre-sized/ZST extend paths.
+- **[RESOLVED 2026-07-02] `SimdCow::scale` copy-then-rescale** — now delegates
+  to the fused `mul_scalar_cow` (`broadcast_op` SSOT); halves traffic, removes
+  the duplicate implementation.
+
+### Architecture / redundancy / hygiene
+
+- **[RESOLVED 2026-07-02] Tracked scratch at repo root** — `apply_changes.ps1`,
+  `do_changes.ps1`, `check_errors.txt` deleted from git; untracked logs removed;
+  `check_errors.txt` gitignored. Dead dep declarations dropped (`divan`,
+  2×`bytemuck`, intrinsics `rkyv`; facade `rkyv` corrected to dev-dependency).
+  `benchmarks_baseline.json`/`benchmarks_results.md` kept (live baseline).
+- **[open] `codegen.rs` ungoverned SSOT (1334 lines, live generator of the 4 x86
+  kernel files).** Not dead — regenerates `avx2_f32/f64`, `avx512_f32/f64`; but no
+  `@generated` banner, no CI regeneration-diff gate. `[patch→minor]` process.
+- **[open] ~150-200 lines cross-backend scaffold duplication** — compress/expand
+  emulation, AVX-512 cmp-mask blend, popcount LUT, masked-reduce, NEON sign-flip
+  constants; hoist into `kernel_helpers`/codegen templates per ADR-005. `[minor]`.
+- **[PARTIAL 2026-07-02] Doc drift** — README `hermes-numeric` entry replaced
+  with the eunomia provenance note; the fictional lib.rs feature table replaced
+  with the real set; `gemm_int8` example corrected to `gemm::<i8,i8,i32>`.
+  ADR number collisions resolved 2026-07-03 (the duplicate 001/002/003 —
+  refined-simd-view, target-feature-inlining, numa-memory — renumbered to
+  008/009/010 via `git mv` + title fix; 001–010 now unique, no cross-refs
+  affected). **Still open:** stale backlog/checklist `hermes-numeric` refs,
+  `dispatch/mod.rs` (828) split into trait/impls/facade. `[patch]`.
+- **[open] `widen_I8_*` type-named duplicate API + undocumented unsafe + SIMD
+  branch untestable at n=5** — collapse to one generic (`#[repr(transparent)]`),
+  add SAFETY, differential test at n ∈ {31,32,33,47,1024}. `[patch→minor]`.
+
+### Tests / benches / docs
+
+- **[RESOLVED 2026-07-02] CI runs bare `cargo test`** — both test jobs now run
+  `cargo nextest run --workspace` (committed timeout instrument applies) plus
+  explicit `cargo test --doc`; x86_64 job gains a `cargo build --examples`
+  rot gate (verified green locally; CI run pending next push).
+- **[open] ~25 magic-tolerance assertion sites** vs the repo's own demonstrated
+  derivation discipline (complex_tests derives the bound); derive+cite each.
+  **AVX-512 differential suite silently skips on CI hosts (unreported).**
+  **Stale criterion baseline** — newest GEMM/AMX groups ungated; axpy/gemv/complex
+  unbenched. **`missing_docs` absent on `hermes-simd-macros`; ~5 doctests for ~60
+  facade fns; `# Errors`/`# Safety` gaps.** **No `cargo build --examples`,
+  semver-checks, or bench-compile CI gates.** Each `[patch]`/`[minor]`.
+
+### Verified clean (negative results — do not re-chase)
+
+- Proc-macro `#[runtime_dispatch]` ladder: every `#[target_feature]` helper is
+  called only behind a compile-time `cfg!` arm or a runtime `is_x86_feature_detected!`
+  gate; no bypass, no env override.
+- CSR & BlockedCoo SpMV self-defend on adversarial input.
+- `tiling/` dims fully checked (prior overflow fix holds in dev+release);
+  `AlignedVec` init paths panic-safe (no uninit read); `SimdView` borrow lifetime
+  precludes aliased in-place APIs from safe code.
+- AMX inline asm operand/clobber model + `AmxSession` Drop under `panic=abort`
+  are sound (tile state released on unwind→abort).
+- Sparse formats are SoA with `i32` indices; no `Arc/Rc/Box` nesting; SimdCow
+  promotion single-allocation; dispatch facade is out-slice/in-place throughout.
+
 ## Allocator Dependency Audit - 2026-06-28 (round 7) <a id="audit-2026-06-28-r7"></a>
 
 hermes is unchanged since round 6 and remains lean (no new findings). This round
@@ -339,6 +556,35 @@ Resolved this sprint:
 
 ## Resolved
 
+- [patch] AVX-512 tile-kernel detection soundness (2026-07-02). The `Avx512Support`
+  probes read raw CPUID without OSXSAVE/XCR0 (a host advertising the bit without OS
+  XSAVE enablement would `#UD`) and, for bf16, tested the unrelated `avx512bf16`
+  dot-product bit while the tile kernel enables `avx512f,avx512bw,avx512vl` and
+  never issues `dpbf16` — both a fault window and a false skip on capable non-bf16
+  parts. Now `is_x86_feature_detected!` for the exact enabled set per kernel
+  (`avx512f,avx512bw,avx512vl`; `avx512f,avx512vnni,avx512vl`), which handles XCR0
+  and the leaf-7 max-leaf internally. `widen_i8_to_i16`'s AVX-512 branch now gates
+  on `avx512bw` (the `_mm512_cvtepi8_epi16` requirement) instead of the
+  `avx512f`-only `TargetId::Avx512`, closing a KNL `#UD`. AMX detection is
+  conservatively disabled in the same change (see round 8, MITIGATED). Evidence
+  tier: source audit + toolchain feature-availability (AMX strings unstable).
+- [patch] SELL-p vectorized SpMV / elementwise OOB read (2026-07-02). The
+  `LANE_COUNT == C` fast path in `sparse/spmv.rs::sellp_spmv_vectorized` and
+  `sparse/ops.rs::elementwise_mul_dense` gathered `x[col_idx]` and loaded
+  `values[offset..]`/stored `out_values[offset..]` at full vector width with no
+  bounds check, reachable from the safe `SparseView::<SellP<C>>::{spmv,
+  elementwise_mul_dense}` — a proven OOB read from safe code on a
+  caller-constructed matrix (`pub` fields, no-op `new`, opt-in `validate()`).
+  Unlike the sibling CSR/BlockedCoo paths, SELL-p never validated. Fixed by
+  routing both vectorized paths through the SSOT `SparseValidate::validate()` via
+  the new `spmv::assert_sellp_validated` before the unsafe kernel (checks
+  `col < ncols`, `col_indices.len() == values.len()`, and
+  `slice_ptr[s] + slice_col_count[s]·C <= values.len()`), plus an
+  `out_values.len() >= values.len()` guard on the elementwise store. Two
+  `#[should_panic]` regressions drive the Scalar-backed vectorized path
+  (`Scalar::LANE_COUNT 4 == C`, host-independent) with an out-of-range column and
+  with over-long slice geometry. Evidence tier: type-level precondition + value
+  regression. See [round 8](#audit-2026-07-02-r8).
 - [patch] Scalar-fallback stack-buffer lane bound (2026-06-24). The default
   `SimdKernel` methods and `kernel_helpers` emulations stored a full vector into
   a fixed `[MaybeUninit<T>; 128]` buffer with the `LANE_COUNT <= 128` invariant

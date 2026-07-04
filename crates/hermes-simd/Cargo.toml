@@ -14,10 +14,9 @@ eunomia = { workspace = true }
 hermes-simd-macros = { path = "../hermes-simd-macros", version = "0.3.0" }
 hermes-simd-types = { path = "../hermes-simd-types", version = "0.3.0", default-features = false }
 half = { workspace = true }
-bytemuck = { version = "1.14" }
-rkyv = { version = "0.7" }
 
 [dev-dependencies]
+rkyv = { version = "0.7" }
 proptest = "1.4"
 criterion = { version = "0.5", features = ["html_reports"] }
 

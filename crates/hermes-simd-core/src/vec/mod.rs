@@ -182,6 +182,56 @@ where
         }
     }
 
+    /// Reserve capacity for at least `additional` more elements beyond `len` in
+    /// a single reallocation; a no-op when capacity already suffices.
+    ///
+    /// Growth is geometric — the new capacity is at least double the old — so a
+    /// sequence of `reserve`/`push` calls keeps amortized O(1) append while a
+    /// one-shot `reserve(n)` before a bulk append performs exactly one
+    /// allocation instead of the `⌈log₂ n⌉` reallocations a push loop incurs.
+    ///
+    /// # Panics
+    /// If `len + additional` overflows `usize`, or on allocator failure.
+    pub fn reserve(&mut self, additional: usize) {
+        if core::mem::size_of::<T>() == 0 {
+            self.cap = usize::MAX;
+            return;
+        }
+        let needed = self.len.checked_add(additional).expect("Capacity overflow");
+        if needed <= self.cap {
+            return;
+        }
+        // Grow to at least `needed`, but never less than doubling, so a bulk
+        // reserve honors the exact target while incremental reserves preserve
+        // the geometric-growth amortization.
+        let new_cap = needed.max(self.cap.saturating_mul(2)).max(4);
+        self.grow_to(new_cap);
+    }
+
+    /// Append every element of `src` in a single reserve + `copy_nonoverlapping`.
+    ///
+    /// For `T: Copy` this is the bulk counterpart of [`push`](Self::push): one
+    /// allocation sized to fit (via [`reserve`](Self::reserve)) then one
+    /// contiguous memcpy, versus a per-element push loop's repeated bounds check
+    /// and geometric reallocations.
+    pub fn extend_from_slice(&mut self, src: &[T])
+    where
+        T: Copy,
+    {
+        self.reserve(src.len());
+        if src.is_empty() {
+            return;
+        }
+        // SAFETY: `reserve(src.len())` guaranteed `cap ≥ len + src.len()`, so the
+        // destination `[len, len + src.len())` is within the allocation and
+        // disjoint from `src` (distinct allocations). `T: Copy` ⇒ no drop/overlap
+        // hazard. For a ZST the copy is a no-op on the dangling-but-aligned ptr.
+        unsafe {
+            core::ptr::copy_nonoverlapping(src.as_ptr(), self.ptr.add(self.len), src.len());
+            self.len += src.len();
+        }
+    }
+
     /// Returns the number of elements in the vector.
     #[inline(always)]
     pub fn len(&self) -> usize {
@@ -383,6 +433,20 @@ where
         } else {
             self.cap.checked_mul(2).expect("Capacity overflow")
         };
+        self.grow_to(new_cap);
+    }
+
+    /// Reallocate the backing storage to exactly `new_cap` elements in a single
+    /// allocator call, preserving the existing `len` initialized elements.
+    ///
+    /// SSOT for capacity growth: [`grow`] (geometric doubling for `push`) and
+    /// [`reserve`](Self::reserve) (grow to an explicit target) both delegate here
+    /// so the NUMA / mnemosyne / global-allocator branch logic lives once.
+    ///
+    /// # Panics
+    /// On allocator failure (`handle_alloc_error`) or capacity-layout overflow.
+    /// Caller guarantees `T` is not a ZST and `new_cap > self.cap`.
+    fn grow_to(&mut self, new_cap: usize) {
         let new_layout = self.layout_for(new_cap);
 
         let old_ptr = self.ptr;

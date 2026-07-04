@@ -1,4 +1,4 @@
-# ADR 002: Monomorphized Target-Feature Gate Helpers for Zero-Overhead Inlining
+# ADR 009: Monomorphized Target-Feature Gate Helpers for Zero-Overhead Inlining
 
 ## Status
 Approved

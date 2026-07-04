@@ -15,8 +15,10 @@
 //! (last block possibly short, `current_tile_m`). Every `(i,j)` lies in exactly
 //! one (row-block, column-panel-or-tail) cell. For panel cells
 //! `gemm_register_tile` loads `C[i, j]`, executes
-//! `acc ← acc + Σ_p A[i,p]·B[p,j]` over all `p ∈ [0,k)`, and stores `acc`; for
-//! tail cells the scalar loop does the same sum. Cells are disjoint, so each
+//! `acc ← acc + Σ_p A[i,p]·B[p,j]` over all `p ∈ [0,k)`, and stores `acc`; tail
+//! cells run the identical fmadd recurrence through `leading_k_mask`-guarded
+//! lane groups (inactive lanes load zero, accumulate `a·0`, and are excluded
+//! from the masked store, so they touch no cell). Cells are disjoint, so each
 //! `C[i,j]` is read-modify-written exactly once with the complete `p`-sum. ∎
 //!
 //! # Theorem 2 (packing invariance)
@@ -279,16 +281,67 @@ where
         }
     }
 
-    // Scalar cleanup for the `n % block_n` trailing columns (all rows). Each
-    // (row, col) is written exactly once, independent of the tiling above.
-    for col_tail in simd_n_len..n {
-        for row in 0..m {
-            let mut sum = T::ZERO;
-            for kk in 0..k {
-                sum += a_slice[row * k + kk] * b_slice[kk * n + col_tail];
+    // Masked-vector cleanup for the `n % block_n` trailing columns: process them
+    // in `lane_count`-wide groups with a `leading_k_mask` on the final partial
+    // group, `TILE_M`-row blocked so each masked B row-load is reused across the
+    // row block — the same fmadd contraction (and therefore the same
+    // fused-multiply rounding) as the register tiles. Previously these columns
+    // ran a strided scalar triple loop, costing up to `block_n − 1` scalar
+    // columns (≈ half the FLOPs for `n` just under a block multiple). Inactive
+    // mask lanes load as zero and are never stored: `a·0` accumulates into a
+    // zero-initialized lane that the masked store discards, so they cannot
+    // contaminate active lanes. Each (row, col) is written exactly once,
+    // independent of the tiling above.
+    let mut col = simd_n_len;
+    while col < n {
+        let w = core::cmp::min(lane_count, n - col);
+        // SAFETY: `w ≤ LANE_COUNT` by construction of `min`.
+        let mask = unsafe { Arch::leading_k_mask(w) };
+        let mut r = 0;
+        while r < m {
+            let current_tile_m = if r + TILE_M <= m { TILE_M } else { m - r };
+            let mut acc = [unsafe { Arch::zero() }; TILE_M];
+            for (i, slot) in acc.iter_mut().take(current_tile_m).enumerate() {
+                // SAFETY: row `r + i < m` and the masked load touches only lanes
+                // `[col, col + w)` with `col + w ≤ n`, inside the validated
+                // `m × n` C span.
+                *slot = unsafe {
+                    Arch::masked_load_unaligned(
+                        c.as_ptr().add((r + i) * n + col),
+                        mask,
+                        Arch::zero(),
+                    )
+                };
             }
-            c[row * n + col_tail] += sum;
+            for kk in 0..k {
+                // SAFETY: masked load of lanes `[col, col + w) ≤ n` in row
+                // `kk < k` of the validated `k × n` B span.
+                let b_reg = unsafe {
+                    Arch::masked_load_unaligned(
+                        b_slice.as_ptr().add(kk * n + col),
+                        mask,
+                        Arch::zero(),
+                    )
+                };
+                for (i, slot) in acc.iter_mut().take(current_tile_m).enumerate() {
+                    // SAFETY: pure register ops; `a_slice[(r+i)*k + kk]` is inside
+                    // the validated `m × k` A span.
+                    unsafe {
+                        let a_reg = Arch::splat(a_slice[(r + i) * k + kk]);
+                        *slot = Arch::fmadd(a_reg, b_reg, *slot);
+                    }
+                }
+            }
+            for (i, slot) in acc.iter().take(current_tile_m).enumerate() {
+                // SAFETY: identical span to the masked load above; only the first
+                // `w` lanes are written.
+                unsafe {
+                    Arch::masked_store_unaligned(c.as_mut_ptr().add((r + i) * n + col), mask, *slot)
+                };
+            }
+            r += TILE_M;
         }
+        col += lane_count;
     }
 
     Ok(())

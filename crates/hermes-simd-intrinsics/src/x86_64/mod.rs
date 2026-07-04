@@ -27,6 +27,9 @@ pub mod amx;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub mod avx512_tiling;
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+pub mod avx_vnni_tiling;
+
 // Avx2 emulated kernels for half::bf16, i8, i16, i32 and newtypes
 crate::impl_emulated_kernel!(
     crate::Avx2,

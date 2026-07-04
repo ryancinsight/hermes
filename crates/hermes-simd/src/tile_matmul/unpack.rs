@@ -65,7 +65,11 @@ pub fn widen_i8_to_i16(src: &[i8], dest: &mut [i16]) {
 
     #[cfg(target_arch = "x86_64")]
     {
-        if crate::target::TargetId::Avx512.is_supported() {
+        // `_mm512_cvtepi8_epi16` (`vpmovsxbw`) is an AVX-512**BW** instruction, not
+        // AVX-512F. `TargetId::Avx512` only detects `avx512f`, so gating on it
+        // would `#UD` on an AVX-512F-without-BW part (e.g. Knights Landing). Detect
+        // `avx512bw` (which implies `avx512f` on every real CPU) directly.
+        if std::is_x86_feature_detected!("avx512bw") {
             while i + 32 <= len {
                 unsafe {
                     let src_ptr = src.as_ptr().add(i) as *const __m256i;
