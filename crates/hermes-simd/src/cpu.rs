@@ -33,6 +33,9 @@ pub fn has_fma3() -> bool {
     *CACHED.get_or_init(|| std::is_x86_feature_detected!("fma"))
 }
 
+/// FMA3 is an x86_64-specific extension; every other architecture reports
+/// no support (aarch64/NEON has its own always-available fused multiply-add
+/// instructions, dispatched separately from this x86-specific probe).
 #[cfg(not(target_arch = "x86_64"))]
 #[inline]
 pub fn has_fma3() -> bool {
