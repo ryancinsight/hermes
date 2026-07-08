@@ -361,6 +361,7 @@ dependencies = [
  "bytemuck",
  "half",
  "libm",
+ "num-traits",
  "rkyv",
 ]
 
