@@ -4,6 +4,45 @@ Persistent gap register. Evidence tiers follow the repository instruction
 hierarchy: machine-checked proof > type-level invariant > property/fuzz >
 differential/empirical > source audit.
 
+## 2026-07-08 CI: miri gate known-failing, tracked on upstream mnemosyne <a id="miri-known-failing-2026-07-08"></a>
+
+**Evidence tier: machine-checked (Miri, both Stacked Borrows and Tree Borrows
+aliasing models).** PR #5 (`cb0b1b0`) merged with the `miri` CI job left
+red — this is a deliberate, tracked exception, not an overlooked failure.
+
+- **Finding:** `cargo miri test -p hermes-simd-core` fails on a genuine
+  aliasing violation inside `mnemosyne-local`'s allocator, not in
+  hermes-owned code. Repro: `AlignedVec::with_capacity` (`vec/mod.rs:96`)
+  calls `mnemosyne_local::alloc::thread_alloc_checked` (`alloc.rs:130`),
+  which reads a `Page` via `NonNull::as_mut`; a later `dealloc()`
+  (`vec/mod.rs:542`) writes through an aliasing pointer to the same backing
+  memory, disabling the earlier `Page`-pointer's tag; a subsequent `alloc()`
+  re-reads that now-disabled tag.
+- **Ruled out as a Stacked-Borrows-specific false positive**: tested under
+  `-Zmiri-tree-borrows` (a materially more permissive aliasing model
+  designed to accept exactly this embedded-metadata-allocator pattern) — it
+  still failed, with a clearer diagnostic pointing at the same `Page`
+  pointer/foreign-write sequence. Agreement across both independent models
+  is strong evidence of a real bug, not a model artifact. The Tree Borrows
+  CI experiment was reverted (`166a7b9`, since it provided no benefit) after
+  confirming this.
+- **Owning repo:** mnemosyne, not hermes. Full reproduction instructions and
+  working hypothesis documented in mnemosyne's own `gap_audit.md`
+  ("2026-07-08 Miri: real aliasing violation in the alloc/free
+  page-metadata path", commit `98a02b6`).
+- **Why merge anyway:** the other 4 CI jobs (gates, cargo-deny,
+  cross-compile, test-aarch64) all pass; this is a pre-existing bug in an
+  upstream dependency, newly surfaced by CI graph resolution rather than
+  introduced by this PR's changes; blocking hermes indefinitely on an
+  upstream fix has no bounded timeline.
+- **Follow-up (tracked, not deferred silently):** once mnemosyne's allocator
+  fix lands and hermes bumps its pinned `mnemosyne` rev, re-run
+  `cargo miri test -p hermes-simd-core` and confirm green before removing
+  this entry. Until then the `miri` job on hermes CI is a **known-failing,
+  tracked gate** — branch protection was overridden via `--admin` for this
+  merge only; it is not disabled going forward, so future PRs will need the
+  same override (or the upstream fix) to land.
+
 ## Comprehensive Audit - 2026-07-02 (round 8, 5-agent sweep) <a id="audit-2026-07-02-r8"></a>
 
 Five parallel read-only audits (performance, memory/zero-copy, unsafe soundness,
