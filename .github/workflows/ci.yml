@@ -14,13 +14,38 @@ jobs:
   gates:
     name: fmt + clippy + test + doc (x86_64)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hermes
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: hermes
+      # hermes's [patch] table (Cargo.toml) resolves themis/eunomia/mnemosyne
+      # to local-path siblings for cross-repo dev; CI must recreate that same
+      # sibling layout so those patches resolve. actions/checkout refuses
+      # paths outside $GITHUB_WORKSPACE, so hermes checks out into a named
+      # subdirectory alongside each sibling, all directly under
+      # $GITHUB_WORKSPACE (the true common parent).
+      - uses: actions/checkout@v4
+        with:
+          repository: ryancinsight/themis
+          path: themis
+      - uses: actions/checkout@v4
+        with:
+          repository: ryancinsight/eunomia
+          path: eunomia
+      - uses: actions/checkout@v4
+        with:
+          repository: ryancinsight/Mnemosyne
+          path: mnemosyne
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.95.0
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: hermes
       - name: Format check
         run: cargo fmt --all -- --check
       - name: Clippy
@@ -45,13 +70,32 @@ jobs:
   miri:
     name: miri (core + intrinsics boundary)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hermes
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: hermes
+      - uses: actions/checkout@v4
+        with:
+          repository: ryancinsight/themis
+          path: themis
+      - uses: actions/checkout@v4
+        with:
+          repository: ryancinsight/eunomia
+          path: eunomia
+      - uses: actions/checkout@v4
+        with:
+          repository: ryancinsight/Mnemosyne
+          path: mnemosyne
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly
           components: miri
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: hermes
       - name: cargo miri test (core pointer logic)
         run: cargo +nightly miri test -p hermes-simd-core
       - name: cargo miri test (intrinsics boundary state)
@@ -60,12 +104,31 @@ jobs:
   test-aarch64:
     name: test (aarch64, runtime NEON validation)
     runs-on: ubuntu-24.04-arm
+    defaults:
+      run:
+        working-directory: hermes
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: hermes
+      - uses: actions/checkout@v4
+        with:
+          repository: ryancinsight/themis
+          path: themis
+      - uses: actions/checkout@v4
+        with:
+          repository: ryancinsight/eunomia
+          path: eunomia
+      - uses: actions/checkout@v4
+        with:
+          repository: ryancinsight/Mnemosyne
+          path: mnemosyne
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.95.0
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: hermes
       - uses: taiki-e/install-action@nextest
       - name: Tests (nextest, committed timeout config)
         run: cargo nextest run --workspace
@@ -75,21 +138,57 @@ jobs:
   cross-check:
     name: cross-compile check (aarch64 target from x86_64)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hermes
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: hermes
+      - uses: actions/checkout@v4
+        with:
+          repository: ryancinsight/themis
+          path: themis
+      - uses: actions/checkout@v4
+        with:
+          repository: ryancinsight/eunomia
+          path: eunomia
+      - uses: actions/checkout@v4
+        with:
+          repository: ryancinsight/Mnemosyne
+          path: mnemosyne
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.95.0
           targets: aarch64-unknown-linux-gnu
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: hermes
       - name: Check
         run: cargo check --workspace --all-targets --target aarch64-unknown-linux-gnu
 
   supply-chain:
     name: cargo-deny (advisories, licenses, bans, sources)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hermes
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: hermes
+      - uses: actions/checkout@v4
+        with:
+          repository: ryancinsight/themis
+          path: themis
+      - uses: actions/checkout@v4
+        with:
+          repository: ryancinsight/eunomia
+          path: eunomia
+      - uses: actions/checkout@v4
+        with:
+          repository: ryancinsight/Mnemosyne
+          path: mnemosyne
       # The cargo-deny container image ships its own toolchain and trips over
       # rust-toolchain.toml; install the pinned toolchain + cargo-deny instead.
       - uses: dtolnay/rust-toolchain@master

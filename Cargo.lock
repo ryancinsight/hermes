@@ -696,6 +696,7 @@ checksum = "953f07c43838f8e6f9758cab68bf5bed85465e7587ebe0b823f1bcd81978ad3a"
 [[package]]
 name = "melinoe"
 version = "0.8.0"
+source = "git+https://github.com/ryancinsight/melinoe.git#ba9194613169827a6db55e7458b8e0320cd515e1"
 
 [[package]]
 name = "memchr"

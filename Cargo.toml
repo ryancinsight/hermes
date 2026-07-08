@@ -61,6 +61,3 @@ mnemosyne = { path = "../mnemosyne/crates/mnemosyne" }
 mnemosyne-core = { path = "../mnemosyne/crates/mnemosyne-core" }
 mnemosyne-arena = { path = "../mnemosyne/crates/mnemosyne-arena" }
 mnemosyne-local = { path = "../mnemosyne/crates/mnemosyne-local" }
-
-[patch."https://github.com/ryancinsight/melinoe.git"]
-melinoe = { path = "../melinoe" }
