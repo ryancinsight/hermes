@@ -36,7 +36,9 @@ pub use cow::{
 };
 pub use ops::SparseOps;
 pub use spmv::SparseSpMv;
-pub use types::{BlockedCooData, CsrData, DenseWithMaskData, SellPData, SparseShape};
+pub use types::{
+    BlockedCooData, CsrData, DenseWithMaskData, SellPData, SparseShape, ValidatedData,
+};
 pub use view::{SparseView, SparseViewShape};
 
 /// Compressed Sparse Row format marker.
@@ -60,10 +62,16 @@ pub struct BlockedCoo<const BM: usize, const BN: usize>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DenseWithMask;
 
+/// Typestate marker for sparse formats whose structural invariants were checked
+/// before kernel entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Validated<F>(core::marker::PhantomData<F>);
+
 impl crate::private::Sealed for Csr {}
 impl<const C: usize> crate::private::Sealed for SellP<C> {}
 impl<const BM: usize, const BN: usize> crate::private::Sealed for BlockedCoo<BM, BN> {}
 impl crate::private::Sealed for DenseWithMask {}
+impl<F: SparseFormat> crate::private::Sealed for Validated<F> {}
 
 /// Marker trait for sparse matrix storage formats.
 ///
@@ -97,4 +105,9 @@ impl<const BM: usize, const BN: usize> SparseFormat for BlockedCoo<BM, BN> {
 impl SparseFormat for DenseWithMask {
     const NAME: &'static str = "DenseWithMask";
     type Storage<'a, T: 'a> = DenseWithMaskData<'a, T>;
+}
+
+impl<F: SparseFormat> SparseFormat for Validated<F> {
+    const NAME: &'static str = F::NAME;
+    type Storage<'a, T: 'a> = ValidatedData<F::Storage<'a, T>>;
 }

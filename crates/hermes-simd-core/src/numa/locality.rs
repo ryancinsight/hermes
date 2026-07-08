@@ -201,69 +201,66 @@ fn verify_numa_locality_os(ptr: *const u8, size: usize, expected_node: u32) -> b
         true
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", feature = "libnuma"))]
     unsafe {
-        #[cfg(feature = "libnuma")]
-        {
-            #[link(name = "numa")]
-            extern "C" {
-                fn move_pages(
-                    pid: i32,
-                    count: usize,
-                    pages: *const *mut core::ffi::c_void,
-                    nodes: *const i32,
-                    status: *mut i32,
-                    flags: i32,
-                ) -> i32;
-            }
-            let page_size = 4096;
-            let start_page = (ptr as usize) & !(page_size - 1);
-            let end_page = ((ptr as usize) + size + page_size - 1) & !(page_size - 1);
-            let pages_count = (end_page - start_page) / page_size;
-            if pages_count == 0 {
-                return true;
-            }
-
-            const CHUNK_SIZE: usize = 64;
-            let mut pages_arr = [core::ptr::null_mut(); CHUNK_SIZE];
-            let mut status_arr = [0i32; CHUNK_SIZE];
-
-            let mut checked = 0;
-            while checked < pages_count {
-                let chunk_len = core::cmp::min(pages_count - checked, CHUNK_SIZE);
-                for i in 0..chunk_len {
-                    pages_arr[i] =
-                        (start_page + (checked + i) * page_size) as *mut core::ffi::c_void;
-                }
-                let res = move_pages(
-                    0,
-                    chunk_len,
-                    pages_arr.as_ptr(),
-                    core::ptr::null(),
-                    status_arr.as_mut_ptr(),
-                    0,
-                );
-                if res >= 0 {
-                    for i in 0..chunk_len {
-                        let node = status_arr[i];
-                        if node >= 0 && node as u32 != expected_node {
-                            return false;
-                        }
-                    }
-                } else {
-                    return false;
-                }
-                checked += chunk_len;
-            }
+        #[link(name = "numa")]
+        extern "C" {
+            fn move_pages(
+                pid: i32,
+                count: usize,
+                pages: *const *mut core::ffi::c_void,
+                nodes: *const i32,
+                status: *mut i32,
+                flags: i32,
+            ) -> i32;
+        }
+        let page_size = 4096;
+        let start_page = (ptr as usize) & !(page_size - 1);
+        let end_page = ((ptr as usize) + size + page_size - 1) & !(page_size - 1);
+        let pages_count = (end_page - start_page) / page_size;
+        if pages_count == 0 {
             return true;
         }
-        #[cfg(not(feature = "libnuma"))]
-        {
-            let _ = ptr;
-            let _ = size;
-            let _ = expected_node;
-            true
+
+        const CHUNK_SIZE: usize = 64;
+        let mut pages_arr = [core::ptr::null_mut(); CHUNK_SIZE];
+        let mut status_arr = [0i32; CHUNK_SIZE];
+
+        let mut checked = 0;
+        while checked < pages_count {
+            let chunk_len = core::cmp::min(pages_count - checked, CHUNK_SIZE);
+            for i in 0..chunk_len {
+                pages_arr[i] = (start_page + (checked + i) * page_size) as *mut core::ffi::c_void;
+            }
+            let res = move_pages(
+                0,
+                chunk_len,
+                pages_arr.as_ptr(),
+                core::ptr::null(),
+                status_arr.as_mut_ptr(),
+                0,
+            );
+            if res >= 0 {
+                for i in 0..chunk_len {
+                    let node = status_arr[i];
+                    if node >= 0 && node as u32 != expected_node {
+                        return false;
+                    }
+                }
+            } else {
+                return false;
+            }
+            checked += chunk_len;
         }
+        return true;
+    }
+
+    #[cfg(all(target_os = "linux", not(feature = "libnuma")))]
+    {
+        let _ = ptr;
+        let _ = size;
+        let _ = expected_node;
+        true
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "linux")))]

@@ -13,10 +13,13 @@ Intel Advanced Matrix Extensions (AMX) provide tile matrix multiplication accele
 We implement `AmxSession` and `AmxBatchSession` to manage the lifecycle of tile register configuration:
 - `SESSION_DEPTH`: A thread-local `Cell<usize>` tracking nested session entries.
 - `ACTIVE_CONFIG`: A thread-local `Cell<Option<AmxConfig>>` caching the current active configuration.
+- `AmxSession::new` and `AmxBatchSession::begin` return `AmxSessionError::UnsupportedTarget`
+  before issuing `ldtilecfg` unless the runtime AMX support probe confirms the
+  host and process may execute tile instructions.
 
 ### 2. Context-Switch Mitigation
 
-- When `SESSION_DEPTH` returns to 0 (or when `AmxSession::release` is invoked), the system executes `tilerelease()`.
+- When `SESSION_DEPTH` returns to 0 (or when `AmxSession::release` is invoked), the system executes `tilerelease()` only for a supported active session.
 - Releasing the tile registers resets their state to "initialized". The OS kernel detects this state and skips saving/restoring the 8KB register file on subsequent context switches.
 
 ### 3. Dynamic Configuration Caching

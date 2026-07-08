@@ -53,6 +53,10 @@ harness = false
 name = "streaming_bench"
 harness = false
 
+[[bench]]
+name = "compress_bench"
+harness = false
+
 [features]
 default = ["mnemosyne-memory"]
 mnemosyne-memory = [

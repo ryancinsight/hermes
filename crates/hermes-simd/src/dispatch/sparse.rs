@@ -5,17 +5,20 @@ use hermes_simd_core::kernel::SimdKernel;
 use hermes_simd_core::scalar::Scalar;
 use hermes_simd_core::sparse::{
     BlockedCoo, BlockedCooData, Csr, CsrData, DenseWithMask, DenseWithMaskData, SellP, SellPData,
-    SparseSpMv, SparseView,
+    SparseSpMv, SparseView, Validated, ValidatedData,
 };
 use hermes_simd_macros::runtime_dispatch;
 
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
-pub(super) fn dispatch_spmv_csr_kernel<T, A>(data: CsrData<'_, T>, x: &[T], y: &mut [T])
-where
+pub(super) fn dispatch_spmv_csr_kernel<T, A>(
+    data: ValidatedData<CsrData<'_, T>>,
+    x: &[T],
+    y: &mut [T],
+) where
     T: Scalar,
     A: SimdArch + SimdKernel<T>,
 {
-    SparseView::<T, Csr, A>::from_csr(data).spmv(x, y);
+    SparseView::<T, Validated<Csr>, A>::from_validated_csr(data).spmv(x, y);
 }
 
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
@@ -32,24 +35,24 @@ pub(super) fn dispatch_spmv_dense_masked_kernel<T, A>(
 
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
 pub(super) fn dispatch_spmv_sellp_kernel<T, const C: usize, A>(
-    data: SellPData<'_, T, C>,
+    data: ValidatedData<SellPData<'_, T, C>>,
     x: &[T],
     y: &mut [T],
 ) where
     T: Scalar,
     A: SimdArch + SimdKernel<T>,
 {
-    SparseView::<T, SellP<C>, A>::from_sellp(data).spmv(x, y);
+    SparseView::<T, Validated<SellP<C>>, A>::from_validated_sellp(data).spmv(x, y);
 }
 
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
 pub(super) fn dispatch_spmv_bcoo_kernel<T, const BM: usize, const BN: usize, A>(
-    data: BlockedCooData<'_, T, BM, BN>,
+    data: ValidatedData<BlockedCooData<'_, T, BM, BN>>,
     x: &[T],
     y: &mut [T],
 ) where
     T: Scalar,
     A: SimdArch + SimdKernel<T>,
 {
-    SparseView::<T, BlockedCoo<BM, BN>, A>::from_blocked_coo(data).spmv(x, y);
+    SparseView::<T, Validated<BlockedCoo<BM, BN>>, A>::from_validated_blocked_coo(data).spmv(x, y);
 }

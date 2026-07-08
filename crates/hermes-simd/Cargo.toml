@@ -6,6 +6,10 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 description.workspace = true
+# Not currently publishable: transitively depends on eunomia/mnemosyne via
+# git (crates.io disallows git dependencies). Revisit once those SSOT crates
+# are registry-published.
+publish = false
 
 [dependencies]
 hermes-simd-core = { path = "../hermes-simd-core", version = "0.3.0", default-features = false }
@@ -14,6 +18,7 @@ eunomia = { workspace = true }
 hermes-simd-macros = { path = "../hermes-simd-macros", version = "0.3.0" }
 hermes-simd-types = { path = "../hermes-simd-types", version = "0.3.0", default-features = false }
 half = { workspace = true }
+themis = { workspace = true }
 
 [dev-dependencies]
 rkyv = { version = "0.7" }
@@ -30,7 +35,7 @@ harness = false
 
 [features]
 default = ["std", "mnemosyne-memory"]
-# Linux NUMA node placement via libnuma (links -lnuma); off by default.
+# Linux NUMA affinity and residency probes via libnuma (links -lnuma); off by default.
 libnuma = ["hermes-simd-core/libnuma"]
 mnemosyne-memory = [
     "hermes-simd-core/mnemosyne-memory",
@@ -42,4 +47,5 @@ std = [
     "hermes-simd-intrinsics/std",
     "eunomia/std",
     "hermes-simd-types/std",
+    "themis/std",
 ]

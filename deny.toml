@@ -24,7 +24,12 @@ confidence-threshold = 0.9
 
 [bans]
 multiple-versions = "warn"
-wildcards = "deny"
+# Same rationale as `unlicensed` above: mnemosyne's sub-crates don't set
+# `publish = false` (or a version-pinned path dep), which cargo-deny flags
+# as an unpublishable wildcard on a nominally-public crate. hermes's own
+# crates are fixed directly (publish = false, below); the sibling repos'
+# publish intent isn't hermes's call to make.
+wildcards = "warn"
 # Workspace members reference each other by path without versions; these are
 # not registry wildcards.
 allow-wildcard-paths = true
@@ -33,3 +38,8 @@ allow-wildcard-paths = true
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# melinoe is a real (non-patched) transitive dependency via mnemosyne-local;
+# every other Atlas-fleet git dependency here resolves through the local
+# [patch] path override in dev/CI (sibling checkout layout), so it never
+# reaches this check as a git source.
+allow-git = ["https://github.com/ryancinsight/melinoe.git"]

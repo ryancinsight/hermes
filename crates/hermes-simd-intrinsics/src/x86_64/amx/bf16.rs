@@ -57,7 +57,8 @@ impl super::AmxGemm<half::bf16, half::bf16, f32> for AmxBf16 {
         c_stride: usize,
     ) {
         let config = AmxConfig::for_dimensions(m, n, k, 2);
-        let _session = AmxSession::new(&config);
+        let _session = AmxSession::new(&config)
+            .expect("invariant: AMX bf16 dispatch requires runtime AMX support");
 
         let mut i = 0;
         while i + 32 <= m {
@@ -269,7 +270,8 @@ impl super::AmxGemm<Bf16, Bf16, F32> for AmxBf16 {
         c_stride: usize,
     ) {
         let config = AmxConfig::for_dimensions(m, n, k, 2);
-        let _session = AmxSession::new(&config);
+        let _session = AmxSession::new(&config)
+            .expect("invariant: AMX bf16 dispatch requires runtime AMX support");
 
         let mut i = 0;
         while i + 32 <= m {

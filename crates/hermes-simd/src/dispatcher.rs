@@ -3,7 +3,7 @@
 #[cfg(target_arch = "x86_64")]
 use crate::cpu::{AmxSupport, Avx512Support};
 #[cfg(target_arch = "x86_64")]
-use hermes_simd_core::numa::{verify_numa_locality, NumaTopologyService};
+use hermes_simd_core::numa::{current_numa_node, verify_numa_locality};
 
 /// Dynamic hardware and layout configuration dispatcher.
 pub struct AdaptiveDispatcher;
@@ -33,7 +33,9 @@ pub enum DispatchDecision {
 fn is_multi_numa() -> bool {
     use std::sync::OnceLock;
     static MULTI_NUMA: OnceLock<bool> = OnceLock::new();
-    *MULTI_NUMA.get_or_init(|| NumaTopologyService::total_nodes() > 1)
+    *MULTI_NUMA.get_or_init(|| {
+        themis::CpuTopology::detect().is_some_and(|topology| topology.numa_nodes().len() > 1)
+    })
 }
 
 impl AdaptiveDispatcher {
@@ -43,8 +45,8 @@ impl AdaptiveDispatcher {
     /// # Performance notes
     /// - `has_amx`/`has_avx512` are cached via `OnceLock` in `cpu.rs`.
     /// - `is_multi_numa()` is cached via `OnceLock` (process-stable).
-    /// - `NumaTopologyService::current_node()` (thread-affinity query) is
-    ///   called only on multi-NUMA + AMX-eligible paths.
+    /// - `current_numa_node()` (Themis locality query) is called only on
+    ///   multi-NUMA + AMX-eligible paths.
     pub fn select_backend<T>(
         m: usize,
         n: usize,
@@ -70,7 +72,7 @@ impl AdaptiveDispatcher {
             if has_amx && total_ops >= min_ops && !is_too_small {
                 // NUMA locality check — skip the per-call syscall on single-node hosts.
                 if is_multi_numa() {
-                    if let Some(curr_node) = NumaTopologyService::current_node() {
+                    if let Some(curr_node) = current_numa_node() {
                         let a_local = verify_numa_locality(
                             a_ptr as *const u8,
                             a_len * core::mem::size_of::<T>(),

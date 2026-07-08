@@ -4,6 +4,46 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ## [Unreleased]
 
+### Breaking
+- `hermes-simd-core`/`hermes-simd-intrinsics` [minor]: `SimdArch` now requires
+  `is_runtime_supported()`, the SSOT runtime probe used by safe vector/mask
+  wrappers and forced target dispatch. `AmxSession::new` and
+  `AmxBatchSession::begin` now return `Result<_, AmxSessionError>` so safe code
+  cannot enter `ldtilecfg` on unsupported or OS-disabled AMX hosts.
+- `hermes-simd-core`/`hermes-simd` [minor]: remove Hermes' public
+  `NumaTopologyService`, `numa_node_count`, and `numa_node_distance` facades.
+  Consumers that need node counts, distances, processor maps, or current
+  topology snapshots must use `themis::CpuTopology` and Themis current-locality
+  queries directly. Hermes still exposes SIMD-local `current_numa_node`,
+  `refresh_numa_node`, `verify_numa_locality`, `NumaBinding`,
+  `NumaAllocator`, and `MnemosyneNumaAllocator`.
+- `hermes-simd-core`/`hermes-simd` [minor]: CSR, SELL-p, and Blocked-COO SpMV
+  now require `ValidatedData` sparse storage. Build validated storage with
+  `ValidatedData::new(...)`, `SparseView::<_, Validated<_>, _>::try_from_*`, or
+  `SparseCow::<_, Validated<_>, _>::try_borrowed`/validated `from_slices`.
+  Malformed sparse structures fail at construction instead of being rescanned
+  inside hot `spmv` calls.
+
+### Changed
+- `hermes-simd-core`/`hermes-simd-intrinsics` [minor]: safe vector and mask
+  wrappers check `SimdArch::is_runtime_supported()` before executing
+  target-feature kernels. Fallible vector constructors (`try_zero`, `try_splat`,
+  `try_from_array`) and checked slice wrappers return
+  `SimdError::UnsupportedTarget` on unsupported AVX-512 hosts before any
+  AVX-512 instruction; infallible vector conveniences panic before ISA
+  execution. AMX `release` now avoids `tilerelease` unless a supported active
+  session exists. Regression tests cover unsupported-host AVX-512 constructor
+  rejection and AMX session rejection.
+- `hermes-simd-core` [patch]: remove the direct `libnuma`
+  `numa_alloc_onnode`/`numa_free` and Windows `VirtualAllocExNuma` allocation
+  branches from `MnemosyneNumaAllocator`. Hermes now uses explicit affinity
+  binding plus Mnemosyne/the configured allocator path for node-associated
+  allocation instead of owning platform allocation fallbacks.
+- `hermes-simd-core` [minor]: added the sparse `Validated<F>` typestate and
+  `ValidatedData<S>` wrapper. `SparseSpMv` is implemented for validated
+  CSR/SELL-p/Blocked-COO views only, so repeated solver calls trust
+  construction-time validation and avoid per-call structural index scans.
+
 ### Added
 - `hermes-simd-intrinsics`/`hermes-simd` [minor]: **256-bit AVX-VNNI int8 tile
   GEMM backend** (`AvxVnni` arch marker + `x86_64/avx_vnni_tiling.rs`). Client
@@ -65,6 +105,17 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   sufficient, extend_from_slice value/empty/pre-sized/ZST paths.
 
 ### Changed
+- `hermes-simd-core` [patch]: `SimdView::compress` no longer re-zeroes a
+  `[T::ZERO; 64]` scratch buffer on every chunk. The store writes `lane_count`
+  lanes and the copy reads only `pop ≤ lane_count`, so no lane is read before the
+  store initializes it — the buffer is now a single `MaybeUninit<T>` array
+  hoisted out of the loop (sized `MAX_SIMD_LANES` with the `LANE_BOUND_CHECK`
+  compile-time guard), removing 256–512 B of per-chunk zero-init stores from the
+  hot compaction loop. The loop-invariant `mask.popcount()` is hoisted too.
+  Behavior unchanged (verified by the existing compress tests). A focused
+  `SimdView compress` Criterion group now records scalar and host-AVX2
+  all/half/quarter-mask rows at 1K, 16K, and 256K elements in
+  `benchmarks_baseline.json` / `benchmarks_results.md`.
 - `hermes-simd-core` [patch]: consolidate `reduce_popcount_{and,or,xor}` — three
   byte-identical ~104-line 4-accumulator popcount reductions differing only in
   the bitwise combining op — into one generic `reduce_popcount_op<Op:

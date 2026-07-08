@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-06-15 16:08:34 -04:00",
+  "generated_at": "2026-07-05 22:04:41 -04:00",
   "cpu": "Intel(R) Core(TM) Ultra 9 285K",
   "runtime_backend": "avx2",
   "isa_features": "avx2, fma",
@@ -33,7 +33,7 @@
       "group_id": "Dense Dot f32",
       "function_id": "dispatch",
       "value_str": "1024",
-      "time_ns": 31.097256529222996,
+      "time_ns": 25.10910989984819,
       "throughput_kind": "Elements",
       "throughput_val": 1024
     },
@@ -41,7 +41,7 @@
       "group_id": "Dense Dot f32",
       "function_id": "dispatch",
       "value_str": "16384",
-      "time_ns": 959.2319954298372,
+      "time_ns": 754.2455950719032,
       "throughput_kind": "Elements",
       "throughput_val": 16384
     },
@@ -49,7 +49,7 @@
       "group_id": "Dense Dot f32",
       "function_id": "dispatch",
       "value_str": "256",
-      "time_ns": 7.600250507671734,
+      "time_ns": 5.995913065080558,
       "throughput_kind": "Elements",
       "throughput_val": 256
     },
@@ -57,7 +57,7 @@
       "group_id": "Dense Dot f32",
       "function_id": "dispatch",
       "value_str": "65536",
-      "time_ns": 4367.020015702117,
+      "time_ns": 3459.1414329722293,
       "throughput_kind": "Elements",
       "throughput_val": 65536
     },
@@ -65,7 +65,7 @@
       "group_id": "Dense Dot f32",
       "function_id": "scalar_iter",
       "value_str": "1024",
-      "time_ns": 2154.4792548446376,
+      "time_ns": 1890.1069993919753,
       "throughput_kind": "Elements",
       "throughput_val": 1024
     },
@@ -73,7 +73,7 @@
       "group_id": "Dense Dot f32",
       "function_id": "scalar_iter",
       "value_str": "16384",
-      "time_ns": 37190.69288633671,
+      "time_ns": 30409.513011002593,
       "throughput_kind": "Elements",
       "throughput_val": 16384
     },
@@ -81,7 +81,7 @@
       "group_id": "Dense Dot f32",
       "function_id": "scalar_iter",
       "value_str": "256",
-      "time_ns": 528.8041311997894,
+      "time_ns": 466.3554001627144,
       "throughput_kind": "Elements",
       "throughput_val": 256
     },
@@ -89,7 +89,71 @@
       "group_id": "Dense Dot f32",
       "function_id": "scalar_iter",
       "value_str": "65536",
-      "time_ns": 149654.77299209763,
+      "time_ns": 121924.33492602991,
+      "throughput_kind": "Elements",
+      "throughput_val": 65536
+    },
+    {
+      "group_id": "Dense Dot f64",
+      "function_id": "dispatch",
+      "value_str": "1024",
+      "time_ns": 58.85794488805911,
+      "throughput_kind": "Elements",
+      "throughput_val": 1024
+    },
+    {
+      "group_id": "Dense Dot f64",
+      "function_id": "dispatch",
+      "value_str": "16384",
+      "time_ns": 1699.3001002153092,
+      "throughput_kind": "Elements",
+      "throughput_val": 16384
+    },
+    {
+      "group_id": "Dense Dot f64",
+      "function_id": "dispatch",
+      "value_str": "256",
+      "time_ns": 13.15928215697036,
+      "throughput_kind": "Elements",
+      "throughput_val": 256
+    },
+    {
+      "group_id": "Dense Dot f64",
+      "function_id": "dispatch",
+      "value_str": "65536",
+      "time_ns": 6902.901458228486,
+      "throughput_kind": "Elements",
+      "throughput_val": 65536
+    },
+    {
+      "group_id": "Dense Dot f64",
+      "function_id": "scalar_iter",
+      "value_str": "1024",
+      "time_ns": 1841.194619857965,
+      "throughput_kind": "Elements",
+      "throughput_val": 1024
+    },
+    {
+      "group_id": "Dense Dot f64",
+      "function_id": "scalar_iter",
+      "value_str": "16384",
+      "time_ns": 30290.051838019623,
+      "throughput_kind": "Elements",
+      "throughput_val": 16384
+    },
+    {
+      "group_id": "Dense Dot f64",
+      "function_id": "scalar_iter",
+      "value_str": "256",
+      "time_ns": 429.00771850261646,
+      "throughput_kind": "Elements",
+      "throughput_val": 256
+    },
+    {
+      "group_id": "Dense Dot f64",
+      "function_id": "scalar_iter",
+      "value_str": "65536",
+      "time_ns": 121907.39405283812,
       "throughput_kind": "Elements",
       "throughput_val": 65536
     },
@@ -97,7 +161,7 @@
       "group_id": "Dense Sum f32",
       "function_id": "dispatch",
       "value_str": "1024",
-      "time_ns": 14.951006933187438,
+      "time_ns": 13.029517047853387,
       "throughput_kind": "Elements",
       "throughput_val": 1024
     },
@@ -105,7 +169,7 @@
       "group_id": "Dense Sum f32",
       "function_id": "dispatch",
       "value_str": "1048576",
-      "time_ns": 64252.16702652186,
+      "time_ns": 39407.97017289788,
       "throughput_kind": "Elements",
       "throughput_val": 1048576
     },
@@ -113,7 +177,7 @@
       "group_id": "Dense Sum f32",
       "function_id": "dispatch",
       "value_str": "16384",
-      "time_ns": 317.13987601467227,
+      "time_ns": 304.5913458338874,
       "throughput_kind": "Elements",
       "throughput_val": 16384
     },
@@ -121,7 +185,7 @@
       "group_id": "Dense Sum f32",
       "function_id": "dispatch",
       "value_str": "256",
-      "time_ns": 5.2121987224598465,
+      "time_ns": 4.085299950043514,
       "throughput_kind": "Elements",
       "throughput_val": 256
     },
@@ -129,7 +193,7 @@
       "group_id": "Dense Sum f32",
       "function_id": "dispatch",
       "value_str": "65536",
-      "time_ns": 1671.132187973148,
+      "time_ns": 2135.6841483721932,
       "throughput_kind": "Elements",
       "throughput_val": 65536
     },
@@ -137,7 +201,7 @@
       "group_id": "Dense Sum f32",
       "function_id": "scalar_iter",
       "value_str": "1024",
-      "time_ns": 2172.888939500732,
+      "time_ns": 1864.3656653564235,
       "throughput_kind": "Elements",
       "throughput_val": 1024
     },
@@ -145,7 +209,7 @@
       "group_id": "Dense Sum f32",
       "function_id": "scalar_iter",
       "value_str": "1048576",
-      "time_ns": 2071590.4514533088,
+      "time_ns": 1944050.0608837004,
       "throughput_kind": "Elements",
       "throughput_val": 1048576
     },
@@ -153,7 +217,7 @@
       "group_id": "Dense Sum f32",
       "function_id": "scalar_iter",
       "value_str": "16384",
-      "time_ns": 35251.33166906461,
+      "time_ns": 30498.0589043979,
       "throughput_kind": "Elements",
       "throughput_val": 16384
     },
@@ -161,7 +225,7 @@
       "group_id": "Dense Sum f32",
       "function_id": "scalar_iter",
       "value_str": "256",
-      "time_ns": 485.1883601326757,
+      "time_ns": 449.5773840612145,
       "throughput_kind": "Elements",
       "throughput_val": 256
     },
@@ -169,7 +233,7 @@
       "group_id": "Dense Sum f32",
       "function_id": "scalar_iter",
       "value_str": "65536",
-      "time_ns": 129501.2028924792,
+      "time_ns": 120828.994203898,
       "throughput_kind": "Elements",
       "throughput_val": 65536
     },
@@ -196,6 +260,102 @@
       "time_ns": 497.3767587811443,
       "throughput_kind": "Elements",
       "throughput_val": 1048576
+    },
+    {
+      "group_id": "SimdView compress",
+      "function_id": "avx2_all",
+      "value_str": "1024",
+      "time_ns": 1331.9807374020984,
+      "throughput_kind": "Elements",
+      "throughput_val": 1024
+    },
+    {
+      "group_id": "SimdView compress",
+      "function_id": "avx2_all",
+      "value_str": "16384",
+      "time_ns": 45188.80967932614,
+      "throughput_kind": "Elements",
+      "throughput_val": 16384
+    },
+    {
+      "group_id": "SimdView compress",
+      "function_id": "avx2_all",
+      "value_str": "262144",
+      "time_ns": 314360.0735185459,
+      "throughput_kind": "Elements",
+      "throughput_val": 262144
+    },
+    {
+      "group_id": "SimdView compress",
+      "function_id": "avx2_half",
+      "value_str": "1024",
+      "time_ns": 1129.5529194079804,
+      "throughput_kind": "Elements",
+      "throughput_val": 1024
+    },
+    {
+      "group_id": "SimdView compress",
+      "function_id": "avx2_half",
+      "value_str": "16384",
+      "time_ns": 18197.606419810425,
+      "throughput_kind": "Elements",
+      "throughput_val": 16384
+    },
+    {
+      "group_id": "SimdView compress",
+      "function_id": "avx2_half",
+      "value_str": "262144",
+      "time_ns": 301854.083493424,
+      "throughput_kind": "Elements",
+      "throughput_val": 262144
+    },
+    {
+      "group_id": "SimdView compress",
+      "function_id": "avx2_quarter",
+      "value_str": "1024",
+      "time_ns": 1677.897851996869,
+      "throughput_kind": "Elements",
+      "throughput_val": 1024
+    },
+    {
+      "group_id": "SimdView compress",
+      "function_id": "avx2_quarter",
+      "value_str": "16384",
+      "time_ns": 16123.73579020359,
+      "throughput_kind": "Elements",
+      "throughput_val": 16384
+    },
+    {
+      "group_id": "SimdView compress",
+      "function_id": "avx2_quarter",
+      "value_str": "262144",
+      "time_ns": 264063.51595980494,
+      "throughput_kind": "Elements",
+      "throughput_val": 262144
+    },
+    {
+      "group_id": "SimdView compress",
+      "function_id": "scalar_all",
+      "value_str": "1024",
+      "time_ns": 1171.245803298396,
+      "throughput_kind": "Elements",
+      "throughput_val": 1024
+    },
+    {
+      "group_id": "SimdView compress",
+      "function_id": "scalar_all",
+      "value_str": "16384",
+      "time_ns": 18608.57707353388,
+      "throughput_kind": "Elements",
+      "throughput_val": 16384
+    },
+    {
+      "group_id": "SimdView compress",
+      "function_id": "scalar_all",
+      "value_str": "262144",
+      "time_ns": 356086.4867001626,
+      "throughput_kind": "Elements",
+      "throughput_val": 262144
     },
     {
       "group_id": "Tiled GEMM f32",
@@ -438,6 +598,86 @@
       "throughput_val": 4096
     },
     {
+      "group_id": "gemv_f32",
+      "function_id": "scalar_ref",
+      "value_str": "1024",
+      "time_ns": 390474.98625683464,
+      "throughput_kind": "Elements",
+      "throughput_val": 1048576
+    },
+    {
+      "group_id": "gemv_f32",
+      "function_id": "scalar_ref",
+      "value_str": "16384",
+      "time_ns": 127730156.0,
+      "throughput_kind": "Elements",
+      "throughput_val": 268435456
+    },
+    {
+      "group_id": "gemv_f32",
+      "function_id": "scalar_ref",
+      "value_str": "256",
+      "time_ns": 18499.270145843515,
+      "throughput_kind": "Elements",
+      "throughput_val": 65536
+    },
+    {
+      "group_id": "gemv_f32",
+      "function_id": "scalar_ref",
+      "value_str": "4096",
+      "time_ns": 7986117.714285714,
+      "throughput_kind": "Elements",
+      "throughput_val": 16777216
+    },
+    {
+      "group_id": "gemv_f32",
+      "function_id": "simd",
+      "value_str": "1024",
+      "time_ns": 49347.08764670654,
+      "throughput_kind": "Elements",
+      "throughput_val": 1048576
+    },
+    {
+      "group_id": "gemv_f32",
+      "function_id": "simd",
+      "value_str": "16384",
+      "time_ns": 41271660.0,
+      "throughput_kind": "Elements",
+      "throughput_val": 268435456
+    },
+    {
+      "group_id": "gemv_f32",
+      "function_id": "simd",
+      "value_str": "256",
+      "time_ns": 2011.4858759811184,
+      "throughput_kind": "Elements",
+      "throughput_val": 65536
+    },
+    {
+      "group_id": "gemv_f32",
+      "function_id": "simd",
+      "value_str": "4096",
+      "time_ns": 2358155.6363636367,
+      "throughput_kind": "Elements",
+      "throughput_val": 16777216
+    },
+    {
+      "group_id": "gemv_transpose_f32",
+      "function_id": "scalar_ref",
+      "value_str": "256",
+      "time_ns": 4201.829921127706,
+      "throughput_kind": "Elements",
+      "throughput_val": 65536
+    },
+    {
+      "group_id": "gemv_transpose_f32",
+      "function_id": "simd",
+      "value_str": "256",
+      "time_ns": 2574.4994473524334,
+      "throughput_kind": "Elements",
+      "throughput_val": 65536
+    },
+    {
       "group_id": "packed4_cow_unpack",
       "function_id": "bf4_to_wide",
       "value_str": "1024",
@@ -484,6 +724,70 @@
       "time_ns": 325266.23488099885,
       "throughput_kind": null,
       "throughput_val": null
+    },
+    {
+      "group_id": "reflector_dots_f64",
+      "function_id": "gemv_strided",
+      "value_str": "128",
+      "time_ns": 1106.0965951426251,
+      "throughput_kind": "Elements",
+      "throughput_val": 16384
+    },
+    {
+      "group_id": "reflector_dots_f64",
+      "function_id": "gemv_strided",
+      "value_str": "256",
+      "time_ns": 4488.577422907415,
+      "throughput_kind": "Elements",
+      "throughput_val": 65536
+    },
+    {
+      "group_id": "reflector_dots_f64",
+      "function_id": "gemv_strided",
+      "value_str": "32",
+      "time_ns": 73.74577607726984,
+      "throughput_kind": "Elements",
+      "throughput_val": 1024
+    },
+    {
+      "group_id": "reflector_dots_f64",
+      "function_id": "gemv_strided",
+      "value_str": "64",
+      "time_ns": 249.16853637300355,
+      "throughput_kind": "Elements",
+      "throughput_val": 4096
+    },
+    {
+      "group_id": "reflector_dots_f64",
+      "function_id": "per_column_dot",
+      "value_str": "128",
+      "time_ns": 2098.352174541243,
+      "throughput_kind": "Elements",
+      "throughput_val": 16384
+    },
+    {
+      "group_id": "reflector_dots_f64",
+      "function_id": "per_column_dot",
+      "value_str": "256",
+      "time_ns": 7439.279308568211,
+      "throughput_kind": "Elements",
+      "throughput_val": 65536
+    },
+    {
+      "group_id": "reflector_dots_f64",
+      "function_id": "per_column_dot",
+      "value_str": "32",
+      "time_ns": 174.14104619444456,
+      "throughput_kind": "Elements",
+      "throughput_val": 1024
+    },
+    {
+      "group_id": "reflector_dots_f64",
+      "function_id": "per_column_dot",
+      "value_str": "64",
+      "time_ns": 589.3552011903686,
+      "throughput_kind": "Elements",
+      "throughput_val": 4096
     },
     {
       "group_id": "sum_f32",

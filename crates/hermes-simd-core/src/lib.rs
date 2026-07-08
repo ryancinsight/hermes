@@ -67,8 +67,8 @@ pub use iter::{SimdChunks, SimdChunksMut, ZipChunks};
 pub use kernel::SimdKernel;
 pub use mask::BitMask;
 pub use numa::{
-    current_numa_node, numa_node_count, numa_node_distance, refresh_numa_node,
-    verify_numa_locality, MnemosyneNumaAllocator, NumaAllocator, NumaBinding, NumaTopologyService,
+    current_numa_node, refresh_numa_node, verify_numa_locality, MnemosyneNumaAllocator,
+    NumaAllocator, NumaBinding,
 };
 pub use ops::{
     Abs, AbsMax, AbsSum, Add, BitAnd, BitOr, BitXor, Clamp, Div, Dot, ElementOp, Exclusive, FmaAdd,
@@ -78,7 +78,7 @@ pub use ops::{
 pub use scalar::{FloatElement, NumericElement, Scalar};
 pub use sparse::{
     BlockedCoo, BlockedCooData, Csr, CsrData, DenseWithMask, DenseWithMaskData, SellP, SellPData,
-    SparseFormat, SparseShape, SparseView,
+    SparseFormat, SparseShape, SparseView, Validated, ValidatedData,
 };
 pub use tensor::{ColMajor, RowMajor, TensorCow, TensorError, TensorView};
 pub use tiling::{tiled_dot, tiled_gemm, tiled_gemv, TilingPolicy, TilingStrategy};

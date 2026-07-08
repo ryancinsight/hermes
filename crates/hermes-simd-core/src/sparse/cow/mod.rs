@@ -9,8 +9,8 @@
 use super::{
     ops::SparseOps,
     spmv::SparseSpMv,
-    types::{BlockedCooData, CsrData, DenseWithMaskData, SellPData, SparseShape},
-    BlockedCoo, Csr, DenseWithMask, SellP, SparseFormat, SparseView,
+    types::{BlockedCooData, CsrData, DenseWithMaskData, SellPData, SparseShape, SparseValidate},
+    BlockedCoo, Csr, DenseWithMask, SellP, SparseFormat, SparseView, Validated, ValidatedData,
 };
 use crate::arch::SimdArch;
 use crate::scalar::Scalar;
@@ -132,6 +132,26 @@ impl CowFormat for DenseWithMask {
     }
 }
 
+impl<F> CowFormat for Validated<F>
+where
+    F: CowFormat,
+{
+    type Owned<T>
+        = ValidatedData<F::Owned<T>>
+    where
+        T: Send + Sync;
+
+    #[inline(always)]
+    fn as_storage<T: Send + Sync>(owned: &Self::Owned<T>) -> Self::Storage<'_, T> {
+        ValidatedData::new_unchecked(F::as_storage(owned.storage()))
+    }
+
+    #[inline]
+    fn to_owned_storage<T: Clone + Send + Sync>(storage: &Self::Storage<'_, T>) -> Self::Owned<T> {
+        ValidatedData::new_unchecked(F::to_owned_storage(storage.storage()))
+    }
+}
+
 /// Clone-on-Write sparse matrix, generic over the storage format `F`.
 ///
 /// `Borrowed` wraps a zero-copy [`SparseView`]; `Owned` holds heap-backed
@@ -141,7 +161,7 @@ impl CowFormat for DenseWithMask {
 /// # Examples
 ///
 /// ```
-/// use hermes_simd_core::{Csr, CsrData};
+/// use hermes_simd_core::{Csr, CsrData, Validated};
 /// use hermes_simd_core::sparse::{SparseCow, SparseSpMv};
 /// use hermes_simd_intrinsics::Scalar;
 ///
@@ -149,7 +169,7 @@ impl CowFormat for DenseWithMask {
 /// let col_indices = [0, 2, 1];
 /// let row_ptr = [0, 2, 3];
 /// let data = CsrData::new(&values, &col_indices, &row_ptr, 2, 3);
-/// let matrix = SparseCow::<f64, Csr, Scalar>::borrowed(data);
+/// let matrix = SparseCow::<f64, Validated<Csr>, Scalar>::try_borrowed(data).unwrap();
 ///
 /// let x = [10.0, 20.0, 30.0];
 /// let mut y = [0.0; 2];
@@ -224,6 +244,20 @@ impl<'a, T: Send + Sync, F: CowFormat, Arch: SimdArch> SparseCow<'a, T, F, Arch>
     }
 }
 
+impl<'a, T: Send + Sync, F: CowFormat, Arch: SimdArch> SparseCow<'a, T, Validated<F>, Arch>
+where
+    F::Storage<'a, T>: SparseValidate,
+{
+    /// Validate borrowed storage and wrap it in a zero-copy sparse Cow.
+    ///
+    /// # Errors
+    /// Returns the format-specific validation error if `data` is malformed.
+    #[inline]
+    pub fn try_borrowed(data: F::Storage<'a, T>) -> Result<Self, crate::SimdError> {
+        Ok(Self::Borrowed(SparseView::new(ValidatedData::new(data)?)))
+    }
+}
+
 impl<'a, T, F, Arch> SparseSpMv<T> for SparseCow<'a, T, F, Arch>
 where
     T: Scalar,
@@ -285,6 +319,29 @@ impl<'a, T: Send + Sync + Clone, Arch: SimdArch> SparseCow<'a, T, Csr, Arch> {
     }
 }
 
+impl<'a, T: Send + Sync + Clone, Arch: SimdArch> SparseCow<'a, T, Validated<Csr>, Arch> {
+    /// Build an owned validated CSR Cow from slices.
+    ///
+    /// # Errors
+    /// Returns the CSR validation error if the sparse structure is malformed.
+    #[inline]
+    pub fn from_slices(
+        values: &[T],
+        col_indices: &[i32],
+        row_ptr: &[i32],
+        nrows: usize,
+        ncols: usize,
+    ) -> Result<Self, crate::SimdError> {
+        Ok(Self::Owned(ValidatedData::new(OwnedCsr::new(
+            AlignedVec::from_slice_clone(values),
+            AlignedVec::from_slice(col_indices),
+            AlignedVec::from_slice(row_ptr),
+            nrows,
+            ncols,
+        ))?))
+    }
+}
+
 impl<'a, T: Send + Sync + Clone, const C: usize, Arch: SimdArch> SparseCow<'a, T, SellP<C>, Arch> {
     /// Build an owned SELL-p Cow from slices.
     #[inline]
@@ -304,6 +361,33 @@ impl<'a, T: Send + Sync + Clone, const C: usize, Arch: SimdArch> SparseCow<'a, T
             nrows,
             ncols,
         ))
+    }
+}
+
+impl<'a, T: Send + Sync + Clone, const C: usize, Arch: SimdArch>
+    SparseCow<'a, T, Validated<SellP<C>>, Arch>
+{
+    /// Build an owned validated SELL-p Cow from slices.
+    ///
+    /// # Errors
+    /// Returns the SELL-p validation error if the sparse structure is malformed.
+    #[inline]
+    pub fn from_slices(
+        values: &[T],
+        col_indices: &[i32],
+        slice_ptr: &[i32],
+        slice_col_count: &[i32],
+        nrows: usize,
+        ncols: usize,
+    ) -> Result<Self, crate::SimdError> {
+        Ok(Self::Owned(ValidatedData::new(OwnedSellP::new(
+            AlignedVec::from_slice_clone(values),
+            AlignedVec::from_slice(col_indices),
+            AlignedVec::from_slice(slice_ptr),
+            AlignedVec::from_slice(slice_col_count),
+            nrows,
+            ncols,
+        ))?))
     }
 }
 
@@ -328,6 +412,33 @@ impl<'a, T: Send + Sync + Clone, const BM: usize, const BN: usize, Arch: SimdArc
             nrows,
             ncols,
         ))
+    }
+}
+
+impl<'a, T: Send + Sync + Clone, const BM: usize, const BN: usize, Arch: SimdArch>
+    SparseCow<'a, T, Validated<BlockedCoo<BM, BN>>, Arch>
+{
+    /// Build an owned validated Blocked-COO Cow from slices.
+    ///
+    /// # Errors
+    /// Returns the Blocked-COO validation error if the sparse structure is malformed.
+    #[inline]
+    pub fn from_slices(
+        blocks: &[T],
+        block_row: &[i32],
+        block_col: &[i32],
+        nblocks: usize,
+        nrows: usize,
+        ncols: usize,
+    ) -> Result<Self, crate::SimdError> {
+        Ok(Self::Owned(ValidatedData::new(OwnedBlockedCoo::new(
+            AlignedVec::from_slice_clone(blocks),
+            AlignedVec::from_slice(block_row),
+            AlignedVec::from_slice(block_col),
+            nblocks,
+            nrows,
+            ncols,
+        ))?))
     }
 }
 

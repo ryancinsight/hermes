@@ -46,11 +46,16 @@ order (correctness → architecture → tests → docs → PM).
   AVX-512**F**-only guard → SIGILL on KNL. Fixed: the two AVX-512 tile probes now
   use `is_x86_feature_detected!` for the exact enabled set (macro handles
   XCR0/max-leaf); `widen_i8_to_i16` gated on `avx512bw`. See [Resolved](#resolved).
-- **[open] Unsound safe API surfaces (PROVEN).** `AmxSession::new` (safe `fn`)
-  runs `ldtilecfg` with no detection; `Vector::<T, Avx512>::{splat,zero}` +
-  operator impls run ISA intrinsics from safe code. In-repo callers all guard,
-  but the *API* admits `#UD` from safe code. Fix: unforgeable detection-minted
-  arch token, or make these `unsafe fn`/probed. `[minor]`.
+- **[RESOLVED 2026-07-05] Unsound safe API surfaces (PROVEN).**
+  `AmxSession::new` / `AmxBatchSession::begin` now return
+  `AmxSessionError::UnsupportedTarget` before `ldtilecfg`; `release` does not
+  issue `tilerelease` unless a supported active session exists. `SimdArch`
+  carries the runtime-support probe used by `TargetId` and the safe `Vector` /
+  `Mask` wrappers; unsupported AVX-512 hosts get `SimdError::UnsupportedTarget`
+  from fallible constructors and checked slice wrappers before any AVX-512
+  instruction. Infallible vector conveniences panic before ISA execution.
+  Evidence tier: type-level trait seam + value-semantic unsupported-host
+  regressions. See [Resolved](#resolved).
 
 ### Performance (source-audit tier; each needs a criterion baseline before/after)
 
@@ -71,12 +76,17 @@ order (correctness → architecture → tests → docs → PM).
   AVX2-routed on an AVX-512 runner; do not re-implement without that number.
   The `C = k·LANE_COUNT` kernel generalization remains a separate `[minor]`
   candidate under the same measurement gate.
-- **[open] Per-call CSR/BCOO index re-validation (HIGH, 2 agents).** The soundness
-  scans in CSR/BCOO (and now SELL-p) re-read `col_indices` every `spmv`; iterative
-  solvers call spmv thousands of times on one immutable matrix (+~17-50% index
-  traffic per call). Root-cause fix: a `Validated` sparse typestate constructed
-  once, kernels trust the type — removes all four per-call scans and closes the
-  soundness holes structurally. `[minor]` (supersedes the per-call scans).
+- **[RESOLVED 2026-07-05] Per-call CSR/BCOO/SELL-p SpMV re-validation
+  (HIGH, 2 agents).** Added `Validated<F>`/`ValidatedData<S>` and moved CSR,
+  SELL-p, and Blocked-COO `SparseSpMv` impls to
+  `SparseView<Validated<_>>`. Public `spmv_csr`/`spmv_bcoo`/`spmv_sellp`
+  dispatch now requires validated storage, and validated `SparseCow`
+  constructors preserve the run-once invariant for repeated solver calls. Raw
+  malformed structures fail at validated view/COW/public-dispatch construction;
+  hot SpMV kernels keep only runtime-vector size checks for `x`/`y`. Evidence:
+  type-level typestate plus regression/property coverage over construction-time
+  rejection and value-semantic SpMV for CSR/SELL-p/Blocked-COO. Local compile
+  verification is pending shared Cargo target lock clearance.
 - **[RESOLVED 2026-07-03] GEMM/GEMV scalar column tails (HIGH).** **GEMM:**
   `tiled_gemm`'s `n % block_n` trailing columns run `leading_k_mask`-guarded
   fmadd lane groups; measured 3.43× at n=63 (25.17 → 7.33 µs), bitwise
@@ -140,8 +150,18 @@ order (correctness → architecture → tests → docs → PM).
   (MED-HIGH)** — 8× footprint; bit-pack once at the boundary (a `BitMask` type
   already exists). **`cmp_*_mask`/`cast` round-trip through stack buffers with
   64-iter scalar loops (MED)** — route through native backend mask ops.
-  **`compress` zero-inits a 64-elem stack buffer per chunk (MED); argmin/argmax
-  two-pass (LOW-MED).** All `[patch]`/`[minor]`.
+  **argmin/argmax two-pass (LOW-MED)** — bandwidth-bound-only win; a correct
+  single-pass needs SIMD index-vector tracking with first-occurrence
+  tie-breaking (non-trivial). All `[patch]`/`[minor]`.
+- **[RESOLVED 2026-07-04] `compress` per-chunk buffer zero-init.** The hot
+  compaction loop re-declared `[T::ZERO; 64]` each chunk (256–512 B of zero
+  stores) though the vector store writes `lane_count` lanes and the copy reads
+  only `pop ≤ lane_count`. Now a single hoisted `MaybeUninit<T>` array
+  (`MAX_SIMD_LANES`, `LANE_BOUND_CHECK`-guarded) with the loop-invariant popcount
+  hoisted; behavior unchanged (compress + `expand∘compress` identity tests pass).
+  Focused Criterion coverage now records public `SimdView::compress` scalar and
+  host-AVX2 all/half/quarter-mask rows at 1K, 16K, and 256K elements; regression
+  self-check covered 102 committed Hermes benchmark rows.
 - **[RESOLVED 2026-07-03] Non-temporal (streaming) stores for out-of-LLC writes
   — strongly beneficial, productionized.** Focused experiment
   (`streaming_bench.rs`): `out = a + b` over 16 Mi f32 (192 MiB working set, past
@@ -556,6 +576,16 @@ Resolved this sprint:
 
 ## Resolved
 
+- [minor] Safe-code ISA fault surfaces (2026-07-05). `AmxSession::new` and
+  `AmxBatchSession::begin` became fallible (`AmxSessionError::UnsupportedTarget`)
+  and guard `ldtilecfg`; `AmxSession::release` guards `tilerelease`. `SimdArch`
+  now owns `is_runtime_supported()`, with `TargetId` and safe vector/mask wrappers
+  sharing that SSOT. `Vector::<T, Avx512>::try_zero`, `try_splat`,
+  `try_from_array`, and checked slice wrappers return `SimdError::UnsupportedTarget`
+  on unsupported hosts before entering AVX-512 code; infallible conveniences
+  panic before ISA execution. Regression coverage asserts AMX session rejection
+  and AVX-512 constructor/slice-wrapper rejection on unsupported x86 hosts.
+  Evidence tier: type-level runtime-support seam + value-semantic regression.
 - [patch] AVX-512 tile-kernel detection soundness (2026-07-02). The `Avx512Support`
   probes read raw CPUID without OSXSAVE/XCR0 (a host advertising the bit without OS
   XSAVE enablement would `#UD`) and, for bf16, tested the unrelated `avx512bf16`

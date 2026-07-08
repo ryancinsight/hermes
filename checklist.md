@@ -4,6 +4,14 @@
 
 ## Sprint scope: ship 0.2.0 with CI
 
+- [x] [patch] `hermes-simd` AMX auto-dispatch mitigation: AMX support probes now
+      return false until Hermes has a stable, permission-aware AMX probe that
+      verifies hardware bits, XCR0 OS state, and Linux XTILEDATA process
+      permission. This removes unstable Rust AMX feature-detection macro calls
+      and prevents CPUID-only AMX dispatch. AVX-512 tile probes still use exact
+      stable `is_x86_feature_detected!` checks. Evidence tier: compile-time
+      validation. Checks: `cargo check -p hermes-simd` and `cargo clippy -p
+      hermes-simd --all-targets -- -D warnings`.
 - [x] [patch] `.github/workflows/ci.yml`: fmt-check, clippy `-D warnings`,
       `cargo test --workspace` (x86_64 + native aarch64 runner), warning-clean
       docs, aarch64 cross-check, cargo-deny. → green (run 27296233212; required three fixes: libnuma feature gating, license inheritance, AMX bench import cfg).
@@ -27,18 +35,38 @@
 
 ## Residual risks
 
-- AVX-512 and AMX paths: differential tests self-skip on unsupported hosts;
-  no AVX-512 CI runner yet ([backlog → P0](backlog.md#p0)).
+- AVX-512 and AMX hot paths: differential tests self-skip on unsupported hosts;
+  safe constructors/lifecycle APIs now reject unsupported targets before ISA
+  execution, but no AVX-512/AMX CI runner exists yet ([backlog → P0](backlog.md#p0)).
 - `cargo-semver-checks --workspace` cannot doc-build `hermes-numeric` under
   its feature-combination probing (rkyv `size_*` feature requirement);
   per-crate scoped runs are the working procedure.
 - `panic = "abort"` in the release profile: CI tests the dev profile.
-- Full Themis topology consolidation remains open: Hermes still owns the
-  public `NumaTopologyService` facade and platform binding fallback, while
-  default NUMA-vector allocations now route through Mnemosyne.
+- Full Themis topology consolidation closed: Hermes no longer owns the public
+  `NumaTopologyService`/node-count/node-distance facade, and
+  `MnemosyneNumaAllocator` no longer owns direct platform allocation fallback
+  branches. Consumer topology queries route to Themis; allocation ownership
+  routes through Mnemosyne/the configured allocator path.
 
 ## Post-0.2.0 increment (2026-06-10)
 
+- [x] [minor] Sparse `Validated` typestate follow-up: added
+      `Validated<F>`/`ValidatedData<S>`, moved CSR/SELL-p/Blocked-COO SpMV onto
+      `SparseView<Validated<_>>`, changed public SpMV dispatch to require
+      validated storage, and added validated COW constructors. Regression and
+      property tests assert malformed sparse layouts fail at construction and
+      generated valid layouts match scalar references. Evidence tier:
+      type-level invariant + property tests. Checks: `cargo fmt --check` clean;
+      `cargo check -p hermes-simd` could not acquire the shared Cargo target lock
+      in this pass.
+- [x] [minor] Safe-code ISA fault hardening: `SimdArch::is_runtime_supported`
+      is the SSOT for safe vector/mask wrappers and `TargetId`; unsupported
+      AVX-512 hosts get `SimdError::UnsupportedTarget` from fallible vector
+      constructors/checked slice wrappers before any AVX-512 instruction, and
+      infallible vector conveniences panic before ISA execution. `AmxSession::new`
+      and `AmxBatchSession::begin` now return `AmxSessionError::UnsupportedTarget`
+      before `ldtilecfg`; `release` guards `tilerelease`. Evidence tier:
+      type-level trait seam + value-semantic unsupported-host regressions.
 - [x] [patch] `cargo miri` over hermes-simd-core: unit tests green; rkyv 0.7
       tests `#[cfg_attr(miri, ignore)]` (upstream Stacked Borrows violations);
       CI `miri` job added.
@@ -119,6 +147,12 @@
       `benchmarks_baseline.json` and `benchmarks_results.md` from local
       Criterion output, including packed4 COW unpack and the unrolled complex
       `mul_assign` rows. Regression self-check covered 48 rows.
+- [x] [patch] Compress scratch-hoist benchmark: added
+      `compress_bench` with public `SimdView::compress` scalar and host-AVX2
+      all/half/quarter-mask rows at 1K, 16K, and 256K elements. Refreshed
+      `benchmarks_baseline.json` / `benchmarks_results.md`; regression
+      self-check covered 102 Hermes rows. Evidence tier: empirical Criterion
+      validation plus existing value-semantic compress regressions.
 - [x] [minor] Const-generic Blocked-COO dispatch: removed fixed public
       `spmv_bcoo4x4`/`spmv_bcoo8x8` dispatch functions and fixed
       `SparseView::from_blocked_coo_4x4`/`from_blocked_coo_8x8` constructors

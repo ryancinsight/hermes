@@ -50,4 +50,11 @@ pub trait SimdArch: crate::private::Sealed + Send + Sync + 'static + Copy + Clon
     /// - `Avx2`: 4 (16 YMM / TILE_M=4 leaves headroom for loop overhead)
     /// - `Avx512`: 8 (32 ZMM / TILE_M=8 saturates two FMA ports)
     const FMA_THROUGHPUT_HINT: u32;
+
+    /// Returns true when the current host may execute this architecture's
+    /// native instructions from safe wrappers.
+    ///
+    /// Emulated backends return `true`; native ISA backends must include the
+    /// OS-enabled register-state checks covered by the platform feature probe.
+    fn is_runtime_supported() -> bool;
 }

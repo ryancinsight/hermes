@@ -1,6 +1,6 @@
 //! Sparse matrix-vector multiplication (SpMV) kernels.
 
-use super::{BlockedCoo, Csr, DenseWithMask, SellP, SellPData, SparseView};
+use super::{BlockedCoo, Csr, DenseWithMask, SellP, SellPData, SparseView, Validated};
 use crate::arch::SimdArch;
 use crate::kernel::SimdKernel;
 use crate::scalar::Scalar;
@@ -47,31 +47,6 @@ pub(crate) unsafe fn build_index_vector<T: Scalar, Arch: SimdKernel<T>>(
     core::ptr::read_unaligned(ptr)
 }
 
-/// Assert a SELL-p matrix is structurally sound before its vectorized kernels
-/// run.
-///
-/// The vectorized SELL-p paths (`sellp_spmv_vectorized`,
-/// `elementwise_mul_dense`) load `values[offset..]` as one full `C`-lane vector
-/// and `gather(x, col_idx)` **without** the per-lane bounds checks that the
-/// scalar fallback performs. Because `SellPMatrix` exposes `pub` fields and its
-/// `new` performs no validation, a caller can construct a matrix whose slice
-/// geometry (`slice_ptr`/`slice_col_count`) or `col_indices` drive those
-/// unchecked reads out of bounds from a fully safe `spmv`/`elementwise_mul_dense`
-/// call. This routes the structure through the SSOT [`SparseValidate`] checks —
-/// `col < ncols`, `col_indices.len() == values.len()`, and
-/// `slice_ptr[s] + slice_col_count[s]·C <= values.len()` — so the kernel runs on
-/// a proven structure. Mirrors the up-front column scan the CSR and BlockedCOO
-/// `spmv` paths already perform inline.
-#[inline(never)]
-pub(crate) fn assert_sellp_validated<T, const C: usize>(data: &SellPData<'_, T, C>)
-where
-    T: Scalar,
-{
-    use super::types::SparseValidate;
-    data.validate()
-        .expect("SELL-p matrix failed structural validation before vectorized kernel");
-}
-
 #[inline(never)]
 fn validate_spmv_sizes(x_len: usize, y_len: usize, ncols: usize, nrows: usize, format_name: &str) {
     assert!(
@@ -90,29 +65,15 @@ fn validate_spmv_sizes(x_len: usize, y_len: usize, ncols: usize, nrows: usize, f
     );
 }
 
-impl<'a, T, Arch> SparseSpMv<T> for SparseView<'a, T, Csr, Arch>
+impl<'a, T, Arch> SparseSpMv<T> for SparseView<'a, T, Validated<Csr>, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
 {
     #[inline]
     fn spmv(&self, x: &[T], y: &mut [T]) {
-        let data = &self.data;
+        let data = self.data.storage();
         validate_spmv_sizes(x.len(), y.len(), data.ncols, data.nrows, "CSR");
-
-        // The SIMD path gathers `x[cols[j]]` without bounds-checking the column
-        // index (only the scalar tail is checked), so a malformed CSR matrix
-        // could make this safe function read out of bounds. Validate every column
-        // index is in range up front — a linear scan, cheap relative to the
-        // random-access gathers it guards — so the kernel is sound on adversarial
-        // input. A negative `i32` becomes a huge `usize` and is rejected too.
-        for &c in data.col_indices.iter() {
-            assert!(
-                (c as usize) < data.ncols,
-                "CSR column index {c} out of range for ncols {}",
-                data.ncols
-            );
-        }
 
         let lane_count = Arch::LANE_COUNT;
 
@@ -292,30 +253,15 @@ where
 }
 
 impl<'a, T, const BM: usize, const BN: usize, Arch> SparseSpMv<T>
-    for SparseView<'a, T, BlockedCoo<BM, BN>, Arch>
+    for SparseView<'a, T, Validated<BlockedCoo<BM, BN>>, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
 {
     #[inline]
     fn spmv(&self, x: &[T], y: &mut [T]) {
-        let data = &self.data;
+        let data = self.data.storage();
         validate_spmv_sizes(x.len(), y.len(), data.ncols, data.nrows, "BlockedCoo");
-
-        // Per-block bounds for the unchecked SIMD column loads (`x[bc..bc+BN]`)
-        // and row stores (`y[br..br+BM]`) below. O(nblocks), once per call, so a
-        // malformed block coordinate is a panic rather than an out-of-bounds
-        // vector read/write.
-        for b in 0..data.nblocks {
-            let br = data.block_row[b] as usize;
-            let bc = data.block_col[b] as usize;
-            assert!(
-                bc + BN <= x.len() && br + BM <= y.len(),
-                "BlockedCoo block {b} (row {br}+{BM}, col {bc}+{BN}) exceeds x.len()={} / y.len()={}",
-                x.len(),
-                y.len()
-            );
-        }
 
         let block_size = BM * BN;
         let lane_count = Arch::LANE_COUNT;
@@ -491,26 +437,24 @@ unsafe fn sellp_spmv_vectorized<T, const C: usize, Arch>(
     }
 }
 
-impl<'a, T, const C: usize, Arch> SparseSpMv<T> for SparseView<'a, T, SellP<C>, Arch>
+impl<'a, T, const C: usize, Arch> SparseSpMv<T> for SparseView<'a, T, Validated<SellP<C>>, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
 {
     #[inline]
     fn spmv(&self, x: &[T], y: &mut [T]) {
-        validate_spmv_sizes(x.len(), y.len(), self.data.ncols, self.data.nrows, "SellP");
+        let data = self.data.storage();
+        validate_spmv_sizes(x.len(), y.len(), data.ncols, data.nrows, "SellP");
 
         if Arch::LANE_COUNT == C {
-            // SAFETY: `assert_sellp_validated` proves every `col_indices[k] <
-            // ncols` (so each gathered `x[col]` is in bounds given
-            // `validate_spmv_sizes` guarantees `x.len() >= ncols`) and every
-            // slice load `values[offset..offset + C]` stays within `values` — the
-            // exact preconditions `sellp_spmv_vectorized`'s unchecked loads rely
-            // on.
-            assert_sellp_validated(&self.data);
-            unsafe { sellp_spmv_vectorized::<T, C, Arch>(&self.data, x, y) };
+            // SAFETY: `ValidatedData` proves every `col_indices[k] < ncols`
+            // (so each gathered `x[col]` is in bounds given `x.len() >= ncols`)
+            // and every slice load `values[offset..offset + C]` stays within
+            // `values`, which are the unchecked-load preconditions.
+            unsafe { sellp_spmv_vectorized::<T, C, Arch>(data, x, y) };
         } else {
-            sellp_spmv_scalar::<T, C>(&self.data, x, y);
+            sellp_spmv_scalar::<T, C>(data, x, y);
         }
     }
 }

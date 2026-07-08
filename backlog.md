@@ -5,8 +5,38 @@ Tags: `[patch]` / `[minor]` / `[major]` / `[arch]` per SemVer change class.
 Tactical breakdown of the active items lives in [checklist.md](checklist.md).
 External gap findings live in [gap_audit.md](gap_audit.md).
 
+## Open
+
+- [minor] Re-enable AMX auto-dispatch only after adding a stable,
+  permission-aware probe that verifies hardware feature bits, XCR0 OS state,
+  and Linux XTILEDATA process permission before reporting support. Acceptance:
+  AMX GEMM dispatches and matches the scalar reference on a Sapphire-Rapids
+  Linux runner.
+
 ## Delivered (2026-06-11)
 
+- [x] [minor] (2026-07-05) Sparse `Validated` typestate follow-up. CSR,
+  SELL-p, and Blocked-COO SpMV now require `ValidatedData` storage; malformed
+  sparse structures fail at validated view/COW/public-dispatch construction, and
+  hot `SparseSpMv` impls run only on `SparseView<Validated<_>>` without per-call
+  structural scans. Regression/property coverage checks construction-time
+  rejection plus value-semantic SpMV for all three formats. Evidence tier:
+  type-level typestate + property tests; local compile/nextest pending shared
+  Cargo target lock clearance.
+- [x] [minor] (2026-07-05) Safe-code ISA fault hardening. `SimdArch` now owns
+  runtime-support probing for safe wrappers and forced dispatch; safe AVX-512
+  vector constructors/checked slice wrappers return `SimdError::UnsupportedTarget`
+  on unsupported hosts before executing target-feature code, while infallible
+  conveniences panic before ISA execution. `AmxSession::new` and
+  `AmxBatchSession::begin` return `AmxSessionError::UnsupportedTarget` before
+  `ldtilecfg`; `release` guards `tilerelease`. Evidence: unsupported-host
+  regression coverage plus focused package verification.
+- [x] [patch] (2026-07-02) AMX auto-dispatch mitigation. `hermes-simd`
+  conservatively reports no AMX support until the permission-aware probe above
+  exists, avoiding unstable Rust AMX feature-detection macros and preventing
+  CPUID-only dispatch into AMX tile instructions. AVX-512 tile probes keep exact
+  stable feature checks. Evidence: `cargo check -p hermes-simd`; `cargo clippy
+  -p hermes-simd --all-targets -- -D warnings`.
 - [x] [patch] (2026-06-28) `recip_sqrt` full native precision. The f64 SIMD paths
   and NEON f32 under-refined a low-bit hardware `rsqrt` seed (one Newton step),
   giving backend-dependent accuracy from ~1e-16 (scalar) to ~1.5e-5 (NEON) —
@@ -316,6 +346,12 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
       iteration before the single-register and scalar tails. Criterion
       validation on this host showed runtime improvement across 256, 1K, 4K,
       and 16K complex-pair inputs.
+- [x] **[patch] Compress scratch-hoist benchmark** (delivered 2026-07-05):
+      add a focused `SimdView compress` Criterion group for the public
+      compaction path, covering scalar all-active and host-AVX2 all/half/quarter
+      masks at 1K, 16K, and 256K elements. `run-benches --parse-only
+      --write-baseline --check-regressions` refreshed the committed benchmark
+      report/baseline and checked 102 Hermes rows.
 - [x] **[minor] Expose popcount and horizontal reductions** (delivered 2026-06-21): add SIMD population
       count (`popcnt`) and bitwise horizontal fold/reduction primitives to the facade,
       enabling Leto/Hephaestus to implement Jaccard and Hamming distance metrics. Driver:
@@ -349,9 +385,9 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
       [gap_audit.md](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17).
       Delivered 2026-06-21 as ADR 007 feasibility study.
 - [x] **[minor] NUMA module status** (audited 2026-06-11): `numa.rs` IS
-      integrated — `hermes-simd::dispatcher` uses `NumaTopologyService`/
+      integrated — `hermes-simd::dispatcher` uses Themis topology queries /
       `verify_numa_locality`, `vec` uses `NumaAllocator`, and types_tests
-      cover node count/distance. Finding: it reimplements platform NUMA
+      cover Mnemosyne allocation plus Themis topology ownership. Finding: it reimplements platform NUMA
       detection (`GetNumaHighestNodeNumber` on Windows, sysfs on Linux) that
       **themis `CpuTopology` owns**, and its `MnemosyneNumaAllocator` names
       mnemosyne's allocation responsibility — a structural duplication across
@@ -364,15 +400,16 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
 - [x] **[arch] NUMA consolidation onto themis/mnemosyne** (delivered
       2026-06-12): `numa.rs` detection now delegates to themis —
       `current_numa_node` → `themis::try_current_numa_node` (Option-honest,
-      added in themis 0.7.0), `NumaTopologyService::{current_cpu,total_nodes,
-      node_distance}` → `themis::current_processor` / process-cached
+      added in themis 0.7.0), public topology facades were removed in favor of
+      direct consumer use of `themis::current_processor` / process-cached
       `CpuTopology::detect()` distance tables. The duplicated libnuma /
-      GetNumaHighestNodeNumber / sched_getcpu platform blocks are deleted.
+      GetNumaHighestNodeNumber / sched_getcpu platform blocks are deleted, and
+      `MnemosyneNumaAllocator` no longer owns direct `numa_alloc_onnode`,
+      `numa_free`, or `VirtualAllocExNuma` allocation branches.
       Allocation already routes through mnemosyne (`MnemosyneNumaAllocator`
       with `NumaBinding`). Kept in hermes by design: `NumaAllocator` trait,
       `NumaBinding` thread-affinity RAII, and `verify_numa_locality` —
-      SIMD-specific concerns the topology SSOT should not own. Public query
-      surface unchanged; dispatcher/vec/tests untouched.
+      SIMD-specific concerns the topology SSOT should not own.
 
 ## P4 — Documentation <a id="p4"></a>
 

@@ -27,6 +27,11 @@ impl SimdArch for SveArch {
     const REGISTER_WIDTH_BITS: u32 = 512;
     const ISA_FAMILY: IsaFamily = IsaFamily::AArch64;
     const FMA_THROUGHPUT_HINT: u32 = 4;
+
+    #[inline]
+    fn is_runtime_supported() -> bool {
+        true
+    }
 }
 
 crate::impl_emulated_kernel!(SveArch, f32, 16, cfg(all()));

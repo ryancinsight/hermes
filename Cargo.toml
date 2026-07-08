@@ -26,7 +26,7 @@ rust-version = "1.95"
 
 [workspace.dependencies]
 half = { version = "2.3", default-features = false }
-mnemosyne = { git = "https://github.com/ryancinsight/Mnemosyne.git", rev = "1e014d25461b322345c15fb3cf9467b5388616dd", default-features = false }
+mnemosyne = { git = "https://github.com/ryancinsight/Mnemosyne.git", rev = "a6cbccf207c271af640c126ff27435f995c7cb6c", default-features = false }
 themis = { git = "https://github.com/ryancinsight/themis", version = "0.9.9", default-features = false }
 eunomia = { git = "https://github.com/ryancinsight/eunomia", default-features = false }
 
@@ -61,6 +61,3 @@ mnemosyne = { path = "../mnemosyne/crates/mnemosyne" }
 mnemosyne-core = { path = "../mnemosyne/crates/mnemosyne-core" }
 mnemosyne-arena = { path = "../mnemosyne/crates/mnemosyne-arena" }
 mnemosyne-local = { path = "../mnemosyne/crates/mnemosyne-local" }
-
-[patch."https://github.com/ryancinsight/melinoe.git"]
-melinoe = { path = "../melinoe" }

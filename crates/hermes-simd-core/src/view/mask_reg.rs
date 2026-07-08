@@ -1,6 +1,6 @@
 //! Monomorphized SIMD mask register wrapper.
 
-use super::vector_reg::Vector;
+use super::vector_reg::{assert_runtime_supported, Vector};
 use crate::arch::SimdArch;
 use crate::kernel::SimdKernel;
 use crate::mask::BitMask;
@@ -43,6 +43,7 @@ where
     T: Scalar,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        assert_runtime_supported::<T, Arch>();
         let bm = unsafe { self.to_bitmask() };
         f.debug_tuple("Mask").field(&bm.to_bools()).finish()
     }
@@ -55,6 +56,7 @@ where
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
+        assert_runtime_supported::<T, Arch>();
         unsafe { self.to_bitmask() == other.to_bitmask() }
     }
 }
@@ -101,12 +103,14 @@ where
     /// Returns `true` if any lanes of the mask are active.
     #[inline(always)]
     pub fn any(self) -> bool {
+        assert_runtime_supported::<T, Arch>();
         unsafe { !self.to_bitmask().is_none_active() }
     }
 
     /// Returns `true` if all lanes of the mask are active.
     #[inline(always)]
     pub fn all(self) -> bool {
+        assert_runtime_supported::<T, Arch>();
         let lanes = <Arch as SimdKernel<T>>::LANE_COUNT;
         let expected = if lanes >= 64 {
             u64::MAX
@@ -119,12 +123,14 @@ where
     /// Returns `true` if no lanes of the mask are active.
     #[inline(always)]
     pub fn none(self) -> bool {
+        assert_runtime_supported::<T, Arch>();
         unsafe { self.to_bitmask().is_none_active() }
     }
 
     /// Select elements from `true_val` where the mask is active, and from `false_val` otherwise.
     #[inline(always)]
     pub fn select(self, true_val: Vector<T, Arch>, false_val: Vector<T, Arch>) -> Vector<T, Arch> {
+        assert_runtime_supported::<T, Arch>();
         let zero = Vector::<T, Arch>::zero();
         Vector::new(unsafe { Arch::masked_add(true_val.raw, zero.raw, self.raw, false_val.raw) })
     }
@@ -139,6 +145,7 @@ where
     type Output = Self;
     #[inline(always)]
     fn bitand(self, rhs: Self) -> Self::Output {
+        assert_runtime_supported::<T, Arch>();
         unsafe {
             let bm_self = self.to_bitmask();
             let bm_rhs = rhs.to_bitmask();
@@ -155,6 +162,7 @@ where
     type Output = Self;
     #[inline(always)]
     fn bitor(self, rhs: Self) -> Self::Output {
+        assert_runtime_supported::<T, Arch>();
         unsafe {
             let bm_self = self.to_bitmask();
             let bm_rhs = rhs.to_bitmask();
@@ -171,6 +179,7 @@ where
     type Output = Self;
     #[inline(always)]
     fn bitxor(self, rhs: Self) -> Self::Output {
+        assert_runtime_supported::<T, Arch>();
         unsafe {
             let bm_self = self.to_bitmask();
             let bm_rhs = rhs.to_bitmask();
@@ -187,6 +196,7 @@ where
     type Output = Self;
     #[inline(always)]
     fn not(self) -> Self::Output {
+        assert_runtime_supported::<T, Arch>();
         unsafe {
             let bm = self.to_bitmask();
             let lanes = <Arch as SimdKernel<T>>::LANE_COUNT;

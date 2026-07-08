@@ -1,5 +1,12 @@
 use hermes_simd::*;
 
+fn validated<S>(data: S) -> ValidatedData<S>
+where
+    S: hermes_simd_core::sparse::types::SparseValidate,
+{
+    ValidatedData::new(data).expect("test sparse fixture must validate")
+}
+
 #[test]
 fn test_spmv_csr_identity() {
     // 3x3 identity
@@ -9,12 +16,11 @@ fn test_spmv_csr_identity() {
     let data = CsrData::new(&values[..], &col_indices[..], &row_ptr[..], 3, 3);
     let x = [5.0f32, 7.0, 11.0];
     let mut y = [0.0f32; 3];
-    spmv_csr::<f32>(data, &x, &mut y);
+    spmv_csr::<f32>(validated(data), &x, &mut y);
     assert_eq!(y, [5.0, 7.0, 11.0]);
 }
 
 #[test]
-#[should_panic(expected = "out of range for ncols")]
 fn test_spmv_csr_rejects_out_of_range_column() {
     // A column index of 3 is out of range for a 3-column matrix; the SIMD gather
     // would otherwise read out of bounds, so the kernel must reject it.
@@ -22,9 +28,10 @@ fn test_spmv_csr_rejects_out_of_range_column() {
     let col_indices = [0i32, 3, 2]; // 3 >= ncols
     let row_ptr = [0i32, 1, 2, 3];
     let data = CsrData::new(&values[..], &col_indices[..], &row_ptr[..], 3, 3);
-    let x = [5.0f32, 7.0, 11.0];
-    let mut y = [0.0f32; 3];
-    spmv_csr::<f32>(data, &x, &mut y);
+    assert_eq!(
+        ValidatedData::new(data).err(),
+        Some(SimdError::IndexOutOfBounds)
+    );
 }
 
 #[test]
@@ -36,7 +43,7 @@ fn test_spmv_csr_accumulates() {
     let data = CsrData::new(&values[..], &col_indices[..], &row_ptr[..], 2, 2);
     let x = [3.0f32, 4.0];
     let mut y = [1.0f32; 2]; // y starts at 1.0 to test accumulation
-    spmv_csr::<f32>(data, &x, &mut y);
+    spmv_csr::<f32>(validated(data), &x, &mut y);
     // y[0] = 1 + (1*3 + 1*4) = 8; y[1] = 1 + (1*3 + 1*4) = 8
     assert_eq!(y, [8.0, 8.0]);
 }
@@ -63,7 +70,7 @@ fn test_blocked_coo_4x4_spmv() {
     let data = BlockedCooData::new(&block[..], &block_row[..], &block_col[..], 1, 4, 4);
     let x = [2.0f32, 3.0, 5.0, 7.0];
     let mut y = [0.0f32; 4];
-    spmv_bcoo::<f32, 4, 4>(data, &x, &mut y);
+    spmv_bcoo::<f32, 4, 4>(validated(data), &x, &mut y);
     assert_eq!(y, x);
 }
 
@@ -108,7 +115,7 @@ fn test_blocked_coo_simd_branch_matches_scalar_reference() {
         ncols,
     );
     let mut y = vec![0.0f32; nrows];
-    spmv_bcoo::<f32, BM, BN>(data, &x, &mut y);
+    spmv_bcoo::<f32, BM, BN>(validated(data), &x, &mut y);
     assert_eq!(y, want, "BCOO SIMD spmv must match scalar reference");
 }
 
@@ -156,7 +163,7 @@ fn test_blocked_coo_simd_double_lane_branch_matches_scalar_reference() {
         ncols,
     );
     let mut y = vec![0.0f32; nrows];
-    spmv_bcoo::<f32, BM, BN>(data, &x, &mut y);
+    spmv_bcoo::<f32, BM, BN>(validated(data), &x, &mut y);
     assert_eq!(
         y, want,
         "BCOO double-lane SIMD spmv must match scalar reference"
@@ -180,14 +187,13 @@ fn test_sellp_spmv_correctness() {
     let x = [10.0f32, 10.0, 10.0, 10.0];
     let mut y = [0.0f32; 4];
 
-    let view = SparseView::<f32, SellP<4>, Scalar>::from_sellp(data);
+    let view = SparseView::<f32, Validated<SellP<4>>, Scalar>::try_from_sellp(data).unwrap();
     view.spmv(&x, &mut y);
 
     assert_eq!(y, [10.0, 20.0, 30.0, 40.0]);
 }
 
 #[test]
-#[should_panic(expected = "failed structural validation")]
 fn test_sellp_spmv_rejects_out_of_range_column() {
     // Column index 4 is out of range for a 4-column matrix. The vectorized SELL-p
     // path (engaged because `Scalar::LANE_COUNT == 4 == C`) gathers `x[col]`
@@ -205,15 +211,13 @@ fn test_sellp_spmv_rejects_out_of_range_column() {
         4,
         4,
     );
-    let x = [10.0f32, 10.0, 10.0, 10.0];
-    let mut y = [0.0f32; 4];
-
-    let view = SparseView::<f32, SellP<4>, Scalar>::from_sellp(data);
-    view.spmv(&x, &mut y);
+    assert_eq!(
+        SparseView::<f32, Validated<SellP<4>>, Scalar>::try_from_sellp(data).err(),
+        Some(SimdError::IndexOutOfBounds)
+    );
 }
 
 #[test]
-#[should_panic(expected = "failed structural validation")]
 fn test_sellp_spmv_rejects_bad_slice_geometry() {
     // `slice_col_count = 2` with `C = 4` and only 4 values makes the second
     // column's load `values[4..8]` read past the 4-element array. The vectorized
@@ -231,11 +235,10 @@ fn test_sellp_spmv_rejects_bad_slice_geometry() {
         8,
         4,
     );
-    let x = [10.0f32, 10.0, 10.0, 10.0];
-    let mut y = [0.0f32; 8];
-
-    let view = SparseView::<f32, SellP<4>, Scalar>::from_sellp(data);
-    view.spmv(&x, &mut y);
+    assert_eq!(
+        SparseView::<f32, Validated<SellP<4>>, Scalar>::try_from_sellp(data).err(),
+        Some(SimdError::LengthMismatch)
+    );
 }
 
 #[test]
@@ -255,7 +258,7 @@ fn test_sellp_spmv_dispatch() {
     let x = [10.0f32, 10.0, 10.0, 10.0];
     let mut y = [0.0f32; 4];
 
-    spmv_sellp::<f32, 4>(data.clone(), &x, &mut y);
+    spmv_sellp::<f32, 4>(validated(data.clone()), &x, &mut y);
     assert_eq!(y, [10.0, 20.0, 30.0, 40.0]);
 
     let mut y8 = [0.0f32; 4];
@@ -267,7 +270,7 @@ fn test_sellp_spmv_dispatch() {
         4,
         4,
     );
-    spmv_sellp::<f32, 8>(data8, &x, &mut y8);
+    spmv_sellp::<f32, 8>(validated(data8), &x, &mut y8);
     assert_eq!(y8, [10.0, 20.0, 30.0, 40.0]);
 }
 
@@ -316,7 +319,7 @@ fn test_sellp_spmv_dispatch_multislice_differential() {
 
     let x: Vec<f32> = (0..ncols).map(|i| i as f32 + 0.25).collect();
     let mut y = vec![1.0f32; nrows];
-    spmv_sellp::<f32, C>(data, &x, &mut y);
+    spmv_sellp::<f32, C>(validated(data), &x, &mut y);
 
     // Independent dense reference: y_ref = 1 + Σ values[r,·]·x[col].
     let mut y_ref = vec![1.0f32; nrows];
@@ -367,7 +370,7 @@ fn make_csr_3x3_identity() -> (Vec<f32>, Vec<i32>, Vec<i32>) {
 fn test_csr_cow_borrowed_is_zero_alloc() {
     let (vals, cols, row_ptr) = make_csr_3x3_identity();
     let data = CsrData::new(&vals, &cols, &row_ptr, 3, 3);
-    let cow: SparseCow<f32, Csr, Scalar> = SparseCow::borrowed(data);
+    let cow: SparseCow<f32, Validated<Csr>, Scalar> = SparseCow::try_borrowed(data).unwrap();
 
     // Borrowed variant: no allocation, dimensions correct.
     assert!(cow.is_borrowed());
@@ -380,7 +383,7 @@ fn test_csr_cow_borrowed_is_zero_alloc() {
 fn test_csr_cow_spmv_borrowed() {
     let (vals, cols, row_ptr) = make_csr_3x3_identity();
     let data = CsrData::new(&vals, &cols, &row_ptr, 3, 3);
-    let cow: SparseCow<f32, Csr, Scalar> = SparseCow::borrowed(data);
+    let cow: SparseCow<f32, Validated<Csr>, Scalar> = SparseCow::try_borrowed(data).unwrap();
 
     let x = [2.0f32, 3.0, 5.0];
     let mut y = [0.0f32; 3];
@@ -391,7 +394,8 @@ fn test_csr_cow_spmv_borrowed() {
 #[test]
 fn test_csr_cow_spmv_owned() {
     let (vals, cols, row_ptr) = make_csr_3x3_identity();
-    let cow = SparseCow::<f32, Csr, Scalar>::from_slices(&vals, &cols, &row_ptr, 3, 3);
+    let cow = SparseCow::<f32, Validated<Csr>, Scalar>::from_slices(&vals, &cols, &row_ptr, 3, 3)
+        .unwrap();
 
     assert!(cow.is_owned());
 
@@ -405,7 +409,7 @@ fn test_csr_cow_spmv_owned() {
 fn test_csr_cow_to_owned_promotes_borrowed() {
     let (vals, cols, row_ptr) = make_csr_3x3_identity();
     let data = CsrData::new(&vals, &cols, &row_ptr, 3, 3);
-    let mut cow: SparseCow<f32, Csr, Scalar> = SparseCow::borrowed(data);
+    let mut cow: SparseCow<f32, Validated<Csr>, Scalar> = SparseCow::try_borrowed(data).unwrap();
 
     assert!(cow.is_borrowed());
     cow.to_owned();
@@ -421,7 +425,9 @@ fn test_csr_cow_to_owned_promotes_borrowed() {
 #[test]
 fn test_csr_cow_to_owned_noop_when_already_owned() {
     let (vals, cols, row_ptr) = make_csr_3x3_identity();
-    let mut cow = SparseCow::<f32, Csr, Scalar>::from_slices(&vals, &cols, &row_ptr, 3, 3);
+    let mut cow =
+        SparseCow::<f32, Validated<Csr>, Scalar>::from_slices(&vals, &cols, &row_ptr, 3, 3)
+            .unwrap();
     assert!(cow.is_owned());
     cow.to_owned(); // must not panic or reallocate
     assert!(cow.is_owned());
@@ -474,7 +480,7 @@ fn test_sellp_cow_borrowed_spmv() {
     let slice_ptr = [0i32, 4];
     let slice_col_count = [1i32];
     let data = SellPData::new(&values, &col_indices, &slice_ptr, &slice_col_count, 4, 4);
-    let cow: SparseCow<f32, SellP<4>, Scalar> = SparseCow::borrowed(data);
+    let cow: SparseCow<f32, Validated<SellP<4>>, Scalar> = SparseCow::try_borrowed(data).unwrap();
 
     assert!(cow.is_borrowed());
     let x = [10.0f32; 4];
@@ -485,14 +491,15 @@ fn test_sellp_cow_borrowed_spmv() {
 
 #[test]
 fn test_sellp_cow_owned_spmv() {
-    let cow = SparseCow::<f32, SellP<4>, Scalar>::from_slices(
+    let cow = SparseCow::<f32, Validated<SellP<4>>, Scalar>::from_slices(
         &[1.0f32, 2.0, 3.0, 4.0],
         &[0i32, 1, 2, 3],
         &[0i32, 4],
         &[1i32],
         4,
         4,
-    );
+    )
+    .unwrap();
     assert!(cow.is_owned());
     let x = [10.0f32; 4];
     let mut y = [0.0f32; 4];
@@ -507,7 +514,8 @@ fn test_sellp_cow_to_owned_promotes() {
     let slice_ptr = [0i32, 4];
     let slice_col_count = [1i32];
     let data = SellPData::new(&values, &col_indices, &slice_ptr, &slice_col_count, 4, 4);
-    let mut cow: SparseCow<f32, SellP<4>, Scalar> = SparseCow::borrowed(data);
+    let mut cow: SparseCow<f32, Validated<SellP<4>>, Scalar> =
+        SparseCow::try_borrowed(data).unwrap();
     assert!(cow.is_borrowed());
     cow.to_owned();
     assert!(cow.is_owned());
@@ -575,7 +583,8 @@ fn test_bcoo_cow_borrowed_spmv() {
     let block_row = [0i32];
     let block_col = [0i32];
     let data = BlockedCooData::new(&block, &block_row, &block_col, 1, 4, 4);
-    let cow: SparseCow<f32, BlockedCoo<4, 4>, Scalar> = SparseCow::borrowed(data);
+    let cow: SparseCow<f32, Validated<BlockedCoo<4, 4>>, Scalar> =
+        SparseCow::try_borrowed(data).unwrap();
 
     assert!(cow.is_borrowed());
     let x = [1.0f32, 2.0, 3.0, 4.0];
@@ -586,7 +595,7 @@ fn test_bcoo_cow_borrowed_spmv() {
 
 #[test]
 fn test_bcoo_cow_owned_spmv() {
-    let cow = SparseCow::<f32, BlockedCoo<4, 4>, Scalar>::from_slices(
+    let cow = SparseCow::<f32, Validated<BlockedCoo<4, 4>>, Scalar>::from_slices(
         &[
             1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ],
@@ -595,7 +604,8 @@ fn test_bcoo_cow_owned_spmv() {
         1,
         4,
         4,
-    );
+    )
+    .unwrap();
     assert!(cow.is_owned());
     let x = [5.0f32, 6.0, 7.0, 8.0];
     let mut y = [0.0f32; 4];
@@ -611,7 +621,8 @@ fn test_bcoo_cow_to_owned_promotes() {
     let block_row = [0i32];
     let block_col = [0i32];
     let data = BlockedCooData::new(&block, &block_row, &block_col, 1, 4, 4);
-    let mut cow: SparseCow<f32, BlockedCoo<4, 4>, Scalar> = SparseCow::borrowed(data);
+    let mut cow: SparseCow<f32, Validated<BlockedCoo<4, 4>>, Scalar> =
+        SparseCow::try_borrowed(data).unwrap();
     assert!(cow.is_borrowed());
     cow.to_owned();
     assert!(cow.is_owned());
@@ -723,4 +734,105 @@ fn test_sparse_validate_bcoo_bounds() {
     let data_bad_col =
         BlockedCooData::<f32, 4, 4>::new(&block, &block_row, &block_col_bad[..], 1, 4, 4);
     assert_eq!(data_bad_col.validate(), Err(SimdError::IndexOutOfBounds));
+}
+
+mod sparse_validated_properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn prop_validated_csr_single_entry_spmv_matches_reference(
+            ncols in 1usize..16,
+            col in 0usize..16,
+            value in -32i32..32,
+            x_value in -32i32..32,
+        ) {
+            let col = col % ncols;
+            let values = [value as f32];
+            let cols = [col as i32];
+            let row_ptr = [0i32, 1];
+            let mut x = vec![0.0f32; ncols];
+            x[col] = x_value as f32;
+            let mut y = [0.0f32; 1];
+
+            let data = CsrData::new(&values, &cols, &row_ptr, 1, ncols);
+            spmv_csr::<f32>(validated(data), &x, &mut y);
+
+            prop_assert_eq!(y[0], values[0] * x[col]);
+        }
+
+        #[test]
+        fn prop_validated_csr_rejects_generated_bad_column(
+            ncols in 1usize..16,
+            extra in 0usize..16,
+        ) {
+            let values = [1.0f32];
+            let cols = [(ncols + extra) as i32];
+            let row_ptr = [0i32, 1];
+            let data = CsrData::new(&values, &cols, &row_ptr, 1, ncols);
+
+            prop_assert_eq!(ValidatedData::new(data).err(), Some(SimdError::IndexOutOfBounds));
+        }
+
+        #[test]
+        fn prop_validated_sellp_single_slice_spmv_matches_reference(
+            values_i in prop::array::uniform4(-16i32..16),
+            x_i in prop::array::uniform4(-16i32..16),
+            cols_raw in prop::array::uniform4(0usize..4),
+        ) {
+            let values = values_i.map(|v| v as f32);
+            let x = x_i.map(|v| v as f32);
+            let cols = cols_raw.map(|c| c as i32);
+            let slice_ptr = [0i32, 4];
+            let slice_col_count = [1i32];
+            let data = SellPData::<f32, 4>::new(
+                &values,
+                &cols,
+                &slice_ptr,
+                &slice_col_count,
+                4,
+                4,
+            );
+            let mut y = [0.0f32; 4];
+
+            spmv_sellp::<f32, 4>(validated(data), &x, &mut y);
+
+            for row in 0..4 {
+                prop_assert_eq!(y[row], values[row] * x[cols_raw[row]]);
+            }
+        }
+
+        #[test]
+        fn prop_validated_bcoo_single_block_spmv_matches_reference(
+            block_i in prop::array::uniform4(-8i32..8),
+            x_i in prop::array::uniform4(-8i32..8),
+            br in 0usize..3,
+            bc in 0usize..3,
+        ) {
+            let block = block_i.map(|v| v as f32);
+            let x = x_i.map(|v| v as f32);
+            let block_row = [br as i32];
+            let block_col = [bc as i32];
+            let data = BlockedCooData::<f32, 2, 2>::new(
+                &block,
+                &block_row,
+                &block_col,
+                1,
+                4,
+                4,
+            );
+            let mut y = [0.0f32; 4];
+
+            spmv_bcoo::<f32, 2, 2>(validated(data), &x, &mut y);
+
+            let mut want = [0.0f32; 4];
+            for row in 0..2 {
+                for col in 0..2 {
+                    want[br + row] += block[row * 2 + col] * x[bc + col];
+                }
+            }
+            prop_assert_eq!(y, want);
+        }
+    }
 }
