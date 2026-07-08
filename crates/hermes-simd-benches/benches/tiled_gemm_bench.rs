@@ -217,14 +217,11 @@ fn bench_int8_gemm_batch_sensitivity(c: &mut Criterion) {
 }
 
 fn bench_amx_context_switch_pressure(c: &mut Criterion) {
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    if !<bf16 as AmxSupport>::has_amx() {
-        return;
-    }
-
-    #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
-    return;
-
+    // AMX is x86_64-only; scenario 1 below already falls through to the
+    // generic gemm path (matching scenarios 2/3) when the host lacks AMX or
+    // isn't x86_64 (its `#[cfg(...)] { if has_amx() { ... } }` guard simply
+    // doesn't compile on other architectures), so this benchmark still
+    // measures something useful cross-platform instead of skipping outright.
     let mut group = c.benchmark_group("AMX Context Switch Pressure");
     let size = 64usize;
     let a = vec![bf16::from_f32(1.0); size * size];
