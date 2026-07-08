@@ -4,7 +4,9 @@
 //! compaction path whose scratch vector is hoisted out of the chunk loop.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use hermes_simd::{Avx2, BitMask, Scalar, SimdArch, SimdView, Unaligned, Unmasked};
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+use hermes_simd::{Avx2, SimdArch};
+use hermes_simd::{BitMask, Scalar, SimdView, Unaligned, Unmasked};
 
 const LENGTHS: [usize; 3] = [1_024, 16_384, 262_144];
 
@@ -12,6 +14,7 @@ fn data(len: usize) -> Vec<f32> {
     (0..len).map(|idx| idx as f32 * 0.25 + 1.0).collect()
 }
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 fn mask_from<const LANES: usize>(active: impl Fn(usize) -> bool) -> BitMask<LANES> {
     let mut lanes = [false; LANES];
     for (lane, value) in lanes.iter_mut().enumerate() {
