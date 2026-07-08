@@ -6,7 +6,7 @@ use crate::Neon;
 use crate::{Avx2, Avx512};
 use crate::{DispatchedView, Scalar};
 use hermes_simd_core::{
-    align::Alignment, execution::Unmasked, scalar::FloatElement, view::SimdView,
+    align::Alignment, arch::SimdArch, execution::Unmasked, scalar::FloatElement, view::SimdView,
 };
 
 /// Runtime-selectable SIMD target token for tests and benchmark harnesses.
@@ -53,13 +53,9 @@ impl TargetId {
 
 #[inline]
 fn avx2_supported() -> bool {
-    #[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), feature = "std"))]
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma")
-    }
-    #[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), not(feature = "std")))]
-    {
-        cfg!(target_feature = "avx2") && cfg!(target_feature = "fma")
+        Avx2::is_runtime_supported()
     }
     #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
     {
@@ -69,13 +65,9 @@ fn avx2_supported() -> bool {
 
 #[inline]
 fn avx512_supported() -> bool {
-    #[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), feature = "std"))]
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        std::is_x86_feature_detected!("avx512f")
-    }
-    #[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), not(feature = "std")))]
-    {
-        cfg!(target_feature = "avx512f")
+        Avx512::is_runtime_supported()
     }
     #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
     {
@@ -87,7 +79,7 @@ fn avx512_supported() -> bool {
 fn neon_supported() -> bool {
     #[cfg(target_arch = "aarch64")]
     {
-        true
+        Neon::is_runtime_supported()
     }
     #[cfg(not(target_arch = "aarch64"))]
     {

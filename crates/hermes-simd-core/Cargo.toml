@@ -22,5 +22,5 @@ hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.3.0"
 default = ["std", "mnemosyne-memory"]
 std = ["eunomia/std", "themis/std"]
 mnemosyne-memory = ["dep:mnemosyne"]
-# Linux NUMA node placement via libnuma (links -lnuma); off by default.
+# Linux NUMA affinity and residency probes via libnuma (links -lnuma); off by default.
 libnuma = []

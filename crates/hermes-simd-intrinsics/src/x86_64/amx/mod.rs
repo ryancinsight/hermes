@@ -15,6 +15,11 @@ impl SimdArch for AmxBf16 {
     const REGISTER_WIDTH_BITS: u32 = 8192; // AMX tile registers are 1024 bytes (8192 bits) each
     const ISA_FAMILY: IsaFamily = IsaFamily::X86;
     const FMA_THROUGHPUT_HINT: u32 = 16;
+
+    #[inline]
+    fn is_runtime_supported() -> bool {
+        amx_runtime_supported()
+    }
 }
 
 impl SimdArch for AmxInt8 {
@@ -22,6 +27,11 @@ impl SimdArch for AmxInt8 {
     const REGISTER_WIDTH_BITS: u32 = 8192;
     const ISA_FAMILY: IsaFamily = IsaFamily::X86;
     const FMA_THROUGHPUT_HINT: u32 = 16;
+
+    #[inline]
+    fn is_runtime_supported() -> bool {
+        amx_runtime_supported()
+    }
 }
 
 impl hermes_simd_core::private::Sealed for AmxBf16 {}
@@ -153,6 +163,27 @@ pub struct AmxSession {
     _private: (),
 }
 
+/// Error returned when an AMX session cannot be entered safely.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AmxSessionError {
+    /// The current host cannot execute AMX tile instructions safely.
+    UnsupportedTarget,
+}
+
+impl core::fmt::Display for AmxSessionError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::UnsupportedTarget => write!(
+                f,
+                "AMX tile instructions are not supported or enabled for this process"
+            ),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for AmxSessionError {}
+
 impl AmxSession {
     /// Returns true if an AMX session is currently active on the executing thread.
     #[inline]
@@ -162,7 +193,11 @@ impl AmxSession {
 
     /// Enter a new AMX compute phase with the given configuration.
     #[inline]
-    pub fn new(config: &AmxConfig) -> Self {
+    pub fn new(config: &AmxConfig) -> Result<Self, AmxSessionError> {
+        if !amx_runtime_supported() {
+            return Err(AmxSessionError::UnsupportedTarget);
+        }
+
         let depth = SESSION_DEPTH.with(|d| {
             let val = d.get();
             d.set(val + 1);
@@ -183,14 +218,17 @@ impl AmxSession {
                 ACTIVE_CONFIG.with(|c| c.set(Some(*config)));
             }
         }
-        Self { _private: () }
+        Ok(Self { _private: () })
     }
 
     /// Context switch mitigation: release tile registers explicitly.
     #[inline]
     pub fn release() {
-        unsafe {
-            raw::tilerelease();
+        let active = Self::is_active();
+        if active && amx_runtime_supported() {
+            unsafe {
+                raw::tilerelease();
+            }
         }
         ACTIVE_CONFIG.with(|c| c.set(None));
         SESSION_DEPTH.with(|d| d.set(0));
@@ -228,12 +266,16 @@ pub struct AmxBatchSession;
 impl AmxBatchSession {
     /// Begin a new AMX batch computation.
     #[inline]
-    pub fn begin(config: &AmxConfig) -> Self {
+    pub fn begin(config: &AmxConfig) -> Result<Self, AmxSessionError> {
+        if !amx_runtime_supported() {
+            return Err(AmxSessionError::UnsupportedTarget);
+        }
+
         unsafe {
             raw::ldtilecfg(config);
         }
         ACTIVE_CONFIG.with(|c| c.set(Some(*config)));
-        Self
+        Ok(Self)
     }
 }
 
@@ -245,6 +287,18 @@ impl Drop for AmxBatchSession {
         }
         ACTIVE_CONFIG.with(|c| c.set(None));
         SESSION_DEPTH.with(|d| d.set(0));
+    }
+}
+
+#[inline]
+fn amx_runtime_supported() -> bool {
+    #[cfg(miri)]
+    {
+        true
+    }
+    #[cfg(not(miri))]
+    {
+        false
     }
 }
 
@@ -487,10 +541,10 @@ mod tests {
         assert!(!AmxSession::is_active());
 
         {
-            let _outer = AmxSession::new(&config);
+            let _outer = AmxSession::new(&config).unwrap();
             assert!(AmxSession::is_active());
             {
-                let _inner = AmxSession::new(&config);
+                let _inner = AmxSession::new(&config).unwrap();
                 assert!(AmxSession::is_active());
             }
             assert!(AmxSession::is_active());
@@ -502,7 +556,7 @@ mod tests {
     #[test]
     fn miri_explicit_release_resets_session_state() {
         let config = AmxConfig::new_uniform(16, 64);
-        let _session = AmxSession::new(&config);
+        let _session = AmxSession::new(&config).unwrap();
         assert!(AmxSession::is_active());
 
         AmxSession::release();
@@ -513,7 +567,7 @@ mod tests {
     fn miri_batch_session_drop_resets_session_state() {
         let config = AmxConfig::new_uniform(16, 64);
         {
-            let _session = AmxBatchSession::begin(&config);
+            let _session = AmxBatchSession::begin(&config).unwrap();
             assert!(AmxSession::is_active());
         }
         assert!(!AmxSession::is_active());

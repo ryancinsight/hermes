@@ -319,6 +319,72 @@ impl<T, V: AsRef<[T]>, M: AsRef<[bool]>> DenseWithMaskMatrix<T, V, M> {
 /// Backward-compatible type alias.
 pub type DenseWithMaskData<'a, T> = DenseWithMaskMatrix<T, &'a [T], &'a [bool]>;
 
+/// Sparse storage whose structural invariants have been checked once at
+/// construction.
+#[derive(Clone)]
+pub struct ValidatedData<S> {
+    inner: S,
+}
+
+impl<S> ValidatedData<S> {
+    /// Validate sparse storage and wrap it in the validated typestate.
+    ///
+    /// # Errors
+    /// Returns the format-specific validation error if `inner` is malformed.
+    #[inline]
+    pub fn new(inner: S) -> Result<Self, crate::SimdError>
+    where
+        S: SparseValidate,
+    {
+        inner.validate()?;
+        Ok(Self { inner })
+    }
+
+    pub(crate) fn new_unchecked(inner: S) -> Self {
+        Self { inner }
+    }
+
+    /// Borrow the validated storage.
+    #[inline(always)]
+    pub fn storage(&self) -> &S {
+        &self.inner
+    }
+
+    /// Consume the typestate wrapper and return the underlying storage.
+    #[inline(always)]
+    pub fn into_inner(self) -> S {
+        self.inner
+    }
+}
+
+impl<S> core::ops::Deref for ValidatedData<S> {
+    type Target = S;
+
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<S: SparseShape> SparseShape for ValidatedData<S> {
+    #[inline(always)]
+    fn nrows(&self) -> usize {
+        self.inner.nrows()
+    }
+
+    #[inline(always)]
+    fn ncols(&self) -> usize {
+        self.inner.ncols()
+    }
+}
+
+impl<S> SparseValidate for ValidatedData<S> {
+    #[inline(always)]
+    fn validate(&self) -> Result<(), crate::SimdError> {
+        Ok(())
+    }
+}
+
 /// Trait for validating the structural soundness of sparse matrices.
 pub trait SparseValidate {
     /// Validate structural correctness and bounds checks.

@@ -92,7 +92,9 @@ where
             // values.len()`) and require the output to be at least as long as the
             // values array, so both unchecked accesses stay in bounds even for a
             // caller-constructed matrix with `pub` fields.
-            super::spmv::assert_sellp_validated(d);
+            use super::types::SparseValidate;
+            d.validate()
+                .expect("SELL-p matrix failed structural validation before vectorized kernel");
             assert!(
                 out_values.len() >= d.values.len(),
                 "SELL-p elementwise_mul_dense: out_values len {} < values len {}",

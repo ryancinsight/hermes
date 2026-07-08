@@ -240,7 +240,8 @@ fn bench_amx_context_switch_pressure(c: &mut Criterion) {
             {
                 if <bf16 as AmxSupport>::has_amx() {
                     let config = hermes_simd::AmxConfig::new_uniform(16, 64);
-                    let _session = hermes_simd::AmxSession::new(&config);
+                    let _session = hermes_simd::AmxSession::new(&config)
+                        .expect("invariant: AMX benchmark row is gated by AmxSupport");
                     gemm::<bf16, bf16, f32>(size, size, size, &a, size, &b, size, &mut out, size)
                         .unwrap();
                     return;

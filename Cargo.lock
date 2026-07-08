@@ -514,6 +514,7 @@ dependencies = [
  "hermes-simd-types",
  "proptest",
  "rkyv",
+ "themis",
 ]
 
 [[package]]
@@ -694,7 +695,7 @@ checksum = "953f07c43838f8e6f9758cab68bf5bed85465e7587ebe0b823f1bcd81978ad3a"
 
 [[package]]
 name = "melinoe"
-version = "0.7.0"
+version = "0.8.0"
 
 [[package]]
 name = "memchr"

@@ -37,7 +37,7 @@ pub trait NumaAllocator: Send + Sync {
     }
 }
 
-/// Default system NUMA allocator that hooks into Mnemosyne or uses platform APIs.
+/// NUMA-associated allocator backed by Mnemosyne when `mnemosyne-memory` is enabled.
 pub struct MnemosyneNumaAllocator;
 
 impl NumaAllocator for MnemosyneNumaAllocator {
@@ -47,56 +47,9 @@ impl NumaAllocator for MnemosyneNumaAllocator {
             let _binding = NumaBinding::bind(node);
             unsafe { core::alloc::GlobalAlloc::alloc(&mnemosyne::Mnemosyne, layout) }
         }
-        #[cfg(all(
-            not(feature = "mnemosyne-memory"),
-            target_os = "linux",
-            feature = "libnuma"
-        ))]
+        #[cfg(not(feature = "mnemosyne-memory"))]
         {
-            #[link(name = "numa")]
-            extern "C" {
-                fn numa_alloc_onnode(size: usize, node: i32) -> *mut u8;
-            }
-            numa_alloc_onnode(layout.size(), node as i32)
-        }
-        #[cfg(all(not(feature = "mnemosyne-memory"), target_os = "windows"))]
-        {
-            extern "system" {
-                fn GetCurrentProcess() -> *mut core::ffi::c_void;
-                fn VirtualAllocExNuma(
-                    hProcess: *mut core::ffi::c_void,
-                    lpAddress: *mut core::ffi::c_void,
-                    dwSize: usize,
-                    flAllocationType: u32,
-                    flProtect: u32,
-                    nndPreferred: u32,
-                ) -> *mut core::ffi::c_void;
-            }
-            const MEM_COMMIT: u32 = 0x00001000;
-            const MEM_RESERVE: u32 = 0x00002000;
-            const PAGE_READWRITE: u32 = 0x04;
-
-            let ptr = VirtualAllocExNuma(
-                GetCurrentProcess(),
-                core::ptr::null_mut(),
-                layout.size(),
-                MEM_COMMIT | MEM_RESERVE,
-                PAGE_READWRITE,
-                node,
-            );
-            if ptr.is_null() {
-                core::ptr::null_mut()
-            } else {
-                ptr as *mut u8
-            }
-        }
-        #[cfg(not(any(
-            feature = "mnemosyne-memory",
-            all(target_os = "linux", feature = "libnuma"),
-            target_os = "windows"
-        )))]
-        {
-            let _ = node;
+            let _binding = NumaBinding::bind(node);
             alloc::alloc::alloc(layout)
         }
     }
@@ -112,42 +65,7 @@ impl NumaAllocator for MnemosyneNumaAllocator {
                 core::alloc::GlobalAlloc::dealloc(&mnemosyne::Mnemosyne, ptr, layout);
             }
         }
-        #[cfg(all(
-            not(feature = "mnemosyne-memory"),
-            target_os = "linux",
-            feature = "libnuma"
-        ))]
-        {
-            #[link(name = "numa")]
-            extern "C" {
-                fn numa_free(ptr: *mut u8, size: usize);
-            }
-            numa_free(ptr, layout.size());
-        }
-        #[cfg(all(not(feature = "mnemosyne-memory"), target_os = "windows"))]
-        {
-            extern "system" {
-                fn GetCurrentProcess() -> *mut core::ffi::c_void;
-                fn VirtualFreeEx(
-                    hProcess: *mut core::ffi::c_void,
-                    lpAddress: *mut core::ffi::c_void,
-                    dwSize: usize,
-                    dwFreeType: u32,
-                ) -> i32;
-            }
-            const MEM_RELEASE: u32 = 0x00008000;
-            let _res = VirtualFreeEx(
-                GetCurrentProcess(),
-                ptr as *mut core::ffi::c_void,
-                0,
-                MEM_RELEASE,
-            );
-        }
-        #[cfg(not(any(
-            feature = "mnemosyne-memory",
-            all(target_os = "linux", feature = "libnuma"),
-            target_os = "windows"
-        )))]
+        #[cfg(not(feature = "mnemosyne-memory"))]
         {
             let _ = _node;
             alloc::alloc::dealloc(ptr, layout);

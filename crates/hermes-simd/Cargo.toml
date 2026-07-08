@@ -14,6 +14,7 @@ eunomia = { workspace = true }
 hermes-simd-macros = { path = "../hermes-simd-macros", version = "0.3.0" }
 hermes-simd-types = { path = "../hermes-simd-types", version = "0.3.0", default-features = false }
 half = { workspace = true }
+themis = { workspace = true }
 
 [dev-dependencies]
 rkyv = { version = "0.7" }
@@ -30,7 +31,7 @@ harness = false
 
 [features]
 default = ["std", "mnemosyne-memory"]
-# Linux NUMA node placement via libnuma (links -lnuma); off by default.
+# Linux NUMA affinity and residency probes via libnuma (links -lnuma); off by default.
 libnuma = ["hermes-simd-core/libnuma"]
 mnemosyne-memory = [
     "hermes-simd-core/mnemosyne-memory",
@@ -42,4 +43,5 @@ std = [
     "hermes-simd-intrinsics/std",
     "eunomia/std",
     "hermes-simd-types/std",
+    "themis/std",
 ]

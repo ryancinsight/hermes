@@ -56,7 +56,8 @@ impl super::AmxGemm<i8, i8, i32> for AmxInt8 {
         c_stride: usize,
     ) {
         let config = AmxConfig::for_dimensions(m, n, k, 1);
-        let _session = AmxSession::new(&config);
+        let _session = AmxSession::new(&config)
+            .expect("invariant: AMX int8 dispatch requires runtime AMX support");
 
         let mut i = 0;
         while i + 32 <= m {
@@ -248,7 +249,8 @@ impl super::AmxGemm<I8, I8, I32> for AmxInt8 {
         c_stride: usize,
     ) {
         let config = AmxConfig::for_dimensions(m, n, k, 1);
-        let _session = AmxSession::new(&config);
+        let _session = AmxSession::new(&config)
+            .expect("invariant: AMX int8 dispatch requires runtime AMX support");
 
         let mut i = 0;
         while i + 32 <= m {

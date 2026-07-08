@@ -1056,20 +1056,22 @@ fn test_widen_i8_primitives() {
 }
 
 #[test]
-fn test_numa_topology_and_allocation() {
+fn test_numa_allocation_and_themis_owned_topology() {
     use hermes_simd_core::align::Unaligned;
-    use hermes_simd_core::numa::{verify_numa_locality, NumaTopologyService};
+    use hermes_simd_core::numa::{current_numa_node, verify_numa_locality};
     use hermes_simd_core::AlignedVec;
 
-    let cpu = NumaTopologyService::current_cpu();
-    println!("Current CPU: {:?}", cpu);
-
-    let node = NumaTopologyService::current_node();
-    println!("Current NUMA Node: {:?}", node);
-
-    let total = NumaTopologyService::total_nodes();
-    println!("Total NUMA Nodes: {}", total);
-    assert!(total >= 1);
+    if let Some(current_node) = current_numa_node() {
+        let topology = themis::CpuTopology::detect()
+            .expect("Themis must provide a topology snapshot for a reported NUMA node");
+        assert!(
+            topology
+                .numa_nodes()
+                .iter()
+                .any(|node| node.id.get() == current_node),
+            "reported node {current_node} must be present in the Themis topology snapshot"
+        );
+    }
 
     // Allocate on node 0
     let mut vec: AlignedVec<f32, Unaligned> = AlignedVec::with_capacity_numa(1000, 0);
@@ -1077,16 +1079,6 @@ fn test_numa_topology_and_allocation() {
     vec.push(2.0);
     assert_eq!(vec[0], 1.0);
     assert_eq!(vec[1], 2.0);
-
-    // Verify newly exposed numa functions
-    use hermes_simd_core::numa::{numa_node_count, numa_node_distance};
-    let count = numa_node_count();
-    assert_eq!(count, total);
-
-    // Self distance is always 10
-    assert_eq!(numa_node_distance(0, 0), 10);
-    // Remote distance is always 20 (or platform specific positive value)
-    assert_eq!(numa_node_distance(0, 1), 20);
 
     // Verify locality check runs without crashing
     let is_local = verify_numa_locality(vec.as_ptr() as *const u8, 8, 0);
@@ -1172,25 +1164,38 @@ fn test_adaptive_dispatcher_and_amx_session() {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        use hermes_simd::{AmxBatchSession, AmxConfig, AmxSession, AmxSupport};
+        use hermes_simd::{AmxBatchSession, AmxConfig, AmxSession, AmxSessionError, AmxSupport};
         let config = AmxConfig::new_uniform(16, 64);
 
         assert!(!AmxSession::is_active());
 
         if <half::bf16 as AmxSupport>::has_amx() {
-            let _s1 = AmxSession::new(&config);
+            let _s1 = AmxSession::new(&config).unwrap();
             assert!(AmxSession::is_active());
             {
-                let _s2 = AmxSession::new(&config);
+                let _s2 = AmxSession::new(&config).unwrap();
                 assert!(AmxSession::is_active());
             }
             assert!(AmxSession::is_active());
+        } else {
+            assert!(matches!(
+                AmxSession::new(&config),
+                Err(AmxSessionError::UnsupportedTarget)
+            ));
+            assert!(!AmxSession::is_active());
         }
         assert!(!AmxSession::is_active());
 
         if <half::bf16 as AmxSupport>::has_amx() {
-            let _s = AmxBatchSession::begin(&config);
+            let _s = AmxBatchSession::begin(&config).unwrap();
             assert!(AmxSession::is_active());
+        } else {
+            assert!(matches!(
+                AmxBatchSession::begin(&config),
+                Err(AmxSessionError::UnsupportedTarget)
+            ));
+            AmxSession::release();
+            assert!(!AmxSession::is_active());
         }
         assert!(!AmxSession::is_active());
     }

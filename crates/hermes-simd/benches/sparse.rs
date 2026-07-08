@@ -8,7 +8,7 @@
 //! per second.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use hermes_simd::{spmv_csr, CsrData};
+use hermes_simd::{spmv_csr, CsrData, ValidatedData};
 
 /// Construct a random-ish CSR sparse matrix of shape `(nrows, ncols)` at `density` fill.
 /// Uses a deterministic pseudo-random pattern (modular arithmetic, no external RNG dep).
@@ -55,19 +55,14 @@ fn bench_spmv_csr_f32(c: &mut Criterion) {
 
         let x: Vec<f32> = (0..NCOLS).map(|i| i as f32 / NCOLS as f32).collect();
         let mut y: Vec<f32> = vec![0.0f32; NROWS];
+        let data = ValidatedData::new(CsrData::new(&values, &col_idx, &row_ptr, NROWS, NCOLS))
+            .expect("benchmark CSR fixture must validate");
 
         group.bench_with_input(BenchmarkId::new("scalar", label), &label, |bench, _| {
             bench.iter(|| {
                 // Reset output each iteration to get consistent results.
                 y.iter_mut().for_each(|v| *v = 0.0);
-                let data = CsrData::new(
-                    black_box(&values),
-                    black_box(&col_idx),
-                    black_box(&row_ptr),
-                    NROWS,
-                    NCOLS,
-                );
-                spmv_csr::<f32>(data, black_box(&x), black_box(&mut y))
+                spmv_csr::<f32>(black_box(data.clone()), black_box(&x), black_box(&mut y))
             })
         });
     }

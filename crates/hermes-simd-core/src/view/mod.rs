@@ -52,6 +52,8 @@ pub enum SimdError {
     UnalignedAddress,
     /// An index is out of bounds of the view.
     IndexOutOfBounds,
+    /// The current host cannot execute the requested SIMD target safely.
+    UnsupportedTarget,
 }
 
 impl core::fmt::Display for SimdError {
@@ -64,6 +66,9 @@ impl core::fmt::Display for SimdError {
                 write!(f, "Memory address does not satisfy alignment constraints")
             }
             Self::IndexOutOfBounds => write!(f, "Index is out of bounds of the view"),
+            Self::UnsupportedTarget => {
+                write!(f, "SIMD target is not supported or enabled on this host")
+            }
         }
     }
 }

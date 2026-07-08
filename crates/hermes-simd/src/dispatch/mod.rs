@@ -31,7 +31,9 @@ pub use popcount::{
 };
 
 use hermes_simd_core::scalar::Scalar as ScalarTrait;
-use hermes_simd_core::sparse::{BlockedCooData, CsrData, DenseWithMaskData, SellPData};
+use hermes_simd_core::sparse::{
+    BlockedCooData, CsrData, DenseWithMaskData, SellPData, ValidatedData,
+};
 use hermes_simd_core::view::SimdError;
 use hermes_simd_core::{Add, Div, Mul, Sub};
 #[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
@@ -128,17 +130,21 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     fn masked_add(a: &[Self], b: &[Self], mask: &[bool], out: &mut [Self])
         -> Result<(), SimdError>;
     /// Computes sparse SpMV using CSR.
-    fn spmv_csr(data: CsrData<'_, Self>, x: &[Self], y: &mut [Self]);
+    fn spmv_csr(data: ValidatedData<CsrData<'_, Self>>, x: &[Self], y: &mut [Self]);
     /// Computes sparse SpMV using const-generic Blocked-COO tiles.
     fn spmv_bcoo<const BM: usize, const BN: usize>(
-        data: BlockedCooData<'_, Self, BM, BN>,
+        data: ValidatedData<BlockedCooData<'_, Self, BM, BN>>,
         x: &[Self],
         y: &mut [Self],
     );
     /// Computes sparse SpMV using Dense-with-Mask.
     fn spmv_dense_masked(data: DenseWithMaskData<'_, Self>, x: &[Self], y: &mut [Self]);
     /// Computes sparse SpMV using const-generic Sliced ELLPACK (SELL-p).
-    fn spmv_sellp<const C: usize>(data: SellPData<'_, Self, C>, x: &[Self], y: &mut [Self]);
+    fn spmv_sellp<const C: usize>(
+        data: ValidatedData<SellPData<'_, Self, C>>,
+        x: &[Self],
+        y: &mut [Self],
+    );
     /// Computes register-blocked tiled GEMM: `c += A * B`.
     fn tiled_gemm(
         a: &[Self],
@@ -316,12 +322,12 @@ macro_rules! impl_simd_ops_methods {
             masked::dispatch_masked_add::<Self>(a, b, mask, out)
         }
         #[inline(always)]
-        fn spmv_csr(data: CsrData<'_, Self>, x: &[Self], y: &mut [Self]) {
+        fn spmv_csr(data: ValidatedData<CsrData<'_, Self>>, x: &[Self], y: &mut [Self]) {
             sparse::dispatch_spmv_csr::<Self>(data, x, y)
         }
         #[inline(always)]
         fn spmv_bcoo<const BM: usize, const BN: usize>(
-            data: BlockedCooData<'_, Self, BM, BN>,
+            data: ValidatedData<BlockedCooData<'_, Self, BM, BN>>,
             x: &[Self],
             y: &mut [Self],
         ) {
@@ -334,7 +340,11 @@ macro_rules! impl_simd_ops_methods {
             sparse::dispatch_spmv_dense_masked::<Self>(data, x, y)
         }
         #[inline(always)]
-        fn spmv_sellp<const C: usize>(data: SellPData<'_, Self, C>, x: &[Self], y: &mut [Self]) {
+        fn spmv_sellp<const C: usize>(
+            data: ValidatedData<SellPData<'_, Self, C>>,
+            x: &[Self],
+            y: &mut [Self],
+        ) {
             sparse::dispatch_spmv_sellp::<Self, C>(data, x, y)
         }
         #[inline(always)]
@@ -622,18 +632,22 @@ pub fn masked_add<T: SimdOps>(
 /// Computes sparse SpMV using CSR: `y += A · x`.
 ///
 /// # Panics
-/// Panics if `x.len() < ncols`, `y.len() < nrows`, or any column index is
-/// `>= ncols` (the indices feed an unchecked SIMD gather, so they are validated
-/// up front to keep the operation memory-safe on malformed input).
+/// Panics if `x.len() < ncols` or `y.len() < nrows`. Structural CSR validation
+/// is performed by [`ValidatedData::new`] before this function can be called.
 #[inline(always)]
-pub fn spmv_csr<T: SimdOps>(data: CsrData<'_, T>, x: &[T], y: &mut [T]) {
+pub fn spmv_csr<T: SimdOps>(data: ValidatedData<CsrData<'_, T>>, x: &[T], y: &mut [T]) {
     T::spmv_csr(data, x, y)
 }
 
 /// Computes sparse SpMV using const-generic Blocked-COO tiles.
+///
+/// # Panics
+/// Panics if `x.len() < ncols` or `y.len() < nrows`. Structural Blocked-COO
+/// validation is performed by [`ValidatedData::new`] before this function can be
+/// called.
 #[inline(always)]
 pub fn spmv_bcoo<T: SimdOps, const BM: usize, const BN: usize>(
-    data: BlockedCooData<'_, T, BM, BN>,
+    data: ValidatedData<BlockedCooData<'_, T, BM, BN>>,
     x: &[T],
     y: &mut [T],
 ) {
@@ -647,8 +661,17 @@ pub fn spmv_dense_masked<T: SimdOps>(data: DenseWithMaskData<'_, T>, x: &[T], y:
 }
 
 /// Computes sparse SpMV using const-generic Sliced ELLPACK (SELL-p).
+///
+/// # Panics
+/// Panics if `x.len() < ncols` or `y.len() < nrows`. Structural SELL-p
+/// validation is performed by [`ValidatedData::new`] before this function can be
+/// called.
 #[inline(always)]
-pub fn spmv_sellp<T: SimdOps, const C: usize>(data: SellPData<'_, T, C>, x: &[T], y: &mut [T]) {
+pub fn spmv_sellp<T: SimdOps, const C: usize>(
+    data: ValidatedData<SellPData<'_, T, C>>,
+    x: &[T],
+    y: &mut [T],
+) {
     T::spmv_sellp::<C>(data, x, y)
 }
 

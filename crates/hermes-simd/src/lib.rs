@@ -14,7 +14,7 @@
 //! |---------|-------------|
 //! | `std` (default) | Runtime CPU feature detection (`is_x86_feature_detected!`); without it dispatch uses compile-time `cfg!(target_feature)` only |
 //! | `mnemosyne-memory` (default) | Route `AlignedVec` allocation through the mnemosyne allocator |
-//! | `libnuma` | Linux NUMA node placement via libnuma (links `-lnuma`) |
+//! | `libnuma` | Linux NUMA affinity and residency probes via libnuma (links `-lnuma`); allocation still routes through Mnemosyne/the configured allocator |
 //!
 //! # Usage Examples
 //!
@@ -59,8 +59,6 @@ pub use hermes_simd_core::{
     iter::{SimdChunks, SimdChunksMut, ZipChunks, ZipChunksMut},
     kernel::SimdKernel,
     mask::BitMask,
-    numa_node_count,
-    numa_node_distance,
     refresh_numa_node,
     scalar::{CastFrom, CastTo, FloatElement, Scalar as SimdScalar},
     vec::AlignedVec,
@@ -83,7 +81,6 @@ pub use hermes_simd_core::{
     Mul,
     Neg,
     NumaBinding,
-    NumaTopologyService,
     Popcount,
     Product,
     RecipSqrt,
@@ -125,6 +122,8 @@ pub use hermes_simd_core::sparse::{
     SparseOps,
     SparseSpMv,
     SparseView,
+    Validated,
+    ValidatedData,
 };
 
 // Re-export tiling
@@ -140,7 +139,9 @@ pub use hermes_simd_intrinsics::{
 };
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-pub use hermes_simd_intrinsics::{AmxBatchSession, AmxBf16, AmxConfig, AmxInt8, AmxSession};
+pub use hermes_simd_intrinsics::{
+    AmxBatchSession, AmxBf16, AmxConfig, AmxInt8, AmxSession, AmxSessionError,
+};
 
 pub use eunomia::{
     unpack_bf4_to_bf16, unpack_bf4_to_bf16_packed, unpack_bf8_to_bf16, unpack_f4_to_f32,

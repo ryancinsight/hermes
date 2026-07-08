@@ -2,7 +2,7 @@
 
 use super::{
     BlockedCoo, BlockedCooData, Csr, CsrData, DenseWithMask, DenseWithMaskData, SellP, SellPData,
-    SparseFormat, SparseShape,
+    SparseFormat, SparseShape, Validated, ValidatedData,
 };
 use crate::arch::SimdArch;
 use core::marker::PhantomData;
@@ -73,6 +73,31 @@ where
     }
 }
 
+impl<'a, T: 'a, Arch> SparseView<'a, T, Validated<Csr>, Arch>
+where
+    Arch: SimdArch,
+{
+    /// Validate CSR storage and create a SpMV-ready view.
+    #[inline]
+    pub fn try_from_csr(data: CsrData<'a, T>) -> Result<Self, crate::SimdError> {
+        Ok(Self {
+            data: ValidatedData::new(data)?,
+            _arch: PhantomData,
+            _lifetime: PhantomData,
+        })
+    }
+
+    /// Create a SpMV-ready view from already-validated CSR storage.
+    #[inline]
+    pub fn from_validated_csr(data: ValidatedData<CsrData<'a, T>>) -> Self {
+        Self {
+            data,
+            _arch: PhantomData,
+            _lifetime: PhantomData,
+        }
+    }
+}
+
 impl<'a, T: 'a, const C: usize, Arch> SparseView<'a, T, SellP<C>, Arch>
 where
     Arch: SimdArch,
@@ -88,6 +113,31 @@ where
     }
 }
 
+impl<'a, T: 'a, const C: usize, Arch> SparseView<'a, T, Validated<SellP<C>>, Arch>
+where
+    Arch: SimdArch,
+{
+    /// Validate SELL-p storage and create a SpMV-ready view.
+    #[inline]
+    pub fn try_from_sellp(data: SellPData<'a, T, C>) -> Result<Self, crate::SimdError> {
+        Ok(Self {
+            data: ValidatedData::new(data)?,
+            _arch: PhantomData,
+            _lifetime: PhantomData,
+        })
+    }
+
+    /// Create a SpMV-ready view from already-validated SELL-p storage.
+    #[inline]
+    pub fn from_validated_sellp(data: ValidatedData<SellPData<'a, T, C>>) -> Self {
+        Self {
+            data,
+            _arch: PhantomData,
+            _lifetime: PhantomData,
+        }
+    }
+}
+
 impl<'a, T: 'a, const BM: usize, const BN: usize, Arch> SparseView<'a, T, BlockedCoo<BM, BN>, Arch>
 where
     Arch: SimdArch,
@@ -95,6 +145,34 @@ where
     /// Create a `SparseView` over Blocked-COO data (generic BM, BN).
     #[inline]
     pub fn from_blocked_coo(data: BlockedCooData<'a, T, BM, BN>) -> Self {
+        Self {
+            data,
+            _arch: PhantomData,
+            _lifetime: PhantomData,
+        }
+    }
+}
+
+impl<'a, T: 'a, const BM: usize, const BN: usize, Arch>
+    SparseView<'a, T, Validated<BlockedCoo<BM, BN>>, Arch>
+where
+    Arch: SimdArch,
+{
+    /// Validate Blocked-COO storage and create a SpMV-ready view.
+    #[inline]
+    pub fn try_from_blocked_coo(
+        data: BlockedCooData<'a, T, BM, BN>,
+    ) -> Result<Self, crate::SimdError> {
+        Ok(Self {
+            data: ValidatedData::new(data)?,
+            _arch: PhantomData,
+            _lifetime: PhantomData,
+        })
+    }
+
+    /// Create a SpMV-ready view from already-validated Blocked-COO storage.
+    #[inline]
+    pub fn from_validated_blocked_coo(data: ValidatedData<BlockedCooData<'a, T, BM, BN>>) -> Self {
         Self {
             data,
             _arch: PhantomData,

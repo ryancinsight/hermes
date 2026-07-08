@@ -261,6 +261,37 @@ fn test_masked_load_store_slice_neon() {
 
 #[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), feature = "std"))]
 #[test]
+fn safe_avx512_vector_constructors_reject_unsupported_target() {
+    use hermes_simd::{target::TargetId, Avx512, Vector};
+
+    if TargetId::Avx512.is_supported() {
+        return;
+    }
+
+    let data = [1.0f32; 16];
+    assert_eq!(
+        Vector::<f32, Avx512>::try_zero(),
+        Err(SimdError::UnsupportedTarget)
+    );
+    assert_eq!(
+        Vector::<f32, Avx512>::try_splat(1.0),
+        Err(SimdError::UnsupportedTarget)
+    );
+    assert_eq!(
+        Vector::<f32, Avx512>::try_from_array(data),
+        Err(SimdError::UnsupportedTarget)
+    );
+    assert_eq!(
+        Vector::<f32, Avx512>::load_unaligned_from_slice(&data),
+        Err(SimdError::UnsupportedTarget)
+    );
+
+    let panic = std::panic::catch_unwind(|| Vector::<f32, Avx512>::splat(1.0));
+    assert!(panic.is_err());
+}
+
+#[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), feature = "std"))]
+#[test]
 fn test_masked_load_store_slice_avx512() {
     use hermes_simd::{target::TargetId, Avx512, BitMask, Mask, Vector};
 

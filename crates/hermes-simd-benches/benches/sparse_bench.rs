@@ -7,7 +7,9 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use hermes_simd::{spmv_bcoo, spmv_csr, spmv_dense_masked, spmv_sellp};
-use hermes_simd_core::sparse::{BlockedCooData, CsrData, DenseWithMaskData, SellPData};
+use hermes_simd_core::sparse::{
+    BlockedCooData, CsrData, DenseWithMaskData, SellPData, ValidatedData,
+};
 
 const NCOLS: usize = 1024;
 const ROW_SWEEP: [usize; 3] = [1024, 10_000, 100_000];
@@ -130,7 +132,8 @@ fn bench_csr_spmv(c: &mut Criterion) {
         for density in DENSITIES {
             let case = MatrixCase { nrows, density };
             let (values, cols, row_ptr) = make_csr(case);
-            let data = CsrData::new(&values, &cols, &row_ptr, nrows, NCOLS);
+            let data = ValidatedData::new(CsrData::new(&values, &cols, &row_ptr, nrows, NCOLS))
+                .expect("benchmark CSR fixture must validate");
             let mut y = vec![0.0f32; nrows];
             group.throughput(Throughput::Elements(case.logical_elements()));
             group.bench_with_input(BenchmarkId::new("csr", case.label()), &case, |bench, _| {
@@ -151,7 +154,10 @@ fn bench_sellp_spmv(c: &mut Criterion) {
         for density in DENSITIES {
             let case = MatrixCase { nrows, density };
             let (values4, cols4, ptr4, count4) = make_sellp::<4>(case);
-            let data4 = SellPData::new(&values4, &cols4, &ptr4, &count4, nrows, NCOLS);
+            let data4 = ValidatedData::new(SellPData::new(
+                &values4, &cols4, &ptr4, &count4, nrows, NCOLS,
+            ))
+            .expect("benchmark SELL-p fixture must validate");
             let mut y4 = vec![0.0f32; nrows];
             group.throughput(Throughput::Elements(case.logical_elements()));
             group.bench_with_input(
@@ -166,7 +172,10 @@ fn bench_sellp_spmv(c: &mut Criterion) {
             );
 
             let (values8, cols8, ptr8, count8) = make_sellp::<8>(case);
-            let data8 = SellPData::new(&values8, &cols8, &ptr8, &count8, nrows, NCOLS);
+            let data8 = ValidatedData::new(SellPData::new(
+                &values8, &cols8, &ptr8, &count8, nrows, NCOLS,
+            ))
+            .expect("benchmark SELL-p fixture must validate");
             let mut y8 = vec![0.0f32; nrows];
             group.bench_with_input(
                 BenchmarkId::new("sellp8", case.label()),
@@ -190,7 +199,10 @@ fn bench_bcoo_spmv(c: &mut Criterion) {
         for density in DENSITIES {
             let case = MatrixCase { nrows, density };
             let (blocks4, brow4, bcol4, nblocks4) = make_bcoo::<4, 4>(case);
-            let data4 = BlockedCooData::new(&blocks4, &brow4, &bcol4, nblocks4, nrows, NCOLS);
+            let data4 = ValidatedData::new(BlockedCooData::new(
+                &blocks4, &brow4, &bcol4, nblocks4, nrows, NCOLS,
+            ))
+            .expect("benchmark Blocked-COO fixture must validate");
             let mut y4 = vec![0.0f32; nrows];
             group.throughput(Throughput::Elements(case.logical_elements()));
             group.bench_with_input(
@@ -205,7 +217,10 @@ fn bench_bcoo_spmv(c: &mut Criterion) {
             );
 
             let (blocks8, brow8, bcol8, nblocks8) = make_bcoo::<8, 8>(case);
-            let data8 = BlockedCooData::new(&blocks8, &brow8, &bcol8, nblocks8, nrows, NCOLS);
+            let data8 = ValidatedData::new(BlockedCooData::new(
+                &blocks8, &brow8, &bcol8, nblocks8, nrows, NCOLS,
+            ))
+            .expect("benchmark Blocked-COO fixture must validate");
             let mut y8 = vec![0.0f32; nrows];
             group.bench_with_input(
                 BenchmarkId::new("bcoo8x8", case.label()),

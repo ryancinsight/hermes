@@ -6,12 +6,20 @@ High-performance numerical computing on multi-socket servers faces latency penal
 
 ## Design
 
-### 1. NUMA-Aware Allocator Integration
+### 1. Allocation Ownership
 
-We define the `NumaAllocator` trait and implement `MnemosyneNumaAllocator`:
-- **Linux**: Hooks into `numa_alloc_onnode` and `numa_free` from `libnuma`.
-- **Windows**: Hooks into `VirtualAllocExNuma` and `VirtualFreeEx`.
-- **Fallback**: Falls back to the standard system allocator on unsupported operating systems or when node-local allocation fails.
+Allocation routing is owned by Mnemosyne and the typed topology/current-node
+queries it consumes from Themis. Hermes keeps only the `NumaAllocator` trait
+needed by `AlignedVec::with_capacity_numa` and the `MnemosyneNumaAllocator`
+adapter:
+- **Default path**: temporarily binds the executing thread to the requested
+  node, then allocates through `mnemosyne::Mnemosyne`; Mnemosyne owns segment
+  routing, ownership metadata, and deallocation by pointer owner.
+- **Feature-disabled path**: applies the same explicit affinity guard and uses
+  the configured global allocator. Hermes does not call `numa_alloc_onnode`,
+  `VirtualAllocExNuma`, or any direct OS allocation API.
+- **Topology**: consumers that need node counts, distances, or processor maps
+  use `themis::CpuTopology` directly.
 
 ### 2. Thread Affinity Binding
 
@@ -23,8 +31,8 @@ We define the `NumaAllocator` trait and implement `MnemosyneNumaAllocator`:
 ### 3. Memory Residency Verification
 
 - `verify_numa_locality` validates if a given pointer range is physically resident on the expected NUMA node:
-  - **Linux**: Queries `move_pages` with a null target nodes array to retrieve page status, or inspects Mnemosyne page descriptors for verified segments.
-  - **Windows**: Queries `VirtualQuery` page states.
+  - **Linux**: Queries `move_pages` with a null target nodes array to retrieve page status when `libnuma` is enabled.
+  - **Windows**: Queries `K32QueryWorkingSetEx` working-set attributes.
 - If memory resides on a remote node, the system re-routes execution paths (e.g. from AMX to AVX-512) or issues warning logs to help diagnose alignment defects.
 
 ### 4. Cache & TLB Pressure Management
@@ -35,5 +43,8 @@ We define the `NumaAllocator` trait and implement `MnemosyneNumaAllocator`:
 ## Consequences
 
 - Node-local allocation minimizes cross-socket interconnect traffic.
-- Transparent fallback prevents crashes on single-socket consumer systems or non-NUMA configurations.
+- There is no Hermes-owned topology facade; consumer-facing topology APIs live
+  in Themis.
+- There is no direct Hermes OS allocation fallback; allocation ownership stays
+  with Mnemosyne or the configured allocator path.
 - Runtime routing mitigates performance degradation caused by incorrect tensor allocation placement.

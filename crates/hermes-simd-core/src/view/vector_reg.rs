@@ -44,6 +44,7 @@ where
     T: Scalar + core::fmt::Debug,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        assert_runtime_supported::<T, Arch>();
         const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
         let lane_count = Arch::LANE_COUNT;
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
@@ -62,6 +63,7 @@ where
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
+        assert_runtime_supported::<T, Arch>();
         const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
         let lane_count = Arch::LANE_COUNT;
         let mut buf_self = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
@@ -101,13 +103,27 @@ where
     /// Construct a Vector with all lanes set to zero.
     #[inline(always)]
     pub fn zero() -> Self {
-        Self::new(unsafe { Arch::zero() })
+        Self::try_zero().expect("SIMD target is not supported or enabled on this host")
+    }
+
+    /// Try to construct a Vector with all lanes set to zero.
+    #[inline(always)]
+    pub fn try_zero() -> Result<Self, SimdError> {
+        runtime_support_result::<T, Arch>()?;
+        Ok(Self::new(unsafe { Arch::zero() }))
     }
 
     /// Construct a Vector by broadcasting a scalar value to all lanes.
     #[inline(always)]
     pub fn splat(val: T) -> Self {
-        Self::new(unsafe { Arch::splat(val) })
+        Self::try_splat(val).expect("SIMD target is not supported or enabled on this host")
+    }
+
+    /// Try to construct a Vector by broadcasting a scalar value to all lanes.
+    #[inline(always)]
+    pub fn try_splat(val: T) -> Result<Self, SimdError> {
+        runtime_support_result::<T, Arch>()?;
+        Ok(Self::new(unsafe { Arch::splat(val) }))
     }
 
     /// Load a Vector from an aligned pointer.
@@ -170,6 +186,7 @@ where
     /// elements than `Arch::LANE_COUNT`.
     #[inline(always)]
     pub fn load_unaligned_from_slice(data: &[T]) -> Result<Self, SimdError> {
+        runtime_support_result::<T, Arch>()?;
         if data.len() < Arch::LANE_COUNT {
             return Err(SimdError::InsufficientInputLength);
         }
@@ -185,6 +202,7 @@ where
     /// when the slice start is not aligned to the vector byte width.
     #[inline(always)]
     pub fn load_aligned_from_slice(data: &[T]) -> Result<Self, SimdError> {
+        runtime_support_result::<T, Arch>()?;
         if data.len() < Arch::LANE_COUNT {
             return Err(SimdError::InsufficientInputLength);
         }
@@ -201,6 +219,7 @@ where
     /// elements than `Arch::LANE_COUNT`.
     #[inline(always)]
     pub fn store_unaligned_to_slice(self, out: &mut [T]) -> Result<(), SimdError> {
+        runtime_support_result::<T, Arch>()?;
         if out.len() < Arch::LANE_COUNT {
             return Err(SimdError::InsufficientOutputLength);
         }
@@ -219,6 +238,7 @@ where
     /// when the slice start is not aligned to the vector byte width.
     #[inline(always)]
     pub fn store_aligned_to_slice(self, out: &mut [T]) -> Result<(), SimdError> {
+        runtime_support_result::<T, Arch>()?;
         if out.len() < Arch::LANE_COUNT {
             return Err(SimdError::InsufficientOutputLength);
         }
@@ -242,6 +262,7 @@ where
         mask: Mask<T, Arch>,
         src: Self,
     ) -> Result<Self, SimdError> {
+        runtime_support_result::<T, Arch>()?;
         let len = data.len();
         let bm = unsafe { mask.to_bitmask().0 };
         let is_out_of_bounds = if len < u64::BITS as usize {
@@ -295,6 +316,7 @@ where
         data: &mut [T],
         mask: Mask<T, Arch>,
     ) -> Result<(), SimdError> {
+        runtime_support_result::<T, Arch>()?;
         let len = data.len();
         let bm = unsafe { mask.to_bitmask().0 };
         let is_out_of_bounds = if len < u64::BITS as usize {
@@ -342,109 +364,136 @@ where
     /// Horizontal sum reduction of all lanes in the Vector.
     #[inline(always)]
     pub fn sum_reduce(self) -> T {
+        assert_runtime_supported::<T, Arch>();
         unsafe { Arch::sum_reduce(self.raw) }
     }
 
     /// Elementwise population count (number of set bits).
     #[inline(always)]
     pub fn popcount(self) -> Self {
+        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::popcount(self.raw) })
     }
 
     /// Horizontal bitwise AND reduction across all lanes.
     #[inline(always)]
     pub fn horizontal_bitwise_and(self) -> T {
+        assert_runtime_supported::<T, Arch>();
         unsafe { Arch::horizontal_bitwise_and(self.raw) }
     }
 
     /// Horizontal bitwise OR reduction across all lanes.
     #[inline(always)]
     pub fn horizontal_bitwise_or(self) -> T {
+        assert_runtime_supported::<T, Arch>();
         unsafe { Arch::horizontal_bitwise_or(self.raw) }
     }
 
     /// Horizontal bitwise XOR reduction across all lanes.
     #[inline(always)]
     pub fn horizontal_bitwise_xor(self) -> T {
+        assert_runtime_supported::<T, Arch>();
         unsafe { Arch::horizontal_bitwise_xor(self.raw) }
     }
 
     /// Elementwise absolute value.
     #[inline(always)]
     pub fn abs(self) -> Self {
+        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::abs(self.raw) })
     }
 
     /// Elementwise minimum of `self` and `other`.
     #[inline(always)]
     pub fn min(self, other: Self) -> Self {
+        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::min(self.raw, other.raw) })
     }
 
     /// Elementwise maximum of `self` and `other`.
     #[inline(always)]
     pub fn max(self, other: Self) -> Self {
+        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::max(self.raw, other.raw) })
     }
 
     /// Elementwise square root.
     #[inline(always)]
     pub fn sqrt(self) -> Self {
+        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::sqrt(self.raw) })
     }
 
     /// Elementwise equal comparison (`self == other`).
     #[inline(always)]
     pub fn cmp_eq(self, other: Self) -> Self {
+        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_eq(self.raw, other.raw) })
     }
 
     /// Elementwise not-equal comparison (`self != other`).
     #[inline(always)]
     pub fn cmp_ne(self, other: Self) -> Self {
+        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_ne(self.raw, other.raw) })
     }
 
     /// Elementwise less-than comparison (`self < other`).
     #[inline(always)]
     pub fn cmp_lt(self, other: Self) -> Self {
+        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_lt(self.raw, other.raw) })
     }
 
     /// Elementwise less-than-or-equal comparison (`self <= other`).
     #[inline(always)]
     pub fn cmp_le(self, other: Self) -> Self {
+        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_le(self.raw, other.raw) })
     }
 
     /// Elementwise greater-than comparison (`self > other`).
     #[inline(always)]
     pub fn cmp_gt(self, other: Self) -> Self {
+        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_gt(self.raw, other.raw) })
     }
 
     /// Elementwise greater-than-or-equal comparison (`self >= other`).
     #[inline(always)]
     pub fn cmp_ge(self, other: Self) -> Self {
+        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_ge(self.raw, other.raw) })
     }
 
     /// Conditional blend: select lanes from `true_val` where the mask lane in `self` is active (sign bit set), and from `false_val` otherwise.
     #[inline(always)]
     pub fn blend(self, true_val: Self, false_val: Self) -> Self {
+        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::blend(self.raw, true_val.raw, false_val.raw) })
     }
 
     /// Create a Vector from an array of size `N`, where `N` must equal `Arch::LANE_COUNT`.
     #[inline(always)]
     pub fn from_array<const N: usize>(arr: [T; N]) -> Self {
+        assert_runtime_supported::<T, Arch>();
         let _ = AssertLaneCount::<T, Arch, N>::OK;
         unsafe { Self::load_unaligned(arr.as_ptr()) }
+    }
+
+    /// Try to create a Vector from an array of size `N`, where `N` must equal
+    /// `Arch::LANE_COUNT`.
+    #[inline(always)]
+    pub fn try_from_array<const N: usize>(arr: [T; N]) -> Result<Self, SimdError> {
+        runtime_support_result::<T, Arch>()?;
+        let _ = AssertLaneCount::<T, Arch, N>::OK;
+        unsafe { Ok(Self::load_unaligned(arr.as_ptr())) }
     }
 
     /// Convert the vector to an array of size `N`, where `N` must equal `Arch::LANE_COUNT`.
     #[inline(always)]
     pub fn to_array<const N: usize>(self) -> [T; N] {
+        assert_runtime_supported::<T, Arch>();
         let _ = AssertLaneCount::<T, Arch, N>::OK;
         let mut arr = [core::mem::MaybeUninit::<T>::uninit(); N];
         unsafe {
@@ -456,6 +505,7 @@ where
     /// Convert this vector mask representation (sign bits) into a portable `BitMask`.
     #[inline(always)]
     pub fn to_bitmask(self) -> BitMask<64> {
+        assert_runtime_supported::<T, Arch>();
         const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let lanes = <Arch as SimdKernel<T>>::LANE_COUNT;
@@ -516,6 +566,8 @@ where
         U: Scalar,
         U: CastFrom<T>,
     {
+        assert_runtime_supported::<T, Arch>();
+        assert_runtime_supported::<U, Arch>();
         let _ = AssertLaneCountSame::<T, U, Arch>::OK;
         const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
         let mut buf_t = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
@@ -534,6 +586,7 @@ where
     /// Extract a single lane element by index at compile-time.
     #[inline(always)]
     pub fn extract<const I: usize>(self) -> T {
+        assert_runtime_supported::<T, Arch>();
         let _ = AssertLaneIndex::<T, Arch, I>::OK;
         const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
@@ -546,6 +599,7 @@ where
     /// Insert a value into a single lane by index at compile-time.
     #[inline(always)]
     pub fn insert<const I: usize>(self, val: T) -> Self {
+        assert_runtime_supported::<T, Arch>();
         let _ = AssertLaneIndex::<T, Arch, I>::OK;
         const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
@@ -567,6 +621,7 @@ where
         Mode: crate::execution::ExecutionMode,
         Ref: core::ops::Deref<Target = [T]>,
     {
+        assert_runtime_supported::<T, Arch>();
         let offset = chunk_idx * Arch::LANE_COUNT;
         let slice = view.as_slice();
         assert!(
@@ -592,6 +647,7 @@ where
         Align: crate::align::Alignment,
         Mode: crate::execution::ExecutionMode,
     {
+        assert_runtime_supported::<T, Arch>();
         let offset = chunk_idx * Arch::LANE_COUNT;
         let slice = view.as_slice_mut();
         assert!(
@@ -616,6 +672,31 @@ where
 {
     let alignment = Arch::LANE_COUNT * core::mem::size_of::<T>();
     alignment != 0 && (ptr as usize).is_multiple_of(alignment)
+}
+
+#[inline(always)]
+pub(crate) fn runtime_support_result<T, Arch>() -> Result<(), SimdError>
+where
+    Arch: SimdArch + SimdKernel<T>,
+    T: Scalar,
+{
+    if Arch::is_runtime_supported() {
+        Ok(())
+    } else {
+        Err(SimdError::UnsupportedTarget)
+    }
+}
+
+#[inline(always)]
+pub(crate) fn assert_runtime_supported<T, Arch>()
+where
+    Arch: SimdArch + SimdKernel<T>,
+    T: Scalar,
+{
+    assert!(
+        Arch::is_runtime_supported(),
+        "SIMD target is not supported or enabled on this host"
+    );
 }
 
 struct AssertLaneIndex<T, Arch, const I: usize>(PhantomData<(T, Arch)>);

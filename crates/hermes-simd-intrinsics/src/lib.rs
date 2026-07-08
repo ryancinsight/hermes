@@ -223,7 +223,7 @@ pub use bitboard::magic::Magic;
 pub use bitboard::swar::{Swar, SwarUtils};
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-pub use x86_64::amx::{AmxBatchSession, AmxBf16, AmxConfig, AmxInt8, AmxSession};
+pub use x86_64::amx::{AmxBatchSession, AmxBf16, AmxConfig, AmxInt8, AmxSession, AmxSessionError};
 
 // ---------------------------------------------------------------------------
 // ZST Architecture Markers
@@ -265,6 +265,11 @@ impl SimdArch for Scalar {
     const REGISTER_WIDTH_BITS: u32 = 0;
     const ISA_FAMILY: hermes_simd_core::arch::IsaFamily = hermes_simd_core::arch::IsaFamily::Scalar;
     const FMA_THROUGHPUT_HINT: u32 = 1;
+
+    #[inline]
+    fn is_runtime_supported() -> bool {
+        true
+    }
 }
 
 impl SimdArch for Avx2 {
@@ -272,6 +277,22 @@ impl SimdArch for Avx2 {
     const REGISTER_WIDTH_BITS: u32 = 256;
     const ISA_FAMILY: hermes_simd_core::arch::IsaFamily = hermes_simd_core::arch::IsaFamily::X86;
     const FMA_THROUGHPUT_HINT: u32 = 4;
+
+    #[inline]
+    fn is_runtime_supported() -> bool {
+        #[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), feature = "std"))]
+        {
+            std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma")
+        }
+        #[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), not(feature = "std")))]
+        {
+            cfg!(target_feature = "avx2") && cfg!(target_feature = "fma")
+        }
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+        {
+            false
+        }
+    }
 }
 
 impl SimdArch for Avx512 {
@@ -279,6 +300,22 @@ impl SimdArch for Avx512 {
     const REGISTER_WIDTH_BITS: u32 = 512;
     const ISA_FAMILY: hermes_simd_core::arch::IsaFamily = hermes_simd_core::arch::IsaFamily::X86;
     const FMA_THROUGHPUT_HINT: u32 = 8;
+
+    #[inline]
+    fn is_runtime_supported() -> bool {
+        #[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), feature = "std"))]
+        {
+            std::is_x86_feature_detected!("avx512f")
+        }
+        #[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), not(feature = "std")))]
+        {
+            cfg!(target_feature = "avx512f")
+        }
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+        {
+            false
+        }
+    }
 }
 
 impl SimdArch for AvxVnni {
@@ -287,6 +324,22 @@ impl SimdArch for AvxVnni {
     const ISA_FAMILY: hermes_simd_core::arch::IsaFamily = hermes_simd_core::arch::IsaFamily::X86;
     // Two 256-bit `vpdpbusd` per cycle on current client cores (Golden Cove / Zen 4).
     const FMA_THROUGHPUT_HINT: u32 = 4;
+
+    #[inline]
+    fn is_runtime_supported() -> bool {
+        #[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), feature = "std"))]
+        {
+            std::is_x86_feature_detected!("avxvnni")
+        }
+        #[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), not(feature = "std")))]
+        {
+            false
+        }
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+        {
+            false
+        }
+    }
 }
 
 impl SimdArch for Neon {
@@ -295,6 +348,11 @@ impl SimdArch for Neon {
     const ISA_FAMILY: hermes_simd_core::arch::IsaFamily =
         hermes_simd_core::arch::IsaFamily::AArch64;
     const FMA_THROUGHPUT_HINT: u32 = 4;
+
+    #[inline]
+    fn is_runtime_supported() -> bool {
+        cfg!(target_arch = "aarch64")
+    }
 }
 
 impl hermes_simd_core::private::Sealed for Scalar {}
