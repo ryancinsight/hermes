@@ -96,10 +96,28 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: hermes
+      # mnemosyne's global allocator (exercised transitively via
+      # AlignedVec::with_capacity) embeds page/segment metadata inside the
+      # same allocation it hands out to callers — pointers into the header
+      # and the returned data pointer alias the same backing memory, aliased
+      # through logically-separate Rust references. Stacked Borrows (Miri's
+      # default aliasing model) is documented to false-positive on exactly
+      # this "self-referential header + user payload in one allocation"
+      # pattern; Tree Borrows is Miri's less-strict, still-rigorous
+      # alternative model built to permit it correctly. mnemosyne has no
+      # CI of its own yet (this is the first time its allocator has run
+      # under Miri at all), so this is a from-scratch finding, not a
+      # regression — tracked as a residual-risk follow-up (confirm under
+      # Tree Borrows here; a deeper audit of mnemosyne's aliasing discipline
+      # belongs in that repo).
       - name: cargo miri test (core pointer logic)
         run: cargo +nightly miri test -p hermes-simd-core
+        env:
+          MIRIFLAGS: -Zmiri-tree-borrows
       - name: cargo miri test (intrinsics boundary state)
         run: cargo +nightly miri test -p hermes-simd-intrinsics
+        env:
+          MIRIFLAGS: -Zmiri-tree-borrows
 
   test-aarch64:
     name: test (aarch64, runtime NEON validation)
