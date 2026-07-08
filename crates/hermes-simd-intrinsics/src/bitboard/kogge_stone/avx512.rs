@@ -16,6 +16,15 @@ pub unsafe fn kogge_stone_rook_avx512(slider: u64, occupancy: u64) -> u64 {
     // Upper 4 lanes: right shifts (South, West, 0, 0)
     let left_shifts = _mm512_set_epi64(0, 0, 0, 0, 0, 0, 1, 8);
     let right_shifts = _mm512_set_epi64(0, 0, 1, 8, 0, 0, 0, 0);
+    // `_mm512_sllv_epi64`/`_mm512_srlv_epi64` shift-by-0 is the identity, not
+    // zero — lanes 2,3,6,7 (unused padding) and, critically, the *inactive*
+    // side's lanes (right_shifts is 0 in lanes 0,1; left_shifts is 0 in lanes
+    // 4,5) pass their input through unchanged. OR-ing `sg_l`/`sg_r` (or
+    // `sp_l`/`sp_r`) directly therefore leaks the pre-shift `g`/`p` value
+    // into lanes 0,1,4,5, corrupting the fill. Mask each side down to only
+    // its own active lanes before the OR.
+    let left_active = _mm512_set_epi64(0, 0, 0, 0, 0, 0, -1, -1);
+    let right_active = _mm512_set_epi64(0, 0, -1, -1, 0, 0, 0, 0);
 
     let mut g = _mm512_set1_epi64(slider as i64);
     let mut p = _mm512_set_epi64(
@@ -47,11 +56,11 @@ pub unsafe fn kogge_stone_rook_avx512(slider: u64, occupancy: u64) -> u64 {
         let l_shift = left_shifts;
         let r_shift = right_shifts;
 
-        let sg_l = _mm512_sllv_epi64(g, l_shift);
-        let sp_l = _mm512_sllv_epi64(p, l_shift);
+        let sg_l = _mm512_and_si512(_mm512_sllv_epi64(g, l_shift), left_active);
+        let sp_l = _mm512_and_si512(_mm512_sllv_epi64(p, l_shift), left_active);
 
-        let sg_r = _mm512_srlv_epi64(g, r_shift);
-        let sp_r = _mm512_srlv_epi64(p, r_shift);
+        let sg_r = _mm512_and_si512(_mm512_srlv_epi64(g, r_shift), right_active);
+        let sp_r = _mm512_and_si512(_mm512_srlv_epi64(p, r_shift), right_active);
 
         let sg = _mm512_or_si512(sg_l, sg_r);
         let sp = _mm512_or_si512(sp_l, sp_r);
@@ -68,11 +77,11 @@ pub unsafe fn kogge_stone_rook_avx512(slider: u64, occupancy: u64) -> u64 {
         let l_shift = _mm512_slli_epi64(left_shifts, 1);
         let r_shift = _mm512_slli_epi64(right_shifts, 1);
 
-        let sg_l = _mm512_sllv_epi64(g, l_shift);
-        let sp_l = _mm512_sllv_epi64(p, l_shift);
+        let sg_l = _mm512_and_si512(_mm512_sllv_epi64(g, l_shift), left_active);
+        let sp_l = _mm512_and_si512(_mm512_sllv_epi64(p, l_shift), left_active);
 
-        let sg_r = _mm512_srlv_epi64(g, r_shift);
-        let sp_r = _mm512_srlv_epi64(p, r_shift);
+        let sg_r = _mm512_and_si512(_mm512_srlv_epi64(g, r_shift), right_active);
+        let sp_r = _mm512_and_si512(_mm512_srlv_epi64(p, r_shift), right_active);
 
         let sg = _mm512_or_si512(sg_l, sg_r);
         let sp = _mm512_or_si512(sp_l, sp_r);
@@ -89,8 +98,8 @@ pub unsafe fn kogge_stone_rook_avx512(slider: u64, occupancy: u64) -> u64 {
         let l_shift = _mm512_slli_epi64(left_shifts, 2);
         let r_shift = _mm512_slli_epi64(right_shifts, 2);
 
-        let sg_l = _mm512_sllv_epi64(g, l_shift);
-        let sg_r = _mm512_srlv_epi64(g, r_shift);
+        let sg_l = _mm512_and_si512(_mm512_sllv_epi64(g, l_shift), left_active);
+        let sg_r = _mm512_and_si512(_mm512_srlv_epi64(g, r_shift), right_active);
 
         let sg = _mm512_or_si512(sg_l, sg_r);
         let masked_sg = _mm512_and_si512(sg, masks[2]);
@@ -127,6 +136,12 @@ pub unsafe fn kogge_stone_bishop_avx512(slider: u64, occupancy: u64) -> u64 {
     // Upper 4 lanes: right shifts (South-East (>> 7), South-West (>> 9), 0, 0)
     let left_shifts = _mm512_set_epi64(0, 0, 0, 0, 0, 0, 7, 9);
     let right_shifts = _mm512_set_epi64(0, 0, 9, 7, 0, 0, 0, 0);
+    // See kogge_stone_rook_avx512: shift-by-0 is the identity, so the
+    // inactive side's lanes (0,1 for right_shifts; 4,5 for left_shifts) pass
+    // g/p through unshifted, corrupting the OR unless masked to each side's
+    // own active lanes first.
+    let left_active = _mm512_set_epi64(0, 0, 0, 0, 0, 0, -1, -1);
+    let right_active = _mm512_set_epi64(0, 0, -1, -1, 0, 0, 0, 0);
 
     let mut g = _mm512_set1_epi64(slider as i64);
     let mut p = _mm512_set_epi64(
@@ -185,11 +200,11 @@ pub unsafe fn kogge_stone_bishop_avx512(slider: u64, occupancy: u64) -> u64 {
         let l_shift = left_shifts;
         let r_shift = right_shifts;
 
-        let sg_l = _mm512_sllv_epi64(g, l_shift);
-        let sp_l = _mm512_sllv_epi64(p, l_shift);
+        let sg_l = _mm512_and_si512(_mm512_sllv_epi64(g, l_shift), left_active);
+        let sp_l = _mm512_and_si512(_mm512_sllv_epi64(p, l_shift), left_active);
 
-        let sg_r = _mm512_srlv_epi64(g, r_shift);
-        let sp_r = _mm512_srlv_epi64(p, r_shift);
+        let sg_r = _mm512_and_si512(_mm512_srlv_epi64(g, r_shift), right_active);
+        let sp_r = _mm512_and_si512(_mm512_srlv_epi64(p, r_shift), right_active);
 
         let sg = _mm512_or_si512(sg_l, sg_r);
         let sp = _mm512_or_si512(sp_l, sp_r);
@@ -206,11 +221,11 @@ pub unsafe fn kogge_stone_bishop_avx512(slider: u64, occupancy: u64) -> u64 {
         let l_shift = _mm512_slli_epi64(left_shifts, 1);
         let r_shift = _mm512_slli_epi64(right_shifts, 1);
 
-        let sg_l = _mm512_sllv_epi64(g, l_shift);
-        let sp_l = _mm512_sllv_epi64(p, l_shift);
+        let sg_l = _mm512_and_si512(_mm512_sllv_epi64(g, l_shift), left_active);
+        let sp_l = _mm512_and_si512(_mm512_sllv_epi64(p, l_shift), left_active);
 
-        let sg_r = _mm512_srlv_epi64(g, r_shift);
-        let sp_r = _mm512_srlv_epi64(p, r_shift);
+        let sg_r = _mm512_and_si512(_mm512_srlv_epi64(g, r_shift), right_active);
+        let sp_r = _mm512_and_si512(_mm512_srlv_epi64(p, r_shift), right_active);
 
         let sg = _mm512_or_si512(sg_l, sg_r);
         let sp = _mm512_or_si512(sp_l, sp_r);
@@ -227,8 +242,8 @@ pub unsafe fn kogge_stone_bishop_avx512(slider: u64, occupancy: u64) -> u64 {
         let l_shift = _mm512_slli_epi64(left_shifts, 2);
         let r_shift = _mm512_slli_epi64(right_shifts, 2);
 
-        let sg_l = _mm512_sllv_epi64(g, l_shift);
-        let sg_r = _mm512_srlv_epi64(g, r_shift);
+        let sg_l = _mm512_and_si512(_mm512_sllv_epi64(g, l_shift), left_active);
+        let sg_r = _mm512_and_si512(_mm512_srlv_epi64(g, r_shift), right_active);
 
         let sg = _mm512_or_si512(sg_l, sg_r);
         let masked_sg = _mm512_and_si512(sg, masks[2]);
