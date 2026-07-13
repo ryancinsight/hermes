@@ -5,6 +5,9 @@ Tags: `[patch]` / `[minor]` / `[major]` / `[arch]` per SemVer change class.
 Tactical breakdown of the active items lives in [checklist.md](checklist.md).
 External gap findings live in [gap_audit.md](gap_audit.md).
 
+- [x] [patch] Close standalone Git provider resolution with exact Mnemosyne,
+  Eunomia, and Themis revisions.
+
 ## Open
 
 - [minor] Re-enable AMX auto-dispatch only after adding a stable,

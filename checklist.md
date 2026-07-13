@@ -5,6 +5,7 @@
 - [x] [patch] Pin the Themis provider identity to revision
   `6140468c79279ec8f112641ea7422cef4688c7f6`; verify workspace format,
   warning-denied Clippy, and canonical nextest.
+- [x] [patch] Pin current Mnemosyne and Eunomia provider revisions.
 
 ## Sprint scope: ship 0.2.0 with CI
 

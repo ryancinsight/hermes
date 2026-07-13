@@ -4,6 +4,9 @@ Persistent gap register. Evidence tiers follow the repository instruction
 hierarchy: machine-checked proof > type-level invariant > property/fuzz >
 differential/empirical > source audit.
 
+- Resolved provider drift: current Mnemosyne and Eunomia revisions are exact,
+  eliminating Hermes's stale Melinoe 0.8 transitive graph.
+
 ## 2026-07-08 CI: miri gate known-failing, tracked on upstream mnemosyne <a id="miri-known-failing-2026-07-08"></a>
 
 **Evidence tier: machine-checked (Miri, both Stacked Borrows and Tree Borrows

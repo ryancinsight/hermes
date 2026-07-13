@@ -7,6 +7,8 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 ### Changed
 - Pin Themis to audited revision `6140468c79279ec8f112641ea7422cef4688c7f6`
   so stack integrators resolve one provider source identity.
+- Pin current Mnemosyne and Eunomia revisions so standalone Git consumers
+  resolve one reproducible provider graph.
 
 ### Breaking
 - `hermes-simd-core`/`hermes-simd-intrinsics` [minor]: `SimdArch` now requires
