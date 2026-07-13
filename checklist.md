@@ -2,6 +2,10 @@
 
 **Target version: 0.2.0** · Strategy: [backlog.md](backlog.md) · Gap register: [gap_audit.md](gap_audit.md) · Phase: Closure (release)
 
+- [x] [patch] Pin the Themis provider identity to revision
+  `6140468c79279ec8f112641ea7422cef4688c7f6`; verify workspace format,
+  warning-denied Clippy, and canonical nextest.
+
 ## Sprint scope: ship 0.2.0 with CI
 
 - [x] [patch] `hermes-simd` AMX auto-dispatch mitigation: AMX support probes now

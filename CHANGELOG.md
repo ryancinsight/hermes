@@ -4,6 +4,10 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ## [Unreleased]
 
+### Changed
+- Pin Themis to audited revision `6140468c79279ec8f112641ea7422cef4688c7f6`
+  so stack integrators resolve one provider source identity.
+
 ### Breaking
 - `hermes-simd-core`/`hermes-simd-intrinsics` [minor]: `SimdArch` now requires
   `is_runtime_supported()`, the SSOT runtime probe used by safe vector/mask
