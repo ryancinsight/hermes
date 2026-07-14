@@ -107,8 +107,14 @@ pub unsafe fn kogge_stone_rook_avx512(slider: u64, occupancy: u64) -> u64 {
         g = _mm512_or_si512(g, _mm512_and_si512(masked_sg, p));
     }
 
-    let final_l = _mm512_and_si512(_mm512_sllv_epi64(g, left_shifts), masks[0]);
-    let final_r = _mm512_and_si512(_mm512_srlv_epi64(g, right_shifts), masks[0]);
+    let final_l = _mm512_and_si512(
+        _mm512_and_si512(_mm512_sllv_epi64(g, left_shifts), left_active),
+        masks[0],
+    );
+    let final_r = _mm512_and_si512(
+        _mm512_and_si512(_mm512_srlv_epi64(g, right_shifts), right_active),
+        masks[0],
+    );
     let final_res = _mm512_or_si512(final_l, final_r);
 
     let low = _mm512_castsi512_si256(final_res);
@@ -251,8 +257,14 @@ pub unsafe fn kogge_stone_bishop_avx512(slider: u64, occupancy: u64) -> u64 {
         g = _mm512_or_si512(g, _mm512_and_si512(masked_sg, p));
     }
 
-    let final_l = _mm512_and_si512(_mm512_sllv_epi64(g, left_shifts), masks[0]);
-    let final_r = _mm512_and_si512(_mm512_srlv_epi64(g, right_shifts), masks[0]);
+    let final_l = _mm512_and_si512(
+        _mm512_and_si512(_mm512_sllv_epi64(g, left_shifts), left_active),
+        masks[0],
+    );
+    let final_r = _mm512_and_si512(
+        _mm512_and_si512(_mm512_srlv_epi64(g, right_shifts), right_active),
+        masks[0],
+    );
     let final_res = _mm512_or_si512(final_l, final_r);
 
     let low = _mm512_castsi512_si256(final_res);
@@ -280,6 +292,11 @@ pub unsafe fn kogge_stone_queen_avx512(slider: u64, occupancy: u64) -> u64 {
     // Upper 4 lanes: right shifts (South (>> 8), West (>> 1), South-East (>> 7), South-West (>> 9))
     let left_shifts = _mm512_set_epi64(0, 0, 0, 0, 7, 9, 1, 8);
     let right_shifts = _mm512_set_epi64(9, 7, 1, 8, 0, 0, 0, 0);
+
+    // Shift-by-zero is the identity. Mask each direction group before the
+    // left/right OR so the inactive half cannot preserve stale `g`/`p` bits.
+    let left_active = _mm512_set_epi64(0, 0, 0, 0, -1, -1, -1, -1);
+    let right_active = _mm512_set_epi64(-1, -1, -1, -1, 0, 0, 0, 0);
 
     let mut g = _mm512_set1_epi64(slider as i64);
     let mut p = _mm512_set1_epi64(p_scalar as i64);
@@ -329,11 +346,11 @@ pub unsafe fn kogge_stone_queen_avx512(slider: u64, occupancy: u64) -> u64 {
         let l_shift = left_shifts;
         let r_shift = right_shifts;
 
-        let sg_l = _mm512_sllv_epi64(g, l_shift);
-        let sp_l = _mm512_sllv_epi64(p, l_shift);
+        let sg_l = _mm512_and_si512(_mm512_sllv_epi64(g, l_shift), left_active);
+        let sp_l = _mm512_and_si512(_mm512_sllv_epi64(p, l_shift), left_active);
 
-        let sg_r = _mm512_srlv_epi64(g, r_shift);
-        let sp_r = _mm512_srlv_epi64(p, r_shift);
+        let sg_r = _mm512_and_si512(_mm512_srlv_epi64(g, r_shift), right_active);
+        let sp_r = _mm512_and_si512(_mm512_srlv_epi64(p, r_shift), right_active);
 
         let sg = _mm512_or_si512(sg_l, sg_r);
         let sp = _mm512_or_si512(sp_l, sp_r);
@@ -350,11 +367,11 @@ pub unsafe fn kogge_stone_queen_avx512(slider: u64, occupancy: u64) -> u64 {
         let l_shift = _mm512_slli_epi64(left_shifts, 1);
         let r_shift = _mm512_slli_epi64(right_shifts, 1);
 
-        let sg_l = _mm512_sllv_epi64(g, l_shift);
-        let sp_l = _mm512_sllv_epi64(p, l_shift);
+        let sg_l = _mm512_and_si512(_mm512_sllv_epi64(g, l_shift), left_active);
+        let sp_l = _mm512_and_si512(_mm512_sllv_epi64(p, l_shift), left_active);
 
-        let sg_r = _mm512_srlv_epi64(g, r_shift);
-        let sp_r = _mm512_srlv_epi64(p, r_shift);
+        let sg_r = _mm512_and_si512(_mm512_srlv_epi64(g, r_shift), right_active);
+        let sp_r = _mm512_and_si512(_mm512_srlv_epi64(p, r_shift), right_active);
 
         let sg = _mm512_or_si512(sg_l, sg_r);
         let sp = _mm512_or_si512(sp_l, sp_r);
@@ -371,8 +388,8 @@ pub unsafe fn kogge_stone_queen_avx512(slider: u64, occupancy: u64) -> u64 {
         let l_shift = _mm512_slli_epi64(left_shifts, 2);
         let r_shift = _mm512_slli_epi64(right_shifts, 2);
 
-        let sg_l = _mm512_sllv_epi64(g, l_shift);
-        let sg_r = _mm512_srlv_epi64(g, r_shift);
+        let sg_l = _mm512_and_si512(_mm512_sllv_epi64(g, l_shift), left_active);
+        let sg_r = _mm512_and_si512(_mm512_srlv_epi64(g, r_shift), right_active);
 
         let sg = _mm512_or_si512(sg_l, sg_r);
         let masked_sg = _mm512_and_si512(sg, masks[2]);
@@ -380,8 +397,14 @@ pub unsafe fn kogge_stone_queen_avx512(slider: u64, occupancy: u64) -> u64 {
         g = _mm512_or_si512(g, _mm512_and_si512(masked_sg, p));
     }
 
-    let final_l = _mm512_and_si512(_mm512_sllv_epi64(g, left_shifts), masks[0]);
-    let final_r = _mm512_and_si512(_mm512_srlv_epi64(g, right_shifts), masks[0]);
+    let final_l = _mm512_and_si512(
+        _mm512_and_si512(_mm512_sllv_epi64(g, left_shifts), left_active),
+        masks[0],
+    );
+    let final_r = _mm512_and_si512(
+        _mm512_and_si512(_mm512_srlv_epi64(g, right_shifts), right_active),
+        masks[0],
+    );
     let final_res = _mm512_or_si512(final_l, final_r);
 
     let low = _mm512_castsi512_si256(final_res);
