@@ -27,7 +27,7 @@ rust-version = "1.95"
 [workspace.dependencies]
 half = { version = "2.3", default-features = false }
 mnemosyne = { git = "https://github.com/ryancinsight/Mnemosyne.git", rev = "4a9d2a32423f7c3f1413171193765d6aba34ad8e", default-features = false }
-themis = { git = "https://github.com/ryancinsight/themis", rev = "07bf558804e90d6121f994dde8fdebf11538fba7", version = "0.10.0", default-features = false }
+themis = { git = "https://github.com/ryancinsight/themis", rev = "18807bb5c43f4dc4cb6cedefeee2cc12375056c1", version = "0.10.0", default-features = false }
 eunomia = { git = "https://github.com/ryancinsight/eunomia", rev = "dd94f7b9d223668887302531006628818e2bd45b", default-features = false }
 
 # Integer overflow must trap during development and tests (numerical-discipline
