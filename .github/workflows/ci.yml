@@ -93,13 +93,14 @@ jobs:
         with:
           toolchain: nightly
           components: miri
+      - uses: taiki-e/install-action@nextest
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: hermes
-      - name: cargo miri test (core pointer logic)
-        run: cargo +nightly miri test -p hermes-simd-core
-      - name: cargo miri test (intrinsics boundary state)
-        run: cargo +nightly miri test -p hermes-simd-intrinsics
+      - name: Miri nextest (core pointer logic)
+        run: cargo +nightly miri nextest run -p hermes-simd-core --all-features --locked
+      - name: Miri nextest (intrinsics boundary state)
+        run: cargo +nightly miri nextest run -p hermes-simd-intrinsics --all-features --locked
 
   test-aarch64:
     name: test (aarch64, runtime NEON validation)
