@@ -26,7 +26,7 @@ rust-version = "1.95"
 
 [workspace.dependencies]
 half = { version = "2.3", default-features = false }
-mnemosyne = { git = "https://github.com/ryancinsight/Mnemosyne.git", rev = "eb0d94109c452cdca934c87c1e3dd53884f2ca28", default-features = false }
+mnemosyne = { git = "https://github.com/ryancinsight/Mnemosyne.git", rev = "4a9d2a32423f7c3f1413171193765d6aba34ad8e", default-features = false }
 themis = { git = "https://github.com/ryancinsight/themis", rev = "6140468c79279ec8f112641ea7422cef4688c7f6", version = "0.9.9", default-features = false }
 eunomia = { git = "https://github.com/ryancinsight/eunomia", rev = "dd94f7b9d223668887302531006628818e2bd45b", default-features = false }
 
