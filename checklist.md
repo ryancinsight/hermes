@@ -9,7 +9,9 @@
   2026-07-15 with `cargo tree --locked -d -p hermes-simd`, `cargo fmt --check`,
   `cargo clippy -p hermes-simd --all-targets --all-features --locked -- -D
   warnings`, `cargo nextest run -p hermes-simd --locked --no-fail-fast`, and
-  `cargo doc -p hermes-simd --no-deps --locked`.
+  `cargo doc -p hermes-simd --no-deps --locked`. CI source policy is updated
+  for the default providers and `cargo deny check` passes locally; the PR CI
+  rerun remains the merge gate.
 
 ## Sprint scope: ship 0.2.0 with CI
 

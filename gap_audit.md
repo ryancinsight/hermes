@@ -7,8 +7,10 @@ differential/empirical > source audit.
 - Resolved 2026-07-15 — provider default-branch convergence: Hermes removes
   revision pins and workspace-local patches for Mnemosyne, Eunomia, and Themis.
   `cargo tree --locked -d -p hermes-simd` reports one identity for each; the
-  package-scoped format, Clippy, nextest, and rustdoc gates pass. Evidence tier:
-  locked dependency-resolution and value-semantic package tests.
+  package-scoped format, Clippy, nextest, rustdoc, and `cargo deny check` gates
+  pass. CI's source allowlist names the reviewed provider URLs directly and
+  redundant sibling checkouts are deleted. Evidence tier: locked
+  dependency-resolution and value-semantic package tests.
 
 ## 2026-07-08 CI: miri gate known-failing, tracked on upstream mnemosyne <a id="miri-known-failing-2026-07-08"></a>
 

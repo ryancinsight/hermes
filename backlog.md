@@ -9,7 +9,9 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   Mnemosyne, Eunomia, and Themis default branches; remove local patch
   overrides and prove a single locked provider identity for `hermes-simd`.
   Delivered 2026-07-15: locked graph inspection plus package-scoped fmt,
-  warning-denied Clippy, nextest, and rustdoc gates pass.
+  warning-denied Clippy, nextest, rustdoc, and `cargo deny check` gates pass.
+  CI removes its obsolete sibling checkouts and allowlists the reviewed provider
+  Git sources.
 
 ## Open
 

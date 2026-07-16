@@ -7,7 +7,8 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 ### Changed
 - Resolve Themis, Mnemosyne, and Eunomia from their default branches and remove
   workspace-local patch overrides so downstream Atlas consumers share provider
-  identities.
+  identities. The supply-chain allowlist now names those reviewed Git sources,
+  and CI no longer checks out redundant sibling repositories.
 
 ### Breaking
 - `hermes-simd-core`/`hermes-simd-intrinsics` [minor]: `SimdArch` now requires
