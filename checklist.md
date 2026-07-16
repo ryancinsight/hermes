@@ -2,10 +2,14 @@
 
 **Target version: 0.2.0** · Strategy: [backlog.md](backlog.md) · Gap register: [gap_audit.md](gap_audit.md) · Phase: Closure (release)
 
-- [x] [patch] Pin the Themis provider identity to revision
-  `6140468c79279ec8f112641ea7422cef4688c7f6`; verify workspace format,
-  warning-denied Clippy, and canonical nextest.
-- [x] [patch] Pin current Mnemosyne and Eunomia provider revisions.
+- [x] [patch] Converge Themis, Mnemosyne, and Eunomia onto their default
+  branches and remove workspace-local patch overrides. Acceptance: the locked
+  `hermes-simd` graph contains one identity for each provider; format,
+  warning-denied Clippy, canonical nextest, and rustdoc are clean. Verified
+  2026-07-15 with `cargo tree --locked -d -p hermes-simd`, `cargo fmt --check`,
+  `cargo clippy -p hermes-simd --all-targets --all-features --locked -- -D
+  warnings`, `cargo nextest run -p hermes-simd --locked --no-fail-fast`, and
+  `cargo doc -p hermes-simd --no-deps --locked`.
 
 ## Sprint scope: ship 0.2.0 with CI
 

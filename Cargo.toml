@@ -26,9 +26,9 @@ rust-version = "1.95"
 
 [workspace.dependencies]
 half = { version = "2.3", default-features = false }
-mnemosyne = { git = "https://github.com/ryancinsight/Mnemosyne.git", rev = "32b4a2ac71f909205b58d68c3b244caf99407b2d", default-features = false }
-themis = { git = "https://github.com/ryancinsight/themis", rev = "18807bb5c43f4dc4cb6cedefeee2cc12375056c1", version = "0.10.0", default-features = false }
-eunomia = { git = "https://github.com/ryancinsight/eunomia", rev = "dd94f7b9d223668887302531006628818e2bd45b", default-features = false }
+mnemosyne = { git = "https://github.com/ryancinsight/Mnemosyne.git", default-features = false }
+themis = { git = "https://github.com/ryancinsight/themis", version = "0.10.0", default-features = false }
+eunomia = { git = "https://github.com/ryancinsight/eunomia", default-features = false }
 
 # Integer overflow must trap during development and tests (numerical-discipline
 # mandate): a silent wraparound can defeat a length/bounds check that gates an
@@ -49,15 +49,3 @@ panic = "abort"
 opt-level = 3
 lto = "fat"
 codegen-units = 1
-
-[patch."https://github.com/ryancinsight/themis"]
-themis = { path = "../themis" }
-
-[patch."https://github.com/ryancinsight/eunomia"]
-eunomia = { path = "../eunomia/crates/eunomia" }
-
-[patch."https://github.com/ryancinsight/Mnemosyne.git"]
-mnemosyne = { path = "../mnemosyne/crates/mnemosyne" }
-mnemosyne-core = { path = "../mnemosyne/crates/mnemosyne-core" }
-mnemosyne-arena = { path = "../mnemosyne/crates/mnemosyne-arena" }
-mnemosyne-local = { path = "../mnemosyne/crates/mnemosyne-local" }
