@@ -5,8 +5,13 @@ Tags: `[patch]` / `[minor]` / `[major]` / `[arch]` per SemVer change class.
 Tactical breakdown of the active items lives in [checklist.md](checklist.md).
 External gap findings live in [gap_audit.md](gap_audit.md).
 
-- [x] [patch] Close standalone Git provider resolution with exact Mnemosyne,
-  Eunomia, and Themis revisions.
+- [x] [patch] Close standalone Git provider resolution on the
+  Mnemosyne, Eunomia, and Themis default branches; remove local patch
+  overrides and prove a single locked provider identity for `hermes-simd`.
+  Delivered 2026-07-15: locked graph inspection plus package-scoped fmt,
+  warning-denied Clippy, nextest, rustdoc, and `cargo deny check` gates pass.
+  CI removes its obsolete sibling checkouts and allowlists the reviewed provider
+  Git sources.
 
 ## Open
 
