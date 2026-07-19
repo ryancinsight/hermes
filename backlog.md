@@ -5,6 +5,11 @@ Tags: `[patch]` / `[minor]` / `[major]` / `[arch]` per SemVer change class.
 Tactical breakdown of the active items lives in [checklist.md](checklist.md).
 External gap findings live in [gap_audit.md](gap_audit.md).
 
+- [ ] [patch] **HS-402 — review.** Regenerate the Hermes provider lock
+  against merged Eunomia 0.6 after Eunomia retired its production raw-half
+  trait surface. Acceptance: one Eunomia 0.6 identity, no normal `half` edge
+  introduced by Eunomia, and the full Hermes verification gate remains green.
+
 - [x] [patch] Close standalone Git provider resolution on the
   Mnemosyne, Eunomia, and Themis default branches; remove local patch
   overrides and prove a single locked provider identity for `hermes-simd`.

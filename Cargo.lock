@@ -344,11 +344,10 @@ dependencies = [
 
 [[package]]
 name = "eunomia"
-version = "0.5.0"
-source = "git+https://github.com/ryancinsight/eunomia#7c62a9bac5ca4900a0e16ea069002c252b98d14c"
+version = "0.6.0"
+source = "git+https://github.com/ryancinsight/eunomia#df77dfde76ad9d2e29bc49d30a9325be32e9ffad"
 dependencies = [
  "bytemuck",
- "half",
  "libm",
  "rkyv",
 ]
