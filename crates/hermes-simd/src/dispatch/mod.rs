@@ -50,8 +50,6 @@ mod private {
 
 impl private::Sealed for f32 {}
 impl private::Sealed for f64 {}
-impl private::Sealed for half::f16 {}
-impl private::Sealed for half::bf16 {}
 impl private::Sealed for i8 {}
 impl private::Sealed for i16 {}
 impl private::Sealed for i32 {}

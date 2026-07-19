@@ -131,24 +131,24 @@ fn bench_dot(c: &mut Criterion) {
     // evidence gate for a hardware-conversion (F16C / shift-based bf16) kernel.
     let mut group = c.benchmark_group("Dense Dot f16");
     for &size in &[256usize, 16384, 65536] {
-        let a = vec![half::f16::from_f32(1.5); size];
-        let b = vec![half::f16::from_f32(0.5); size];
+        let a = vec![eunomia::F16::from_f32(1.5); size];
+        let b = vec![eunomia::F16::from_f32(0.5); size];
         group.throughput(Throughput::Elements(size as u64));
 
         group.bench_with_input(BenchmarkId::new("dispatch", size), &size, |bencher, _| {
-            bencher.iter(|| dot::<half::f16>(black_box(&a), black_box(&b)).unwrap())
+            bencher.iter(|| dot::<eunomia::F16>(black_box(&a), black_box(&b)).unwrap())
         });
     }
     group.finish();
 
     let mut group = c.benchmark_group("Dense Dot bf16");
     for &size in &[256usize, 16384, 65536] {
-        let a = vec![half::bf16::from_f32(1.5); size];
-        let b = vec![half::bf16::from_f32(0.5); size];
+        let a = vec![eunomia::Bf16::from_f32(1.5); size];
+        let b = vec![eunomia::Bf16::from_f32(0.5); size];
         group.throughput(Throughput::Elements(size as u64));
 
         group.bench_with_input(BenchmarkId::new("dispatch", size), &size, |bencher, _| {
-            bencher.iter(|| dot::<half::bf16>(black_box(&a), black_box(&b)).unwrap())
+            bencher.iter(|| dot::<eunomia::Bf16>(black_box(&a), black_box(&b)).unwrap())
         });
     }
     group.finish();

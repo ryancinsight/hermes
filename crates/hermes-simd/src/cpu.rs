@@ -56,14 +56,14 @@ impl FmaSupport for f64 {
     }
 }
 
-impl FmaSupport for half::bf16 {
+impl FmaSupport for Bf16 {
     #[inline]
     fn has_fma() -> bool {
         has_fma3()
     }
 }
 
-impl AmxSupport for half::bf16 {
+impl AmxSupport for Bf16 {
     #[inline]
     fn has_amx() -> bool {
         #[cfg(target_arch = "x86_64")]
@@ -91,7 +91,7 @@ impl AmxSupport for i8 {
     }
 }
 
-impl Avx512Support for half::bf16 {
+impl Avx512Support for Bf16 {
     #[inline]
     fn has_avx512() -> bool {
         #[cfg(target_arch = "x86_64")]
@@ -191,3 +191,4 @@ fn has_avx512_vnni_tile() -> bool {
             && std::is_x86_feature_detected!("avx512vl")
     })
 }
+use eunomia::Bf16;

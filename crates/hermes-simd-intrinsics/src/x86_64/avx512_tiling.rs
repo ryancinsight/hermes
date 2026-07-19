@@ -10,53 +10,6 @@ use hermes_simd_core::view::TileMatrixMultiply;
 // AVX-512 Implementations
 // ---------------------------------------------------------------------------
 
-impl TileMatrixMultiply<half::bf16, half::bf16, f32, Avx512, Avx512, 16, 16, 32> for Avx512 {
-    // SAFETY: caller must ensure the target CPU supports `avx512f,avx512bw,avx512vl`
-    // (enforced by the `#[target_feature]` gate below plus runtime
-    // `is_x86_feature_detected!` selection at the dispatch site) and that `a`, `b`, and
-    // `c` point to a valid 16x16x32 tile addressable at the given strides; all loads and
-    // stores stay within that caller-declared tile.
-    #[target_feature(enable = "avx512f,avx512bw,avx512vl")]
-    unsafe fn tile_matmul(
-        c: *mut f32,
-        c_stride: usize,
-        a: *const half::bf16,
-        a_stride: usize,
-        b: *const half::bf16,
-        b_stride: usize,
-    ) {
-        use core::arch::x86_64::*;
-
-        let mut c_regs = [_mm512_setzero_ps(); 16];
-        for i in 0..16 {
-            c_regs[i] = _mm512_loadu_ps(c.add(i * c_stride));
-        }
-
-        for k in 0..32 {
-            let mut a_vals = [0f32; 16];
-            for i in 0..16 {
-                a_vals[i] = (*a.add(i * a_stride + k)).to_f32();
-            }
-
-            let b_ptr = b.add(k * b_stride);
-            let mut b_vals = [0f32; 16];
-            for j in 0..16 {
-                b_vals[j] = (*b_ptr.add(j)).to_f32();
-            }
-            let b_vec = _mm512_loadu_ps(b_vals.as_ptr());
-
-            for i in 0..16 {
-                let a_vec = _mm512_set1_ps(a_vals[i]);
-                c_regs[i] = _mm512_fmadd_ps(a_vec, b_vec, c_regs[i]);
-            }
-        }
-
-        for i in 0..16 {
-            _mm512_storeu_ps(c.add(i * c_stride), c_regs[i]);
-        }
-    }
-}
-
 impl TileMatrixMultiply<Bf16, Bf16, F32, Avx512, Avx512, 16, 16, 32> for Avx512 {
     // SAFETY: caller must ensure the target CPU supports `avx512f,avx512bw,avx512vl`
     // (enforced by the `#[target_feature]` gate below plus runtime
@@ -82,13 +35,13 @@ impl TileMatrixMultiply<Bf16, Bf16, F32, Avx512, Avx512, 16, 16, 32> for Avx512 
         for k in 0..32 {
             let mut a_vals = [0f32; 16];
             for i in 0..16 {
-                a_vals[i] = (*a.add(i * a_stride + k)).0.to_f32();
+                a_vals[i] = eunomia::FloatElement::to_f32(*a.add(i * a_stride + k));
             }
 
             let b_ptr = b.add(k * b_stride);
             let mut b_vals = [0f32; 16];
             for j in 0..16 {
-                b_vals[j] = (*b_ptr.add(j)).0.to_f32();
+                b_vals[j] = eunomia::FloatElement::to_f32(*b_ptr.add(j));
             }
             let b_vec = _mm512_loadu_ps(b_vals.as_ptr());
 

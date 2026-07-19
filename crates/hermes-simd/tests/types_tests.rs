@@ -763,7 +763,7 @@ macro_rules! test_numeric_ops_for_arch {
 fn test_vector_ops_scalar() {
     test_f32_ops_for_arch!(Scalar, 4);
     test_f64_ops_for_arch!(Scalar, 2);
-    test_numeric_ops_for_arch!(half::bf16, Scalar, 8);
+    test_numeric_ops_for_arch!(eunomia::Bf16, Scalar, 8);
     test_numeric_ops_for_arch!(i8, Scalar, 16);
     test_numeric_ops_for_arch!(i16, Scalar, 8);
     test_numeric_ops_for_arch!(i32, Scalar, 4);
@@ -775,7 +775,7 @@ fn test_vector_ops_avx2() {
     if std::is_x86_feature_detected!("avx2") {
         test_f32_ops_for_arch!(Avx2, 8);
         test_f64_ops_for_arch!(Avx2, 4);
-        test_numeric_ops_for_arch!(half::bf16, Avx2, 16);
+        test_numeric_ops_for_arch!(eunomia::Bf16, Avx2, 16);
         test_numeric_ops_for_arch!(i8, Avx2, 32);
         test_numeric_ops_for_arch!(i16, Avx2, 16);
         test_numeric_ops_for_arch!(i32, Avx2, 8);
@@ -788,7 +788,7 @@ fn test_vector_ops_avx512() {
     if std::is_x86_feature_detected!("avx512f") {
         test_f32_ops_for_arch!(Avx512, 16);
         test_f64_ops_for_arch!(Avx512, 8);
-        test_numeric_ops_for_arch!(half::bf16, Avx512, 32);
+        test_numeric_ops_for_arch!(eunomia::Bf16, Avx512, 32);
         test_numeric_ops_for_arch!(i8, Avx512, 64);
         test_numeric_ops_for_arch!(i16, Avx512, 32);
         test_numeric_ops_for_arch!(i32, Avx512, 16);
@@ -800,7 +800,7 @@ fn test_vector_ops_avx512() {
 fn test_vector_ops_neon() {
     test_f32_ops_for_arch!(Neon, 4);
     test_f64_ops_for_arch!(Neon, 2);
-    test_numeric_ops_for_arch!(half::bf16, Neon, 8);
+    test_numeric_ops_for_arch!(eunomia::Bf16, Neon, 8);
     test_numeric_ops_for_arch!(i8, Neon, 16);
     test_numeric_ops_for_arch!(i16, Neon, 8);
     test_numeric_ops_for_arch!(i32, Neon, 4);
@@ -1169,7 +1169,7 @@ fn test_adaptive_dispatcher_and_amx_session() {
 
         assert!(!AmxSession::is_active());
 
-        if <half::bf16 as AmxSupport>::has_amx() {
+        if <eunomia::Bf16 as AmxSupport>::has_amx() {
             let _s1 = AmxSession::new(&config).unwrap();
             assert!(AmxSession::is_active());
             {
@@ -1186,7 +1186,7 @@ fn test_adaptive_dispatcher_and_amx_session() {
         }
         assert!(!AmxSession::is_active());
 
-        if <half::bf16 as AmxSupport>::has_amx() {
+        if <eunomia::Bf16 as AmxSupport>::has_amx() {
             let _s = AmxBatchSession::begin(&config).unwrap();
             assert!(AmxSession::is_active());
         } else {
@@ -1745,7 +1745,7 @@ macro_rules! test_select_ops_for_arch {
 fn test_select_ops_scalar() {
     test_select_ops_for_arch!(f32, Scalar, 4);
     test_select_ops_for_arch!(f64, Scalar, 2);
-    test_select_ops_for_arch!(half::bf16, Scalar, 8);
+    test_select_ops_for_arch!(eunomia::Bf16, Scalar, 8);
     test_select_ops_for_arch!(i8, Scalar, 16);
     test_select_ops_for_arch!(i16, Scalar, 8);
     test_select_ops_for_arch!(i32, Scalar, 4);
@@ -1757,7 +1757,7 @@ fn test_select_ops_avx2() {
     if std::is_x86_feature_detected!("avx2") {
         test_select_ops_for_arch!(f32, Avx2, 8);
         test_select_ops_for_arch!(f64, Avx2, 4);
-        test_select_ops_for_arch!(half::bf16, Avx2, 16);
+        test_select_ops_for_arch!(eunomia::Bf16, Avx2, 16);
         test_select_ops_for_arch!(i8, Avx2, 32);
         test_select_ops_for_arch!(i16, Avx2, 16);
         test_select_ops_for_arch!(i32, Avx2, 8);
@@ -1770,7 +1770,7 @@ fn test_select_ops_avx512() {
     if std::is_x86_feature_detected!("avx512f") {
         test_select_ops_for_arch!(f32, Avx512, 16);
         test_select_ops_for_arch!(f64, Avx512, 8);
-        test_select_ops_for_arch!(half::bf16, Avx512, 32);
+        test_select_ops_for_arch!(eunomia::Bf16, Avx512, 32);
         test_select_ops_for_arch!(i8, Avx512, 64);
         test_select_ops_for_arch!(i16, Avx512, 32);
         test_select_ops_for_arch!(i32, Avx512, 16);
@@ -1782,7 +1782,7 @@ fn test_select_ops_avx512() {
 fn test_select_ops_neon() {
     test_select_ops_for_arch!(f32, Neon, 4);
     test_select_ops_for_arch!(f64, Neon, 2);
-    test_select_ops_for_arch!(half::bf16, Neon, 8);
+    test_select_ops_for_arch!(eunomia::Bf16, Neon, 8);
     test_select_ops_for_arch!(i8, Neon, 16);
     test_select_ops_for_arch!(i16, Neon, 8);
     test_select_ops_for_arch!(i32, Neon, 4);

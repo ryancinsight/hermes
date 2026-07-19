@@ -3,6 +3,8 @@
 #[cfg(target_arch = "x86_64")]
 use crate::cpu::{AmxSupport, Avx512Support};
 #[cfg(target_arch = "x86_64")]
+use eunomia::Bf16;
+#[cfg(target_arch = "x86_64")]
 use hermes_simd_core::numa::{current_numa_node, verify_numa_locality};
 
 /// Dynamic hardware and layout configuration dispatcher.
@@ -58,8 +60,8 @@ impl AdaptiveDispatcher {
     ) -> DispatchDecision {
         #[cfg(target_arch = "x86_64")]
         {
-            let has_amx = <half::bf16 as AmxSupport>::has_amx();
-            let has_avx512 = <half::bf16 as Avx512Support>::has_avx512();
+            let has_amx = <Bf16 as AmxSupport>::has_amx();
+            let has_avx512 = <Bf16 as Avx512Support>::has_avx512();
 
             // Session-aware heuristic: if an AMX session is already active,
             // bypass the high context-setup threshold.

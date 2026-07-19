@@ -6,11 +6,17 @@
 
 - [x] Reconcile the preserved peer WIP and verify it compiles against Eunomia
   main before takeover.
-- [ ] Replace raw half types natively across scalar/ISA/tiled kernels and every
-  Hermes call site; delete the `half` dependency from all manifests and lock.
-- [ ] Add or update value-semantic cross-backend tests for the Eunomia types.
-- [ ] Pass format, all-feature warning-denied Clippy, full Nextest, doctests,
-  rustdoc, no-default-feature checks, semver checks, and residue audits.
+- [x] Replace raw half types natively across scalar/ISA/tiled kernels and every
+  Hermes call site; delete every direct `half` dependency from Hermes
+  manifests. The lock retains transitive `half` through Eunomia and Ciborium.
+- [x] Add or update value-semantic cross-backend tests for the Eunomia types.
+- [x] Pass format, all-feature warning-denied Clippy, full Nextest (388/388),
+  doctests, rustdoc, no-default-feature checks, dependency/source residue
+  audits, and current-workspace compilation. Semver classification is
+  externally blocked because the `origin/main` baseline resolves moving
+  Eunomia main 0.5.0 and no longer compiles its historical raw-half calls.
+  AArch64 cross-check is externally blocked by incompatible rustup/MSYS 1.95
+  artifacts in the shared target; remote architecture CI is the merge gate.
 - [ ] Publish and merge Hermes first, then advance Leto to its merged commit.
 
 - [x] [patch] Converge Themis, Mnemosyne, and Eunomia onto their default

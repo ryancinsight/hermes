@@ -63,7 +63,7 @@ fn fma_support_matches_runtime_feature_detector() {
         assert_eq!(has_fma3(), expected);
         assert_eq!(<f32 as FmaSupport>::has_fma(), expected);
         assert_eq!(<f64 as FmaSupport>::has_fma(), expected);
-        assert_eq!(<half::bf16 as FmaSupport>::has_fma(), expected);
+        assert_eq!(<eunomia::Bf16 as FmaSupport>::has_fma(), expected);
     }
 
     #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
@@ -71,7 +71,7 @@ fn fma_support_matches_runtime_feature_detector() {
         assert!(!has_fma3());
         assert!(!<f32 as FmaSupport>::has_fma());
         assert!(!<f64 as FmaSupport>::has_fma());
-        assert!(!<half::bf16 as FmaSupport>::has_fma());
+        assert!(!<eunomia::Bf16 as FmaSupport>::has_fma());
     }
 }
 

@@ -4,6 +4,30 @@ Persistent gap register. Evidence tiers follow the repository instruction
 hierarchy: machine-checked proof > type-level invariant > property/fuzz >
 differential/empirical > source audit.
 
+- Resolved 2026-07-18 — HS-401 Eunomia reduced-precision ownership: Hermes
+  replaces raw `half::f16`/`half::bf16` in scalar, F16C, AVX-512, NEON, AMX,
+  tiled GEMM, tests, and benchmarks with `eunomia::F16`/`Bf16`/`F32`.
+  Duplicate raw-half AMX and tiled-GEMM families are deleted, and all direct
+  `half` manifest dependencies are removed. Source and manifest residue scans
+  are empty; the locked graph contains one Eunomia 0.5.0 identity. Full
+  all-feature warning-denied Clippy, 388 value-semantic Nextest cases,
+  doctests, rustdoc, and no-default-feature compilation pass. Evidence tier:
+  compile-time provider identity plus value-semantic and differential tests.
+  The lock still contains transitive `half` through Eunomia's temporary
+  raw-trait surface and Criterion's Ciborium dependency.
+- Residual 2026-07-18 — HS-401 historical semver baseline: `origin/main`
+  resolves moving Eunomia main 0.5.0, so its historical raw-half implementation
+  no longer compiles at `scalar/tiling.rs:76-77` and
+  `x86_64/avx512_tiling.rs:85,91`. `cargo semver-checks` therefore cannot
+  classify the current public delta against that baseline. This is baseline
+  dependency drift; the current 0.4.0 workspace compiles and passes its gates.
+  Re-open when the semver baseline can pin its historical Eunomia revision.
+- Residual 2026-07-18 — HS-401 AArch64 local cross-check: rustup's 1.95 target
+  libraries are incompatible with proc-macro artifacts already produced by the
+  PATH MSYS Rust 1.95 Rev2 compiler in the mandatory shared target directory.
+  No private target or destructive clean was used. Re-open on remote AArch64 CI
+  or after the shared artifact producer converges on one compiler build.
+
 - Resolved 2026-07-15 — provider default-branch convergence: Hermes removes
   revision pins and workspace-local patches for Mnemosyne, Eunomia, and Themis.
   `cargo tree --locked -d -p hermes-simd` reports one identity for each; the

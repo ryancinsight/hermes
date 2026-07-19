@@ -30,7 +30,7 @@ fn approx_eq_f32(x: f32, y: f32) -> bool {
     norm > 0.0 && (abs_diff / norm) < 1e-2
 }
 
-fn approx_eq_f16(x: half::f16, y: half::f16) -> bool {
+fn approx_eq_f16(x: eunomia::F16, y: eunomia::F16) -> bool {
     let x_f32 = x.to_f32();
     let y_f32 = y.to_f32();
     if x_f32.is_nan() && y_f32.is_nan() {
@@ -139,9 +139,9 @@ proptest! {
 
     #[test]
     fn prop_sum_f16(ref_data in prop::collection::vec(-10.0f32..10.0f32, 0..100)) {
-        let f16_data: Vec<half::f16> = ref_data.iter().map(|&x| half::f16::from_f32(x)).collect();
-        let actual = sum::<half::f16>(&f16_data);
-        let expected = f16_data.iter().copied().fold(half::f16::ZERO, |acc, x| acc + x);
+        let f16_data: Vec<eunomia::F16> = ref_data.iter().map(|&x| eunomia::F16::from_f32(x)).collect();
+        let actual = sum::<eunomia::F16>(&f16_data);
+        let expected = f16_data.iter().copied().fold(eunomia::F16::ZERO, |acc, x| acc + x);
         prop_assert!(approx_eq_f16(actual, expected), "f16 sum mismatch: actual = {:?}, expected = {:?}", actual, expected);
     }
 
@@ -153,10 +153,10 @@ proptest! {
                 (Just(v), prop::collection::vec(-5.0f32..5.0f32, len))
             })
     ) {
-        let f16_a: Vec<half::f16> = a.iter().map(|&x| half::f16::from_f32(x)).collect();
-        let f16_b: Vec<half::f16> = b.iter().map(|&x| half::f16::from_f32(x)).collect();
-        let actual = dot::<half::f16>(&f16_a, &f16_b).unwrap();
-        let expected = f16_a.iter().zip(f16_b.iter()).map(|(&x, &y)| x * y).fold(half::f16::ZERO, |acc, x| acc + x);
+        let f16_a: Vec<eunomia::F16> = a.iter().map(|&x| eunomia::F16::from_f32(x)).collect();
+        let f16_b: Vec<eunomia::F16> = b.iter().map(|&x| eunomia::F16::from_f32(x)).collect();
+        let actual = dot::<eunomia::F16>(&f16_a, &f16_b).unwrap();
+        let expected = f16_a.iter().zip(f16_b.iter()).map(|(&x, &y)| x * y).fold(eunomia::F16::ZERO, |acc, x| acc + x);
         prop_assert!(approx_eq_f16(actual, expected), "f16 dot mismatch: actual = {:?}, expected = {:?}", actual, expected);
     }
 
@@ -168,11 +168,11 @@ proptest! {
                 (Just(v), prop::collection::vec(-10.0f32..10.0f32, len))
             })
     ) {
-        let f16_a: Vec<half::f16> = a.iter().map(|&x| half::f16::from_f32(x)).collect();
-        let f16_b: Vec<half::f16> = b.iter().map(|&x| half::f16::from_f32(x)).collect();
-        let mut actual = vec![half::f16::ZERO; f16_a.len()];
-        let mut expected = vec![half::f16::ZERO; f16_a.len()];
-        elementwise_mul::<half::f16>(&f16_a, &f16_b, &mut actual).unwrap();
+        let f16_a: Vec<eunomia::F16> = a.iter().map(|&x| eunomia::F16::from_f32(x)).collect();
+        let f16_b: Vec<eunomia::F16> = b.iter().map(|&x| eunomia::F16::from_f32(x)).collect();
+        let mut actual = vec![eunomia::F16::ZERO; f16_a.len()];
+        let mut expected = vec![eunomia::F16::ZERO; f16_a.len()];
+        elementwise_mul::<eunomia::F16>(&f16_a, &f16_b, &mut actual).unwrap();
         for i in 0..f16_a.len() {
             expected[i] = f16_a[i] * f16_b[i];
         }

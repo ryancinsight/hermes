@@ -4,21 +4,27 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-18
+
 ### Changed
-- [patch] Advance the Eunomia pin to 0.4.0, adopting the native `u16`-backed
-  `F16`/`Bf16` (E-025), the const-generic conversion kernel, and the byte-layout
-  vocabulary. The bump crosses Eunomia's E-021/E-025 breaking changes without
-  hermes breakage: the SIMD kernels use raw `half::f16`/`bf16` (retained upstream)
-  and the `eunomia::F16`/`Bf16` re-exports flow through the trait surface, so the
-  only forced edit is one output-buffer initializer migrated to `Bf16::ZERO`.
-  Drop the now-redundant `half` dependency from `hermes-simd-core` and
-  `hermes-simd-types` (neither references it).
+- [arch] Advance Eunomia to 0.5.0 and replace raw `half::f16`/`half::bf16`
+  throughout scalar, F16C, AVX-512, NEON, AMX, tiled GEMM, tests, and benchmarks
+  with `eunomia::F16`/`Bf16`/`F32`. Remove every direct Hermes `half`
+  dependency and delete the duplicate raw-half AMX and tiled-GEMM families.
 - Resolve Themis, Mnemosyne, and Eunomia from their default branches and remove
   workspace-local patch overrides so downstream Atlas consumers share provider
   identities. The supply-chain allowlist now names those reviewed Git sources,
   and CI no longer checks out redundant sibling repositories.
 
+### Migration
+- Replace raw `half::f16`/`half::bf16` kernel and tiled-GEMM operands with
+  `eunomia::F16`/`eunomia::Bf16`; use `eunomia::F32` for the typed Bf16
+  accumulation surface.
+
 ### Breaking
+- `hermes-simd-intrinsics`/`hermes-simd` [arch]: remove SIMD and tiled-GEMM
+  implementations specialized for raw `half` types. Reduced-precision callers
+  now use the Eunomia numeric vocabulary.
 - `hermes-simd-core`/`hermes-simd-intrinsics` [minor]: `SimdArch` now requires
   `is_runtime_supported()`, the SSOT runtime probe used by safe vector/mask
   wrappers and forced target dispatch. `AmxSession::new` and
