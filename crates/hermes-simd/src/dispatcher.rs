@@ -1,6 +1,5 @@
 //! Dynamic runtime dispatch choosing the optimal execution backend.
 
-#[cfg(target_arch = "x86_64")]
 use crate::cpu::{AmxSupport, Avx512Support};
 #[cfg(target_arch = "x86_64")]
 use hermes_simd_core::numa::{current_numa_node, verify_numa_locality};
