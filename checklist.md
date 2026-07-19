@@ -1,6 +1,23 @@
 # Checklist — active sprint
 
-**Target version: 0.2.0** · Strategy: [backlog.md](backlog.md) · Gap register: [gap_audit.md](gap_audit.md) · Phase: Closure (release)
+**Target version: 0.4.0** · Strategy: [backlog.md](backlog.md) · Gap register: [gap_audit.md](gap_audit.md) · Phase: Execution
+
+## HS-401 [arch] — Eunomia reduced-precision cutover (Owner: Codex)
+
+- [x] Reconcile the preserved peer WIP and verify it compiles against Eunomia
+  main before takeover.
+- [x] Replace raw half types natively across scalar/ISA/tiled kernels and every
+  Hermes call site; delete every direct `half` dependency from Hermes
+  manifests. The lock retains transitive `half` through Eunomia and Ciborium.
+- [x] Add or update value-semantic cross-backend tests for the Eunomia types.
+- [x] Pass format, all-feature warning-denied Clippy, full Nextest (388/388),
+  doctests, rustdoc, no-default-feature checks, dependency/source residue
+  audits, and current-workspace compilation. Semver classification is
+  externally blocked because the `origin/main` baseline resolves moving
+  Eunomia main 0.5.0 and no longer compiles its historical raw-half calls.
+  PR #8's AArch64 cross-compile and runtime NEON lanes pass, as does Miri; the
+  x86 lane rerun is the remaining merge gate.
+- [ ] Publish and merge Hermes first, then advance Leto to its merged commit.
 
 - [x] [patch] Converge Themis, Mnemosyne, and Eunomia onto their default
   branches and remove workspace-local patch overrides. Acceptance: the locked

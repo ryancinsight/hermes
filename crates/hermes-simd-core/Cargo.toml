@@ -13,14 +13,13 @@ publish = false
 
 [dependencies]
 eunomia = { workspace = true, features = ["rkyv"] }
-half = { workspace = true }
 bytemuck = { version = "1.14", features = ["derive"] }
 rkyv = { version = "0.7" }
 mnemosyne = { workspace = true, optional = true }
 themis = { workspace = true }
 
 [dev-dependencies]
-hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.3.0" }
+hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.4.0" }
 
 [features]
 default = ["std", "mnemosyne-memory"]

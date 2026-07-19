@@ -137,7 +137,8 @@ macro_rules! test_masked_ops_for_type {
         // --- 3. Test gather / gather_masked ---
         {
             let conv = $conv;
-            let base_data: Vec<$t> = (0..100).map(|x| conv(x)).collect();
+            // The largest gathered index is `3 * (lanes - 1)`.
+            let base_data: Vec<$t> = (0..($lanes * 3)).map(|x| conv(x)).collect();
             let mut idx_arr = [0i32; $lanes];
             for i in 0..$lanes {
                 idx_arr[i] = (i * 3) as i32;
@@ -209,8 +210,12 @@ macro_rules! test_masked_ops_for_type {
 fn test_masked_ops_scalar() {
     test_masked_ops_for_type!(f32, Scalar, 4, |x| x as f32);
     test_masked_ops_for_type!(f64, Scalar, 2, |x| x as f64);
-    test_masked_ops_for_type!(half::f16, Scalar, 8, |x| half::f16::from_f32(x as f32));
-    test_masked_ops_for_type!(half::bf16, Scalar, 8, |x| half::bf16::from_f32(x as f32));
+    test_masked_ops_for_type!(eunomia::F16, Scalar, 8, |x| eunomia::F16::from_f32(
+        x as f32
+    ));
+    test_masked_ops_for_type!(eunomia::Bf16, Scalar, 8, |x| eunomia::Bf16::from_f32(
+        x as f32
+    ));
     test_masked_ops_for_type!(i8, Scalar, 16, |x| x as i8);
     test_masked_ops_for_type!(i16, Scalar, 8, |x| x as i16);
     test_masked_ops_for_type!(i32, Scalar, 4, |x| x as i32);
@@ -222,8 +227,10 @@ fn test_masked_ops_avx2() {
     if std::is_x86_feature_detected!("avx2") {
         test_masked_ops_for_type!(f32, Avx2, 8, |x| x as f32);
         test_masked_ops_for_type!(f64, Avx2, 4, |x| x as f64);
-        test_masked_ops_for_type!(half::f16, Avx2, 16, |x| half::f16::from_f32(x as f32));
-        test_masked_ops_for_type!(half::bf16, Avx2, 16, |x| half::bf16::from_f32(x as f32));
+        test_masked_ops_for_type!(eunomia::F16, Avx2, 16, |x| eunomia::F16::from_f32(x as f32));
+        test_masked_ops_for_type!(eunomia::Bf16, Avx2, 16, |x| eunomia::Bf16::from_f32(
+            x as f32
+        ));
         test_masked_ops_for_type!(i8, Avx2, 32, |x| x as i8);
         test_masked_ops_for_type!(i16, Avx2, 16, |x| x as i16);
         test_masked_ops_for_type!(i32, Avx2, 8, |x| x as i32);
@@ -236,8 +243,12 @@ fn test_masked_ops_avx512() {
     if std::is_x86_feature_detected!("avx512f") {
         test_masked_ops_for_type!(f32, Avx512, 16, |x| x as f32);
         test_masked_ops_for_type!(f64, Avx512, 8, |x| x as f64);
-        test_masked_ops_for_type!(half::f16, Avx512, 32, |x| half::f16::from_f32(x as f32));
-        test_masked_ops_for_type!(half::bf16, Avx512, 32, |x| half::bf16::from_f32(x as f32));
+        test_masked_ops_for_type!(eunomia::F16, Avx512, 32, |x| eunomia::F16::from_f32(
+            x as f32
+        ));
+        test_masked_ops_for_type!(eunomia::Bf16, Avx512, 32, |x| eunomia::Bf16::from_f32(
+            x as f32
+        ));
         test_masked_ops_for_type!(i8, Avx512, 64, |x| x as i8);
         test_masked_ops_for_type!(i16, Avx512, 32, |x| x as i16);
         test_masked_ops_for_type!(i32, Avx512, 16, |x| x as i32);
@@ -249,8 +260,10 @@ fn test_masked_ops_avx512() {
 fn test_masked_ops_neon() {
     test_masked_ops_for_type!(f32, Neon, 4, |x| x as f32);
     test_masked_ops_for_type!(f64, Neon, 2, |x| x as f64);
-    test_masked_ops_for_type!(half::f16, Neon, 8, |x| half::f16::from_f32(x as f32));
-    test_masked_ops_for_type!(half::bf16, Neon, 8, |x| half::bf16::from_f32(x as f32));
+    test_masked_ops_for_type!(eunomia::F16, Neon, 8, |x| eunomia::F16::from_f32(x as f32));
+    test_masked_ops_for_type!(eunomia::Bf16, Neon, 8, |x| eunomia::Bf16::from_f32(
+        x as f32
+    ));
     test_masked_ops_for_type!(i8, Neon, 16, |x| x as i8);
     test_masked_ops_for_type!(i16, Neon, 8, |x| x as i16);
     test_masked_ops_for_type!(i32, Neon, 4, |x| x as i32);

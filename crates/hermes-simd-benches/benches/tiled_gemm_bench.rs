@@ -1,7 +1,7 @@
 //! Register-blocking / tiling benchmark: tiled GEMM, batch sensitivity, and context switch pressure.
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use half::bf16;
+use eunomia::{Bf16, F32};
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use hermes_simd::AmxSupport;
 use hermes_simd::{gemm, tiled_gemm, Scalar, TileMatrixMultiply};
@@ -41,9 +41,9 @@ fn bench_bf16_gemm_batch_sensitivity(c: &mut Criterion) {
 
     // Test a range of matrix sizes to show the crossover threshold where AMX becomes highly profitable
     for &size in &[8usize, 16, 32, 64, 128] {
-        let a = vec![bf16::from_f32(1.0); size * size];
-        let b = vec![bf16::from_f32(2.0); size * size];
-        let mut out = vec![0.0f32; size * size];
+        let a = vec![Bf16::from_f32(1.0); size * size];
+        let b = vec![Bf16::from_f32(2.0); size * size];
+        let mut out = vec![F32(0.0); size * size];
 
         group.throughput(Throughput::Elements((size * size * size) as u64));
 
@@ -60,9 +60,9 @@ fn bench_bf16_gemm_batch_sensitivity(c: &mut Criterion) {
                             let mut kk = 0;
                             while kk + 32 <= size {
                                 <Scalar as TileMatrixMultiply<
-                                    bf16,
-                                    bf16,
-                                    f32,
+                                    Bf16,
+                                    Bf16,
+                                    F32,
                                     Scalar,
                                     Scalar,
                                     16,
@@ -92,13 +92,13 @@ fn bench_bf16_gemm_batch_sensitivity(c: &mut Criterion) {
                                 for kk in 0..size {
                                     sum += a[r * size + kk].to_f32() * b[kk * size + col].to_f32();
                                 }
-                                out[r * size + col] += sum;
+                                out[r * size + col].0 += sum;
                             } else if k_bound < size {
                                 let mut sum = 0.0f32;
                                 for kk in k_bound..size {
                                     sum += a[r * size + kk].to_f32() * b[kk * size + col].to_f32();
                                 }
-                                out[r * size + col] += sum;
+                                out[r * size + col].0 += sum;
                             }
                         }
                     }
@@ -109,7 +109,7 @@ fn bench_bf16_gemm_batch_sensitivity(c: &mut Criterion) {
         // Dynamic dispatch: AVX-512 or AMX depending on CPU and batch size heuristics
         group.bench_with_input(BenchmarkId::new("dispatch", size), &size, |bencher, _| {
             bencher.iter(|| unsafe {
-                gemm::<bf16, bf16, f32>(size, size, size, &a, size, &b, size, &mut out, size)
+                gemm::<Bf16, Bf16, F32>(size, size, size, &a, size, &b, size, &mut out, size)
                     .unwrap();
             })
         });
@@ -224,9 +224,9 @@ fn bench_amx_context_switch_pressure(c: &mut Criterion) {
     // measures something useful cross-platform instead of skipping outright.
     let mut group = c.benchmark_group("AMX Context Switch Pressure");
     let size = 64usize;
-    let a = vec![bf16::from_f32(1.0); size * size];
-    let b = vec![bf16::from_f32(2.0); size * size];
-    let mut out = vec![0.0f32; size * size];
+    let a = vec![Bf16::from_f32(1.0); size * size];
+    let b = vec![Bf16::from_f32(2.0); size * size];
+    let mut out = vec![F32(0.0); size * size];
 
     group.throughput(Throughput::Elements((size * size * size) as u64));
 
@@ -235,30 +235,30 @@ fn bench_amx_context_switch_pressure(c: &mut Criterion) {
         bencher.iter(|| unsafe {
             #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             {
-                if <bf16 as AmxSupport>::has_amx() {
+                if <Bf16 as AmxSupport>::has_amx() {
                     let config = hermes_simd::AmxConfig::new_uniform(16, 64);
                     let _session = hermes_simd::AmxSession::new(&config)
                         .expect("invariant: AMX benchmark row is gated by AmxSupport");
-                    gemm::<bf16, bf16, f32>(size, size, size, &a, size, &b, size, &mut out, size)
+                    gemm::<Bf16, Bf16, F32>(size, size, size, &a, size, &b, size, &mut out, size)
                         .unwrap();
                     return;
                 }
             }
-            gemm::<bf16, bf16, f32>(size, size, size, &a, size, &b, size, &mut out, size).unwrap();
+            gemm::<Bf16, Bf16, F32>(size, size, size, &a, size, &b, size, &mut out, size).unwrap();
         })
     });
 
     // Scenario 2: Configuring/releasing tile state on every iteration (no reuse / raw call)
     group.bench_function("raw_call_config_release", |bencher| {
         bencher.iter(|| unsafe {
-            gemm::<bf16, bf16, f32>(size, size, size, &a, size, &b, size, &mut out, size).unwrap();
+            gemm::<Bf16, Bf16, F32>(size, size, size, &a, size, &b, size, &mut out, size).unwrap();
         })
     });
 
     // Scenario 3: yielding thread to simulate heavy OS context switch pressure
     group.bench_function("with_thread_yield", |bencher| {
         bencher.iter(|| unsafe {
-            gemm::<bf16, bf16, f32>(size, size, size, &a, size, &b, size, &mut out, size).unwrap();
+            gemm::<Bf16, Bf16, F32>(size, size, size, &a, size, &b, size, &mut out, size).unwrap();
             std::thread::yield_now();
         })
     });

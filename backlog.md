@@ -15,6 +15,17 @@ External gap findings live in [gap_audit.md](gap_audit.md).
 
 ## Open
 
+- [ ] [arch] **HS-401 — review; owner: Codex; takeover of
+  `feat/eunomia-f16-migration`.** Replace raw `half::f16`/`half::bf16` across
+  Hermes' scalar, ISA, tiled-matrix, tests, and benchmark contracts with
+  Eunomia's native `F16`/`Bf16`; remove every direct Hermes `half` dependency.
+  Scope: workspace/member manifests, reduced-precision source/tests/benches,
+  lockfile resolution, and PM artifacts. Acceptance: zero raw-half source or
+  direct-dependency residue, one Eunomia identity, warning-denied all-feature
+  Clippy, full Nextest, doctests, rustdoc, no-default-feature checks, and an
+  explicit semver classification. Implementation and local gates are complete;
+  remote CI and merge remain. `half` remains transitive through Eunomia's
+  temporary raw-trait surface and Criterion's Ciborium dependency.
 - [minor] Re-enable AMX auto-dispatch only after adding a stable,
   permission-aware probe that verifies hardware feature bits, XCR0 OS state,
   and Linux XTILEDATA process permission before reporting support. Acceptance:

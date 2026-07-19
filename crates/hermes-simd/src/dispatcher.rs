@@ -1,6 +1,5 @@
 //! Dynamic runtime dispatch choosing the optimal execution backend.
 
-#[cfg(target_arch = "x86_64")]
 use crate::cpu::{AmxSupport, Avx512Support};
 #[cfg(target_arch = "x86_64")]
 use hermes_simd_core::numa::{current_numa_node, verify_numa_locality};
@@ -47,7 +46,7 @@ impl AdaptiveDispatcher {
     /// - `is_multi_numa()` is cached via `OnceLock` (process-stable).
     /// - `current_numa_node()` (Themis locality query) is called only on
     ///   multi-NUMA + AMX-eligible paths.
-    pub fn select_backend<T>(
+    pub fn select_backend<T: AmxSupport + Avx512Support>(
         m: usize,
         n: usize,
         k: usize,
@@ -58,8 +57,8 @@ impl AdaptiveDispatcher {
     ) -> DispatchDecision {
         #[cfg(target_arch = "x86_64")]
         {
-            let has_amx = <half::bf16 as AmxSupport>::has_amx();
-            let has_avx512 = <half::bf16 as Avx512Support>::has_avx512();
+            let has_amx = <T as AmxSupport>::has_amx();
+            let has_avx512 = <T as Avx512Support>::has_avx512();
 
             // Session-aware heuristic: if an AMX session is already active,
             // bypass the high context-setup threshold.

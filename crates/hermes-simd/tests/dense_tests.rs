@@ -266,32 +266,32 @@ fn test_generic_masked_ops_f64() {
 
 #[test]
 fn test_f16_basic_ops() {
-    use half::f16;
-    let data = vec![f16::from_f32(1.0); 16];
+    use eunomia::F16;
+    let data = vec![F16::from_f32(1.0); 16];
     let s = sum(&data);
-    assert_eq!(s, f16::from_f32(16.0));
+    assert_eq!(s, F16::from_f32(16.0));
 
-    let a = vec![f16::from_f32(1.0), f16::from_f32(2.0), f16::from_f32(3.0)];
-    let b = vec![f16::from_f32(4.0), f16::from_f32(5.0), f16::from_f32(6.0)];
+    let a = vec![F16::from_f32(1.0), F16::from_f32(2.0), F16::from_f32(3.0)];
+    let b = vec![F16::from_f32(4.0), F16::from_f32(5.0), F16::from_f32(6.0)];
     let d = dot(&a, &b).unwrap();
-    assert_eq!(d, f16::from_f32(32.0));
+    assert_eq!(d, F16::from_f32(32.0));
 
-    let mut mul_out = vec![f16::ZERO; 3];
+    let mut mul_out = vec![F16::ZERO; 3];
     elementwise_mul(&a, &b, &mut mul_out).unwrap();
     assert_eq!(
         mul_out,
-        vec![f16::from_f32(4.0), f16::from_f32(10.0), f16::from_f32(18.0)]
+        vec![F16::from_f32(4.0), F16::from_f32(10.0), F16::from_f32(18.0)]
     );
 
     let mask = [true, false, true];
-    assert_eq!(masked_sum(&a, &mask), f16::from_f32(4.0));
-    assert_eq!(masked_dot(&a, &b, &mask).unwrap(), f16::from_f32(22.0));
+    assert_eq!(masked_sum(&a, &mask), F16::from_f32(4.0));
+    assert_eq!(masked_dot(&a, &b, &mask).unwrap(), F16::from_f32(22.0));
 
-    let mut add_out = vec![f16::ZERO; 3];
+    let mut add_out = vec![F16::ZERO; 3];
     masked_add(&a, &b, &mask, &mut add_out).unwrap();
     assert_eq!(
         add_out,
-        vec![f16::from_f32(5.0), f16::from_f32(2.0), f16::from_f32(9.0)]
+        vec![F16::from_f32(5.0), F16::from_f32(2.0), F16::from_f32(9.0)]
     );
 }
 
@@ -305,9 +305,8 @@ fn test_dispatch_view_selection() {
     let view_mut = dispatch_view_mut::<f32, Unaligned>(&mut data_mut);
     assert!(view_mut.is_some());
 
-    use half::f16;
-    let data_f16 = vec![f16::from_f32(1.0); 8];
-    let view_f16 = dispatch_view::<f16, Unaligned>(&data_f16);
+    let data_f16 = vec![eunomia::F16::from_f32(1.0); 8];
+    let view_f16 = dispatch_view::<eunomia::F16, Unaligned>(&data_f16);
     assert!(view_f16.is_some());
 }
 
@@ -530,15 +529,15 @@ fn test_monomorphized_vector_ops() {
 
 #[test]
 fn test_new_emulated_types() {
-    // 1. half::bf16
+    // 1. Eunomia bfloat16
     {
-        use half::bf16;
-        let data = vec![bf16::from_f32(1.5); 16];
-        assert_eq!(sum(&data), bf16::from_f32(24.0));
+        use eunomia::Bf16;
+        let data = vec![Bf16::from_f32(1.5); 16];
+        assert_eq!(sum(&data), Bf16::from_f32(24.0));
 
-        let a = vec![bf16::from_f32(1.0), bf16::from_f32(2.0)];
-        let b = vec![bf16::from_f32(3.0), bf16::from_f32(4.0)];
-        assert_eq!(dot(&a, &b).unwrap(), bf16::from_f32(11.0));
+        let a = vec![Bf16::from_f32(1.0), Bf16::from_f32(2.0)];
+        let b = vec![Bf16::from_f32(3.0), Bf16::from_f32(4.0)];
+        assert_eq!(dot(&a, &b).unwrap(), Bf16::from_f32(11.0));
     }
 
     // 2. i8

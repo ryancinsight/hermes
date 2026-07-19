@@ -276,12 +276,12 @@ mod reduced_precision_lanes {
 
     #[test]
     fn interleaved_complex_half_lane_runtime_matches_scalar_backend() {
-        check_lane_type!(half::f16, half::f16::from_f32, 2.0f32.powi(-10));
+        check_lane_type!(eunomia::F16, eunomia::F16::from_f32, 2.0f32.powi(-10));
     }
 
     #[test]
     fn interleaved_complex_brain_lane_runtime_matches_scalar_backend() {
-        check_lane_type!(half::bf16, half::bf16::from_f32, 2.0f32.powi(-7));
+        check_lane_type!(eunomia::Bf16, eunomia::Bf16::from_f32, 2.0f32.powi(-7));
     }
 }
 

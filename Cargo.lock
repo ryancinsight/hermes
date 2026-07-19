@@ -344,13 +344,12 @@ dependencies = [
 
 [[package]]
 name = "eunomia"
-version = "0.1.0"
-source = "git+https://github.com/ryancinsight/eunomia#dd94f7b9d223668887302531006628818e2bd45b"
+version = "0.5.0"
+source = "git+https://github.com/ryancinsight/eunomia#7c62a9bac5ca4900a0e16ea069002c252b98d14c"
 dependencies = [
  "bytemuck",
  "half",
  "libm",
- "num-traits",
  "rkyv",
 ]
 
@@ -464,11 +463,10 @@ dependencies = [
 
 [[package]]
 name = "hermes-simd"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "criterion",
  "eunomia",
- "half",
  "hermes-simd-core",
  "hermes-simd-intrinsics",
  "hermes-simd-macros",
@@ -480,11 +478,11 @@ dependencies = [
 
 [[package]]
 name = "hermes-simd-benches"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "chrono",
  "criterion",
- "half",
+ "eunomia",
  "hermes-simd",
  "hermes-simd-core",
  "serde",
@@ -493,11 +491,10 @@ dependencies = [
 
 [[package]]
 name = "hermes-simd-core"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "bytemuck",
  "eunomia",
- "half",
  "hermes-simd-intrinsics",
  "mnemosyne",
  "rkyv",
@@ -506,23 +503,22 @@ dependencies = [
 
 [[package]]
 name = "hermes-simd-examples"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "hermes-simd",
 ]
 
 [[package]]
 name = "hermes-simd-intrinsics"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "eunomia",
- "half",
  "hermes-simd-core",
 ]
 
 [[package]]
 name = "hermes-simd-macros"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -531,9 +527,8 @@ dependencies = [
 
 [[package]]
 name = "hermes-simd-types"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
- "half",
  "hermes-simd-core",
  "hermes-simd-intrinsics",
 ]

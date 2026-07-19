@@ -96,17 +96,17 @@ fn test_tiled_gemm() {
 
 #[test]
 fn test_tile_matrix_multiply_bf16() {
-    use half::bf16;
-    let mut c = vec![0.0f32; 16 * 16];
-    let a = vec![bf16::from_f32(1.0); 16 * 32];
-    let b = vec![bf16::from_f32(2.0); 32 * 16];
+    use eunomia::{Bf16, F32};
+    let mut c = vec![F32(0.0); 16 * 16];
+    let a = vec![Bf16::from_f32(1.0); 16 * 32];
+    let b = vec![Bf16::from_f32(2.0); 32 * 16];
 
     unsafe {
-        dispatch_tile_matmul::<bf16, bf16, f32>(c.as_mut_ptr(), 16, a.as_ptr(), 32, b.as_ptr(), 16);
+        dispatch_tile_matmul::<Bf16, Bf16, F32>(c.as_mut_ptr(), 16, a.as_ptr(), 32, b.as_ptr(), 16);
     }
 
     for val in c {
-        assert_eq!(val, 64.0);
+        assert_eq!(val, F32(64.0));
     }
 }
 
@@ -127,20 +127,20 @@ fn test_tile_matrix_multiply_int8() {
 
 #[test]
 fn test_gemm_bf16_high_level() {
-    use half::bf16;
+    use eunomia::{Bf16, F32};
     let m = 35;
     let n = 20;
     let k = 36;
-    let a = vec![bf16::from_f32(1.5); m * k];
-    let b = vec![bf16::from_f32(2.0); k * n];
-    let mut c = vec![0.0f32; m * n];
+    let a = vec![Bf16::from_f32(1.5); m * k];
+    let b = vec![Bf16::from_f32(2.0); k * n];
+    let mut c = vec![F32(0.0); m * n];
 
     unsafe {
-        gemm::<bf16, bf16, f32>(m, n, k, &a, k, &b, n, &mut c, n).unwrap();
+        gemm::<Bf16, Bf16, F32>(m, n, k, &a, k, &b, n, &mut c, n).unwrap();
     }
 
     for val in c {
-        assert_eq!(val, 108.0);
+        assert_eq!(val, F32(108.0));
     }
 }
 
@@ -242,16 +242,16 @@ fn test_gemm_int8_signed_differential() {
 
 #[test]
 fn test_gemm_bf16_size_16() {
-    use half::bf16;
+    use eunomia::{Bf16, F32};
     let m = 16;
     let n = 16;
     let k = 16;
-    let a = vec![bf16::from_f32(1.5); m * k];
-    let b = vec![bf16::from_f32(2.0); k * n];
-    let mut c = vec![0.0f32; m * n];
+    let a = vec![Bf16::from_f32(1.5); m * k];
+    let b = vec![Bf16::from_f32(2.0); k * n];
+    let mut c = vec![F32(0.0); m * n];
 
     unsafe {
-        gemm::<bf16, bf16, f32>(m, n, k, &a, k, &b, n, &mut c, n).unwrap();
+        gemm::<Bf16, Bf16, F32>(m, n, k, &a, k, &b, n, &mut c, n).unwrap();
     }
 }
 
