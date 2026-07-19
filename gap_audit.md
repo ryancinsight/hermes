@@ -23,7 +23,9 @@ differential/empirical > source audit.
   also used a fixed 100-element fixture although its maximum index is
   `3 * (lanes - 1)`; fixture length is now derived as `3 * lanes`. Evidence
   tier: remote ISA failure reproduction plus type-bound dispatch and an
-  analytical index bound. PR CI rerun is the closure gate.
+  analytical index bound. PR #8's final x86, AArch64 cross-compile, native
+  AArch64 NEON, Miri, cargo-deny, and CodeRabbit gates pass at `f9e8ff5`;
+  merge commit `8970ffc` closes the item.
 - Residual 2026-07-18 — HS-401 historical semver baseline: `origin/main`
   resolves moving Eunomia main 0.5.0, so its historical raw-half implementation
   no longer compiles at `scalar/tiling.rs:76-77` and
