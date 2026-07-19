@@ -17,7 +17,9 @@
   Eunomia main 0.5.0 and no longer compiles its historical raw-half calls.
   PR #8's AArch64 cross-compile and runtime NEON lanes pass, as does Miri; the
   x86 lane rerun is the remaining merge gate.
-- [ ] Publish and merge Hermes first, then advance Leto to its merged commit.
+- [x] Publish and merge Hermes PR #8 at `8970ffc`, preserving the peer-owned
+  kernel work and closing both CI-discovered host-sensitive regressions.
+- [ ] Advance Leto to the merged Hermes/Eunomia provider state.
 
 - [x] [patch] Converge Themis, Mnemosyne, and Eunomia onto their default
   branches and remove workspace-local patch overrides. Acceptance: the locked
