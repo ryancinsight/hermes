@@ -8,7 +8,8 @@
 - [x] Pass format, all-target/all-feature warning-denied Clippy, Nextest
       (388/388), doctests (18/18 runnable), rustdoc, and dependency-identity
       checks.
-- [ ] Publish, merge, and advance the Atlas Hermes gitlink.
+- [x] Publish and merge Hermes PR #10 at `53a8e03`; hand the parent gitlink
+      refresh to Atlas item ATLAS-INTEGRATION-027.
 
 ## HS-401 [arch] — Eunomia reduced-precision cutover (Owner: Codex)
 
