@@ -2,6 +2,14 @@
 
 **Target version: 0.4.0** · Strategy: [backlog.md](backlog.md) · Gap register: [gap_audit.md](gap_audit.md) · Phase: Execution
 
+## HS-402 [patch] — Eunomia 0.6 lock convergence (Owner: Codex)
+
+- [x] Regenerate the provider lock through Cargo against merged Eunomia 0.6.
+- [x] Pass format, all-target/all-feature warning-denied Clippy, Nextest
+      (388/388), doctests (18/18 runnable), rustdoc, and dependency-identity
+      checks.
+- [ ] Publish, merge, and advance the Atlas Hermes gitlink.
+
 ## HS-401 [arch] — Eunomia reduced-precision cutover (Owner: Codex)
 
 - [x] Reconcile the preserved peer WIP and verify it compiles against Eunomia

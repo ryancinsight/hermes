@@ -4,6 +4,13 @@ Persistent gap register. Evidence tiers follow the repository instruction
 hierarchy: machine-checked proof > type-level invariant > property/fuzz >
 differential/empirical > source audit.
 
+- Resolved 2026-07-19 — HS-402 provider compatibility: Hermes' native
+  `eunomia::F16`/`Bf16` source compiles against Eunomia 0.6 without restoring
+  the retired foreign raw-half trait implementations. Cargo resolves the
+  workspace to one Eunomia 0.6 identity at `df77dfd`; warning-denied Clippy,
+  388 value-semantic Nextest cases, 18 runnable doctests, and warning-denied
+  rustdoc pass.
+
 - Resolved 2026-07-18 — HS-401 Eunomia reduced-precision ownership: Hermes
   replaces raw `half::f16`/`half::bf16` in scalar, F16C, AVX-512, NEON, AMX,
   tiled GEMM, tests, and benchmarks with `eunomia::F16`/`Bf16`/`F32`.
