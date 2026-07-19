@@ -5,6 +5,14 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 ## [Unreleased]
 
 ### Changed
+- [patch] Advance the Eunomia pin to 0.4.0, adopting the native `u16`-backed
+  `F16`/`Bf16` (E-025), the const-generic conversion kernel, and the byte-layout
+  vocabulary. The bump crosses Eunomia's E-021/E-025 breaking changes without
+  hermes breakage: the SIMD kernels use raw `half::f16`/`bf16` (retained upstream)
+  and the `eunomia::F16`/`Bf16` re-exports flow through the trait surface, so the
+  only forced edit is one output-buffer initializer migrated to `Bf16::ZERO`.
+  Drop the now-redundant `half` dependency from `hermes-simd-core` and
+  `hermes-simd-types` (neither references it).
 - Resolve Themis, Mnemosyne, and Eunomia from their default branches and remove
   workspace-local patch overrides so downstream Atlas consumers share provider
   identities. The supply-chain allowlist now names those reviewed Git sources,

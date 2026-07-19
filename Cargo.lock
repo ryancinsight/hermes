@@ -344,13 +344,12 @@ dependencies = [
 
 [[package]]
 name = "eunomia"
-version = "0.1.0"
-source = "git+https://github.com/ryancinsight/eunomia#dd94f7b9d223668887302531006628818e2bd45b"
+version = "0.4.0"
+source = "git+https://github.com/ryancinsight/eunomia#1b610d4bf482a7e4cf553645137d6d79fa802abc"
 dependencies = [
  "bytemuck",
  "half",
  "libm",
- "num-traits",
  "rkyv",
 ]
 
@@ -497,7 +496,6 @@ version = "0.3.0"
 dependencies = [
  "bytemuck",
  "eunomia",
- "half",
  "hermes-simd-intrinsics",
  "mnemosyne",
  "rkyv",
@@ -533,7 +531,6 @@ dependencies = [
 name = "hermes-simd-types"
 version = "0.3.0"
 dependencies = [
- "half",
  "hermes-simd-core",
  "hermes-simd-intrinsics",
 ]

@@ -10,7 +10,6 @@ description = "Monomorphized vector register types for the hermes-simd workspace
 [dependencies]
 hermes-simd-core = { path = "../hermes-simd-core", version = "0.3.0", default-features = false }
 hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.3.0", default-features = false }
-half = { workspace = true }
 
 [features]
 default = ["std", "mnemosyne-memory"]

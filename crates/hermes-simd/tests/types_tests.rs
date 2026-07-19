@@ -1456,7 +1456,7 @@ fn test_bf8_and_f8_unpacking() {
         Bf8::from_f32(2.5),
         Bf8::from_f32(-3.0),
     ];
-    let mut bf16_outputs = [Bf16(half::bf16::ZERO); 5];
+    let mut bf16_outputs = [Bf16::ZERO; 5];
 
     if std::is_x86_feature_detected!("avx512bw") {
         // Direct hardware routed call
