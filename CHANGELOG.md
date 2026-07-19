@@ -16,6 +16,13 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   identities. The supply-chain allowlist now names those reviewed Git sources,
   and CI no longer checks out redundant sibling repositories.
 
+### Fixed
+- Bind adaptive tile dispatch to the operand type's AMX and AVX-512 capability
+  probes so an int8 GEMM cannot select AVX-512 VNNI from the unrelated Bf16
+  feature set.
+- Size masked-gather fixtures from their lane-derived maximum index, covering
+  the 64-lane AVX-512 int8 case without out-of-bounds oracle access.
+
 ### Migration
 - Replace raw `half::f16`/`half::bf16` kernel and tiled-GEMM operands with
   `eunomia::F16`/`eunomia::Bf16`; use `eunomia::F32` for the typed Bf16

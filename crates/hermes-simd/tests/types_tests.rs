@@ -1156,8 +1156,8 @@ fn test_packed_bf4_slice() {
 fn test_adaptive_dispatcher_and_amx_session() {
     use hermes_simd::AdaptiveDispatcher;
 
-    let a = [1.0f32; 100];
-    let b = [2.0f32; 100];
+    let a = [eunomia::Bf16::ONE; 100];
+    let b = [eunomia::Bf16::from_f32(2.0); 100];
     let decision =
         AdaptiveDispatcher::select_backend(10, 10, 10, a.as_ptr(), a.len(), b.as_ptr(), b.len());
     println!("Selected backend for small matrix: {:?}", decision);

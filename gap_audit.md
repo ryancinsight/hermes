@@ -15,6 +15,15 @@ differential/empirical > source audit.
   compile-time provider identity plus value-semantic and differential tests.
   The lock still contains transitive `half` through Eunomia's temporary
   raw-trait surface and Criterion's Ciborium dependency.
+- Resolved 2026-07-18 — HS-401 remote host variance: PR #8 exposed two
+  host-sensitive defects absent on the local CPU. Adaptive dispatch queried
+  Bf16 capabilities for every operand type, allowing int8 GEMM to enter
+  AVX-512 VNNI on a host without that extension; dispatch now binds its probes
+  to `T: AmxSupport + Avx512Support`. The 64-lane AVX-512 masked-gather oracle
+  also used a fixed 100-element fixture although its maximum index is
+  `3 * (lanes - 1)`; fixture length is now derived as `3 * lanes`. Evidence
+  tier: remote ISA failure reproduction plus type-bound dispatch and an
+  analytical index bound. PR CI rerun is the closure gate.
 - Residual 2026-07-18 — HS-401 historical semver baseline: `origin/main`
   resolves moving Eunomia main 0.5.0, so its historical raw-half implementation
   no longer compiles at `scalar/tiling.rs:76-77` and
@@ -22,11 +31,12 @@ differential/empirical > source audit.
   classify the current public delta against that baseline. This is baseline
   dependency drift; the current 0.4.0 workspace compiles and passes its gates.
   Re-open when the semver baseline can pin its historical Eunomia revision.
-- Residual 2026-07-18 — HS-401 AArch64 local cross-check: rustup's 1.95 target
+- Resolved 2026-07-18 — HS-401 AArch64 verification: rustup's 1.95 target
   libraries are incompatible with proc-macro artifacts already produced by the
   PATH MSYS Rust 1.95 Rev2 compiler in the mandatory shared target directory.
-  No private target or destructive clean was used. Re-open on remote AArch64 CI
-  or after the shared artifact producer converges on one compiler build.
+  No private target or destructive clean was used. PR #8 independently passes
+  both the remote AArch64 cross-compile and native runtime NEON lanes. Evidence
+  tier: cross-target compile-time validation plus native architecture tests.
 
 - Resolved 2026-07-15 — provider default-branch convergence: Hermes removes
   revision pins and workspace-local patches for Mnemosyne, Eunomia, and Themis.

@@ -137,7 +137,8 @@ macro_rules! test_masked_ops_for_type {
         // --- 3. Test gather / gather_masked ---
         {
             let conv = $conv;
-            let base_data: Vec<$t> = (0..100).map(|x| conv(x)).collect();
+            // The largest gathered index is `3 * (lanes - 1)`.
+            let base_data: Vec<$t> = (0..($lanes * 3)).map(|x| conv(x)).collect();
             let mut idx_arr = [0i32; $lanes];
             for i in 0..$lanes {
                 idx_arr[i] = (i * 3) as i32;

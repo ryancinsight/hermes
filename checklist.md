@@ -15,8 +15,8 @@
   audits, and current-workspace compilation. Semver classification is
   externally blocked because the `origin/main` baseline resolves moving
   Eunomia main 0.5.0 and no longer compiles its historical raw-half calls.
-  AArch64 cross-check is externally blocked by incompatible rustup/MSYS 1.95
-  artifacts in the shared target; remote architecture CI is the merge gate.
+  PR #8's AArch64 cross-compile and runtime NEON lanes pass, as does Miri; the
+  x86 lane rerun is the remaining merge gate.
 - [ ] Publish and merge Hermes first, then advance Leto to its merged commit.
 
 - [x] [patch] Converge Themis, Mnemosyne, and Eunomia onto their default
