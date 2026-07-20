@@ -29,7 +29,7 @@ impl<T> OnceLock<T> {
         F: FnOnce() -> T,
     {
         if self.state.load(Ordering::Acquire) == 2 {
-            return unsafe { (*self.value.get()).as_ref().unwrap() };
+            return unsafe { (*self.value.get()).as_ref().expect("OnceLock: state==2 implies value is initialized") };
         }
 
         loop {
@@ -56,7 +56,7 @@ impl<T> OnceLock<T> {
                 core::hint::spin_loop();
             }
         }
-        unsafe { (*self.value.get()).as_ref().unwrap() }
+        unsafe { (*self.value.get()).as_ref().expect("OnceLock: state==2 implies value is initialized") }
     }
 }
 
