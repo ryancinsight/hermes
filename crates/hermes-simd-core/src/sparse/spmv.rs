@@ -147,7 +147,14 @@ where
             let mut acc = unsafe { Arch::sum_reduce(acc_vec) };
 
             while j < row_nnz {
-                acc += vals[j] * x[cols[j] as usize];
+                // SAFETY: `Validated<Csr>` proves every `col_indices[k] < ncols`,
+                // and `validate_spmv_sizes` asserted `x.len() >= ncols`, so
+                // `cols[j] < x.len()`. This is the same invariant the SIMD
+                // `Arch::gather` above (and the SellP vectorized path) already
+                // relies on; the scalar tail — the entire row when
+                // `row_nnz < LANE_COUNT` — was inconsistently keeping a per-nonzero
+                // bounds-check + panic branch on the gather.
+                acc += vals[j] * unsafe { *x.get_unchecked(cols[j] as usize) };
                 j += 1;
             }
 
