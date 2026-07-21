@@ -9,6 +9,17 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - [patch] Refresh the locked numeric provider to Eunomia 0.6 after its
   production raw-half trait surface was retired; Hermes continues to use the
   native Eunomia reduced-precision vocabulary.
+- [patch] CSR SpMV's scalar remainder loop now gathers `x[col]` unchecked
+  (`get_unchecked`), matching the SIMD body's `Arch::gather` and the SellP
+  vectorized path, which already trust the same `Validated<Csr>` invariant
+  (`col < ncols`) plus `validate_spmv_sizes` (`x.len() >= ncols`). Rows with
+  `nnz < LANE_COUNT` run *entirely* through this tail, so the previously
+  inconsistent bounds-check + panic branch cost every nonzero. Fully-scalar
+  short-row CSR SpMV (`sparse_bench`, quiet host, 1 nnz/row): **−20% (1024 rows)
+  / −25% (10000 rows)**. Results are unchanged (same gathered value, no reorder);
+  all 38 sparse tests pass. Miri cannot execute the SIMD-bearing kernel, so the
+  `unsafe` is covered by the SAFETY proof (strictly weaker than the existing
+  vectorized gather) and the short-row tests rather than miri.
 
 ## [0.4.0] - 2026-07-18
 
