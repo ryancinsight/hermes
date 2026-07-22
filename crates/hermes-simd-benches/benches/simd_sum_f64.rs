@@ -1,6 +1,10 @@
 use criterion::{criterion_group, criterion_main};
-#[path = "simd/suite.rs"]
-mod suite;
+#[path = "simd/sum.rs"]
+mod sum_suite;
 
-criterion_group!(benches, suite::bench_sum_f64);
+fn bench(c: &mut criterion::Criterion) {
+    sum_suite::bench(c, "Dense Sum f64", 1.0f64, 0.0f64, hermes_simd::sum::<f64>);
+}
+
+criterion_group!(benches, bench);
 criterion_main!(benches);
