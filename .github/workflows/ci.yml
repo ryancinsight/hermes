@@ -33,18 +33,6 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Compile benchmark binaries outside runtime budgets
-        run: cargo bench --locked --workspace --no-run
-      - name: Benchmark smoke budgets
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo metadata --locked --no-deps --format-version 1 \
-            | jq -r '.packages[] as $package | $package.targets[] | select(.kind | index("bench")) | [$package.name, .name] | @tsv' \
-            | while IFS=$'\t' read -r package benchmark; do
-            timeout --foreground --kill-after=10s 60s \
-              cargo bench --locked -p "$package" --bench "$benchmark" -- --test
-          done
       - uses: taiki-e/install-action@nextest
       # nextest applies the committed .config/nextest.toml timeout instrument
       # (30s slow / 60s terminate) — bare `cargo test` bypasses it. Doctests are
@@ -82,6 +70,16 @@ jobs:
           workspaces: hermes
       - name: Compile benchmark binaries outside runtime budgets
         run: cargo bench --locked --workspace --no-run
+      - name: Smoke-run every benchmark binary within 60 seconds
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --no-deps --format-version 1 \
+            | jq -r '.packages[] as $package | $package.targets[] | select(.kind | index("bench")) | [$package.name, .name] | @tsv' \
+            | while IFS=$'\t' read -r package benchmark; do
+            timeout --foreground --kill-after=10s 60s \
+              cargo bench --locked -p "$package" --bench "$benchmark" -- --test
+          done
       - name: Run every benchmark binary within 300 seconds
         shell: bash
         run: |
