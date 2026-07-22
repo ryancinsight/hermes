@@ -22,7 +22,31 @@ name = "run-benches"
 path = "src/main.rs"
 
 [[bench]]
-name = "simd_bench"
+name = "simd_sum_f32"
+harness = false
+
+[[bench]]
+name = "simd_sum_f64"
+harness = false
+
+[[bench]]
+name = "simd_sum_i32"
+harness = false
+
+[[bench]]
+name = "simd_dot_f32"
+harness = false
+
+[[bench]]
+name = "simd_dot_f64"
+harness = false
+
+[[bench]]
+name = "simd_dot_i32"
+harness = false
+
+[[bench]]
+name = "simd_dot_reduced_precision"
 harness = false
 
 [[bench]]
