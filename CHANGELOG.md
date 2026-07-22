@@ -4,6 +4,8 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-21
+
 ### Changed
 
 - [patch] Refresh the locked numeric provider to Eunomia 0.6 after its
