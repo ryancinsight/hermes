@@ -125,9 +125,44 @@ impl AmxConfig {
     }
 }
 
+/// Unaligned thread-local copy of the active tile configuration.
+///
+/// `AmxConfig` itself requires 64-byte alignment for `ldtilecfg`. Windows'
+/// native thread-local storage does not guarantee that over-alignment, so the
+/// session state stores the same bytes in a naturally aligned representation
+/// and keeps the aligned type only at the instruction boundary.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ActiveAmxConfig {
+    palette_id: u8,
+    start_row: u8,
+    reserved: [u8; 14],
+    cols_b: [u16; 8],
+    reserved2: [u8; 16],
+    rows: [u8; 8],
+    reserved3: [u8; 8],
+}
+
+const _: () = assert!(core::mem::size_of::<ActiveAmxConfig>() == 64);
+const _: () = assert!(core::mem::align_of::<ActiveAmxConfig>() <= 2);
+
+impl From<&AmxConfig> for ActiveAmxConfig {
+    fn from(config: &AmxConfig) -> Self {
+        Self {
+            palette_id: config.palette_id,
+            start_row: config.start_row,
+            reserved: config.reserved,
+            cols_b: config.cols_b,
+            reserved2: config.reserved2,
+            rows: config.rows,
+            reserved3: config.reserved3,
+        }
+    }
+}
+
 #[cfg(feature = "std")]
 thread_local! {
-    pub(crate) static ACTIVE_CONFIG: core::cell::Cell<Option<AmxConfig>> = core::cell::Cell::new(None);
+    static ACTIVE_CONFIG: core::cell::Cell<Option<ActiveAmxConfig>> = const { core::cell::Cell::new(None) };
     pub(crate) static SESSION_DEPTH: core::cell::Cell<usize> = core::cell::Cell::new(0);
 }
 
@@ -153,7 +188,7 @@ impl<T> DummyThreadLocal<T> {
 unsafe impl<T> Sync for DummyThreadLocal<T> {}
 
 #[cfg(not(feature = "std"))]
-pub(crate) static ACTIVE_CONFIG: DummyThreadLocal<Option<AmxConfig>> = DummyThreadLocal::new(None);
+static ACTIVE_CONFIG: DummyThreadLocal<Option<ActiveAmxConfig>> = DummyThreadLocal::new(None);
 
 #[cfg(not(feature = "std"))]
 pub(crate) static SESSION_DEPTH: DummyThreadLocal<usize> = DummyThreadLocal::new(0);
@@ -208,14 +243,14 @@ impl AmxSession {
             unsafe {
                 raw::ldtilecfg(config);
             }
-            ACTIVE_CONFIG.with(|c| c.set(Some(*config)));
+            ACTIVE_CONFIG.with(|c| c.set(Some(ActiveAmxConfig::from(config))));
         } else {
             let active = ACTIVE_CONFIG.with(|c| c.get());
-            if active != Some(*config) {
+            if active != Some(ActiveAmxConfig::from(config)) {
                 unsafe {
                     raw::ldtilecfg(config);
                 }
-                ACTIVE_CONFIG.with(|c| c.set(Some(*config)));
+                ACTIVE_CONFIG.with(|c| c.set(Some(ActiveAmxConfig::from(config))));
             }
         }
         Ok(Self { _private: () })
@@ -274,7 +309,7 @@ impl AmxBatchSession {
         unsafe {
             raw::ldtilecfg(config);
         }
-        ACTIVE_CONFIG.with(|c| c.set(Some(*config)));
+        ACTIVE_CONFIG.with(|c| c.set(Some(ActiveAmxConfig::from(config))));
         Ok(Self)
     }
 }
