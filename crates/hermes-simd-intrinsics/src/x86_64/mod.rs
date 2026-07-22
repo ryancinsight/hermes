@@ -1,8 +1,6 @@
 //! x86_64 hardware specialized SIMD kernels module.
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-pub(crate) mod asm_intrinsics;
-
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub mod avx2_f16;
 

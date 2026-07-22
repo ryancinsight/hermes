@@ -512,13 +512,13 @@ pub fn scale<T: SimdOps>(data: &mut [T], scalar: T) {
     T::scale(data, scalar)
 }
 
-/// Returns `Some((index, value))` of the minimum element, or `None` for empty.
+/// Returns the first minimum, or `None` for empty or NaN-containing data.
 #[inline(always)]
 pub fn argmin<T: SimdOps>(data: &[T]) -> Option<(usize, T)> {
     T::argmin(data)
 }
 
-/// Returns `Some((index, value))` of the maximum element, or `None` for empty.
+/// Returns the first maximum, or `None` for empty or NaN-containing data.
 #[inline(always)]
 pub fn argmax<T: SimdOps>(data: &[T]) -> Option<(usize, T)> {
     T::argmax(data)

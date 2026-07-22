@@ -57,13 +57,74 @@ impl TileMatrixMultiply<Bf16, Bf16, F32, Avx512, Avx512, 16, 16, 32> for Avx512 
     }
 }
 
+/// Computes one signed `i8` 16×16×64 tile with AVX-512 VNNI.
+///
+/// AVX-512 VNNI provides `VPDPBUSD` (unsigned bytes × signed bytes), not the
+/// signed-byte ZMM `VPDPBSSD` form. Biasing A by 128 makes it unsigned, then
+/// subtracting `128 * sum(B[:, j])` from every output row recovers the exact
+/// signed product in wrapping `i32` arithmetic.
+///
+/// # Safety
+/// The CPU must support `avx512f` and `avx512vnni`. The pointers must address a
+/// complete 16×16×64 tile at the supplied strides.
+#[target_feature(enable = "avx512f,avx512vnni")]
+unsafe fn tile_matmul_i8(
+    c: *mut i32,
+    c_stride: usize,
+    a: *const i8,
+    a_stride: usize,
+    b: *const i8,
+    b_stride: usize,
+) {
+    use core::arch::x86_64::*;
+
+    let mut c_regs = [_mm512_setzero_si512(); 16];
+    for (row, accumulator) in c_regs.iter_mut().enumerate() {
+        *accumulator = _mm512_loadu_si512(c.add(row * c_stride) as *const _);
+    }
+
+    let byte_bias = _mm512_set1_epi8(i8::MIN);
+    let mut bias_accumulator = _mm512_setzero_si512();
+    for k in (0..64).step_by(4) {
+        let row0 = _mm_loadu_si128(b.add(k * b_stride) as *const __m128i);
+        let row1 = _mm_loadu_si128(b.add((k + 1) * b_stride) as *const __m128i);
+        let row2 = _mm_loadu_si128(b.add((k + 2) * b_stride) as *const __m128i);
+        let row3 = _mm_loadu_si128(b.add((k + 3) * b_stride) as *const __m128i);
+
+        let unpack_lo_01 = _mm_unpacklo_epi8(row0, row1);
+        let unpack_hi_01 = _mm_unpackhi_epi8(row0, row1);
+        let unpack_lo_23 = _mm_unpacklo_epi8(row2, row3);
+        let unpack_hi_23 = _mm_unpackhi_epi8(row2, row3);
+        let packed_lo = _mm_unpacklo_epi16(unpack_lo_01, unpack_lo_23);
+        let packed_mid_lo = _mm_unpackhi_epi16(unpack_lo_01, unpack_lo_23);
+        let packed_mid_hi = _mm_unpacklo_epi16(unpack_hi_01, unpack_hi_23);
+        let packed_hi = _mm_unpackhi_epi16(unpack_hi_01, unpack_hi_23);
+        let b_vec = _mm512_inserti32x4(
+            _mm512_inserti32x4(
+                _mm512_inserti32x4(_mm512_castsi128_si512(packed_lo), packed_mid_lo, 1),
+                packed_mid_hi,
+                2,
+            ),
+            packed_hi,
+            3,
+        );
+
+        bias_accumulator = _mm512_dpbusd_epi32(bias_accumulator, byte_bias, b_vec);
+        for (row, accumulator) in c_regs.iter_mut().enumerate() {
+            let a_val = core::ptr::read_unaligned(a.add(row * a_stride + k) as *const i32);
+            let a_unsigned = _mm512_xor_si512(_mm512_set1_epi32(a_val), byte_bias);
+            *accumulator = _mm512_dpbusd_epi32(*accumulator, a_unsigned, b_vec);
+        }
+    }
+
+    for (row, accumulator) in c_regs.iter().enumerate() {
+        let corrected = _mm512_sub_epi32(*accumulator, bias_accumulator);
+        _mm512_storeu_si512(c.add(row * c_stride) as *mut _, corrected);
+    }
+}
+
 impl TileMatrixMultiply<i8, i8, i32, Avx512, Avx512, 16, 16, 64> for Avx512 {
-    // SAFETY: caller must ensure the target CPU supports `avx512f,avx512vnni,avx512vl`
-    // (enforced by the `#[target_feature]` gate below plus runtime
-    // `is_x86_feature_detected!` selection at the dispatch site) and that `a`, `b`, and
-    // `c` point to a valid 16x16x64 tile addressable at the given strides; all loads and
-    // stores stay within that caller-declared tile.
-    #[target_feature(enable = "avx512f,avx512vnni,avx512vl")]
+    #[target_feature(enable = "avx512f,avx512vnni")]
     unsafe fn tile_matmul(
         c: *mut i32,
         c_stride: usize,
@@ -72,60 +133,12 @@ impl TileMatrixMultiply<i8, i8, i32, Avx512, Avx512, 16, 16, 64> for Avx512 {
         b: *const i8,
         b_stride: usize,
     ) {
-        use core::arch::x86_64::*;
-
-        let mut c_regs = [_mm512_setzero_si512(); 16];
-        for i in 0..16 {
-            c_regs[i] = _mm512_loadu_si512(c.add(i * c_stride) as *const _);
-        }
-
-        for k in (0..64).step_by(4) {
-            let row0 = _mm_loadu_si128(b.add(k * b_stride) as *const __m128i);
-            let row1 = _mm_loadu_si128(b.add((k + 1) * b_stride) as *const __m128i);
-            let row2 = _mm_loadu_si128(b.add((k + 2) * b_stride) as *const __m128i);
-            let row3 = _mm_loadu_si128(b.add((k + 3) * b_stride) as *const __m128i);
-
-            let unpack_lo_01 = _mm_unpacklo_epi8(row0, row1);
-            let unpack_hi_01 = _mm_unpackhi_epi8(row0, row1);
-
-            let unpack_lo_23 = _mm_unpacklo_epi8(row2, row3);
-            let unpack_hi_23 = _mm_unpackhi_epi8(row2, row3);
-
-            let packed_lo = _mm_unpacklo_epi16(unpack_lo_01, unpack_lo_23);
-            let packed_mid_lo = _mm_unpackhi_epi16(unpack_lo_01, unpack_lo_23);
-            let packed_mid_hi = _mm_unpacklo_epi16(unpack_hi_01, unpack_hi_23);
-            let packed_hi = _mm_unpackhi_epi16(unpack_hi_01, unpack_hi_23);
-
-            let b_vec = _mm512_inserti32x4(
-                _mm512_inserti32x4(
-                    _mm512_inserti32x4(_mm512_castsi128_si512(packed_lo), packed_mid_lo, 1),
-                    packed_mid_hi,
-                    2,
-                ),
-                packed_hi,
-                3,
-            );
-
-            for i in 0..16 {
-                let a_val = core::ptr::read_unaligned(a.add(i * a_stride + k) as *const i32);
-                let a_vec = _mm512_set1_epi32(a_val);
-                c_regs[i] = crate::x86_64::asm_intrinsics::vpdpbssd!(c_regs[i], a_vec, b_vec);
-            }
-        }
-
-        for i in 0..16 {
-            _mm512_storeu_si512(c.add(i * c_stride) as *mut _, c_regs[i]);
-        }
+        tile_matmul_i8(c, c_stride, a, a_stride, b, b_stride);
     }
 }
 
 impl TileMatrixMultiply<I8, I8, I32, Avx512, Avx512, 16, 16, 64> for Avx512 {
-    // SAFETY: caller must ensure the target CPU supports `avx512f,avx512vnni,avx512vl`
-    // (enforced by the `#[target_feature]` gate below plus runtime
-    // `is_x86_feature_detected!` selection at the dispatch site) and that `a`, `b`, and
-    // `c` point to a valid 16x16x64 tile addressable at the given strides; all loads and
-    // stores stay within that caller-declared tile.
-    #[target_feature(enable = "avx512f,avx512vnni,avx512vl")]
+    #[target_feature(enable = "avx512f,avx512vnni")]
     unsafe fn tile_matmul(
         c: *mut I32,
         c_stride: usize,
@@ -134,50 +147,14 @@ impl TileMatrixMultiply<I8, I8, I32, Avx512, Avx512, 16, 16, 64> for Avx512 {
         b: *const I8,
         b_stride: usize,
     ) {
-        use core::arch::x86_64::*;
-
-        let mut c_regs = [_mm512_setzero_si512(); 16];
-        for i in 0..16 {
-            c_regs[i] = _mm512_loadu_si512(c.add(i * c_stride) as *const _);
-        }
-
-        for k in (0..64).step_by(4) {
-            let row0 = _mm_loadu_si128(b.add(k * b_stride) as *const __m128i);
-            let row1 = _mm_loadu_si128(b.add((k + 1) * b_stride) as *const __m128i);
-            let row2 = _mm_loadu_si128(b.add((k + 2) * b_stride) as *const __m128i);
-            let row3 = _mm_loadu_si128(b.add((k + 3) * b_stride) as *const __m128i);
-
-            let unpack_lo_01 = _mm_unpacklo_epi8(row0, row1);
-            let unpack_hi_01 = _mm_unpackhi_epi8(row0, row1);
-
-            let unpack_lo_23 = _mm_unpacklo_epi8(row2, row3);
-            let unpack_hi_23 = _mm_unpackhi_epi8(row2, row3);
-
-            let packed_lo = _mm_unpacklo_epi16(unpack_lo_01, unpack_lo_23);
-            let packed_mid_lo = _mm_unpackhi_epi16(unpack_lo_01, unpack_lo_23);
-            let packed_mid_hi = _mm_unpacklo_epi16(unpack_hi_01, unpack_hi_23);
-            let packed_hi = _mm_unpackhi_epi16(unpack_hi_01, unpack_hi_23);
-
-            let b_vec = _mm512_inserti32x4(
-                _mm512_inserti32x4(
-                    _mm512_inserti32x4(_mm512_castsi128_si512(packed_lo), packed_mid_lo, 1),
-                    packed_mid_hi,
-                    2,
-                ),
-                packed_hi,
-                3,
-            );
-
-            for i in 0..16 {
-                let a_val = core::ptr::read_unaligned(a.add(i * a_stride + k) as *const i32);
-                let a_vec = _mm512_set1_epi32(a_val);
-                c_regs[i] = crate::x86_64::asm_intrinsics::vpdpbssd!(c_regs[i], a_vec, b_vec);
-            }
-        }
-
-        for i in 0..16 {
-            _mm512_storeu_si512(c.add(i * c_stride) as *mut _, c_regs[i]);
-        }
+        tile_matmul_i8(
+            c.cast::<i32>(),
+            c_stride,
+            a.cast::<i8>(),
+            a_stride,
+            b.cast::<i8>(),
+            b_stride,
+        );
     }
 }
 
@@ -385,4 +362,75 @@ pub fn unpack_packed_f4_to_f32(packed: &[u8], unpacked: &mut [F32]) {
         }
     }
     eunomia::unpack_f4_to_f32_packed(packed, unpacked);
+}
+
+#[cfg(test)]
+mod int8_tests {
+    use super::*;
+
+    #[test]
+    fn signed_tile_matches_wrapping_scalar_bitwise() {
+        if !std::is_x86_feature_detected!("avx512f") || !std::is_x86_feature_detected!("avx512vnni")
+        {
+            return;
+        }
+
+        const M: usize = 16;
+        const N: usize = 16;
+        const K: usize = 64;
+        let a: Vec<i8> = (0..M * K)
+            .map(|index| ((index * 89 + 3) % 256) as u8 as i8)
+            .collect();
+        let b: Vec<i8> = (0..K * N)
+            .map(|index| ((index * 41 + 128) % 256) as u8 as i8)
+            .collect();
+        let initial: Vec<i32> = (0..M * N)
+            .map(|index| (index as i32).wrapping_mul(7_919).wrapping_sub(40_000))
+            .collect();
+        let mut expected = initial.clone();
+        for row in 0..M {
+            for column in 0..N {
+                let mut sum = 0i32;
+                for depth in 0..K {
+                    sum = sum
+                        .wrapping_add((a[row * K + depth] as i32) * (b[depth * N + column] as i32));
+                }
+                expected[row * N + column] = expected[row * N + column].wrapping_add(sum);
+            }
+        }
+
+        let mut primitive = initial.clone();
+        unsafe {
+            <Avx512 as TileMatrixMultiply<i8, i8, i32, Avx512, Avx512, M, N, K>>::tile_matmul(
+                primitive.as_mut_ptr(),
+                N,
+                a.as_ptr(),
+                K,
+                b.as_ptr(),
+                N,
+            );
+        }
+        assert_eq!(primitive, expected);
+
+        let wrapped_a: Vec<I8> = a.iter().copied().map(I8).collect();
+        let wrapped_b: Vec<I8> = b.iter().copied().map(I8).collect();
+        let mut wrapped_c: Vec<I32> = initial.iter().copied().map(I32).collect();
+        unsafe {
+            <Avx512 as TileMatrixMultiply<I8, I8, I32, Avx512, Avx512, M, N, K>>::tile_matmul(
+                wrapped_c.as_mut_ptr(),
+                N,
+                wrapped_a.as_ptr(),
+                K,
+                wrapped_b.as_ptr(),
+                N,
+            );
+        }
+        assert_eq!(
+            wrapped_c
+                .into_iter()
+                .map(|value| value.0)
+                .collect::<Vec<_>>(),
+            expected
+        );
+    }
 }

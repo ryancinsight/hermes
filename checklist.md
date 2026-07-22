@@ -1,6 +1,26 @@
 # Checklist — active sprint
 
-**Target version: 0.4.0** · Strategy: [backlog.md](backlog.md) · Gap register: [gap_audit.md](gap_audit.md) · Phase: Execution
+**Target: Unreleased** · Strategy: [backlog.md](backlog.md) · Gap register: [gap_audit.md](gap_audit.md) · Phase: Execution
+
+## HS-403 [patch] — deterministic extrema and benchmark budgets (Owner: Codex `/root`)
+
+- [x] Reject NaN-containing extrema inputs and return the first matching slice
+      value.
+- [x] Add NaN-position and signed-zero value-semantic regressions.
+- [x] Remove unreachable unchecked dispatch branches.
+- [x] Add metadata-derived, precompiled 60-second smoke budgets for every
+      workspace Criterion target, plus 300-second full-run budgets for the
+      changed canonical dense and SIMD instruments under a 30-minute job cap.
+- [x] Preserve one SIMD benchmark binary and all 60 SIMD IDs while separating
+      sum, full-precision dot, and reduced-precision dot registration by SRP.
+- [x] Preserve all 48 dense-suite IDs while replacing Criterion's emergent
+      linear iteration multiplier with flat sampling at Criterion's 10-sample
+      floor, 100 ms warm-up, and 500 ms measurement budgets.
+- [x] Pass direct rustfmt and code-bearing exact-head hosted CI at `0487bbd`
+      (run `29963673513`): x86 gates, AArch64 runtime, cross-compile, Miri,
+      cargo-deny, CodeRabbit, and Greptile are green. Benchmark evidence:
+      2m04s compile, 3m19s all-target smoke, 3m18s scoped full timing, and
+      9m00s total job time.
 
 ## HS-402 [patch] — Eunomia 0.6 lock convergence (Owner: Codex)
 

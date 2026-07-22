@@ -124,6 +124,38 @@ fn test_dispatch_argmax_empty() {
 }
 
 #[test]
+fn dispatch_extrema_reject_nan_independent_of_position() {
+    for data in [
+        [f32::NAN, -2.0, 4.0],
+        [-2.0, f32::NAN, 4.0],
+        [-2.0, 4.0, f32::NAN],
+    ] {
+        assert_eq!(argmin(&data), None);
+        assert_eq!(argmax(&data), None);
+    }
+}
+
+#[test]
+fn dispatch_extrema_preserve_first_signed_zero_value() {
+    let positive_first = [0.0_f32, -0.0];
+    let negative_first = [-0.0_f32, 0.0];
+
+    for (positive_extremum, negative_extremum) in [
+        (argmin(&positive_first), argmin(&negative_first)),
+        (argmax(&positive_first), argmax(&negative_first)),
+    ] {
+        assert_eq!(
+            positive_extremum.map(|(index, value)| (index, value.to_bits())),
+            Some((0, 0.0_f32.to_bits()))
+        );
+        assert_eq!(
+            negative_extremum.map(|(index, value)| (index, value.to_bits())),
+            Some((0, (-0.0_f32).to_bits()))
+        );
+    }
+}
+
+#[test]
 fn test_view_argmin() {
     let data = [7.0f32, 3.0, 9.0, 1.0, 5.0];
     let (idx, val) = v(&data).argmin().unwrap();

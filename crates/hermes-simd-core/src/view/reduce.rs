@@ -485,18 +485,15 @@ impl<
 where
     T: crate::scalar::Scalar + crate::scalar::NumericElement,
 {
-    /// Returns `Some((index, value))` of the *first* minimum element.
+    /// Returns `Some((index, value))` for the first minimum element.
     ///
-    /// Correctness: a SIMD reduction pass finds the minimum value, then a linear
-    /// scan locates its first occurrence.
+    /// Correctness: a SIMD reduction pass finds the minimum value, then one
+    /// validation scan rejects NaNs while retaining its first occurrence.
     ///
-    /// # NaN contract
-    /// Returns `None` for an empty slice, and also when the reduction yields
-    /// `NaN` — no element compares equal to `NaN`, so no index exists to report.
-    /// Whether a `NaN` input produces a `NaN` reduction depends on the backend's
-    /// `min` semantics (most SIMD `min` instructions return the second operand
-    /// for unordered compares, so `NaN` may or may not propagate). Callers that
-    /// need deterministic NaN handling must pre-filter the input.
+    /// Returns `None` for an empty slice or when any element is NaN. The
+    /// validation scan rejects the whole unordered domain, so an intermediate
+    /// backend result never escapes. Equal extrema use the first slice element,
+    /// including its signed-zero representation.
     #[inline]
     pub fn argmin(&self) -> Option<(usize, T)> {
         let data = self.as_slice();
@@ -504,23 +501,18 @@ where
             return None;
         }
         let min_val = self.reduce(crate::ops::Min);
-        let idx = data
-            .iter()
-            .position(|x| x.partial_cmp(&min_val) == Some(core::cmp::Ordering::Equal))?;
-        Some((idx, min_val))
+        Self::locate_ordered_extremum(data, min_val)
     }
 
-    /// Returns `Some((index, value))` of the *first* maximum element.
+    /// Returns `Some((index, value))` for the first maximum element.
     ///
-    /// Correctness: a SIMD reduction pass finds the maximum value, then a linear
-    /// scan locates its first occurrence.
+    /// Correctness: a SIMD reduction pass finds the maximum value, then one
+    /// validation scan rejects NaNs while retaining its first occurrence.
     ///
-    /// # NaN contract
-    /// Returns `None` for an empty slice, and also when the reduction yields
-    /// `NaN` — no element compares equal to `NaN`, so no index exists to report.
-    /// Whether a `NaN` input produces a `NaN` reduction depends on the backend's
-    /// `max` semantics. Callers that need deterministic NaN handling must
-    /// pre-filter the input.
+    /// Returns `None` for an empty slice or when any element is NaN. The
+    /// validation scan rejects the whole unordered domain, so an intermediate
+    /// backend result never escapes. Equal extrema use the first slice element,
+    /// including its signed-zero representation.
     #[inline]
     pub fn argmax(&self) -> Option<(usize, T)> {
         let data = self.as_slice();
@@ -528,9 +520,20 @@ where
             return None;
         }
         let max_val = self.reduce(crate::ops::Max);
-        let idx = data
-            .iter()
-            .position(|x| x.partial_cmp(&max_val) == Some(core::cmp::Ordering::Equal))?;
-        Some((idx, max_val))
+        Self::locate_ordered_extremum(data, max_val)
+    }
+
+    #[inline]
+    fn locate_ordered_extremum(data: &[T], extremum: T) -> Option<(usize, T)> {
+        let mut first = None;
+        for (index, value) in data.iter().copied().enumerate() {
+            if value.is_nan() {
+                return None;
+            }
+            if first.is_none() && value.partial_cmp(&extremum) == Some(core::cmp::Ordering::Equal) {
+                first = Some((index, value));
+            }
+        }
+        first
     }
 }
