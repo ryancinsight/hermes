@@ -71,7 +71,8 @@ where
                 data,
                 shape,
                 strides,
-            } => TensorView::with_strides(data.as_slice(), *shape, *strides).expect("Owned variant stores pre-validated shape and strides"),
+            } => TensorView::with_strides(data.as_slice(), *shape, *strides)
+                .expect("Owned variant stores pre-validated shape and strides"),
         }
     }
 

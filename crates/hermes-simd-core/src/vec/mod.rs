@@ -42,7 +42,8 @@ where
         let size = capacity
             .checked_mul(core::mem::size_of::<T>())
             .expect("Capacity overflow");
-        Layout::from_size_align(size, align).expect("align is power-of-2, size validated by checked_mul")
+        Layout::from_size_align(size, align)
+            .expect("align is power-of-2, size validated by checked_mul")
     }
 
     /// Create a new empty `AlignedVec` with no allocation.
@@ -362,7 +363,8 @@ where
     where
         Arch: crate::arch::SimdArch,
     {
-        SimdView::new(self.as_slice()).expect("AlignedVec guarantees aligned buffer of sufficient length")
+        SimdView::new(self.as_slice())
+            .expect("AlignedVec guarantees aligned buffer of sufficient length")
     }
 
     /// Obtains a compile-time safe mutable `SimdView` over the vector's buffer.
@@ -373,7 +375,8 @@ where
     where
         Arch: crate::arch::SimdArch,
     {
-        SimdView::new_mut(self.as_mut_slice()).expect("AlignedVec guarantees aligned buffer of sufficient length")
+        SimdView::new_mut(self.as_mut_slice())
+            .expect("AlignedVec guarantees aligned buffer of sufficient length")
     }
 
     /// Converts this `AlignedVec` to another alignment layout type-safely, without checking

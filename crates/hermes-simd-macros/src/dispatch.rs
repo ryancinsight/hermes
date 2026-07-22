@@ -107,7 +107,9 @@ fn generate_dispatcher(
         if matches!(target, DispatchTarget::Scalar) {
             continue;
         }
-        let feat = target.feature_str().expect("DispatchTarget::feature_str is Some for all non-Scalar variants");
+        let feat = target
+            .feature_str()
+            .expect("DispatchTarget::feature_str is Some for all non-Scalar variants");
         let arch = target.arch_marker();
         let arch_cfg = target.target_arch_cfg();
         let helper_name = format_ident!("{}_{}", dispatch_name, feat.replace(['-', ','], "_"));
@@ -323,7 +325,9 @@ pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
     }
 
     // Last type parameter is the architecture parameter
-    let arch_param = type_params.last().expect("type_params verified non-empty by preceding length check");
+    let arch_param = type_params
+        .last()
+        .expect("type_params verified non-empty by preceding length check");
     let arch_ident = &arch_param.ident;
 
     // The other parameters (lifetimes, consts, other types)
