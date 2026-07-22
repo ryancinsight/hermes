@@ -485,10 +485,18 @@ impl<
 where
     T: crate::scalar::Scalar + crate::scalar::NumericElement,
 {
-    /// Returns `Some((index, value))` of the minimum element, or `None` for an empty slice.
+    /// Returns `Some((index, value))` of the *first* minimum element.
     ///
-    /// Correctness: uses a SIMD-accelerated reduction pass to find the minimum value,
-    /// followed by a linear scan to locate the first occurrence of that value.
+    /// Correctness: a SIMD reduction pass finds the minimum value, then a linear
+    /// scan locates its first occurrence.
+    ///
+    /// # NaN contract
+    /// Returns `None` for an empty slice, and also when the reduction yields
+    /// `NaN` — no element compares equal to `NaN`, so no index exists to report.
+    /// Whether a `NaN` input produces a `NaN` reduction depends on the backend's
+    /// `min` semantics (most SIMD `min` instructions return the second operand
+    /// for unordered compares, so `NaN` may or may not propagate). Callers that
+    /// need deterministic NaN handling must pre-filter the input.
     #[inline]
     pub fn argmin(&self) -> Option<(usize, T)> {
         let data = self.as_slice();
@@ -502,10 +510,17 @@ where
         Some((idx, min_val))
     }
 
-    /// Returns `Some((index, value))` of the maximum element, or `None` for an empty slice.
+    /// Returns `Some((index, value))` of the *first* maximum element.
     ///
-    /// Correctness: uses a SIMD-accelerated reduction pass to find the maximum value,
-    /// followed by a linear scan to locate the first occurrence of that value.
+    /// Correctness: a SIMD reduction pass finds the maximum value, then a linear
+    /// scan locates its first occurrence.
+    ///
+    /// # NaN contract
+    /// Returns `None` for an empty slice, and also when the reduction yields
+    /// `NaN` — no element compares equal to `NaN`, so no index exists to report.
+    /// Whether a `NaN` input produces a `NaN` reduction depends on the backend's
+    /// `max` semantics. Callers that need deterministic NaN handling must
+    /// pre-filter the input.
     #[inline]
     pub fn argmax(&self) -> Option<(usize, T)> {
         let data = self.as_slice();
