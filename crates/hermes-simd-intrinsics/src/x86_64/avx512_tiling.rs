@@ -83,7 +83,7 @@ unsafe fn tile_matmul_i8(
         *accumulator = _mm512_loadu_si512(c.add(row * c_stride) as *const _);
     }
 
-    let byte_bias = _mm512_set1_epi32(i32::MIN);
+    let byte_bias = _mm512_set1_epi8(i8::MIN);
     let mut bias_accumulator = _mm512_setzero_si512();
     for k in (0..64).step_by(4) {
         let row0 = _mm_loadu_si128(b.add(k * b_stride) as *const __m128i);
