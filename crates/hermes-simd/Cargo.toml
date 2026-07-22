@@ -32,6 +32,10 @@ harness = false
 name = "complex"
 harness = false
 
+[[bench]]
+name = "sparse"
+harness = false
+
 [features]
 default = ["std", "mnemosyne-memory"]
 # Linux NUMA affinity and residency probes via libnuma (links -lnuma); off by default.
