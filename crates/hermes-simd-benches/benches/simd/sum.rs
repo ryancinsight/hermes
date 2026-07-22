@@ -12,7 +12,7 @@ where
     T: Copy + core::ops::Add<Output = T> + 'static,
     F: Copy + Fn(&[T]) -> T,
 {
-    let mut group = c.benchmark_group(group_name);
+    let mut group = super::group::configured(c, group_name);
     for &size in &[256usize, 1024, 16384, 65536, 1 << 20] {
         let data = vec![one; size];
         group.throughput(Throughput::Elements(size as u64));

@@ -5,7 +5,7 @@ where
     T: Copy + 'static,
     F: Copy + Fn(&[T], &[T]) -> T,
 {
-    let mut group = c.benchmark_group(group_name);
+    let mut group = super::group::configured(c, group_name);
     for &size in &[256usize, 16384, 65536] {
         let a = vec![a_value; size];
         let b = vec![b_value; size];

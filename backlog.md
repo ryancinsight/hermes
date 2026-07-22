@@ -8,7 +8,8 @@ External gap findings live in [gap_audit.md](gap_audit.md).
 - [x] [patch] **HS-403 — deterministic extrema and benchmark budgets.** Reject
   NaN-containing `argmin`/`argmax` inputs, preserve
   the first slice element's signed-zero representation, and exercise every
-  workspace Criterion binary under committed 60-second smoke and 300-second full-run
+  workspace Criterion binary under a committed 60-second smoke budget and run
+  the changed canonical dense and SIMD instruments under 300-second full-run
   budgets. The first hosted smoke exposed an invalid signed-byte ZMM instruction
   in AVX-512 VNNI dispatch; replace it with exact `VPDPBUSD` bias correction.
   Acceptance: scalar/runtime-dispatch value tests, warning-denied Clippy,

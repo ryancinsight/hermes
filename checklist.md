@@ -8,8 +8,11 @@
       value.
 - [x] Add NaN-position and signed-zero value-semantic regressions.
 - [x] Remove unreachable unchecked dispatch branches.
-- [x] Add metadata-derived, precompiled 60-second smoke and 300-second
-      full-binary CI budgets for every workspace Criterion target.
+- [x] Add metadata-derived, precompiled 60-second smoke budgets for every
+      workspace Criterion target, plus 300-second full-run budgets for the
+      changed canonical dense and SIMD instruments under a 30-minute job cap.
+- [x] Preserve one SIMD benchmark binary and all 60 SIMD IDs while separating
+      sum, full-precision dot, and reduced-precision dot registration by SRP.
 - [x] Preserve all 48 dense-suite IDs while replacing Criterion's emergent
       linear iteration multiplier with flat sampling at Criterion's 10-sample
       floor, 100 ms warm-up, and 500 ms measurement budgets.

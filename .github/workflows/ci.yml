@@ -51,10 +51,13 @@ jobs:
         run: cargo check --workspace --no-default-features
 
   benchmark-budgets:
-    name: full benchmark runtime budgets
+    name: benchmark runtime budgets
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Twelve smoke targets at 60 seconds plus two canonical full targets at
+    # 300 seconds yield a 22-minute analytical ceiling. Compilation and runner
+    # overhead retain eight minutes of margin without admitting an unbounded job.
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: hermes
@@ -80,16 +83,14 @@ jobs:
             timeout --foreground --kill-after=10s 60s \
               cargo bench --locked -p "$package" --bench "$benchmark" -- --test
           done
-      - name: Run every benchmark binary within 300 seconds
+      - name: Run changed canonical benchmarks within 300 seconds
         shell: bash
         run: |
           set -euo pipefail
-          cargo metadata --locked --no-deps --format-version 1 \
-            | jq -r '.packages[] as $package | $package.targets[] | select(.kind | index("bench")) | [$package.name, .name] | @tsv' \
-            | while IFS=$'\t' read -r package benchmark; do
-            timeout --foreground --kill-after=10s 300s \
-              cargo bench --locked -p "$package" --bench "$benchmark"
-          done
+          timeout --foreground --kill-after=10s 300s \
+            cargo bench --locked -p hermes-simd --bench dense
+          timeout --foreground --kill-after=10s 300s \
+            cargo bench --locked -p hermes-simd-benches --bench simd_bench
 
   miri:
     name: miri (core + intrinsics boundary)

@@ -21,7 +21,7 @@ pub fn bench<T, F>(
     T: Copy + core::ops::Add<Output = T> + core::ops::Mul<Output = T> + 'static,
     F: Copy + Fn(&[T], &[T]) -> T,
 {
-    let mut group = c.benchmark_group(group_name);
+    let mut group = super::group::configured(c, group_name);
     for &size in &[256usize, 1024, 16384, 65536] {
         let a = vec![a_value; size];
         let b = vec![b_value; size];
