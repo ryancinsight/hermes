@@ -16,8 +16,11 @@
 - [x] Preserve all 48 dense-suite IDs while replacing Criterion's emergent
       linear iteration multiplier with flat sampling at Criterion's 10-sample
       floor, 100 ms warm-up, and 500 ms measurement budgets.
-- [ ] Pass focused local gates and exact-head hosted CI; merge and clean the
-      branch.
+- [x] Pass direct rustfmt and code-bearing exact-head hosted CI at `0487bbd`
+      (run `29963673513`): x86 gates, AArch64 runtime, cross-compile, Miri,
+      cargo-deny, CodeRabbit, and Greptile are green. Benchmark evidence:
+      2m04s compile, 3m19s all-target smoke, 3m18s scoped full timing, and
+      9m00s total job time.
 
 ## HS-402 [patch] — Eunomia 0.6 lock convergence (Owner: Codex)
 
