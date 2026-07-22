@@ -1,6 +1,20 @@
 # Checklist — active sprint
 
-**Target version: 0.4.0** · Strategy: [backlog.md](backlog.md) · Gap register: [gap_audit.md](gap_audit.md) · Phase: Execution
+**Target: Unreleased** · Strategy: [backlog.md](backlog.md) · Gap register: [gap_audit.md](gap_audit.md) · Phase: Execution
+
+## HS-403 [patch] — deterministic extrema and benchmark budgets (Owner: Codex `/root`)
+
+- [x] Reject NaN-containing extrema inputs before backend-specific reduction
+      and return the first matching slice value.
+- [x] Add NaN-position and signed-zero value-semantic regressions.
+- [x] Remove unreachable unchecked dispatch branches.
+- [x] Add metadata-derived, precompiled 60-second smoke and 300-second
+      full-binary CI budgets for every workspace Criterion target.
+- [x] Preserve all 48 dense-suite IDs while replacing Criterion's emergent
+      default runtime with explicit 500 ms warm-up, 1 s measurement, and
+      50-sample per-ID budgets.
+- [ ] Pass focused local gates and exact-head hosted CI; merge and clean the
+      branch.
 
 ## HS-402 [patch] — Eunomia 0.6 lock convergence (Owner: Codex)
 

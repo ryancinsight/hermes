@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -32,6 +33,18 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Compile benchmark binaries outside runtime budgets
+        run: cargo bench --locked --workspace --no-run
+      - name: Benchmark smoke budgets
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --no-deps --format-version 1 \
+            | jq -r '.packages[] as $package | $package.targets[] | select(.kind | index("bench")) | "\($package.name):\(.name)"' \
+            | while IFS=: read -r package benchmark; do
+            timeout --foreground --kill-after=10s 60s \
+              cargo bench --locked -p "$package" --bench "$benchmark" -- --test
+          done
       - uses: taiki-e/install-action@nextest
       # nextest applies the committed .config/nextest.toml timeout instrument
       # (30s slow / 60s terminate) — bare `cargo test` bypasses it. Doctests are
@@ -48,6 +61,37 @@ jobs:
           RUSTDOCFLAGS: -D warnings
       - name: no_std check (compile-time dispatch + scalar fallback only)
         run: cargo check --workspace --no-default-features
+
+  benchmark-budgets:
+    name: full benchmark runtime budgets
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: hermes
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: hermes
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.95.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: hermes
+      - name: Compile benchmark binaries outside runtime budgets
+        run: cargo bench --locked --workspace --no-run
+      - name: Run every benchmark binary within 300 seconds
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --no-deps --format-version 1 \
+            | jq -r '.packages[] as $package | $package.targets[] | select(.kind | index("bench")) | "\($package.name):\(.name)"' \
+            | while IFS=: read -r package benchmark; do
+            timeout --foreground --kill-after=10s 300s \
+              cargo bench --locked -p "$package" --bench "$benchmark"
+          done
 
   miri:
     name: miri (core + intrinsics boundary)

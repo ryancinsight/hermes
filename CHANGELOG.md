@@ -6,6 +6,13 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch] `argmin` and `argmax` now reject every NaN-containing input before
+  backend reduction and return the first matching slice element. This makes
+  NaN and signed-zero behavior identical across scalar and SIMD backends.
+  CI also smoke-runs each workspace Criterion binary under 60 seconds and
+  provides a dispatchable full-suite job that bounds each binary at 300
+  seconds after precompilation. The 48-ID dense suite retains every regime and
+  uses explicit 500 ms warm-up, 1 s measurement, and 50-sample per-ID budgets.
 - [patch] SELL-p SpMV's scalar fallback (taken when `Arch::LANE_COUNT != C`) drops
   its dead `if c_idx < x.len()` guard and gathers `x[c_idx]` unchecked, matching
   the vectorized path — both rest on the `Validated<SellP>` invariant

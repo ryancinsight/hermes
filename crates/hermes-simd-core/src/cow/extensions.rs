@@ -153,7 +153,7 @@ where
         Self::splat_fill(T::ONE, len)
     }
 
-    /// Returns `Some((index, value))` of the minimum element, or `None` for empty.
+    /// Returns the first minimum, or `None` for empty or NaN-containing data.
     #[inline]
     pub fn argmin(&self) -> Option<(usize, T)>
     where
@@ -162,7 +162,7 @@ where
         self.view().argmin()
     }
 
-    /// Returns `Some((index, value))` of the maximum element, or `None` for empty.
+    /// Returns the first maximum, or `None` for empty or NaN-containing data.
     #[inline]
     pub fn argmax(&self) -> Option<(usize, T)>
     where

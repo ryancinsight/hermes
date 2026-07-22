@@ -15,6 +15,7 @@ use criterion::{
 use hermes_simd::{
     axpy_rows, axpy_rows_batch, dot, elementwise_mul, gemv, gemv_strided, gemv_transpose, sum,
 };
+use std::time::Duration;
 
 const SIZES: &[usize] = &[256, 1024, 4096, 16384];
 const AXPY_BATCH_CASES: &[AxpyBatchCase] = &[
@@ -302,15 +303,29 @@ fn bench_axpy_rows_batch_f32(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    dense_benches,
-    bench_sum_f32,
-    bench_dot_f32,
-    bench_elementwise_mul_f32,
-    bench_gemv_f32,
-    bench_gemv_strided_f32,
-    bench_gemv_transpose_f32,
-    bench_reflector_dots_f64,
-    bench_axpy_rows_batch_f32
-);
+fn benchmark_config() -> Criterion {
+    // Forty-eight IDs cover cache-resident, strided, transposed, reflector, and
+    // batched regimes. Criterion's 3 s + 5 s defaults exceed the binary's
+    // 300-second wall-clock budget before harness overhead. These explicit
+    // per-ID budgets retain every regime and fifty ordered samples while
+    // bounding the modeled measurement time to 72 seconds.
+    Criterion::default()
+        .warm_up_time(Duration::from_millis(500))
+        .measurement_time(Duration::from_secs(1))
+        .sample_size(50)
+}
+
+criterion_group! {
+    name = dense_benches;
+    config = benchmark_config();
+    targets =
+        bench_sum_f32,
+        bench_dot_f32,
+        bench_elementwise_mul_f32,
+        bench_gemv_f32,
+        bench_gemv_strided_f32,
+        bench_gemv_transpose_f32,
+        bench_reflector_dots_f64,
+        bench_axpy_rows_batch_f32
+}
 criterion_main!(dense_benches);
