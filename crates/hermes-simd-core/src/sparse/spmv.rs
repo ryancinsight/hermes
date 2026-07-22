@@ -345,9 +345,14 @@ where
                 let idx = start_offset + col * C + row;
                 let val = data.values[idx];
                 let c_idx = data.col_indices[idx] as usize;
-                if c_idx < x.len() {
-                    row_acc[row] += val * x[c_idx];
-                }
+                // SAFETY: `Validated<SellP>` proves every `col_indices[k] < ncols`
+                // and `validate_spmv_sizes` asserted `x.len() >= ncols`, so
+                // `c_idx < x.len()`. The vectorized path gathers on exactly this
+                // invariant (see its SAFETY note). The removed `if c_idx < x.len()`
+                // guard was dead under that invariant — and had it ever been false
+                // it would have *silently dropped* the term rather than surfacing
+                // the violation, so this is also a correctness-honesty improvement.
+                row_acc[row] += val * unsafe { *x.get_unchecked(c_idx) };
             }
         }
 

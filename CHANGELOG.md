@@ -4,6 +4,23 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ## [Unreleased]
 
+### Changed
+
+- [patch] SELL-p SpMV's scalar fallback (taken when `Arch::LANE_COUNT != C`) drops
+  its dead `if c_idx < x.len()` guard and gathers `x[c_idx]` unchecked, matching
+  the vectorized path — both rest on the `Validated<SellP>` invariant
+  (`col_indices[k] < ncols`) plus `validate_spmv_sizes` (`x.len() >= ncols`).
+  Eliminating a branch *and* a bounds check per entry: **−19% (rows_1024/1.0%) /
+  −30% (rows_1024/10%) / −37% (rows_10000/0.1%) / −24% (rows_10000/1.0%)**
+  (`sparse_bench` sellp4; measured against a quieter baseline, so understated).
+  Results are unchanged — the guard was unreachable under the invariant, and had
+  it ever been false it would have *silently dropped* the term rather than
+  surfacing the violation, so this also removes a silent-wrong-answer path.
+  Covered by the SellP differential (scalar vs vectorized) and property tests;
+  all 38 sparse tests pass. Completes the scalar-tail work begun in 0.4.1's CSR
+  fix. Miri cannot execute the SIMD-bearing module, so the `unsafe` rests on the
+  SAFETY proof plus those tests.
+
 ## [0.4.1] - 2026-07-21
 
 ### Changed
