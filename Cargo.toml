@@ -27,7 +27,7 @@ rust-version = "1.95"
 [workspace.dependencies]
 mnemosyne = { git = "https://github.com/ryancinsight/Mnemosyne.git", default-features = false }
 themis = { git = "https://github.com/ryancinsight/themis", version = "0.10.0", default-features = false }
-eunomia = { version = "0.7.0", git = "https://github.com/ryancinsight/eunomia", rev = "7021628fe8eb3637c297105f626ee5df78abda84", default-features = false }
+eunomia = { version = "0.7.0", git = "https://github.com/ryancinsight/eunomia", default-features = false }
 
 # Integer overflow must trap during development and tests (numerical-discipline
 # mandate): a silent wraparound can defeat a length/bounds check that gates an
