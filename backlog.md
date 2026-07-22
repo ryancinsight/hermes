@@ -6,11 +6,13 @@ Tactical breakdown of the active items lives in [checklist.md](checklist.md).
 External gap findings live in [gap_audit.md](gap_audit.md).
 
 - [x] [patch] **HS-403 — deterministic extrema and benchmark budgets.** Reject
-  NaN-containing `argmin`/`argmax` inputs before backend reduction, preserve
+  NaN-containing `argmin`/`argmax` inputs, preserve
   the first slice element's signed-zero representation, and exercise every
   workspace Criterion binary under committed 60-second smoke and 300-second full-run
-  budgets. Acceptance: scalar/runtime-dispatch value tests, warning-denied
-  Clippy, Nextest, and exact-head hosted CI pass.
+  budgets. The first hosted smoke exposed an invalid signed-byte ZMM instruction
+  in AVX-512 VNNI dispatch; replace it with exact `VPDPBUSD` bias correction.
+  Acceptance: scalar/runtime-dispatch value tests, warning-denied Clippy,
+  Nextest, and exact-head hosted CI pass.
 
 - [x] [patch] **HS-402 — delivered 2026-07-19 in PR #10.** Regenerate the Hermes provider lock
   against merged Eunomia 0.6 after Eunomia retired its production raw-half

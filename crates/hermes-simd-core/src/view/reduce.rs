@@ -487,45 +487,53 @@ where
 {
     /// Returns `Some((index, value))` for the first minimum element.
     ///
-    /// Correctness: a SIMD reduction pass finds the minimum value, then a linear
-    /// scan locates its first occurrence.
+    /// Correctness: a SIMD reduction pass finds the minimum value, then one
+    /// validation scan rejects NaNs while retaining its first occurrence.
     ///
-    /// Returns `None` for an empty slice or when any element is NaN. Rejecting
-    /// the whole unordered domain before reduction makes the result independent
-    /// of scalar and SIMD unordered-comparison instructions. Equal extrema use
-    /// the first slice element, including its signed-zero representation.
+    /// Returns `None` for an empty slice or when any element is NaN. The
+    /// validation scan rejects the whole unordered domain, so an intermediate
+    /// backend result never escapes. Equal extrema use the first slice element,
+    /// including its signed-zero representation.
     #[inline]
     pub fn argmin(&self) -> Option<(usize, T)> {
         let data = self.as_slice();
-        if data.is_empty() || data.iter().any(|value| value.is_nan()) {
+        if data.is_empty() {
             return None;
         }
         let min_val = self.reduce(crate::ops::Min);
-        data.iter()
-            .copied()
-            .enumerate()
-            .find(|(_, value)| value.partial_cmp(&min_val) == Some(core::cmp::Ordering::Equal))
+        Self::locate_ordered_extremum(data, min_val)
     }
 
     /// Returns `Some((index, value))` for the first maximum element.
     ///
-    /// Correctness: a SIMD reduction pass finds the maximum value, then a linear
-    /// scan locates its first occurrence.
+    /// Correctness: a SIMD reduction pass finds the maximum value, then one
+    /// validation scan rejects NaNs while retaining its first occurrence.
     ///
-    /// Returns `None` for an empty slice or when any element is NaN. Rejecting
-    /// the whole unordered domain before reduction makes the result independent
-    /// of scalar and SIMD unordered-comparison instructions. Equal extrema use
-    /// the first slice element, including its signed-zero representation.
+    /// Returns `None` for an empty slice or when any element is NaN. The
+    /// validation scan rejects the whole unordered domain, so an intermediate
+    /// backend result never escapes. Equal extrema use the first slice element,
+    /// including its signed-zero representation.
     #[inline]
     pub fn argmax(&self) -> Option<(usize, T)> {
         let data = self.as_slice();
-        if data.is_empty() || data.iter().any(|value| value.is_nan()) {
+        if data.is_empty() {
             return None;
         }
         let max_val = self.reduce(crate::ops::Max);
-        data.iter()
-            .copied()
-            .enumerate()
-            .find(|(_, value)| value.partial_cmp(&max_val) == Some(core::cmp::Ordering::Equal))
+        Self::locate_ordered_extremum(data, max_val)
+    }
+
+    #[inline]
+    fn locate_ordered_extremum(data: &[T], extremum: T) -> Option<(usize, T)> {
+        let mut first = None;
+        for (index, value) in data.iter().copied().enumerate() {
+            if value.is_nan() {
+                return None;
+            }
+            if first.is_none() && value.partial_cmp(&extremum) == Some(core::cmp::Ordering::Equal) {
+                first = Some((index, value));
+            }
+        }
+        first
     }
 }

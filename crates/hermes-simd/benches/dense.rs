@@ -10,7 +10,8 @@
 //! across sizes and SIMD widths.
 
 use criterion::{
-    black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
+    black_box, criterion_group, criterion_main, measurement::WallTime, BatchSize, BenchmarkGroup,
+    BenchmarkId, Criterion, SamplingMode, Throughput,
 };
 use hermes_simd::{
     axpy_rows, axpy_rows_batch, dot, elementwise_mul, gemv, gemv_strided, gemv_transpose, sum,
@@ -51,8 +52,17 @@ impl AxpyBatchCase {
     }
 }
 
+fn benchmark_group<'criterion>(
+    criterion: &'criterion mut Criterion,
+    name: &str,
+) -> BenchmarkGroup<'criterion, WallTime> {
+    let mut group = criterion.benchmark_group(name);
+    group.sampling_mode(SamplingMode::Flat);
+    group
+}
+
 fn bench_sum_f32(c: &mut Criterion) {
-    let mut group = c.benchmark_group("sum_f32");
+    let mut group = benchmark_group(c, "sum_f32");
     for &n in SIZES {
         group.throughput(Throughput::Elements(n as u64));
         let data: Vec<f32> = (0..n).map(|i| i as f32).collect();
@@ -64,7 +74,7 @@ fn bench_sum_f32(c: &mut Criterion) {
 }
 
 fn bench_dot_f32(c: &mut Criterion) {
-    let mut group = c.benchmark_group("dot_f32");
+    let mut group = benchmark_group(c, "dot_f32");
     for &n in SIZES {
         group.throughput(Throughput::Elements(n as u64));
         let a: Vec<f32> = (0..n).map(|i| i as f32).collect();
@@ -77,7 +87,7 @@ fn bench_dot_f32(c: &mut Criterion) {
 }
 
 fn bench_elementwise_mul_f32(c: &mut Criterion) {
-    let mut group = c.benchmark_group("elementwise_mul_f32");
+    let mut group = benchmark_group(c, "elementwise_mul_f32");
     for &n in SIZES {
         group.throughput(Throughput::Elements(n as u64));
         let a: Vec<f32> = (0..n).map(|i| i as f32).collect();
@@ -95,7 +105,7 @@ fn bench_elementwise_mul_f32(c: &mut Criterion) {
 /// regression in the dispatched kernel (the instrument measures the production
 /// code path, never a tuned body).
 fn bench_gemv_f32(c: &mut Criterion) {
-    let mut group = c.benchmark_group("gemv_f32");
+    let mut group = benchmark_group(c, "gemv_f32");
     for &n in SIZES {
         group.throughput(Throughput::Elements((n as u64) * (n as u64)));
         let a: Vec<f32> = (0..n * n).map(|i| (i % 17) as f32 * 0.01 - 0.5).collect();
@@ -131,7 +141,7 @@ fn bench_gemv_f32(c: &mut Criterion) {
 /// Transposed GEMV (`y = Aᵀ·x`) vs a scalar sum-of-scaled-rows reference, over
 /// square `n × n` matrices — the reduction-free complement of `gemv`.
 fn bench_gemv_transpose_f32(c: &mut Criterion) {
-    let mut group = c.benchmark_group("gemv_transpose_f32");
+    let mut group = benchmark_group(c, "gemv_transpose_f32");
     for &n in SIZES {
         group.throughput(Throughput::Elements((n as u64) * (n as u64)));
         let a: Vec<f32> = (0..n * n).map(|i| (i % 17) as f32 * 0.01 - 0.5).collect();
@@ -167,7 +177,7 @@ fn bench_gemv_transpose_f32(c: &mut Criterion) {
 /// over an `n × n` block of an `n × (n+padding)` buffer — measures the strided
 /// (gapped-row) access path that the packed `gemv_f32` bench does not.
 fn bench_gemv_strided_f32(c: &mut Criterion) {
-    let mut group = c.benchmark_group("gemv_strided_f32");
+    let mut group = benchmark_group(c, "gemv_strided_f32");
     const PAD: usize = 8;
     for &n in SIZES {
         let lda = n + PAD;
@@ -208,7 +218,7 @@ fn bench_gemv_strided_f32(c: &mut Criterion) {
 /// buffer's row count) — isolating whether register-blocking's reuse of `v`
 /// across columns beats `n` independent dots for this shape.
 fn bench_reflector_dots_f64(c: &mut Criterion) {
-    let mut group = c.benchmark_group("reflector_dots_f64");
+    let mut group = benchmark_group(c, "reflector_dots_f64");
     for &n in &[32usize, 64, 128, 256] {
         group.throughput(Throughput::Elements((n as u64) * (n as u64)));
         // Column-major block: column j at j*n, length n (lda = n here).
@@ -239,7 +249,7 @@ fn bench_reflector_dots_f64(c: &mut Criterion) {
 }
 
 fn bench_axpy_rows_batch_f32(c: &mut Criterion) {
-    let mut group = c.benchmark_group("axpy_rows_batch_f32");
+    let mut group = benchmark_group(c, "axpy_rows_batch_f32");
     for &case in AXPY_BATCH_CASES {
         group.throughput(Throughput::Elements(case.work_items()));
         let label = case.label();
@@ -305,14 +315,15 @@ fn bench_axpy_rows_batch_f32(c: &mut Criterion) {
 
 fn benchmark_config() -> Criterion {
     // Forty-eight IDs cover cache-resident, strided, transposed, reflector, and
-    // batched regimes. Criterion's 3 s + 5 s defaults exceed the binary's
-    // 300-second wall-clock budget before harness overhead. These explicit
-    // per-ID budgets retain every regime and fifty ordered samples while
-    // bounding the modeled measurement time to 72 seconds.
+    // batched regimes. Flat sampling prevents slow matrix cases from Criterion's
+    // linear 1+...+N iteration multiplier. Ten samples is Criterion's statistical
+    // floor; 100 ms warm-up plus 500 ms measurement budgets 28.8 seconds before
+    // analysis and slow-iteration floors, leaving margin inside the 300-second
+    // binary cap without removing a workload or changing a timed region.
     Criterion::default()
-        .warm_up_time(Duration::from_millis(500))
-        .measurement_time(Duration::from_secs(1))
-        .sample_size(50)
+        .warm_up_time(Duration::from_millis(100))
+        .measurement_time(Duration::from_millis(500))
+        .sample_size(10)
 }
 
 criterion_group! {

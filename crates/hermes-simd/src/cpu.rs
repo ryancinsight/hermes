@@ -179,16 +179,15 @@ pub fn has_avx_vnni() -> bool {
     *CACHED.get_or_init(|| std::is_x86_feature_detected!("avxvnni"))
 }
 
-/// The AVX-512 int8 tile kernels enable `avx512f,avx512vnni,avx512vl`.
+/// The AVX-512 int8 tile kernel enables `avx512f,avx512vnni` and implements
+/// signed-byte products through `VPDPBUSD` bias correction.
 #[cfg(target_arch = "x86_64")]
 #[inline]
 fn has_avx512_vnni_tile() -> bool {
     use std::sync::OnceLock;
     static CACHED: OnceLock<bool> = OnceLock::new();
     *CACHED.get_or_init(|| {
-        std::is_x86_feature_detected!("avx512f")
-            && std::is_x86_feature_detected!("avx512vnni")
-            && std::is_x86_feature_detected!("avx512vl")
+        std::is_x86_feature_detected!("avx512f") && std::is_x86_feature_detected!("avx512vnni")
     })
 }
 use eunomia::Bf16;

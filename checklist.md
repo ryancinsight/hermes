@@ -4,15 +4,15 @@
 
 ## HS-403 [patch] — deterministic extrema and benchmark budgets (Owner: Codex `/root`)
 
-- [x] Reject NaN-containing extrema inputs before backend-specific reduction
-      and return the first matching slice value.
+- [x] Reject NaN-containing extrema inputs and return the first matching slice
+      value.
 - [x] Add NaN-position and signed-zero value-semantic regressions.
 - [x] Remove unreachable unchecked dispatch branches.
 - [x] Add metadata-derived, precompiled 60-second smoke and 300-second
       full-binary CI budgets for every workspace Criterion target.
 - [x] Preserve all 48 dense-suite IDs while replacing Criterion's emergent
-      default runtime with explicit 500 ms warm-up, 1 s measurement, and
-      50-sample per-ID budgets.
+      linear iteration multiplier with flat sampling at Criterion's 10-sample
+      floor, 100 ms warm-up, and 500 ms measurement budgets.
 - [ ] Pass focused local gates and exact-head hosted CI; merge and clean the
       branch.
 
