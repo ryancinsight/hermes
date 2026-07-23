@@ -93,6 +93,17 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch] `view::vector_reg` — the `Vector<T, Arch>` register wrapper gains a
+  module-level `# Safety` section documenting its two disciplines (safe methods
+  gate on `assert_runtime_supported`/`runtime_support_result` before the kernel
+  call; the `pub unsafe fn` register loads/stores push both the target-feature
+  requirement and pointer validity to the caller). The six `pub unsafe fn` docs,
+  which stated only pointer validity, now also state the target-feature
+  requirement. Per-site `SAFETY` comments cover the blocks with a further
+  obligation — the `MaybeUninit` store-then-read in `Debug`/`PartialEq`/`to_array`/
+  `to_bitmask`/`cast`/`extract`/`insert`, the compile-time lane-count/index guards
+  behind `from_array`/`extract`, and the bounds asserts in the view-chunk
+  loads/stores. Documentation only; no behavior change (SAFETY comments 6 to 23).
 - [patch] `sparse::ops` — the elementwise-multiply and sum kernels each wrapped
   every target-feature call in its own `unsafe {}` block (35 total, none
   documented). Each kernel region is now one `unsafe` block with a `SAFETY`
