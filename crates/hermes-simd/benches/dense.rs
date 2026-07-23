@@ -4,6 +4,7 @@
 //! - `sum_f32`: horizontal sum over varying lengths.
 //! - `dot_f32`: dot product (fused multiply-add) over varying lengths.
 //! - `elementwise_mul_f32`: in-place elementwise multiplication.
+//! - `argmin_f32`: extremum reduction plus the locating scan.
 //! - `axpy_rows_batch_f32`: fused dense row-panel accumulation.
 //!
 //! Throughput is reported in `elements/second`, enabling direct comparison
@@ -14,7 +15,8 @@ use criterion::{
     BenchmarkId, Criterion, SamplingMode, Throughput,
 };
 use hermes_simd::{
-    axpy_rows, axpy_rows_batch, dot, elementwise_mul, gemv, gemv_strided, gemv_transpose, sum,
+    argmin, axpy_rows, axpy_rows_batch, dot, elementwise_mul, gemv, gemv_strided, gemv_transpose,
+    sum,
 };
 use std::time::Duration;
 
@@ -248,6 +250,21 @@ fn bench_reflector_dots_f64(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_argmin_f32(c: &mut Criterion) {
+    let mut group = benchmark_group(c, "argmin_f32");
+    for &n in SIZES {
+        group.throughput(Throughput::Elements(n as u64));
+        // Descending values put the minimum in the final element, so the
+        // locating scan compares across the whole slice. Its NaN validation
+        // must visit every element regardless, making this the honest cost.
+        let data: Vec<f32> = (0..n).map(|i| (n - i) as f32).collect();
+        group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
+            b.iter(|| argmin(black_box(&data)))
+        });
+    }
+    group.finish();
+}
+
 fn bench_axpy_rows_batch_f32(c: &mut Criterion) {
     let mut group = benchmark_group(c, "axpy_rows_batch_f32");
     for &case in AXPY_BATCH_CASES {
@@ -337,6 +354,7 @@ criterion_group! {
         bench_gemv_strided_f32,
         bench_gemv_transpose_f32,
         bench_reflector_dots_f64,
+        bench_argmin_f32,
         bench_axpy_rows_batch_f32
 }
 criterion_main!(dense_benches);

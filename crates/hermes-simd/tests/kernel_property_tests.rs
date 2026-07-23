@@ -157,12 +157,57 @@ fn check_masked_merge_ops<A: SimdKernel<f32>>() {
     }
 }
 
+/// `vector_to_mask` must invert `mask_to_vector` on lane bits.
+fn check_vector_to_mask_roundtrip<A: SimdKernel<f32>>(bm: u64) {
+    let bm = lane_bits::<A>(bm);
+    // SAFETY: caller gates on the required target features for `A`.
+    let roundtrip = unsafe {
+        A::mask_to_bitmask(A::vector_to_mask(A::mask_to_vector(A::mask_from_bitmask(
+            bm,
+        ))))
+    };
+    assert_eq!(
+        lane_bits::<A>(roundtrip),
+        bm,
+        "vector_to_mask round-trip failed for {bm:#b}"
+    );
+}
+
+/// `mask_to_bitmask ∘ vector_to_mask ∘ cmp_eq` must report exactly the lanes
+/// that compare equal. This is the contract extremum search relies on to locate
+/// a match without leaving vector registers.
+fn check_vector_to_mask_matches_cmp<A: SimdKernel<f32>>(vals: &[f32]) {
+    let lanes = A::LANE_COUNT;
+    let a_vals: Vec<f32> = (0..lanes).map(|i| vals[i % vals.len()]).collect();
+    // Alternate lanes differ; `|v| < 1000` keeps `v + 1.0` distinct from `v` in
+    // f32, so the expected mask is exactly the even lanes.
+    let b_vals: Vec<f32> = a_vals
+        .iter()
+        .enumerate()
+        .map(|(i, &v)| if i % 2 == 0 { v } else { v + 1.0 })
+        .collect();
+    // SAFETY: both buffers hold exactly `LANE_COUNT` elements, so the unaligned
+    // loads stay in bounds; caller gates on the required target features for `A`.
+    let bm = unsafe {
+        let a = A::load_unaligned(a_vals.as_ptr());
+        let b = A::load_unaligned(b_vals.as_ptr());
+        A::mask_to_bitmask(A::vector_to_mask(A::cmp_eq(a, b)))
+    };
+    for i in 0..lanes {
+        let want = a_vals[i] == b_vals[i];
+        let got = (bm >> i) & 1 == 1;
+        assert_eq!(got, want, "cmp_eq lane {i}: {} vs {}", a_vals[i], b_vals[i]);
+    }
+}
+
 /// Run every kernel-level check for one backend.
 fn check_all_kernel_invariants<A>(bm: u64, vals: &[f32])
 where
     A: hermes_simd_core::arch::SimdArch + SimdKernel<f32>,
 {
     check_bitmask_roundtrip::<A>(bm);
+    check_vector_to_mask_roundtrip::<A>(bm);
+    check_vector_to_mask_matches_cmp::<A>(vals);
     check_compress_expand_identity::<A>(bm, vals);
     check_leading_k_masked_sum::<A>();
     check_masked_merge_ops::<A>();

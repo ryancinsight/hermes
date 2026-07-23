@@ -414,6 +414,20 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     /// Processor must support the required target feature.
     unsafe fn mask_to_vector(mask: Self::Mask) -> Self::Vector;
 
+    /// Convert a comparison-result vector into the native mask, the inverse of
+    /// [`SimdKernel::mask_to_vector`].
+    ///
+    /// A lane is active iff its sign bit is set, matching hardware movemask
+    /// semantics (`_mm256_movemask_ps` and friends). The `cmp_*` family returns
+    /// `Self::Vector` with active lanes set to `T::ALL_ONES` — whose sign bit is
+    /// set — so composing this with [`SimdKernel::mask_to_bitmask`] yields one
+    /// bit per comparison outcome, and `trailing_zeros` then locates the first
+    /// matching lane without leaving vector registers.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    unsafe fn vector_to_mask(v: Self::Vector) -> Self::Mask;
+
     /// Perform an intra-vector prefix scan (inclusive or exclusive) of the vector,
     /// using the specified `ScanOp` strategy and starting carry value.
     /// Returns the scanned vector and the final carry value.

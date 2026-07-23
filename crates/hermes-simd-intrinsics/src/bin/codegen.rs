@@ -12,6 +12,9 @@ struct Param {
     index_underlying: &'static str,
     lane_count: usize,
     scale: usize,
+    /// Integer-lane suffix (`epi32`/`epi64`) for intrinsics that reinterpret the
+    /// vector as same-width integers, such as sign-bit extraction.
+    int_lane_suffix: &'static str,
     prefix: &'static str,
     suffix: &'static str,
     suffix_upper: &'static str,
@@ -43,6 +46,7 @@ fn main() {
             index_underlying: "__m256i",
             lane_count: 8,
             scale: 4,
+            int_lane_suffix: "epi32",
             prefix: "_mm256",
             suffix: "ps",
             suffix_upper: "PS",
@@ -101,6 +105,7 @@ fn main() {
             index_underlying: "__m128i",
             lane_count: 4,
             scale: 8,
+            int_lane_suffix: "epi64",
             prefix: "_mm256",
             suffix: "pd",
             suffix_upper: "PD",
@@ -164,6 +169,7 @@ fn main() {
             index_underlying: "__m512i",
             lane_count: 16,
             scale: 4,
+            int_lane_suffix: "epi32",
             prefix: "_mm512",
             suffix: "ps",
             suffix_upper: "PS",
@@ -226,6 +232,7 @@ fn main() {
             index_underlying: "__m256i",
             lane_count: 8,
             scale: 8,
+            int_lane_suffix: "epi64",
             prefix: "_mm512",
             suffix: "pd",
             suffix_upper: "PD",
@@ -812,6 +819,15 @@ impl SimdKernel<__SCALAR_TYPE__> for Avx2 {
     unsafe fn mask_to_vector(mask: Self::Mask) -> Self::Vector {
         __VECTOR_TYPE__(mask.0)
     }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); this is a register-to-register reinterpretation with no memory operands.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn vector_to_mask(v: Self::Vector) -> Self::Mask {
+        // Mask and vector share the `__VECTOR_UNDERLYING__` representation, and the
+        // reinterpretation preserves lane sign bits for `__PREFIX___movemask___SUFFIX__`.
+        __MASK_TYPE__(v.0)
+    }
 }
 "#;
     t.replace("__SCALAR_TYPE__", p.scalar_type)
@@ -821,6 +837,7 @@ impl SimdKernel<__SCALAR_TYPE__> for Avx2 {
         .replace("__MASK_UNDERLYING__", p.mask_underlying)
         .replace("__INDEX_VECTOR__", p.index_vector)
         .replace("__INDEX_UNDERLYING__", p.index_underlying)
+        .replace("__INT_LANE_SUFFIX__", p.int_lane_suffix)
         .replace("__LANE_COUNT__", &p.lane_count.to_string())
         .replace("__SCALE__", &p.scale.to_string())
         .replace("__PREFIX__", p.prefix)
@@ -1334,6 +1351,17 @@ impl SimdKernel<__SCALAR_TYPE__> for Avx512 {
             __PREFIX___set1___SUFFIX__(__SCALAR_TYPE__::from_bits(!0)),
         ))
     }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); this is a register-to-register comparison with no memory operands.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn vector_to_mask(v: Self::Vector) -> Self::Mask {
+        // A signed integer lane is negative exactly when its sign bit is set, so
+        // comparing the reinterpreted lanes against zero collects the sign bits
+        // into a k-register. `__PREFIX___mov__INT_LANE_SUFFIX___mask` would express
+        // this directly but requires AVX512DQ, which this backend does not enable.
+        __PREFIX___cmplt___INT_LANE_SUFFIX___mask(__PREFIX___cast__SUFFIX___si512(v.0), __PREFIX___setzero_si512())
+    }
 }
 "#;
     t.replace("__SCALAR_TYPE__", p.scalar_type)
@@ -1342,6 +1370,7 @@ impl SimdKernel<__SCALAR_TYPE__> for Avx512 {
         .replace("__MASK_TYPE__", p.mask_type)
         .replace("__MASK_UNDERLYING__", p.mask_underlying)
         .replace("__INDEX_UNDERLYING__", p.index_underlying)
+        .replace("__INT_LANE_SUFFIX__", p.int_lane_suffix)
         .replace("__LANE_COUNT__", &p.lane_count.to_string())
         .replace("__SCALE__", &p.scale.to_string())
         .replace("__PREFIX__", p.prefix)

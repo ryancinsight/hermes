@@ -242,4 +242,12 @@ impl SimdKernel<F16> for Scalar {
             }
         })
     }
+
+    #[inline(always)]
+    unsafe fn vector_to_mask(v: Self::Vector) -> Self::Mask {
+        // Bit 15 is the sign bit of a binary16 lane; testing it rather than
+        // comparing against `F16::ZERO` keeps the all-ones comparison result
+        // (a NaN bit pattern) from failing a floating-point equality test.
+        core::array::from_fn(|i| (v[i].to_bits() >> 15) != 0)
+    }
 }

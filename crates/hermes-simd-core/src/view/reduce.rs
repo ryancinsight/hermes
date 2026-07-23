@@ -525,15 +525,63 @@ where
 
     #[inline]
     fn locate_ordered_extremum(data: &[T], extremum: T) -> Option<(usize, T)> {
-        let mut first = None;
-        for (index, value) in data.iter().copied().enumerate() {
+        let lane_count = Arch::LANE_COUNT;
+        // Shift-based construction avoids the `1 << 64` overflow a 64-lane
+        // backend would hit; `lane_count` never exceeds `u64::BITS`.
+        let lane_mask = u64::MAX >> (u64::BITS as usize - lane_count.min(64));
+        let vector_len = (data.len() / lane_count) * lane_count;
+        let mut first: Option<usize> = None;
+        let mut index = 0usize;
+
+        while index < vector_len {
+            // SAFETY: `index <= vector_len - lane_count`, so the load reads
+            // exactly `lane_count` in-bounds elements of `data`; the aligned
+            // variant is selected only when `Align` guarantees the view's base
+            // pointer is arch-aligned, and `index` is a multiple of `lane_count`.
+            // Constructing `Arch` already asserts its target features.
+            let (ordered, hits) = unsafe {
+                let ptr = data.as_ptr().add(index);
+                let v = if crate::align::is_aligned_for_arch::<Arch, Align>() {
+                    Arch::load_aligned(ptr)
+                } else {
+                    Arch::load_unaligned(ptr)
+                };
+                // `x == x` is false exactly for NaN under both the ordered
+                // hardware predicates and the scalar fallback, so a lane absent
+                // from `ordered` marks a NaN. `cmp_ne` is deliberately not used:
+                // its NaN result differs between the scalar default and the
+                // `_CMP_NEQ_OQ` hardware backends.
+                let ordered =
+                    Arch::mask_to_bitmask(Arch::vector_to_mask(Arch::cmp_eq(v, v))) & lane_mask;
+                let hits = if first.is_none() {
+                    let target = Arch::splat(extremum);
+                    Arch::mask_to_bitmask(Arch::vector_to_mask(Arch::cmp_eq(v, target))) & lane_mask
+                } else {
+                    0
+                };
+                (ordered, hits)
+            };
+
+            if ordered != lane_mask {
+                return None;
+            }
+            if hits != 0 {
+                first = Some(index + hits.trailing_zeros() as usize);
+            }
+            index += lane_count;
+        }
+
+        for (offset, value) in data[index..].iter().copied().enumerate() {
             if value.is_nan() {
                 return None;
             }
             if first.is_none() && value.partial_cmp(&extremum) == Some(core::cmp::Ordering::Equal) {
-                first = Some((index, value));
+                first = Some(index + offset);
             }
         }
-        first
+
+        // Report the stored element rather than the reduced extremum so equal
+        // values keep their own representation, notably signed zero.
+        first.map(|at| (at, data[at]))
     }
 }

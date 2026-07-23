@@ -4,7 +4,32 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ## [Unreleased]
 
+### Added
+
+- [minor] `SimdKernel::vector_to_mask` converts a comparison-result vector into
+  the backend's native mask — the inverse of `mask_to_vector`. Composed with
+  `mask_to_bitmask` it reduces any `cmp_*` result to one bit per lane, so a lane
+  search resolves through `trailing_zeros` without leaving vector registers.
+  Every backend implements it natively: a register rewrap on AVX2, a
+  bit-preserving reinterpretation on NEON, `cmplt_epi{32,64}_mask` sign
+  extraction on AVX-512 (AVX512F-only, since `movepi*_mask` needs AVX512DQ), and
+  a `SIGN_MASK` bit test on the lane-emulated backends. Adding it to the sealed
+  `SimdKernel` breaks no implementor: `cargo semver-checks` against `main`
+  reports no required update.
+
 ### Changed
+
+- [patch] `argmin`/`argmax` locate their extremum with a vectorized scan instead
+  of a scalar pass. Each vector tests NaN with `cmp_eq(v, v)` and matches the
+  extremum with `cmp_eq(v, target)`, reducing both to bitmasks and taking the
+  first hit with `trailing_zeros`. Measured on `dense/argmin_f32` (quiescent
+  host, zero competing builds, p < 0.05): **−88.1% (256) / −91.8% (1024) /
+  −92.7% (4096) / −92.9% (16384)**, an 8.4× to 14.1× speedup, lifting the scan
+  from ~0.93 Gelem/s to ~12.8 Gelem/s. The NaN test deliberately avoids
+  `cmp_ne`, whose NaN result differs between the scalar default and the
+  `_CMP_NEQ_OQ` hardware backends (tracked as HS-404). Behavior is unchanged:
+  the rejection, first-occurrence, and signed-zero contracts hold, now also
+  covered at lengths that exercise the vector body rather than only the tail.
 
 - [patch] The AVX-512 VNNI signed-int8 GEMM tile now uses the ISA-supported
   unsigned-byte × signed-byte dot product with exact 128-bias correction. This

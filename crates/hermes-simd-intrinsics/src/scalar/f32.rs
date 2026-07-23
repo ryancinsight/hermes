@@ -337,4 +337,60 @@ impl SimdKernel<f32> for Scalar {
             },
         ]
     }
+
+    #[inline(always)]
+    unsafe fn vector_to_mask(v: Self::Vector) -> Self::Mask {
+        // Bit 31 is the sign bit; testing it rather than comparing against zero
+        // keeps the all-ones comparison result (a NaN bit pattern) from failing
+        // a floating-point equality test.
+        core::array::from_fn(|i| (v[i].to_bits() >> 31) != 0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::Scalar;
+    use hermes_simd_core::align::Unaligned;
+    use hermes_simd_core::execution::Unmasked;
+    use hermes_simd_core::view::SimdView;
+
+    /// The view's extremum scan issues raw-pointer vector loads. `hermes-simd`
+    /// holds the behavioural tests, but miri runs only `hermes-simd-core` and
+    /// this crate, so driving the scan through a concrete backend here is what
+    /// puts those loads under the interpreter.
+    /// Located extremum: slice position paired with the stored element.
+    type Extremum = Option<(usize, f32)>;
+
+    fn scan(data: &[f32]) -> (Extremum, Extremum) {
+        let view = SimdView::<f32, Scalar, Unaligned, Unmasked, &[f32]>::new(data)
+            .expect("invariant: any slice is a valid unaligned view");
+        (view.argmin(), view.argmax())
+    }
+
+    #[test]
+    fn extremum_scan_stays_in_bounds_across_lengths() {
+        // Lengths straddle the vector body and the scalar tail.
+        for len in [0_usize, 1, 3, 4, 5, 7, 8, 9, 16, 17, 33] {
+            let data: Vec<f32> = (0..len).map(|i| (len - i) as f32).collect();
+            let (minimum, maximum) = scan(&data);
+            if len == 0 {
+                assert_eq!(minimum, None);
+                assert_eq!(maximum, None);
+            } else {
+                assert_eq!(minimum.map(|(index, _)| index), Some(len - 1), "len {len}");
+                assert_eq!(maximum.map(|(index, _)| index), Some(0), "len {len}");
+            }
+        }
+    }
+
+    #[test]
+    fn extremum_scan_rejects_nan_in_every_position() {
+        for len in [1_usize, 4, 5, 9, 17] {
+            for nan_at in 0..len {
+                let mut data = vec![1.0_f32; len];
+                data[nan_at] = f32::NAN;
+                assert_eq!(scan(&data), (None, None), "len {len}, NaN at {nan_at}");
+            }
+        }
+    }
 }
