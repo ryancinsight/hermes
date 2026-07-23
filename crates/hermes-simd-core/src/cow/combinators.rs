@@ -7,14 +7,13 @@
 //! that precondition holds by construction: a `SimdCow` exists only for an
 //! architecture the host can execute, since its borrowed form comes from
 //! [`SimdView::new`](crate::view::SimdView::new) and its owned constructors
-//! assert the same condition. The second is local — these routines allocate
-//! with `with_capacity` and `set_len` before writing, deliberately avoiding a
-//! zero-fill of a buffer that is about to be overwritten, so each such site
-//! carries a `SAFETY` comment showing that every element in the new length is
-//! written before the value is observable. Several of them hand the buffer to a
-//! filler as `&mut [T]` while its tail is still unwritten; every element is
-//! initialized before anything reads it, but forming that reference early is a
-//! pattern to replace with `spare_capacity_mut`, tracked as HS-407.
+//! assert the same condition. The second is local — these routines build their
+//! output buffer with `with_capacity` and write it through a raw pointer,
+//! raising the length only once every element is initialized. That avoids both
+//! a zero-fill of a buffer about to be overwritten and any `&mut [T]` spanning
+//! uninitialized elements, so each such site carries a `SAFETY` comment showing
+//! the write coverage. Where an existing API needs an initialized slice up
+//! front, the buffer comes from `AlignedVec::with_capacity_zeroed` instead.
 
 use super::types::SimdCow;
 use crate::align::Alignment;
@@ -111,8 +110,10 @@ where
             i += 1;
         }
 
-        // SAFETY: `with_capacity(len)` reserved space for len elements and
-        // every one of them is written below before this buffer is read.
+        // SAFETY: `with_capacity(len)` reserved `len` elements, and the vector
+        // and remainder loops above have together written every one of them
+        // through `out_ptr`. The length is raised only now, so no reference to
+        // this buffer ever spanned uninitialized memory.
         unsafe {
             out.set_len(len);
         }

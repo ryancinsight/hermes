@@ -7,14 +7,13 @@
 //! that precondition holds by construction: a `SimdCow` exists only for an
 //! architecture the host can execute, since its borrowed form comes from
 //! [`SimdView::new`](crate::view::SimdView::new) and its owned constructors
-//! assert the same condition. The second is local — these routines allocate
-//! with `with_capacity` and `set_len` before writing, deliberately avoiding a
-//! zero-fill of a buffer that is about to be overwritten, so each such site
-//! carries a `SAFETY` comment showing that every element in the new length is
-//! written before the value is observable. Several of them hand the buffer to a
-//! filler as `&mut [T]` while its tail is still unwritten; every element is
-//! initialized before anything reads it, but forming that reference early is a
-//! pattern to replace with `spare_capacity_mut`, tracked as HS-407.
+//! assert the same condition. The second is local — these routines build their
+//! output buffer with `with_capacity` and write it through a raw pointer,
+//! raising the length only once every element is initialized. That avoids both
+//! a zero-fill of a buffer about to be overwritten and any `&mut [T]` spanning
+//! uninitialized elements, so each such site carries a `SAFETY` comment showing
+//! the write coverage. Where an existing API needs an initialized slice up
+//! front, the buffer comes from `AlignedVec::with_capacity_zeroed` instead.
 
 use super::types::SimdCow;
 use crate::align::Alignment;
@@ -39,16 +38,10 @@ where
         &self,
         op: Op,
     ) -> SimdCow<'static, T, Arch, Align> {
-        let len = self.len();
-        let mut out: AlignedVec<T, Align> = AlignedVec::with_capacity(len);
-        // SAFETY: we write every element below before returning.
-        unsafe {
-            out.set_len(len);
-        }
-        self.view()
-            .map_unary(op, out.as_mut_slice())
-            .expect("invariant: output length equals input length");
-        SimdCow::Owned(out)
+        // Same operation as `map_cow`, which owns the single implementation:
+        // it writes the output buffer through a raw pointer and raises the
+        // length only once every element is initialized.
+        self.map_cow(op)
     }
 
     /// Apply a `UnaryOp<T>` in-place: `self[i] = op(self[i])`.
@@ -128,15 +121,14 @@ where
     #[inline]
     pub fn splat_fill(value: T, len: usize) -> SimdCow<'static, T, Arch, Align> {
         let mut out: AlignedVec<T, Align> = AlignedVec::with_capacity(len);
-        // SAFETY: `with_capacity(len)` reserved space for len elements and
-        // every one of them is written below before this buffer is read.
-        unsafe {
-            out.set_len(len);
-        }
         let lane_count = Arch::LANE_COUNT;
         let simd_len = (len / lane_count) * lane_count;
         let ptr = out.as_mut_ptr();
 
+        // SAFETY: `with_capacity(len)` reserved `len` elements, so every store
+        // below `len` stays inside the allocation. The vector's length is
+        // raised only after the vector and scalar loops have together written
+        // all `len` elements, so no reference spans uninitialized memory.
         unsafe {
             let vsplat = Arch::splat(value);
             let mut i = 0usize;
@@ -148,11 +140,10 @@ where
                 }
                 i += lane_count;
             }
-        }
-
-        let slice = out.as_mut_slice();
-        for i in simd_len..len {
-            slice[i] = value;
+            for i in simd_len..len {
+                core::ptr::write(ptr.add(i), value);
+            }
+            out.set_len(len);
         }
 
         SimdCow::Owned(out)
@@ -195,12 +186,10 @@ where
     #[inline]
     pub fn gather(&self, indices: &[i32]) -> Result<SimdCow<'static, T, Arch, Align>, SimdError> {
         let len = indices.len();
-        let mut out = AlignedVec::with_capacity(len);
-        // SAFETY: `with_capacity(len)` reserved space for len elements and
-        // every one of them is written below before this buffer is read.
-        unsafe {
-            out.set_len(len);
-        }
+        // Zeroed rather than reserved-and-lengthened: the filler below needs an
+        // initialized `&mut [T]`, and forming that over uninitialized elements
+        // is not a reference the language permits.
+        let mut out = AlignedVec::with_capacity_zeroed(len);
         self.view().gather(indices, out.as_mut_slice())?;
         Ok(SimdCow::Owned(out))
     }
@@ -218,12 +207,10 @@ where
         SMode: crate::ops::ScanMode,
     {
         let len = self.len();
-        let mut out = AlignedVec::with_capacity(len);
-        // SAFETY: `with_capacity(len)` reserved space for len elements and
-        // every one of them is written below before this buffer is read.
-        unsafe {
-            out.set_len(len);
-        }
+        // Zeroed rather than reserved-and-lengthened: the filler below needs an
+        // initialized `&mut [T]`, and forming that over uninitialized elements
+        // is not a reference the language permits.
+        let mut out = AlignedVec::with_capacity_zeroed(len);
         self.view().prefix_scan(out.as_mut_slice(), op, mode)?;
         Ok(SimdCow::Owned(out))
     }
