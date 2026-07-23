@@ -38,34 +38,34 @@ fn main() {
 
     // 1. Sliding attacks using the default Magic Bitboard backend
     println!("\nRook attacks from d3 using Magic Bitboards:");
-    let rook_magic = unsafe { <Magic as BitBoardKernel>::rook_attacks(d3, occupancy) };
+    let rook_magic = <Magic as BitBoardKernel>::rook_attacks(d3, occupancy);
     print_bitboard(rook_magic);
 
     println!("\nBishop attacks from d3 using Magic Bitboards:");
-    let bishop_magic = unsafe { <Magic as BitBoardKernel>::bishop_attacks(d3, occupancy) };
+    let bishop_magic = <Magic as BitBoardKernel>::bishop_attacks(d3, occupancy);
     print_bitboard(bishop_magic);
 
     // 2. Comparing different backends
     println!("\nComparing sliding attack backends...");
-    unsafe {
-        let r_swar = <HybridSwarMagic as BitBoardKernel>::rook_attacks(d3, occupancy);
-        let r_ks = <KoggeStone as BitBoardKernel>::rook_attacks(d3, occupancy);
-        let r_hyp = <Hyperbola as BitBoardKernel>::rook_attacks(d3, occupancy);
+    let r_swar = <HybridSwarMagic as BitBoardKernel>::rook_attacks(d3, occupancy);
+    let r_ks = <KoggeStone as BitBoardKernel>::rook_attacks(d3, occupancy);
+    let r_hyp = <Hyperbola as BitBoardKernel>::rook_attacks(d3, occupancy);
 
-        assert_eq!(rook_magic, r_swar);
-        assert_eq!(rook_magic, r_ks);
-        assert_eq!(rook_magic, r_hyp);
-        println!("  [OK] All Rook attack backends (Magic, KoggeStone, Hyperbola, Hybrid) matched perfectly.");
+    assert_eq!(rook_magic, r_swar);
+    assert_eq!(rook_magic, r_ks);
+    assert_eq!(rook_magic, r_hyp);
+    println!(
+        "  [OK] All Rook attack backends (Magic, KoggeStone, Hyperbola, Hybrid) matched perfectly."
+    );
 
-        let b_swar = <HybridSwarMagic as BitBoardKernel>::bishop_attacks(d3, occupancy);
-        let b_ks = <KoggeStone as BitBoardKernel>::bishop_attacks(d3, occupancy);
-        let b_hyp = <Hyperbola as BitBoardKernel>::bishop_attacks(d3, occupancy);
+    let b_swar = <HybridSwarMagic as BitBoardKernel>::bishop_attacks(d3, occupancy);
+    let b_ks = <KoggeStone as BitBoardKernel>::bishop_attacks(d3, occupancy);
+    let b_hyp = <Hyperbola as BitBoardKernel>::bishop_attacks(d3, occupancy);
 
-        assert_eq!(bishop_magic, b_swar);
-        assert_eq!(bishop_magic, b_ks);
-        assert_eq!(bishop_magic, b_hyp);
-        println!("  [OK] All Bishop attack backends matched perfectly.");
-    }
+    assert_eq!(bishop_magic, b_swar);
+    assert_eq!(bishop_magic, b_ks);
+    assert_eq!(bishop_magic, b_hyp);
+    println!("  [OK] All Bishop attack backends matched perfectly.");
 
     // 3. Batch attacks with BitBoardView
     println!("\nBatch attack queries using BitBoardView:");

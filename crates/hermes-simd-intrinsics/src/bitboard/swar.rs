@@ -63,7 +63,7 @@ where
 
 impl BitBoardKernel for Swar {
     #[inline]
-    unsafe fn rook_attacks(square: u8, occupancy: u64) -> u64 {
+    fn rook_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
         attack_ray(slider, occupancy, shift_n)
             | attack_ray(slider, occupancy, shift_s)
@@ -72,7 +72,7 @@ impl BitBoardKernel for Swar {
     }
 
     #[inline]
-    unsafe fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
+    fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
         attack_ray(slider, occupancy, shift_ne)
             | attack_ray(slider, occupancy, shift_nw)
