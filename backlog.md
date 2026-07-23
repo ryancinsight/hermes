@@ -80,6 +80,11 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   `elementwise_mul_dense` gather (unvalidated view, no dense-length guard; miri
   confirmed the UB) now fixed with validate + length asserts. Remaining:
   `view/reduce.rs`, `tiling/`, `view/vector_reg.rs`.
+  `view/vector_reg.rs` now done — module `# Safety` section added, the six
+  `pub unsafe fn` docs corrected to state the target-feature obligation, and
+  per-site comments added to the MaybeUninit and lane-guard blocks (6 to 23
+  SAFETY comments); the code was already well-guarded, so this is
+  documentation-only. Remaining: `view/reduce.rs`, `tiling/`.
 
 - [x] [patch] **HS-404 — `cmp_ne` NaN semantics diverged across backends.** The
   trait default returns all-ones for `NaN != NaN` (Rust `!=` is true), while the

@@ -1,4 +1,24 @@
 //! Monomorphized SIMD vector register wrapper.
+//!
+//! # Safety
+//!
+//! Every operation here ultimately calls a `#[target_feature]`-gated
+//! [`SimdKernel`](crate::kernel::SimdKernel) method, sound only on a host that
+//! implements `Arch`. Two disciplines discharge that obligation:
+//!
+//! - **Safe methods** call `assert_runtime_supported` (or
+//!   `runtime_support_result` for the `try_*` forms) before their `unsafe`
+//!   kernel call, so the check immediately above each block is its target-feature
+//!   proof. Those blocks therefore carry a per-site `SAFETY` comment only when
+//!   they add a further obligation — a raw-pointer bound, a lane-index range, or
+//!   a `MaybeUninit` initialization.
+//! - The `pub unsafe fn` register loads/stores (`load_aligned` and friends) push
+//!   *both* the target-feature requirement and pointer validity to the caller;
+//!   each states both in its `# Safety` section.
+//!
+//! Lane-count and lane-index preconditions (`from_array`, `extract`, `cast`, …)
+//! are proven at compile time by the `AssertLaneCount`/`AssertLaneIndex` const
+//! guards, so a mismatch fails the build rather than reading out of bounds.
 
 use super::mask_reg::Mask;
 use super::SimdError;
@@ -48,6 +68,10 @@ where
         const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
         let lane_count = Arch::LANE_COUNT;
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        // SAFETY: target feature checked above. The store writes exactly
+        // `lane_count` elements into the `MAX_SIMD_LANES`-slot buffer (bounded by
+        // `LANE_BOUND_CHECK`), so the `lane_count`-length slice reads only
+        // initialized elements.
         unsafe {
             Arch::store_unaligned(buf.as_mut_ptr() as *mut T, self.raw);
             let init_slice = core::slice::from_raw_parts(buf.as_ptr() as *const T, lane_count);
@@ -68,6 +92,9 @@ where
         let lane_count = Arch::LANE_COUNT;
         let mut buf_self = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let mut buf_other = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        // SAFETY: target feature checked above. Each store writes `lane_count`
+        // elements into its buffer, so both `lane_count`-length slices read only
+        // initialized elements.
         unsafe {
             Arch::store_unaligned(buf_self.as_mut_ptr() as *mut T, self.raw);
             Arch::store_unaligned(buf_other.as_mut_ptr() as *mut T, other.raw);
@@ -129,7 +156,8 @@ where
     /// Load a Vector from an aligned pointer.
     ///
     /// # Safety
-    /// `ptr` must be valid for reads and aligned to `Arch::LANE_COUNT * size_of::<T>()` bytes.
+    /// The host must support `Arch`'s target features, and `ptr` must be valid
+    /// for reads and aligned to `Arch::LANE_COUNT * size_of::<T>()` bytes.
     #[inline(always)]
     pub unsafe fn load_aligned(ptr: *const T) -> Self {
         Self::new(Arch::load_aligned(ptr))
@@ -138,7 +166,8 @@ where
     /// Load a Vector from an unaligned pointer.
     ///
     /// # Safety
-    /// `ptr` must be valid for reads.
+    /// The host must support `Arch`'s target features, and `ptr` must be valid
+    /// for reads.
     #[inline(always)]
     pub unsafe fn load_unaligned(ptr: *const T) -> Self {
         Self::new(Arch::load_unaligned(ptr))
@@ -147,7 +176,8 @@ where
     /// Store the Vector elements to an aligned pointer.
     ///
     /// # Safety
-    /// `ptr` must be valid for writes and aligned to `Arch::LANE_COUNT * size_of::<T>()` bytes.
+    /// The host must support `Arch`'s target features, and `ptr` must be valid
+    /// for writes and aligned to `Arch::LANE_COUNT * size_of::<T>()` bytes.
     #[inline(always)]
     pub unsafe fn store_aligned(self, ptr: *mut T) {
         Arch::store_aligned(ptr, self.raw);
@@ -156,7 +186,8 @@ where
     /// Store the Vector elements to an unaligned pointer.
     ///
     /// # Safety
-    /// `ptr` must be valid for writes.
+    /// The host must support `Arch`'s target features, and `ptr` must be valid
+    /// for writes.
     #[inline(always)]
     pub unsafe fn store_unaligned(self, ptr: *mut T) {
         Arch::store_unaligned(ptr, self.raw);
@@ -165,7 +196,8 @@ where
     /// Masked load from an unaligned pointer: active lanes loaded from `ptr`, inactive lanes from `src`.
     ///
     /// # Safety
-    /// `ptr` must be valid for reads.
+    /// The host must support `Arch`'s target features, and `ptr` must be valid
+    /// for reads of `Arch::LANE_COUNT` elements.
     #[inline(always)]
     pub unsafe fn masked_load_unaligned(ptr: *const T, mask: Mask<T, Arch>, src: Self) -> Self {
         Self::new(Arch::masked_load_unaligned(ptr, mask.raw, src.raw))
@@ -174,7 +206,8 @@ where
     /// Masked store to an unaligned pointer: active lanes written to `ptr`, inactive lanes left unchanged.
     ///
     /// # Safety
-    /// `ptr` must be valid for writes.
+    /// The host must support `Arch`'s target features, and `ptr` must be valid
+    /// for writes of `Arch::LANE_COUNT` elements.
     #[inline(always)]
     pub unsafe fn masked_store_unaligned(self, ptr: *mut T, mask: Mask<T, Arch>) {
         Arch::masked_store_unaligned(ptr, mask.raw, self.raw);
@@ -478,6 +511,9 @@ where
     pub fn from_array<const N: usize>(arr: [T; N]) -> Self {
         assert_runtime_supported::<T, Arch>();
         let _ = AssertLaneCount::<T, Arch, N>::OK;
+        // SAFETY: target feature checked above; `AssertLaneCount` proved
+        // `N == LANE_COUNT`, so `arr` holds a full vector's worth of elements for
+        // the unaligned load.
         unsafe { Self::load_unaligned(arr.as_ptr()) }
     }
 
@@ -487,6 +523,7 @@ where
     pub fn try_from_array<const N: usize>(arr: [T; N]) -> Result<Self, SimdError> {
         runtime_support_result::<T, Arch>()?;
         let _ = AssertLaneCount::<T, Arch, N>::OK;
+        // SAFETY: as `from_array` — `N == LANE_COUNT`, so `arr` covers the load.
         unsafe { Ok(Self::load_unaligned(arr.as_ptr())) }
     }
 
@@ -496,6 +533,9 @@ where
         assert_runtime_supported::<T, Arch>();
         let _ = AssertLaneCount::<T, Arch, N>::OK;
         let mut arr = [core::mem::MaybeUninit::<T>::uninit(); N];
+        // SAFETY: target feature checked above; `AssertLaneCount` proved
+        // `N == LANE_COUNT`, so the store initializes all `N` slots before the
+        // `[T; N]` is read out.
         unsafe {
             self.store_unaligned(arr.as_mut_ptr() as *mut T);
             core::ptr::read(arr.as_ptr() as *const [T; N])
@@ -509,6 +549,9 @@ where
         const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let lanes = <Arch as SimdKernel<T>>::LANE_COUNT;
+        // SAFETY: target feature checked above; the store writes `lanes` elements
+        // into the `MAX_SIMD_LANES`-slot buffer (bounded by `LANE_BOUND_CHECK`),
+        // so `assume_init` reads only those initialized lanes.
         unsafe {
             self.store_unaligned(buf.as_mut_ptr() as *mut T);
             let mut m = 0u64;
@@ -525,36 +568,48 @@ where
     /// Elementwise equal comparison returning a native `Mask`.
     #[inline(always)]
     pub fn cmp_eq_mask(self, other: Self) -> Mask<T, Arch> {
+        // SAFETY: `from_bitmask` requires only that the host support `Arch`,
+        // which the inner `cmp_eq`/`to_bitmask` calls already assert.
         unsafe { Mask::from_bitmask(self.cmp_eq(other).to_bitmask()) }
     }
 
     /// Elementwise not-equal comparison returning a native `Mask`.
     #[inline(always)]
     pub fn cmp_ne_mask(self, other: Self) -> Mask<T, Arch> {
+        // SAFETY: `from_bitmask` requires only that the host support `Arch`,
+        // which the inner `cmp_ne`/`to_bitmask` calls already assert.
         unsafe { Mask::from_bitmask(self.cmp_ne(other).to_bitmask()) }
     }
 
     /// Elementwise less-than comparison returning a native `Mask`.
     #[inline(always)]
     pub fn cmp_lt_mask(self, other: Self) -> Mask<T, Arch> {
+        // SAFETY: `from_bitmask` requires only that the host support `Arch`,
+        // which the inner `cmp_lt`/`to_bitmask` calls already assert.
         unsafe { Mask::from_bitmask(self.cmp_lt(other).to_bitmask()) }
     }
 
     /// Elementwise less-than-or-equal comparison returning a native `Mask`.
     #[inline(always)]
     pub fn cmp_le_mask(self, other: Self) -> Mask<T, Arch> {
+        // SAFETY: `from_bitmask` requires only that the host support `Arch`,
+        // which the inner `cmp_le`/`to_bitmask` calls already assert.
         unsafe { Mask::from_bitmask(self.cmp_le(other).to_bitmask()) }
     }
 
     /// Elementwise greater-than comparison returning a native `Mask`.
     #[inline(always)]
     pub fn cmp_gt_mask(self, other: Self) -> Mask<T, Arch> {
+        // SAFETY: `from_bitmask` requires only that the host support `Arch`,
+        // which the inner `cmp_gt`/`to_bitmask` calls already assert.
         unsafe { Mask::from_bitmask(self.cmp_gt(other).to_bitmask()) }
     }
 
     /// Elementwise greater-than-or-equal comparison returning a native `Mask`.
     #[inline(always)]
     pub fn cmp_ge_mask(self, other: Self) -> Mask<T, Arch> {
+        // SAFETY: `from_bitmask` requires only that the host support `Arch`,
+        // which the inner `cmp_ge`/`to_bitmask` calls already assert.
         unsafe { Mask::from_bitmask(self.cmp_ge(other).to_bitmask()) }
     }
 
@@ -573,6 +628,11 @@ where
         let mut buf_t = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let mut buf_u = [core::mem::MaybeUninit::<U>::uninit(); MAX_SIMD_LANES];
         let lanes = <Arch as SimdKernel<T>>::LANE_COUNT;
+        // SAFETY: target features for both `T` and `U` checked above;
+        // `AssertLaneCountSame` and `LANE_BOUND_CHECK` bound `lanes` within both
+        // buffers. The `T` store initializes `buf_t[..lanes]` before `assume_init`
+        // reads it, the loop initializes `buf_u[..lanes]`, and the `U` load reads
+        // exactly those `lanes` lanes.
         unsafe {
             self.store_unaligned(buf_t.as_mut_ptr() as *mut T);
             for i in 0..lanes {
@@ -590,6 +650,9 @@ where
         let _ = AssertLaneIndex::<T, Arch, I>::OK;
         const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        // SAFETY: target feature checked above; `AssertLaneIndex` proved
+        // `I < LANE_COUNT`, and the store initializes `buf[..LANE_COUNT]`, so
+        // `buf[I]` is initialized.
         unsafe {
             self.store_unaligned(buf.as_mut_ptr() as *mut T);
             buf[I].assume_init()
@@ -603,6 +666,10 @@ where
         let _ = AssertLaneIndex::<T, Arch, I>::OK;
         const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        // SAFETY: target feature checked above; `AssertLaneIndex` proved
+        // `I < LANE_COUNT`. The store initializes `buf[..LANE_COUNT]`, `buf[I]` is
+        // then overwritten, and the reload reads all `LANE_COUNT` initialized
+        // lanes.
         unsafe {
             self.store_unaligned(buf.as_mut_ptr() as *mut T);
             buf[I].write(val);
@@ -628,6 +695,10 @@ where
             offset + Arch::LANE_COUNT <= slice.len(),
             "Chunk index out of bounds"
         );
+        // SAFETY: target feature checked above; the assert guarantees
+        // `offset + LANE_COUNT <= slice.len()`, so the load reads a full vector in
+        // bounds. The aligned variant is taken only when `Align` proves the base
+        // pointer is arch-aligned and `offset` is a lane-count multiple.
         unsafe {
             if crate::align::is_aligned_for_arch::<Arch, Align>() {
                 Self::load_aligned(slice.as_ptr().add(offset))
@@ -654,6 +725,9 @@ where
             offset + Arch::LANE_COUNT <= slice.len(),
             "Chunk index out of bounds"
         );
+        // SAFETY: as `from_view_chunk` — the assert guarantees
+        // `offset + LANE_COUNT <= slice.len()`, so the store writes a full vector
+        // in bounds; the aligned variant is gated on `Align`.
         unsafe {
             if crate::align::is_aligned_for_arch::<Arch, Align>() {
                 self.store_aligned(slice.as_mut_ptr().add(offset));
