@@ -68,14 +68,33 @@ where
     /// For buffers handed to a routine that fills them through a `&mut [T]`,
     /// this is the sound alternative to reserving capacity and raising the
     /// length before writing: that would form a reference over uninitialized
-    /// elements. Every scalar type this crate supports has a valid all-zero
-    /// representation, so the allocation is fully initialized on return.
+    /// elements. The returned vector has its length raised over `alloc_zeroed`
+    /// memory, so the `T: Zeroable` bound is load-bearing — it is what makes
+    /// the all-zero byte pattern a valid `T`. Without it a caller could pick a
+    /// type such as `NonZeroU32`, `&U` or a discriminant-restricted enum and
+    /// observe an invalid value through the returned slice, which is the same
+    /// unsoundness the copy-on-write constructors avoid by writing through a
+    /// raw pointer.
     ///
     /// Prefer `with_capacity` plus writes through a raw pointer where the
     /// caller controls the write loop, since that avoids this zeroing pass
     /// entirely; use this only when an existing API requires an initialized
     /// slice up front.
-    pub fn with_capacity_zeroed(capacity: usize) -> Self {
+    ///
+    /// A type without a valid all-zero representation is rejected at compile
+    /// time:
+    ///
+    /// ```compile_fail
+    /// use hermes_simd_core::{AlignedVec, Unaligned};
+    /// // `NonZeroU32` is not `eunomia::Zeroable`: an all-zero element is an
+    /// // invalid value, so this call does not type-check.
+    /// let _v: AlignedVec<core::num::NonZeroU32, Unaligned> =
+    ///     AlignedVec::with_capacity_zeroed(4);
+    /// ```
+    pub fn with_capacity_zeroed(capacity: usize) -> Self
+    where
+        T: eunomia::Zeroable,
+    {
         if core::mem::size_of::<T>() == 0 || capacity == 0 {
             let mut empty = Self::with_capacity(capacity);
             // SAFETY: a zero-sized element type has no storage to initialize,

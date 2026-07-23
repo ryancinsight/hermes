@@ -184,7 +184,10 @@ where
     /// # Errors
     /// Returns `SimdError::IndexOutOfBounds` if any index in `indices` is out of bounds.
     #[inline]
-    pub fn gather(&self, indices: &[i32]) -> Result<SimdCow<'static, T, Arch, Align>, SimdError> {
+    pub fn gather(&self, indices: &[i32]) -> Result<SimdCow<'static, T, Arch, Align>, SimdError>
+    where
+        T: eunomia::Zeroable,
+    {
         let len = indices.len();
         // Zeroed rather than reserved-and-lengthened: the filler below needs an
         // initialized `&mut [T]`, and forming that over uninitialized elements
@@ -205,6 +208,7 @@ where
     where
         Op: crate::ops::ScanOp<T>,
         SMode: crate::ops::ScanMode,
+        T: eunomia::Zeroable,
     {
         let len = self.len();
         // Zeroed rather than reserved-and-lengthened: the filler below needs an
