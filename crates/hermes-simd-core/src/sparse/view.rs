@@ -4,7 +4,7 @@ use super::{
     BlockedCoo, BlockedCooData, Csr, CsrData, DenseWithMask, DenseWithMaskData, SellP, SellPData,
     SparseFormat, SparseShape, Validated, ValidatedData,
 };
-use crate::arch::SimdArch;
+use crate::arch::{assert_arch_executable, SimdArch};
 use core::marker::PhantomData;
 
 /// Format-parameterized sparse matrix view.
@@ -24,8 +24,12 @@ where
     Arch: SimdArch,
 {
     /// Create a `SparseView` from the format's storage representation.
+    ///
+    /// # Panics
+    /// If `Arch` cannot execute on this host.
     #[inline(always)]
     pub fn new(data: Format::Storage<'a, T>) -> Self {
+        assert_arch_executable::<Arch>();
         Self {
             data,
             _arch: PhantomData,
@@ -57,8 +61,12 @@ where
     Arch: SimdArch,
 {
     /// Create a `SparseView` over CSR data.
+    ///
+    /// # Panics
+    /// If `Arch` cannot execute on this host.
     #[inline]
     pub fn from_csr(data: CsrData<'a, T>) -> Self {
+        assert_arch_executable::<Arch>();
         Self {
             data,
             _arch: PhantomData,
@@ -88,8 +96,12 @@ where
     }
 
     /// Create a SpMV-ready view from already-validated CSR storage.
+    ///
+    /// # Panics
+    /// If `Arch` cannot execute on this host.
     #[inline]
     pub fn from_validated_csr(data: ValidatedData<CsrData<'a, T>>) -> Self {
+        assert_arch_executable::<Arch>();
         Self {
             data,
             _arch: PhantomData,
@@ -103,8 +115,12 @@ where
     Arch: SimdArch,
 {
     /// Create a `SparseView` over SELL-p data (generic C).
+    ///
+    /// # Panics
+    /// If `Arch` cannot execute on this host.
     #[inline]
     pub fn from_sellp(data: SellPData<'a, T, C>) -> Self {
+        assert_arch_executable::<Arch>();
         Self {
             data,
             _arch: PhantomData,
@@ -128,8 +144,12 @@ where
     }
 
     /// Create a SpMV-ready view from already-validated SELL-p storage.
+    ///
+    /// # Panics
+    /// If `Arch` cannot execute on this host.
     #[inline]
     pub fn from_validated_sellp(data: ValidatedData<SellPData<'a, T, C>>) -> Self {
+        assert_arch_executable::<Arch>();
         Self {
             data,
             _arch: PhantomData,
@@ -143,8 +163,12 @@ where
     Arch: SimdArch,
 {
     /// Create a `SparseView` over Blocked-COO data (generic BM, BN).
+    ///
+    /// # Panics
+    /// If `Arch` cannot execute on this host.
     #[inline]
     pub fn from_blocked_coo(data: BlockedCooData<'a, T, BM, BN>) -> Self {
+        assert_arch_executable::<Arch>();
         Self {
             data,
             _arch: PhantomData,
@@ -171,8 +195,12 @@ where
     }
 
     /// Create a SpMV-ready view from already-validated Blocked-COO storage.
+    ///
+    /// # Panics
+    /// If `Arch` cannot execute on this host.
     #[inline]
     pub fn from_validated_blocked_coo(data: ValidatedData<BlockedCooData<'a, T, BM, BN>>) -> Self {
+        assert_arch_executable::<Arch>();
         Self {
             data,
             _arch: PhantomData,
@@ -186,8 +214,12 @@ where
     Arch: SimdArch,
 {
     /// Create a `SparseView` over dense-with-mask data.
+    ///
+    /// # Panics
+    /// If `Arch` cannot execute on this host.
     #[inline]
     pub fn from_dense_with_mask(data: DenseWithMaskData<'a, T>) -> Self {
+        assert_arch_executable::<Arch>();
         Self {
             data,
             _arch: PhantomData,

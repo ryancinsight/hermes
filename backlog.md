@@ -5,6 +5,29 @@ Tags: `[patch]` / `[minor]` / `[major]` / `[arch]` per SemVer change class.
 Tactical breakdown of the active items lives in [checklist.md](checklist.md).
 External gap findings live in [gap_audit.md](gap_audit.md).
 
+- [x] [patch] **HS-405 — safe code could execute an unsupported ISA.** A
+  `SimdView`, `SparseView`, or owned `SimdCow` could be built for any `Arch`
+  marker regardless of host support, after which every operation invoked
+  `#[target_feature]`-gated kernels — undefined behavior, reproduced as a hard
+  `SIGILL` from a program containing no `unsafe`. Delivered: construction is now
+  the checkpoint (`SimdView::new`/`new_mut` return `None`; the sparse and owned
+  copy-on-write constructors assert), so possessing one of these values proves
+  its kernels are callable. Runtime dispatch was never affected. Covered by
+  tests asserting availability tracks the platform probe; no measured benchmark
+  change.
+
+- [ ] [patch] **HS-406 — per-site `SAFETY` comments for pointer obligations.**
+  With HS-405 making the target-feature obligation an enforced invariant, the
+  six arch-generic modules state it once in a module-level `# Safety` section.
+  What remains is the *site-specific* half: the raw-pointer arithmetic in
+  `view/reduce.rs` (66 blocks), `sparse/spmv.rs` (69), `sparse/ops.rs` (35),
+  `tiling/` (65), and `view/vector_reg.rs` (46) still needs per-block comments
+  stating the bounds and provenance argument. Scope: one module per increment,
+  pointer-manipulating modules first (`bitboard.rs`, `cow/`). Acceptance: every
+  `unsafe` block in the module carries an obligation-specific comment, or is
+  removed because the invariant makes it unnecessary; warning-denied Clippy and
+  Nextest stay green.
+
 - [x] [patch] **HS-404 — `cmp_ne` NaN semantics diverged across backends.** The
   trait default returns all-ones for `NaN != NaN` (Rust `!=` is true), while the
   AVX2 and AVX-512 backends use the ordered `_CMP_NEQ_OQ` predicate, which

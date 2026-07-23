@@ -1,7 +1,7 @@
 //! `SimdCow` type definition, basic accessors, and trait implementations.
 
 use crate::align::Alignment;
-use crate::arch::SimdArch;
+use crate::arch::{assert_arch_executable, SimdArch};
 use crate::execution::Unmasked;
 use crate::vec::AlignedVec;
 use crate::view::SimdView;
@@ -31,8 +31,12 @@ where
     }
 
     /// Creates an owned `SimdCow` wrapping an `AlignedVec`.
+    ///
+    /// # Panics
+    /// If `Arch` cannot execute on this host.
     #[inline]
     pub fn owned(vec: AlignedVec<T, Align>) -> Self {
+        assert_arch_executable::<Arch>();
         Self::Owned(vec)
     }
 
@@ -222,8 +226,12 @@ impl<T: Copy, Arch: SimdArch, Align: Alignment> SimdCow<'static, T, Arch, Align>
     ///
     /// One allocation, one `copy_nonoverlapping` — no intermediate `push` loop.
     /// The returned `SimdCow` is `'static` because it owns its data entirely.
+    ///
+    /// # Panics
+    /// If `Arch` cannot execute on this host.
     #[inline]
     pub fn from_slice(src: &[T]) -> Self {
+        assert_arch_executable::<Arch>();
         SimdCow::Owned(AlignedVec::from_slice(src))
     }
 }
@@ -324,8 +332,12 @@ where
     ///
     /// The fallback ensures this conversion is always infallible while still achieving
     /// zero-copy for correctly-aligned inputs.
+    ///
+    /// # Panics
+    /// If `Arch` cannot execute on this host.
     #[inline]
     pub fn from_std_cow(src: alloc::borrow::Cow<'a, [T]>) -> Self {
+        assert_arch_executable::<Arch>();
         match src {
             alloc::borrow::Cow::Borrowed(s) => {
                 // Try zero-copy; fall back to owned copy if alignment unsatisfied.

@@ -3,6 +3,17 @@
 //! These iterate non-overlapping sub-views of exactly `LANE_COUNT` elements from a
 //! `SimdView`, leaving the remainder (the scalar tail) accessible via
 //! [`SimdChunks::remainder`] / [`SimdChunksMut::into_remainder`].
+//!
+//! # Safety
+//!
+//! Every kernel call below is `#[target_feature]`-gated and is therefore sound
+//! only on a host implementing `Arch`. That holds by construction rather than by
+//! inspection: [`SimdView::new`](crate::view::SimdView::new) returns `None` for
+//! an architecture the host cannot execute, and the sparse and copy-on-write
+//! constructors assert the same condition, so possessing one of these
+//! arch-parameterized values *is* the proof. Per-site `SAFETY` comments record
+//! only the obligations that go beyond it — pointer provenance, bounds, and
+//! alignment.
 
 use crate::align::Alignment;
 use crate::arch::SimdArch;

@@ -38,7 +38,32 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   `cmp_ne` predicate, which `blend` shared; not reproducible on the development
   host, which lacks AVX-512.
 
+### Fixed
+
+- [patch] Safe code could execute an unsupported instruction set. A view or
+  sparse/copy-on-write container named an `Arch` marker directly — `Avx512` on a
+  host without AVX-512, say — and every operation on it called
+  `#[target_feature]`-gated kernels, which is undefined behavior off that
+  target. Reproduced as a hard `SIGILL`: constructing the view succeeded and the
+  first reduction died with an illegal instruction, from a program containing no
+  `unsafe`. `SimdView::new`/`new_mut` now return `None` for an architecture the
+  host cannot execute — matching how they already reject bad alignment — and the
+  eight `SparseView` constructors plus the owned `SimdCow` constructors assert
+  the same condition, so holding one of these values is itself the proof that
+  its kernels are callable. Runtime dispatch was never affected: it only ever
+  selects a detected target. The probe caches its CPUID result, and an A/B on
+  `dense/argmin_f32` measured no regression (−5.8% / −1.2% / −4.4% / −1.1%,
+  i.e. within layout noise). Pinned by tests asserting that view availability
+  tracks the platform feature probe for every marker.
+
 ### Changed
+
+- [patch] The arch-generic modules (`view::reduce`, `view::ops`, `sparse::spmv`,
+  `sparse::ops`, `iter::chunks`, `iter::zip`) document the target-feature
+  obligation once, as a module-level `# Safety` section, now that construction
+  enforces it. Per-site `SAFETY` comments are reserved for the obligations that
+  go beyond it — pointer provenance, bounds, and alignment — rather than
+  restating the shared invariant at every call.
 
 - [patch] `argmin`/`argmax` locate their extremum with a vectorized scan instead
   of a scalar pass. Each vector tests NaN with `cmp_eq(v, v)` and matches the

@@ -58,3 +58,25 @@ pub trait SimdArch: crate::private::Sealed + Send + Sync + 'static + Copy + Clon
     /// OS-enabled register-state checks covered by the platform feature probe.
     fn is_runtime_supported() -> bool;
 }
+
+/// Panics unless `Arch` can execute on this host.
+///
+/// Kernel methods are `#[target_feature]`-gated, so invoking one on a host
+/// lacking those features is undefined behavior. Types parameterized by `Arch`
+/// call this where they are built, which turns "the host supports `Arch`" into
+/// an invariant of holding the value — the discharge every `unsafe` kernel call
+/// downstream relies on. Constructors that can report failure return `None`
+/// instead of calling this.
+///
+/// The probe caches its CPUID result, so repeated calls are a relaxed load.
+///
+/// # Panics
+/// If `Arch::is_runtime_supported()` is false.
+#[inline]
+pub(crate) fn assert_arch_executable<Arch: SimdArch>() {
+    assert!(
+        Arch::is_runtime_supported(),
+        "SIMD target {} is not supported or enabled on this host",
+        Arch::NAME
+    );
+}
