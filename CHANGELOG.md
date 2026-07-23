@@ -81,6 +81,19 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch] The `sparse::spmv` kernels — CSR, dense-with-mask, and Blocked-COO —
+  each wrapped every target-feature kernel call in its own `unsafe {}` block,
+  around thirty per file, only three of them documented. Each kernel's inner
+  region is now one `unsafe` block carrying one `SAFETY` comment that states the
+  bounds and provenance argument (`Validated<...>` proves `col_indices[k] <
+  ncols`, `validate_spmv_sizes` gives `x.len() >= ncols`, and the windowed
+  offsets stay within `values`/`col_indices`). `sellp_spmv_vectorized`, an
+  `unsafe fn` that had no `# Safety` doc at all, now documents its contract. The
+  dense-with-mask kernel additionally hoists the loop-invariant masked-off fill
+  vector out of its unrolled loop. Behavior is unchanged — the value-semantic
+  integration tests pass and a new differential test drives all four formats
+  through the `Scalar` backend under miri, checked against a dense reference, so
+  the restructured pointer arithmetic is exercised by the interpreter.
 - [patch] The owning `SimdCow::gather` and `prefix_scan` fill reserved capacity
   through the new `*_into_uninit` view methods instead of zeroing it first. The
   zero-fill (introduced with the HS-407 soundness fix) cost 12-59% on this
