@@ -38,7 +38,7 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   tests asserting availability tracks the platform probe; no measured benchmark
   change.
 
-- [ ] [patch] **HS-408 — benchmark the copy-on-write surface.** No Criterion
+- [x] [patch] **HS-408 — benchmark the copy-on-write surface.** No Criterion
   target covers `map_cow`, the scalar-broadcast ops, `splat_fill`, `gather`, or
   `prefix_scan`, so HS-407's claim that the pointer-tail rewrite adds no work
   rests on reasoning (unchecked stores replacing bounds-checked ones) rather
@@ -47,6 +47,12 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   smoke and 300s full budgets. Acceptance: baselines stored for each op, the
   zeroing cost quantified, and a decision recorded on whether it justifies
   teaching the view routines to fill `&mut [MaybeUninit<T>]`.
+  Delivered: a `cow_f32` group (map_cow, mul_scalar_cow, splat_fill, fma_cow,
+  gather, prefix_scan) at the four dense sizes measured the zeroing pass at
+  12-59% on gather/prefix_scan, so the view gained `gather_into_uninit` /
+  `prefix_scan_into_uninit` filling `AlignedVec::spare_capacity_mut`; those
+  constructors now skip the zero-fill (-5% to -31% vs the zeroed version) and
+  `with_capacity_zeroed` is removed. Miri covers the uninit fill.
 
 - [ ] [patch] **HS-406 — per-site `SAFETY` comments for pointer obligations.**
   Progress: `bitboard.rs` is closed — auditing it found the `unsafe` unjustified

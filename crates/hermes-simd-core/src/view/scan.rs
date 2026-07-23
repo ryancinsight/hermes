@@ -5,6 +5,7 @@ use crate::kernel::SimdKernel;
 use crate::ops::{ScanMode, ScanOp};
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
+use core::mem::MaybeUninit;
 
 impl<'a, T: 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode, Ref: 'a>
     SimdView<'a, T, Arch, Align, Mode, Ref>
@@ -20,9 +21,42 @@ where
     pub fn prefix_scan<Op, SMode>(
         &self,
         out: &mut [T],
+        op: Op,
+        mode: SMode,
+    ) -> Result<(), SimdError>
+    where
+        Op: ScanOp<T>,
+        SMode: ScanMode,
+    {
+        // SAFETY: an initialized `[T]` is a valid `[MaybeUninit<T>]` — the cast
+        // only widens the permitted state — and `T: Scalar` is `Copy`, so the
+        // `MaybeUninit::write`s in the delegate drop nothing.
+        let out_uninit = unsafe {
+            core::slice::from_raw_parts_mut(out.as_mut_ptr() as *mut MaybeUninit<T>, out.len())
+        };
+        self.prefix_scan_into_uninit(out_uninit, op, mode)?;
+        Ok(())
+    }
+
+    /// Prefix scan into a possibly-uninitialized buffer, returning the initialized prefix.
+    ///
+    /// This is the single scan implementation; [`prefix_scan`](Self::prefix_scan)
+    /// is the initialized-slice wrapper. On `Ok` exactly the first `self.len()`
+    /// elements of `out` are initialized (and returned); on `Err` — only when
+    /// `out` is too short, checked before any store — nothing is written.
+    /// Filling an `AlignedVec`'s
+    /// [`spare_capacity_mut`](crate::vec::AlignedVec::spare_capacity_mut) through
+    /// this method avoids a zero-fill of the output.
+    ///
+    /// # Errors
+    /// Returns `SimdError::InsufficientOutputLength` if `out.len() < self.len()`.
+    #[inline]
+    pub fn prefix_scan_into_uninit<'o, Op, SMode>(
+        &self,
+        out: &'o mut [MaybeUninit<T>],
         _op: Op,
         _mode: SMode,
-    ) -> Result<(), SimdError>
+    ) -> Result<&'o mut [T], SimdError>
     where
         Op: ScanOp<T>,
         SMode: ScanMode,
@@ -31,18 +65,22 @@ where
         if out.len() < len {
             return Err(SimdError::InsufficientOutputLength);
         }
-        if len == 0 {
-            return Ok(());
-        }
 
         let src = self.as_slice();
         let lane_count = Arch::LANE_COUNT;
         let simd_len = (len / lane_count) * lane_count;
         let ptr_in = src.as_ptr();
-        let ptr_out = out.as_mut_ptr();
+        // Derive the output pointer once and write exclusively through it: mixing
+        // it with `out[i]` slice reborrows would invalidate its provenance under
+        // Stacked Borrows.
+        let ptr_out = out.as_mut_ptr().cast::<T>();
 
         let mut carry = Op::identity();
 
+        // SAFETY: `out` holds at least `len` slots (checked above) and
+        // `MaybeUninit<T>` shares `T`'s layout, so the vector and scalar stores
+        // below fill `[0, len)` through `ptr_out` without reading any slot first;
+        // `ptr_in` reads the view's own `len` initialized elements.
         unsafe {
             let load = |p: *const T| {
                 if crate::align::is_aligned_for_arch::<Arch, Align>() {
@@ -65,22 +103,23 @@ where
                 store(ptr_out.add(i), r);
                 carry = next_carry;
             }
-        }
 
-        if SMode::IS_INCLUSIVE {
-            for i in simd_len..len {
-                carry = Op::combine(carry, src[i]);
-                out[i] = carry;
+            if SMode::IS_INCLUSIVE {
+                for i in simd_len..len {
+                    carry = Op::combine(carry, src[i]);
+                    core::ptr::write(ptr_out.add(i), carry);
+                }
+            } else {
+                for i in simd_len..len {
+                    let temp = src[i];
+                    core::ptr::write(ptr_out.add(i), carry);
+                    carry = Op::combine(carry, temp);
+                }
             }
-        } else {
-            for i in simd_len..len {
-                let temp = src[i];
-                out[i] = carry;
-                carry = Op::combine(carry, temp);
-            }
-        }
 
-        Ok(())
+            // Every element of `[0, len)` is now initialized.
+            Ok(core::slice::from_raw_parts_mut(ptr_out, len))
+        }
     }
 }
 
