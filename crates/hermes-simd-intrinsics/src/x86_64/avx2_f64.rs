@@ -469,7 +469,7 @@ impl SimdKernel<f64> for Avx2 {
     #[target_feature(enable = "avx2")]
     #[inline]
     unsafe fn cmp_ne(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        Avx2F64Vec(_mm256_cmp_pd(a.0, b.0, _CMP_NEQ_OQ))
+        Avx2F64Vec(_mm256_cmp_pd(a.0, b.0, _CMP_NEQ_UQ))
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
