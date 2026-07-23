@@ -5,7 +5,7 @@ Tags: `[patch]` / `[minor]` / `[major]` / `[arch]` per SemVer change class.
 Tactical breakdown of the active items lives in [checklist.md](checklist.md).
 External gap findings live in [gap_audit.md](gap_audit.md).
 
-- [ ] [patch] **HS-404 — `cmp_ne` NaN semantics diverge across backends.** The
+- [x] [patch] **HS-404 — `cmp_ne` NaN semantics diverged across backends.** The
   trait default returns all-ones for `NaN != NaN` (Rust `!=` is true), while the
   AVX2 and AVX-512 backends use the ordered `_CMP_NEQ_OQ` predicate, which
   returns zero. A caller comparing NaN-bearing data therefore gets
@@ -18,6 +18,13 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   every backend, and pin it with a cross-backend property test beside
   `check_vector_to_mask_matches_cmp`. Acceptance: one documented NaN contract,
   differential scalar-versus-native coverage, warning-denied Clippy and Nextest.
+  Delivered: the x86 backends adopt the unordered `_CMP_NEQ_UQ`, the exact
+  complement of `cmp_eq`'s `_CMP_EQ_OQ`, so `cmp_ne` is the lane-wise negation
+  of `cmp_eq` on every backend. Tracing the shared predicate also exposed
+  AVX-512 `blend` testing its mask against zero — rejecting every active lane,
+  whose `ALL_ONES` pattern is a NaN — now fixed to extract the sign bit through
+  `vector_to_mask` per its documented contract. Both are pinned by cross-backend
+  property tests; the `cmp_ne` one reproduces the defect on AVX2 hardware.
 
 - [x] [patch] **HS-403 — deterministic extrema and benchmark budgets.** Reject
   NaN-containing `argmin`/`argmax` inputs, preserve

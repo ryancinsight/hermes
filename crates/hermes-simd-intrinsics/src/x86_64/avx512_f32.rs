@@ -434,7 +434,7 @@ impl SimdKernel<f32> for Avx512 {
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn cmp_ne(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        let m = _mm512_cmp_ps_mask(a.0, b.0, _CMP_NEQ_OQ);
+        let m = _mm512_cmp_ps_mask(a.0, b.0, _CMP_NEQ_UQ);
         Avx512F32Vec(_mm512_mask_blend_ps(
             m,
             _mm512_setzero_ps(),
@@ -498,8 +498,15 @@ impl SimdKernel<f32> for Avx512 {
         true_val: Self::Vector,
         false_val: Self::Vector,
     ) -> Self::Vector {
-        let m = _mm512_cmp_ps_mask(mask.0, _mm512_setzero_ps(), _CMP_NEQ_OQ);
-        Avx512F32Vec(_mm512_mask_blend_ps(m, false_val.0, true_val.0))
+        // Selection is on the mask lane's sign bit. A "differs from zero"
+        // comparison cannot express that: an active lane's `ALL_ONES` pattern is
+        // a NaN, which an ordered predicate reports as inactive, while `-0.0`
+        // carries a sign bit yet compares equal to zero under any predicate.
+        Avx512F32Vec(_mm512_mask_blend_ps(
+            <Self as SimdKernel<f32>>::vector_to_mask(mask),
+            false_val.0,
+            true_val.0,
+        ))
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.

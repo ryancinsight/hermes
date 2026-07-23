@@ -54,7 +54,7 @@ fn main() {
             dup_even_code: "Avx2F32Vec(_mm256_moveldup_ps(v.0))",
             dup_odd_code: "Avx2F32Vec(_mm256_movehdup_ps(v.0))",
             cmp_eq_val: "_CMP_EQ_OQ",
-            cmp_ne_val: "_CMP_NEQ_OQ",
+            cmp_ne_val: "_CMP_NEQ_UQ",
             cmp_lt_val: "_CMP_LT_OQ",
             cmp_le_val: "_CMP_LE_OQ",
             cmp_gt_val: "_CMP_GT_OQ",
@@ -113,7 +113,7 @@ fn main() {
             dup_even_code: "Avx2F64Vec(_mm256_movedup_pd(v.0))",
             dup_odd_code: "Avx2F64Vec(_mm256_permute_pd(v.0, 0b1111))",
             cmp_eq_val: "_CMP_EQ_OQ",
-            cmp_ne_val: "_CMP_NEQ_OQ",
+            cmp_ne_val: "_CMP_NEQ_UQ",
             cmp_lt_val: "_CMP_LT_OQ",
             cmp_le_val: "_CMP_LE_OQ",
             cmp_gt_val: "_CMP_GT_OQ",
@@ -177,7 +177,7 @@ fn main() {
             dup_even_code: "Avx512F32Vec(_mm512_moveldup_ps(v.0))",
             dup_odd_code: "Avx512F32Vec(_mm512_movehdup_ps(v.0))",
             cmp_eq_val: "_CMP_EQ_OQ",
-            cmp_ne_val: "_CMP_NEQ_OQ",
+            cmp_ne_val: "_CMP_NEQ_UQ",
             cmp_lt_val: "_CMP_LT_OQ",
             cmp_le_val: "_CMP_LE_OQ",
             cmp_gt_val: "_CMP_GT_OQ",
@@ -240,7 +240,7 @@ fn main() {
             dup_even_code: "Avx512F64Vec(_mm512_movedup_pd(v.0))",
             dup_odd_code: "Avx512F64Vec(_mm512_permute_pd(v.0, 0b1111_1111))",
             cmp_eq_val: "_CMP_EQ_OQ",
-            cmp_ne_val: "_CMP_NEQ_OQ",
+            cmp_ne_val: "_CMP_NEQ_UQ",
             cmp_lt_val: "_CMP_LT_OQ",
             cmp_le_val: "_CMP_LE_OQ",
             cmp_gt_val: "_CMP_GT_OQ",
@@ -1330,8 +1330,15 @@ impl SimdKernel<__SCALAR_TYPE__> for Avx512 {
         true_val: Self::Vector,
         false_val: Self::Vector,
     ) -> Self::Vector {
-        let m = __PREFIX___cmp___SUFFIX___mask(mask.0, __PREFIX___setzero___SUFFIX__(), __CMP_NE_VAL__);
-        __VECTOR_TYPE__(__PREFIX___mask_blend___SUFFIX__(m, false_val.0, true_val.0))
+        // Selection is on the mask lane's sign bit. A "differs from zero"
+        // comparison cannot express that: an active lane's `ALL_ONES` pattern is
+        // a NaN, which an ordered predicate reports as inactive, while `-0.0`
+        // carries a sign bit yet compares equal to zero under any predicate.
+        __VECTOR_TYPE__(__PREFIX___mask_blend___SUFFIX__(
+            <Self as SimdKernel<__SCALAR_TYPE__>>::vector_to_mask(mask),
+            false_val.0,
+            true_val.0,
+        ))
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the __LANE_COUNT__-lane vector width within caller-validated bounds.

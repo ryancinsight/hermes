@@ -200,6 +200,84 @@ fn check_vector_to_mask_matches_cmp<A: SimdKernel<f32>>(vals: &[f32]) {
     }
 }
 
+/// `cmp_ne` must be the exact lane-wise complement of `cmp_eq`, NaN operands
+/// included, because the trait documents it as Rust's `a != b`. An *ordered*
+/// hardware not-equal predicate reports a NaN lane as neither equal nor
+/// unequal, leaving both results false — the divergence this pins shut.
+fn check_cmp_ne_complements_cmp_eq<A: SimdKernel<f32>>(vals: &[f32]) {
+    let lanes = A::LANE_COUNT;
+    let mut a_vals: Vec<f32> = (0..lanes).map(|i| vals[i % vals.len()]).collect();
+    let mut b_vals: Vec<f32> = a_vals
+        .iter()
+        .enumerate()
+        .map(|(i, &v)| if i % 2 == 0 { v } else { v + 1.0 })
+        .collect();
+    // Lane 0 compares NaN against NaN; lane 1 compares NaN against a finite
+    // value. Both must report "not equal".
+    a_vals[0] = f32::NAN;
+    b_vals[0] = f32::NAN;
+    if lanes > 1 {
+        a_vals[1] = f32::NAN;
+    }
+
+    // SAFETY: both buffers hold exactly `LANE_COUNT` elements, so the unaligned
+    // loads stay in bounds; caller gates on the required target features for `A`.
+    let (eq, ne) = unsafe {
+        let a = A::load_unaligned(a_vals.as_ptr());
+        let b = A::load_unaligned(b_vals.as_ptr());
+        (
+            lane_bits::<A>(A::mask_to_bitmask(A::vector_to_mask(A::cmp_eq(a, b)))),
+            lane_bits::<A>(A::mask_to_bitmask(A::vector_to_mask(A::cmp_ne(a, b)))),
+        )
+    };
+
+    assert_eq!(
+        ne,
+        lane_bits::<A>(!eq),
+        "cmp_ne must be the complement of cmp_eq (eq {eq:#b}, ne {ne:#b})"
+    );
+    for i in 0..lanes {
+        let want = a_vals[i] != b_vals[i];
+        assert_eq!(
+            (ne >> i) & 1 == 1,
+            want,
+            "cmp_ne lane {i}: {} vs {}",
+            a_vals[i],
+            b_vals[i]
+        );
+    }
+}
+
+/// `blend` must take `true_val` exactly on the lanes a canonical mask marks
+/// active. The active pattern is `ALL_ONES` — a NaN — so a backend that tests
+/// the mask by comparing it against zero rather than by its sign bit
+/// misclassifies every active lane under an ordered predicate.
+fn check_blend_honors_canonical_mask<A: SimdKernel<f32>>(bm: u64) {
+    let lanes = A::LANE_COUNT;
+    let bm = lane_bits::<A>(bm);
+    let true_vals: Vec<f32> = (0..lanes).map(|i| (i + 1) as f32).collect();
+    let false_vals: Vec<f32> = (0..lanes).map(|i| -((i + 1) as f32)).collect();
+    let mut out = vec![0.0f32; lanes];
+
+    // SAFETY: every buffer holds exactly `LANE_COUNT` elements; caller gates on
+    // the required target features for `A`.
+    unsafe {
+        let selected = A::load_unaligned(true_vals.as_ptr());
+        let rejected = A::load_unaligned(false_vals.as_ptr());
+        let mask = A::mask_to_vector(A::mask_from_bitmask(bm));
+        A::store_unaligned(out.as_mut_ptr(), A::blend(mask, selected, rejected));
+    }
+
+    for (i, &got) in out.iter().enumerate() {
+        let want = if (bm >> i) & 1 == 1 {
+            true_vals[i]
+        } else {
+            false_vals[i]
+        };
+        assert_eq!(got, want, "blend lane {i} (mask {bm:#b})");
+    }
+}
+
 /// Run every kernel-level check for one backend.
 fn check_all_kernel_invariants<A>(bm: u64, vals: &[f32])
 where
@@ -208,6 +286,8 @@ where
     check_bitmask_roundtrip::<A>(bm);
     check_vector_to_mask_roundtrip::<A>(bm);
     check_vector_to_mask_matches_cmp::<A>(vals);
+    check_cmp_ne_complements_cmp_eq::<A>(vals);
+    check_blend_honors_canonical_mask::<A>(bm);
     check_compress_expand_identity::<A>(bm, vals);
     check_leading_k_masked_sum::<A>();
     check_masked_merge_ops::<A>();

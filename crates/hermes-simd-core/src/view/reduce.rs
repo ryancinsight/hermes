@@ -546,11 +546,8 @@ where
                 } else {
                     Arch::load_unaligned(ptr)
                 };
-                // `x == x` is false exactly for NaN under both the ordered
-                // hardware predicates and the scalar fallback, so a lane absent
-                // from `ordered` marks a NaN. `cmp_ne` is deliberately not used:
-                // its NaN result differs between the scalar default and the
-                // `_CMP_NEQ_OQ` hardware backends.
+                // `x == x` is false exactly for NaN, so a lane absent from
+                // `ordered` marks a NaN.
                 let ordered =
                     Arch::mask_to_bitmask(Arch::vector_to_mask(Arch::cmp_eq(v, v))) & lane_mask;
                 let hits = if first.is_none() {

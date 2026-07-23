@@ -17,6 +17,27 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   `SimdKernel` breaks no implementor: `cargo semver-checks` against `main`
   reports no required update.
 
+### Fixed
+
+- [patch] `cmp_ne` reported NaN operands as *equal* on AVX2 and AVX-512. Those
+  backends used the ordered `_CMP_NEQ_OQ` predicate, which yields false when
+  either operand is NaN, while the trait documents Rust's `a != b` and both the
+  scalar default and NEON (`vmvnq_u32 ∘ vceqq_f32`) return true. The x86
+  backends now use the unordered `_CMP_NEQ_UQ`, the exact complement of the
+  `_CMP_EQ_OQ` used by `cmp_eq`, making `cmp_ne` the lane-wise negation of
+  `cmp_eq` on every backend. A cross-backend property test pins that complement
+  with NaN-versus-NaN and NaN-versus-finite lanes; it reproduces the old
+  behavior on AVX2 hardware, where the two NaN lanes were reported as equal.
+- [patch] AVX-512 `blend` selected `false_val` for every active lane. It tested
+  the mask by comparing it against zero, but an active lane carries `ALL_ONES` —
+  a NaN bit pattern — which the ordered predicate rejects; `-0.0` was likewise
+  misread, since it carries a sign bit yet compares equal to zero under any
+  predicate. It now extracts the mask with `vector_to_mask`, matching the
+  documented sign-bit contract and the AVX2 `blendv` behavior. Pinned by a
+  cross-backend property test over canonical masks. Found while tracing the
+  `cmp_ne` predicate, which `blend` shared; not reproducible on the development
+  host, which lacks AVX-512.
+
 ### Changed
 
 - [patch] `argmin`/`argmax` locate their extremum with a vectorized scan instead
@@ -25,11 +46,11 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   first hit with `trailing_zeros`. Measured on `dense/argmin_f32` (quiescent
   host, zero competing builds, p < 0.05): **−88.1% (256) / −91.8% (1024) /
   −92.7% (4096) / −92.9% (16384)**, an 8.4× to 14.1× speedup, lifting the scan
-  from ~0.93 Gelem/s to ~12.8 Gelem/s. The NaN test deliberately avoids
+  from ~0.93 Gelem/s to ~12.8 Gelem/s. The NaN test used `cmp_eq(v, v)` to avoid
   `cmp_ne`, whose NaN result differs between the scalar default and the
-  `_CMP_NEQ_OQ` hardware backends (tracked as HS-404). Behavior is unchanged:
-  the rejection, first-occurrence, and signed-zero contracts hold, now also
-  covered at lengths that exercise the vector body rather than only the tail.
+  `_CMP_NEQ_OQ` hardware backends, since fixed under HS-404. Behavior is
+  unchanged: the rejection, first-occurrence, and signed-zero contracts hold,
+  now also covered at lengths that exercise the vector body, not only the tail.
 
 - [patch] The AVX-512 VNNI signed-int8 GEMM tile now uses the ISA-supported
   unsigned-byte × signed-byte dot product with exact 128-bias correction. This
