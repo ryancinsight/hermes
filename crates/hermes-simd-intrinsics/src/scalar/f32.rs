@@ -586,4 +586,100 @@ mod tests {
             assert_eq!(y, want);
         }
     }
+
+    /// `SparseOps` elementwise-multiply kernels also index through raw pointers.
+    /// Same rationale as the `spmv` module: drive them via the `Scalar` backend
+    /// so miri checks the pointer arithmetic, and cover the newly added bounds
+    /// guards that keep the CSR gather sound on an unvalidated view.
+    mod ops {
+        use crate::Scalar;
+        use hermes_simd_core::sparse::{CsrData, DenseWithMaskData, SparseOps, SparseView};
+
+        #[test]
+        fn csr_elementwise_mul_dense_matches_reference() {
+            // `out[k] = values[k] * dense[col_indices[k]]`; row 0 has 6 nonzeros
+            // (spanning the 4-lane SIMD body and the 2-element scalar tail), row 1
+            // has one. `dense` is the length-`ncols` per-column vector.
+            let values = [2.0f32, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+            let col_indices = [0i32, 1, 2, 3, 4, 5, 3];
+            let row_ptr = [0i32, 6, 7];
+            let ncols = 6;
+            let dense: Vec<f32> = (0..ncols).map(|c| c as f32 + 1.0).collect();
+
+            let data = CsrData::new(&values[..], &col_indices[..], &row_ptr[..], 2, ncols);
+            let view = SparseView::<f32, _, Scalar>::from_csr(data);
+
+            let mut out = vec![0.0f32; values.len()];
+            view.elementwise_mul_dense(&dense, &mut out);
+
+            let want: Vec<f32> = values
+                .iter()
+                .zip(col_indices.iter())
+                .map(|(&v, &c)| v * dense[c as usize])
+                .collect();
+            assert_eq!(out, want);
+        }
+
+        #[test]
+        #[should_panic(expected = "structural validation")]
+        fn csr_elementwise_mul_dense_rejects_out_of_range_column() {
+            // Column index 9 exceeds `ncols`, so the SIMD gather would read out of
+            // bounds. The guard must reject it before any unchecked access rather
+            // than let safe code reach undefined behavior.
+            let values = [1.0f32, 2.0, 3.0, 4.0];
+            let col_indices = [0i32, 9, 2, 3];
+            let row_ptr = [0i32, 4];
+            let dense = [1.0f32; 4];
+            let data = CsrData::new(&values[..], &col_indices[..], &row_ptr[..], 1, 4);
+            let view = SparseView::<f32, _, Scalar>::from_csr(data);
+            let mut out = vec![0.0f32; 4];
+            view.elementwise_mul_dense(&dense, &mut out);
+        }
+
+        #[test]
+        #[should_panic(expected = "dense len")]
+        fn csr_elementwise_mul_dense_rejects_short_dense() {
+            // Valid indices, but `dense` shorter than `ncols` — the gather would
+            // still read past its end, so the length guard must reject it.
+            let values = [1.0f32, 2.0, 3.0, 4.0];
+            let col_indices = [0i32, 1, 2, 3];
+            let row_ptr = [0i32, 4];
+            let dense = [1.0f32; 2]; // < ncols = 4
+            let data = CsrData::new(&values[..], &col_indices[..], &row_ptr[..], 1, 4);
+            let view = SparseView::<f32, _, Scalar>::from_csr(data);
+            let mut out = vec![0.0f32; 4];
+            view.elementwise_mul_dense(&dense, &mut out);
+        }
+
+        #[test]
+        fn dense_with_mask_elementwise_mul_matches_reference() {
+            // 10 elements span the 4-lane body and a 2-element tail; masked-off
+            // lanes must produce zero.
+            let len = 10;
+            let values: Vec<f32> = (0..len).map(|i| i as f32 + 1.0).collect();
+            let mask: Vec<bool> = (0..len).map(|i| i % 3 != 0).collect();
+            let dense: Vec<f32> = (0..len).map(|i| (i as f32) * 0.5 - 1.0).collect();
+
+            let data = DenseWithMaskData::new(&values[..], &mask[..], 1, len);
+            let view = SparseView::<f32, _, Scalar>::from_dense_with_mask(data);
+
+            let mut out = vec![-1.0f32; len];
+            view.elementwise_mul_dense(&dense, &mut out);
+
+            let want: Vec<f32> = (0..len)
+                .map(|i| if mask[i] { values[i] * dense[i] } else { 0.0 })
+                .collect();
+            assert_eq!(out, want);
+        }
+
+        #[test]
+        fn csr_sum_values_matches_reference() {
+            let values = [1.5f32, -2.0, 3.25, 4.0, 5.5];
+            let col_indices = [0i32, 1, 2, 0, 1];
+            let row_ptr = [0i32, 3, 5];
+            let data = CsrData::new(&values[..], &col_indices[..], &row_ptr[..], 2, 3);
+            let view = SparseView::<f32, _, Scalar>::from_csr(data);
+            assert_eq!(view.sum_values(), values.iter().sum::<f32>());
+        }
+    }
 }

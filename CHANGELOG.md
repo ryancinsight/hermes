@@ -44,6 +44,18 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Fixed
 
+- [patch] `SparseView<Csr>::elementwise_mul_dense` could read out of bounds from
+  safe code. It gathers `dense[col_indices[j]]` with an unchecked `Arch::gather`,
+  but `SparseView<Csr>` is the *unvalidated* type — constructible from arbitrary
+  `CsrData` via the public `from_csr` (and reachable through `SimdCow`) — so
+  nothing guaranteed `col_indices[j] < dense.len()`. miri confirms the
+  undefined behavior on an out-of-range column: "in-bounds pointer arithmetic
+  failed: attempting to offset pointer by 36 bytes, but ... only 16 bytes from
+  the end". The kernel now validates the CSR structure (`col_indices[k] <
+  ncols`) and requires `dense.len() >= ncols` before the gather, matching the
+  guards the SELL-p and Blocked-COO paths in the same file already had. The
+  dense-with-mask path likewise gains the `dense.len() >= values.len()` assert
+  its unchecked loads need. Both convert a reachable UB into a defined panic.
 - [patch] `cmp_ne` reported NaN operands as *equal* on AVX2 and AVX-512. Those
   backends used the ordered `_CMP_NEQ_OQ` predicate, which yields false when
   either operand is NaN, while the trait documents Rust's `a != b` and both the
@@ -81,6 +93,13 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch] `sparse::ops` — the elementwise-multiply and sum kernels each wrapped
+  every target-feature call in its own `unsafe {}` block (35 total, none
+  documented). Each kernel region is now one `unsafe` block with a `SAFETY`
+  comment stating its bounds argument; blocks drop to 7. A differential miri
+  test drives CSR, dense-with-mask, and SELL-p through the `Scalar` backend
+  against a dense reference, and asserts the new CSR guards reject out-of-range
+  columns and short dense buffers.
 - [patch] The `sparse::spmv` kernels — CSR, dense-with-mask, and Blocked-COO —
   each wrapped every target-feature kernel call in its own `unsafe {}` block,
   around thirty per file, only three of them documented. Each kernel's inner
