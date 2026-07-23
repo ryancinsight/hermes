@@ -394,7 +394,7 @@ fn get_magic_data() -> &'static MagicTable {
 
 impl BitBoardKernel for Magic {
     #[inline]
-    unsafe fn rook_attacks(square: u8, occupancy: u64) -> u64 {
+    fn rook_attacks(square: u8, occupancy: u64) -> u64 {
         let table = get_magic_data();
         let mask = rook_mask(square);
         let pop = mask.count_ones() as usize;
@@ -406,7 +406,7 @@ impl BitBoardKernel for Magic {
     }
 
     #[inline]
-    unsafe fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
+    fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
         let table = get_magic_data();
         let mask = bishop_mask(square);
         let pop = mask.count_ones() as usize;

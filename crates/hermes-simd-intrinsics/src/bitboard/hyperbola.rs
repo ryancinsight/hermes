@@ -108,13 +108,13 @@ pub fn hyperbola_quintessence(square: u8, occupancy: u64, ray_mask: u64) -> u64 
 
 impl BitBoardKernel for Hyperbola {
     #[inline]
-    unsafe fn rook_attacks(square: u8, occupancy: u64) -> u64 {
+    fn rook_attacks(square: u8, occupancy: u64) -> u64 {
         hyperbola_quintessence(square, occupancy, file_ray(square))
             | hyperbola_quintessence(square, occupancy, rank_ray(square))
     }
 
     #[inline]
-    unsafe fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
+    fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
         hyperbola_quintessence(square, occupancy, diagonal_ray(square))
             | hyperbola_quintessence(square, occupancy, antidiagonal_ray(square))
     }

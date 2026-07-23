@@ -115,7 +115,7 @@ pub(crate) fn step_sw(g: u64, p: u64, s: usize) -> (u64, u64) {
 impl BitBoardKernel for KoggeStone {
     #[inline(always)]
     #[allow(unreachable_code)]
-    unsafe fn rook_attacks(square: u8, occupancy: u64) -> u64 {
+    fn rook_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
 
         // SAFETY: each ISA-specific fill (`kogge_stone_rook_avx512`/`_avx2`) is
@@ -129,26 +129,40 @@ impl BitBoardKernel for KoggeStone {
             #[cfg(feature = "std")]
             {
                 if std::is_x86_feature_detected!("avx512f") {
-                    return avx512::kogge_stone_rook_avx512(slider, occupancy);
+                    // SAFETY: `kogge_stone_rook_avx512` is `#[target_feature(enable = "avx512f")]`-gated and this
+                    // branch is entered only when that feature is present — probed by
+                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
+                    return unsafe { avx512::kogge_stone_rook_avx512(slider, occupancy) };
                 }
                 if std::is_x86_feature_detected!("avx2") {
-                    return avx2::kogge_stone_rook_avx2(slider, occupancy);
+                    // SAFETY: `kogge_stone_rook_avx2` is `#[target_feature(enable = "avx2")]`-gated and this
+                    // branch is entered only when that feature is present — probed by
+                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
+                    return unsafe { avx2::kogge_stone_rook_avx2(slider, occupancy) };
                 }
             }
             #[cfg(not(feature = "std"))]
             {
                 if cfg!(target_feature = "avx512f") {
-                    return avx512::kogge_stone_rook_avx512(slider, occupancy);
+                    // SAFETY: `kogge_stone_rook_avx512` is `#[target_feature(enable = "avx512f")]`-gated and this
+                    // branch is entered only when that feature is present — probed by
+                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
+                    return unsafe { avx512::kogge_stone_rook_avx512(slider, occupancy) };
                 }
                 if cfg!(target_feature = "avx2") {
-                    return avx2::kogge_stone_rook_avx2(slider, occupancy);
+                    // SAFETY: `kogge_stone_rook_avx2` is `#[target_feature(enable = "avx2")]`-gated and this
+                    // branch is entered only when that feature is present — probed by
+                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
+                    return unsafe { avx2::kogge_stone_rook_avx2(slider, occupancy) };
                 }
             }
         }
 
         #[cfg(target_arch = "aarch64")]
         {
-            return neon::kogge_stone_rook_neon(slider, occupancy);
+            // SAFETY: `kogge_stone_rook_neon` requires `neon`, which is baseline on
+            // every aarch64 target, so its precondition holds unconditionally here.
+            return unsafe { neon::kogge_stone_rook_neon(slider, occupancy) };
         }
 
         scalar::kogge_stone_rook(slider, occupancy)
@@ -156,7 +170,7 @@ impl BitBoardKernel for KoggeStone {
 
     #[inline(always)]
     #[allow(unreachable_code)]
-    unsafe fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
+    fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
 
         // SAFETY: each ISA-specific fill (`kogge_stone_bishop_avx512`/`_avx2`) is
@@ -170,26 +184,40 @@ impl BitBoardKernel for KoggeStone {
             #[cfg(feature = "std")]
             {
                 if std::is_x86_feature_detected!("avx512f") {
-                    return avx512::kogge_stone_bishop_avx512(slider, occupancy);
+                    // SAFETY: `kogge_stone_bishop_avx512` is `#[target_feature(enable = "avx512f")]`-gated and this
+                    // branch is entered only when that feature is present — probed by
+                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
+                    return unsafe { avx512::kogge_stone_bishop_avx512(slider, occupancy) };
                 }
                 if std::is_x86_feature_detected!("avx2") {
-                    return avx2::kogge_stone_bishop_avx2(slider, occupancy);
+                    // SAFETY: `kogge_stone_bishop_avx2` is `#[target_feature(enable = "avx2")]`-gated and this
+                    // branch is entered only when that feature is present — probed by
+                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
+                    return unsafe { avx2::kogge_stone_bishop_avx2(slider, occupancy) };
                 }
             }
             #[cfg(not(feature = "std"))]
             {
                 if cfg!(target_feature = "avx512f") {
-                    return avx512::kogge_stone_bishop_avx512(slider, occupancy);
+                    // SAFETY: `kogge_stone_bishop_avx512` is `#[target_feature(enable = "avx512f")]`-gated and this
+                    // branch is entered only when that feature is present — probed by
+                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
+                    return unsafe { avx512::kogge_stone_bishop_avx512(slider, occupancy) };
                 }
                 if cfg!(target_feature = "avx2") {
-                    return avx2::kogge_stone_bishop_avx2(slider, occupancy);
+                    // SAFETY: `kogge_stone_bishop_avx2` is `#[target_feature(enable = "avx2")]`-gated and this
+                    // branch is entered only when that feature is present — probed by
+                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
+                    return unsafe { avx2::kogge_stone_bishop_avx2(slider, occupancy) };
                 }
             }
         }
 
         #[cfg(target_arch = "aarch64")]
         {
-            return neon::kogge_stone_bishop_neon(slider, occupancy);
+            // SAFETY: `kogge_stone_bishop_neon` requires `neon`, which is baseline on
+            // every aarch64 target, so its precondition holds unconditionally here.
+            return unsafe { neon::kogge_stone_bishop_neon(slider, occupancy) };
         }
 
         scalar::kogge_stone_bishop(slider, occupancy)
@@ -197,7 +225,7 @@ impl BitBoardKernel for KoggeStone {
 
     #[inline(always)]
     #[allow(unreachable_code)]
-    unsafe fn queen_attacks(square: u8, occupancy: u64) -> u64 {
+    fn queen_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
 
         // SAFETY: each ISA-specific fill (`kogge_stone_queen_avx512`/`_avx2`) is
@@ -211,26 +239,40 @@ impl BitBoardKernel for KoggeStone {
             #[cfg(feature = "std")]
             {
                 if std::is_x86_feature_detected!("avx512f") {
-                    return avx512::kogge_stone_queen_avx512(slider, occupancy);
+                    // SAFETY: `kogge_stone_queen_avx512` is `#[target_feature(enable = "avx512f")]`-gated and this
+                    // branch is entered only when that feature is present — probed by
+                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
+                    return unsafe { avx512::kogge_stone_queen_avx512(slider, occupancy) };
                 }
                 if std::is_x86_feature_detected!("avx2") {
-                    return avx2::kogge_stone_queen_avx2(slider, occupancy);
+                    // SAFETY: `kogge_stone_queen_avx2` is `#[target_feature(enable = "avx2")]`-gated and this
+                    // branch is entered only when that feature is present — probed by
+                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
+                    return unsafe { avx2::kogge_stone_queen_avx2(slider, occupancy) };
                 }
             }
             #[cfg(not(feature = "std"))]
             {
                 if cfg!(target_feature = "avx512f") {
-                    return avx512::kogge_stone_queen_avx512(slider, occupancy);
+                    // SAFETY: `kogge_stone_queen_avx512` is `#[target_feature(enable = "avx512f")]`-gated and this
+                    // branch is entered only when that feature is present — probed by
+                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
+                    return unsafe { avx512::kogge_stone_queen_avx512(slider, occupancy) };
                 }
                 if cfg!(target_feature = "avx2") {
-                    return avx2::kogge_stone_queen_avx2(slider, occupancy);
+                    // SAFETY: `kogge_stone_queen_avx2` is `#[target_feature(enable = "avx2")]`-gated and this
+                    // branch is entered only when that feature is present — probed by
+                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
+                    return unsafe { avx2::kogge_stone_queen_avx2(slider, occupancy) };
                 }
             }
         }
 
         #[cfg(target_arch = "aarch64")]
         {
-            return neon::kogge_stone_queen_neon(slider, occupancy);
+            // SAFETY: `kogge_stone_queen_neon` requires `neon`, which is baseline on
+            // every aarch64 target, so its precondition holds unconditionally here.
+            return unsafe { neon::kogge_stone_queen_neon(slider, occupancy) };
         }
 
         scalar::kogge_stone_queen(slider, occupancy)

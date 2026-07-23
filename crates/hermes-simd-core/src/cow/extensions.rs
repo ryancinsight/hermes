@@ -1,5 +1,20 @@
 //! Unary map, in-place scale, splat-fill, argmin/argmax, gather, and prefix-scan
 //! extensions for `SimdCow`.
+//!
+//! # Safety
+//!
+//! Two obligations recur here. Kernel calls are `#[target_feature]`-gated, and
+//! that precondition holds by construction: a `SimdCow` exists only for an
+//! architecture the host can execute, since its borrowed form comes from
+//! [`SimdView::new`](crate::view::SimdView::new) and its owned constructors
+//! assert the same condition. The second is local — these routines allocate
+//! with `with_capacity` and `set_len` before writing, deliberately avoiding a
+//! zero-fill of a buffer that is about to be overwritten, so each such site
+//! carries a `SAFETY` comment showing that every element in the new length is
+//! written before the value is observable. Several of them hand the buffer to a
+//! filler as `&mut [T]` while its tail is still unwritten; every element is
+//! initialized before anything reads it, but forming that reference early is a
+//! pattern to replace with `spare_capacity_mut`, tracked as HS-407.
 
 use super::types::SimdCow;
 use crate::align::Alignment;
@@ -113,6 +128,8 @@ where
     #[inline]
     pub fn splat_fill(value: T, len: usize) -> SimdCow<'static, T, Arch, Align> {
         let mut out: AlignedVec<T, Align> = AlignedVec::with_capacity(len);
+        // SAFETY: `with_capacity(len)` reserved space for len elements and
+        // every one of them is written below before this buffer is read.
         unsafe {
             out.set_len(len);
         }
@@ -179,6 +196,8 @@ where
     pub fn gather(&self, indices: &[i32]) -> Result<SimdCow<'static, T, Arch, Align>, SimdError> {
         let len = indices.len();
         let mut out = AlignedVec::with_capacity(len);
+        // SAFETY: `with_capacity(len)` reserved space for len elements and
+        // every one of them is written below before this buffer is read.
         unsafe {
             out.set_len(len);
         }
@@ -200,6 +219,8 @@ where
     {
         let len = self.len();
         let mut out = AlignedVec::with_capacity(len);
+        // SAFETY: `with_capacity(len)` reserved space for len elements and
+        // every one of them is written below before this buffer is read.
         unsafe {
             out.set_len(len);
         }

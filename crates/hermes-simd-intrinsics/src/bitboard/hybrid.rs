@@ -13,7 +13,7 @@ pub struct HybridSwarMagic;
 
 impl BitBoardKernel for HybridSwarMagic {
     #[inline(always)]
-    unsafe fn rook_attacks(square: u8, occupancy: u64) -> u64 {
+    fn rook_attacks(square: u8, occupancy: u64) -> u64 {
         let mask = super::magic::rook_mask(square);
         let relevant_occupancy = occupancy & mask;
         if relevant_occupancy.count_ones() <= 1 {
@@ -24,7 +24,7 @@ impl BitBoardKernel for HybridSwarMagic {
     }
 
     #[inline(always)]
-    unsafe fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
+    fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
         let mask = super::magic::bishop_mask(square);
         let relevant_occupancy = occupancy & mask;
         if relevant_occupancy.count_ones() <= 1 {

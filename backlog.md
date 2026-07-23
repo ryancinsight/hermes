@@ -5,6 +5,19 @@ Tags: `[patch]` / `[minor]` / `[major]` / `[arch]` per SemVer change class.
 Tactical breakdown of the active items lives in [checklist.md](checklist.md).
 External gap findings live in [gap_audit.md](gap_audit.md).
 
+- [ ] [patch] **HS-407 — replace `set_len`-before-write with `spare_capacity_mut`.**
+  The `cow` constructors allocate with `with_capacity`, call `set_len`, and hand
+  the buffer to a filler as `&mut [T]` while its tail is still unwritten
+  (`extensions.rs` map/`splat_fill`/`gather`/`prefix_scan`, `unary.rs`,
+  `combinators.rs`). Every element is initialized before anything reads it, so
+  no wrong value is observable, but forming a `&mut [T]` over uninitialized
+  elements is not a reference the language permits, and `AlignedVec` allocates
+  with `alloc`, not `alloc_zeroed`. Fix by exposing a `spare_capacity_mut`-style
+  `&mut [MaybeUninit<T>]` on `AlignedVec` and filling through it, keeping the
+  zero-fill-free property the perf budget depends on. Acceptance: no `&mut [T]`
+  spans uninitialized elements, miri covers the constructors, and the
+  `dense`/`cow` benchmarks show no regression.
+
 - [x] [patch] **HS-405 — safe code could execute an unsupported ISA.** A
   `SimdView`, `SparseView`, or owned `SimdCow` could be built for any `Arch`
   marker regardless of host support, after which every operation invoked
@@ -17,6 +30,11 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   change.
 
 - [ ] [patch] **HS-406 — per-site `SAFETY` comments for pointer obligations.**
+  Progress: `bitboard.rs` is closed — auditing it found the `unsafe` unjustified
+  rather than undocumented, so `BitBoardKernel` became a safe trait (ADR 007)
+  and the module went from seven blocks to two, both documented. The six `cow`
+  modules now carry module-level `# Safety` sections plus per-site comments on
+  their `with_capacity`/`set_len` buffers. Remaining:
   With HS-405 making the target-feature obligation an enforced invariant, the
   six arch-generic modules state it once in a module-level `# Safety` section.
   What remains is the *site-specific* half: the raw-pointer arithmetic in

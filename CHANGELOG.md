@@ -17,6 +17,25 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   `SimdKernel` breaks no implementor: `cargo semver-checks` against `main`
   reports no required update.
 
+### Breaking
+
+- [major] `BitBoardKernel::rook_attacks`, `bishop_attacks`, and `queen_attacks`
+  are now safe `fn`s. Their documented obligation — "caller must ensure target
+  feature flags are active" — matched no implementation: four backends are plain
+  integer arithmetic over bounds-checked tables, and `KoggeStone` selects its
+  AVX-512/AVX2/NEON fill inside its own `is_x86_feature_detected!` guard. The
+  `unsafe` now sits on those ISA fills, where the argument is real and local,
+  instead of on every call. `cargo-semver-checks` classifies this as major
+  (`trait_method_unsafe_removed`); see
+  [ADR 007](docs/adr/007-bitboard-kernel-safe-surface.md). The methods also gain
+  a `# Panics` section for an out-of-range square, their actual precondition.
+
+### Migration
+
+- Delete `unsafe` blocks wrapping `BitBoardKernel` calls; they now raise
+  `unused_unsafe`, which is an error under `-D warnings`. Implementors of the
+  trait drop `unsafe` from the three method signatures.
+
 ### Fixed
 
 - [patch] `cmp_ne` reported NaN operands as *equal* on AVX2 and AVX-512. Those
@@ -38,8 +57,6 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   `cmp_ne` predicate, which `blend` shared; not reproducible on the development
   host, which lacks AVX-512.
 
-### Fixed
-
 - [patch] Safe code could execute an unsupported instruction set. A view or
   sparse/copy-on-write container named an `Arch` marker directly — `Avx512` on a
   host without AVX-512, say — and every operation on it called
@@ -57,6 +74,13 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   tracks the platform feature probe for every marker.
 
 ### Changed
+
+- [patch] The unsafe-block audit continues (HS-406): `bitboard.rs` is fully
+  documented, having gone from seven `unsafe` blocks to two — the raw pointer
+  reborrows, each now carrying a `SAFETY` comment deriving the aliasing and
+  lifetime argument from the view's reference typestate. The six `cow` modules
+  gain module-level `# Safety` sections and per-site comments on the
+  `with_capacity`/`set_len` buffers.
 
 - [patch] The arch-generic modules (`view::reduce`, `view::ops`, `sparse::spmv`,
   `sparse::ops`, `iter::chunks`, `iter::zip`) document the target-feature
