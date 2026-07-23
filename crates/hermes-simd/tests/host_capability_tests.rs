@@ -358,3 +358,62 @@ fn local_gemm_dispatch_matches_scalar_reference_for_irregular_shapes() {
 
     assert_eq!(c, expected);
 }
+
+/// A `SimdView` may exist only for an architecture the host can execute.
+///
+/// Every view operation calls `#[target_feature]`-gated kernels, so a view over
+/// an unsupported marker would let entirely safe code issue instructions the CPU
+/// does not implement. Before this was enforced, constructing an `Avx512` view
+/// on a host without AVX-512 succeeded and the first reduction died with an
+/// illegal instruction. The oracle here is the platform feature probe, which is
+/// independent of the `SimdArch::is_runtime_supported` implementation under test.
+#[test]
+fn view_exists_only_for_executable_arch() {
+    let data = [1.0_f32; 64];
+
+    assert!(
+        SimdView::<f32, Scalar, Unaligned, Unmasked, &[f32]>::new(&data).is_some(),
+        "the emulated backend runs everywhere"
+    );
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        let host_avx2 =
+            std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma");
+        assert_eq!(
+            SimdView::<f32, Avx2, Unaligned, Unmasked, &[f32]>::new(&data).is_some(),
+            host_avx2,
+            "AVX2 view availability must track the host probe"
+        );
+
+        let host_avx512 = std::is_x86_feature_detected!("avx512f");
+        assert_eq!(
+            SimdView::<f32, Avx512, Unaligned, Unmasked, &[f32]>::new(&data).is_some(),
+            host_avx512,
+            "AVX-512 view availability must track the host probe"
+        );
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    assert!(
+        SimdView::<f32, Neon, Unaligned, Unmasked, &[f32]>::new(&data).is_some(),
+        "NEON is baseline on aarch64"
+    );
+}
+
+/// The same guard must hold for mutable views, which reach the same kernels.
+#[test]
+fn mutable_view_exists_only_for_executable_arch() {
+    let mut data = [1.0_f32; 64];
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        let host_avx512 = std::is_x86_feature_detected!("avx512f");
+        assert_eq!(
+            SimdView::<f32, Avx512, Unaligned, Unmasked, &mut [f32]>::new_mut(&mut data).is_some(),
+            host_avx512
+        );
+    }
+
+    assert!(SimdView::<f32, Scalar, Unaligned, Unmasked, &mut [f32]>::new_mut(&mut data).is_some());
+}

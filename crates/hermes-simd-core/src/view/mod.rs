@@ -131,10 +131,19 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode> Copy
 impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
     SimdView<'a, T, Arch, Align, Mode, &'a [T]>
 {
-    /// Create a new read-only `SimdView` after verifying alignment invariants.
-    /// Returns `None` if the alignment requirements are not met.
+    /// Create a new read-only `SimdView` after verifying that `Arch` runs on
+    /// this host and that the alignment invariants hold.
+    ///
+    /// Returns `None` when the host cannot execute `Arch` — naming a marker the
+    /// CPU does not implement, such as `Avx512` on a machine without it — or
+    /// when the alignment requirements are not met. Every operation on the view
+    /// calls `#[target_feature]`-gated kernels, so a view that existed without
+    /// that guarantee would let safe code execute unsupported instructions.
     #[inline]
     pub fn new(data: &'a [T]) -> Option<Self> {
+        if !Arch::is_runtime_supported() {
+            return None;
+        }
         if Align::IS_ALIGNED {
             let req_align = Arch::REGISTER_WIDTH_BITS as usize / 8;
             if req_align > 0 && Align::ALIGN_BYTES < req_align {
@@ -155,10 +164,15 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
 impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
     SimdView<'a, T, Arch, Align, Mode, &'a mut [T]>
 {
-    /// Create a new mutable `SimdView` after verifying alignment invariants.
-    /// Returns `None` if the alignment requirements are not met.
+    /// Create a new mutable `SimdView` after verifying that `Arch` runs on this
+    /// host and that the alignment invariants hold.
+    ///
+    /// Returns `None` under the same conditions as [`SimdView::new`].
     #[inline]
     pub fn new_mut(data: &'a mut [T]) -> Option<Self> {
+        if !Arch::is_runtime_supported() {
+            return None;
+        }
         if Align::IS_ALIGNED {
             let req_align = Arch::REGISTER_WIDTH_BITS as usize / 8;
             if req_align > 0 && Align::ALIGN_BYTES < req_align {

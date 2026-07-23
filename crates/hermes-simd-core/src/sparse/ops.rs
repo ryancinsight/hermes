@@ -1,4 +1,15 @@
 //! Elementwise operations and value sum/accumulate helpers.
+//!
+//! # Safety
+//!
+//! Every kernel call below is `#[target_feature]`-gated and is therefore sound
+//! only on a host implementing `Arch`. That holds by construction rather than by
+//! inspection: [`SimdView::new`](crate::view::SimdView::new) returns `None` for
+//! an architecture the host cannot execute, and the sparse and copy-on-write
+//! constructors assert the same condition, so possessing one of these
+//! arch-parameterized values *is* the proof. Per-site `SAFETY` comments record
+//! only the obligations that go beyond it — pointer provenance, bounds, and
+//! alignment.
 
 use super::{BlockedCoo, Csr, DenseWithMask, SellP, SparseView};
 use crate::arch::SimdArch;

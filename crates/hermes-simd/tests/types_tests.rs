@@ -1791,8 +1791,8 @@ fn test_select_ops_neon() {
 #[test]
 fn test_insufficient_alignment_view_rejection() {
     use eunomia::F32;
-    use hermes_simd::{Avx2, Avx512, Scalar};
-    use hermes_simd_core::align::{Aligned, Unaligned};
+    use hermes_simd::Scalar;
+    use hermes_simd_core::align::Aligned;
     use hermes_simd_core::view::SimdView;
 
     // Buffer aligned to 64 bytes
@@ -1804,30 +1804,44 @@ fn test_insufficient_alignment_view_rejection() {
     let view_scalar = SimdView::<'_, F32, Scalar, Aligned<16>>::new(&buf.0);
     assert!(view_scalar.is_some());
 
-    // 2. Avx2 requires 32-byte alignment. Aligned<16> must be rejected.
-    let view_avx2_bad = SimdView::<'_, F32, Avx2, Aligned<16>>::new(&buf.0);
-    assert!(view_avx2_bad.is_none());
+    // A view is also refused when the host cannot execute the architecture, so
+    // the alignment rule is only observable for a marker this host runs —
+    // otherwise `None` would prove nothing about alignment. Availability itself
+    // is covered by `view_exists_only_for_executable_arch`.
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        use hermes_simd::{Avx2, Avx512};
+        use hermes_simd_core::align::Unaligned;
 
-    // Aligned<32> must be accepted.
-    let view_avx2_good = SimdView::<'_, F32, Avx2, Aligned<32>>::new(&buf.0);
-    assert!(view_avx2_good.is_some());
+        if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+            // 2. Avx2 requires 32-byte alignment. Aligned<16> must be rejected.
+            let view_avx2_bad = SimdView::<'_, F32, Avx2, Aligned<16>>::new(&buf.0);
+            assert!(view_avx2_bad.is_none());
 
-    // try_into_aligned:<16> on Avx2 must be rejected.
-    let view_avx2_unaligned = SimdView::<'_, F32, Avx2, Unaligned>::new(&buf.0).unwrap();
-    assert!(view_avx2_unaligned.try_into_aligned::<16>().is_none());
-    assert!(view_avx2_unaligned.try_into_aligned::<32>().is_some());
+            // Aligned<32> must be accepted.
+            let view_avx2_good = SimdView::<'_, F32, Avx2, Aligned<32>>::new(&buf.0);
+            assert!(view_avx2_good.is_some());
 
-    // slice_aligned:<16> on Avx2 must be rejected.
-    assert!(view_avx2_unaligned.slice_aligned::<16>(0..8).is_none());
-    assert!(view_avx2_unaligned.slice_aligned::<32>(0..8).is_some());
+            // try_into_aligned:<16> on Avx2 must be rejected.
+            let view_avx2_unaligned = SimdView::<'_, F32, Avx2, Unaligned>::new(&buf.0).unwrap();
+            assert!(view_avx2_unaligned.try_into_aligned::<16>().is_none());
+            assert!(view_avx2_unaligned.try_into_aligned::<32>().is_some());
 
-    // 3. Avx512 requires 64-byte alignment. Aligned<32> must be rejected.
-    let view_avx512_bad = SimdView::<'_, F32, Avx512, Aligned<32>>::new(&buf.0);
-    assert!(view_avx512_bad.is_none());
+            // slice_aligned:<16> on Avx2 must be rejected.
+            assert!(view_avx2_unaligned.slice_aligned::<16>(0..8).is_none());
+            assert!(view_avx2_unaligned.slice_aligned::<32>(0..8).is_some());
+        }
 
-    // Aligned<64> must be accepted.
-    let view_avx512_good = SimdView::<'_, F32, Avx512, Aligned<64>>::new(&buf.0);
-    assert!(view_avx512_good.is_some());
+        if std::is_x86_feature_detected!("avx512f") {
+            // 3. Avx512 requires 64-byte alignment. Aligned<32> must be rejected.
+            let view_avx512_bad = SimdView::<'_, F32, Avx512, Aligned<32>>::new(&buf.0);
+            assert!(view_avx512_bad.is_none());
+
+            // Aligned<64> must be accepted.
+            let view_avx512_good = SimdView::<'_, F32, Avx512, Aligned<64>>::new(&buf.0);
+            assert!(view_avx512_good.is_some());
+        }
+    }
 }
 
 #[test]
