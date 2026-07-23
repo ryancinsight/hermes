@@ -522,4 +522,13 @@ impl SimdKernel<f32> for Avx2 {
     unsafe fn mask_to_vector(mask: Self::Mask) -> Self::Vector {
         Avx2F32Vec(mask.0)
     }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); this is a register-to-register reinterpretation with no memory operands.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn vector_to_mask(v: Self::Vector) -> Self::Mask {
+        // Mask and vector share the `__m256` representation, and the
+        // reinterpretation preserves lane sign bits for `_mm256_movemask_ps`.
+        Avx2F32Mask(v.0)
+    }
 }

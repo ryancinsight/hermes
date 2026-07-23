@@ -521,4 +521,15 @@ impl SimdKernel<f64> for Avx512 {
             _mm512_set1_pd(f64::from_bits(!0)),
         ))
     }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); this is a register-to-register comparison with no memory operands.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn vector_to_mask(v: Self::Vector) -> Self::Mask {
+        // A signed integer lane is negative exactly when its sign bit is set, so
+        // comparing the reinterpreted lanes against zero collects the sign bits
+        // into a k-register. `_mm512_movepi64_mask` would express
+        // this directly but requires AVX512DQ, which this backend does not enable.
+        _mm512_cmplt_epi64_mask(_mm512_castpd_si512(v.0), _mm512_setzero_si512())
+    }
 }

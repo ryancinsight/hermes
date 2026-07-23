@@ -7,6 +7,7 @@ use hermes_simd::{
     ScanMax, ScanMin, ScanMul, SimdError, SimdView, Sqrt, Unaligned, Unmasked,
 };
 use hermes_simd_core::ops::{Max, Min, Sum};
+use proptest::prelude::*;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -152,6 +153,112 @@ fn dispatch_extrema_preserve_first_signed_zero_value() {
             negative_extremum.map(|(index, value)| (index, value.to_bits())),
             Some((0, (-0.0_f32).to_bits()))
         );
+    }
+}
+
+/// Length covering several vector iterations plus a partial tail on every
+/// supported lane width (4, 8, 16, and 32 lanes).
+const VECTORIZED_SCAN_LEN: usize = 132;
+
+/// Scalar oracle for the extremum contract, written independently of the
+/// vectorized scan: reject any NaN, then report the first element equal to the
+/// extremum along with its own stored representation.
+fn reference_extremum(data: &[f32], maximum: bool) -> Option<(usize, f32)> {
+    let &head = data.first()?;
+    if data.iter().any(|value| value.is_nan()) {
+        return None;
+    }
+    let mut extremum = head;
+    for &value in data {
+        if (maximum && value > extremum) || (!maximum && value < extremum) {
+            extremum = value;
+        }
+    }
+    let index = data.iter().position(|value| *value == extremum)?;
+    Some((index, data[index]))
+}
+
+#[test]
+fn extrema_reject_nan_throughout_vectorized_scan() {
+    // Positions land in the first vector, on lane boundaries for each width, in
+    // interior vectors, and in the scalar tail.
+    for nan_at in [0, 1, 7, 8, 15, 16, 31, 32, 64, 127, 128, 131] {
+        let mut data = vec![1.0_f32; VECTORIZED_SCAN_LEN];
+        data[nan_at] = f32::NAN;
+        assert_eq!(argmin(&data), None, "argmin with NaN at {nan_at}");
+        assert_eq!(argmax(&data), None, "argmax with NaN at {nan_at}");
+    }
+}
+
+#[test]
+fn extrema_report_first_duplicate_across_lane_boundaries() {
+    for first_at in [0, 5, 8, 17, 31, 64, 127] {
+        let mut data = vec![5.0_f32; VECTORIZED_SCAN_LEN];
+        data[first_at] = -1.0;
+        data[first_at + 1] = -1.0;
+        assert_eq!(
+            argmin(&data).map(|(index, _)| index),
+            Some(first_at),
+            "argmin duplicate minimum starting at {first_at}"
+        );
+
+        let mut data = vec![-5.0_f32; VECTORIZED_SCAN_LEN];
+        data[first_at] = 1.0;
+        data[first_at + 1] = 1.0;
+        assert_eq!(
+            argmax(&data).map(|(index, _)| index),
+            Some(first_at),
+            "argmax duplicate maximum starting at {first_at}"
+        );
+    }
+}
+
+#[test]
+fn extrema_preserve_signed_zero_inside_vector_body() {
+    // `-0.0` and `0.0` compare equal, so the first of the pair must win and
+    // must be reported with its own bit pattern rather than the reduced value.
+    let mut data = vec![1.0_f32; VECTORIZED_SCAN_LEN];
+    data[40] = -0.0;
+    data[41] = 0.0;
+    let (index, value) = argmin(&data).expect("no NaN present");
+    assert_eq!(index, 40);
+    assert_eq!(value.to_bits(), (-0.0_f32).to_bits());
+
+    let mut data = vec![1.0_f32; VECTORIZED_SCAN_LEN];
+    data[40] = 0.0;
+    data[41] = -0.0;
+    let (index, value) = argmin(&data).expect("no NaN present");
+    assert_eq!(index, 40);
+    assert_eq!(value.to_bits(), 0.0_f32.to_bits());
+}
+
+proptest! {
+    /// The vectorized scan must agree with the scalar oracle on index, on the
+    /// exact stored bit pattern, and on NaN rejection, at every length spanning
+    /// the vector body and its tail.
+    #[test]
+    fn prop_extrema_match_scalar_oracle(
+        values in prop::collection::vec(
+            prop_oneof![
+                90 => -100.0_f32..100.0,
+                5 => Just(0.0_f32),
+                5 => Just(-0.0_f32),
+            ],
+            1..300,
+        ),
+        nan_at in prop::option::of(0usize..300),
+    ) {
+        let mut values = values;
+        if let Some(at) = nan_at {
+            let at = at % values.len();
+            values[at] = f32::NAN;
+        }
+
+        let bits = |extremum: Option<(usize, f32)>| {
+            extremum.map(|(index, value)| (index, value.to_bits()))
+        };
+        prop_assert_eq!(bits(argmin(&values)), bits(reference_extremum(&values, false)));
+        prop_assert_eq!(bits(argmax(&values)), bits(reference_extremum(&values, true)));
     }
 }
 

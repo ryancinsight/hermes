@@ -554,4 +554,13 @@ impl SimdKernel<f32> for Neon {
     unsafe fn mask_to_vector(mask: Self::Mask) -> Self::Vector {
         NeonF32Vec(vreinterpretq_f32_u32(mask.0))
     }
+
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus runtime selection in the hermes-simd dispatcher); this is a register-to-register reinterpretation with no memory operands.
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn vector_to_mask(v: Self::Vector) -> Self::Mask {
+        // Bit-preserving reinterpretation, so lane sign bits survive into the
+        // `vgetq_lane_u32::<_>(..) >> 31` extraction performed by `mask_to_bitmask`.
+        NeonF32Mask(vreinterpretq_u32_f32(v.0))
+    }
 }

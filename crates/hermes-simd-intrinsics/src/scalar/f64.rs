@@ -276,4 +276,12 @@ impl SimdKernel<f64> for Scalar {
             },
         ]
     }
+
+    #[inline(always)]
+    unsafe fn vector_to_mask(v: Self::Vector) -> Self::Mask {
+        // Bit 63 is the sign bit; testing it rather than comparing against zero
+        // keeps the all-ones comparison result (a NaN bit pattern) from failing
+        // a floating-point equality test.
+        core::array::from_fn(|i| (v[i].to_bits() >> 63) != 0)
+    }
 }

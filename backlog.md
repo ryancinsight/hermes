@@ -5,6 +5,20 @@ Tags: `[patch]` / `[minor]` / `[major]` / `[arch]` per SemVer change class.
 Tactical breakdown of the active items lives in [checklist.md](checklist.md).
 External gap findings live in [gap_audit.md](gap_audit.md).
 
+- [ ] [patch] **HS-404 — `cmp_ne` NaN semantics diverge across backends.** The
+  trait default returns all-ones for `NaN != NaN` (Rust `!=` is true), while the
+  AVX2 and AVX-512 backends use the ordered `_CMP_NEQ_OQ` predicate, which
+  returns zero. A caller comparing NaN-bearing data therefore gets
+  backend-dependent results — the same defect class HS-403 removed from
+  `argmin`/`argmax`. Found while vectorizing the extremum scan, which avoids the
+  divergence by testing `cmp_eq(v, v)` instead (false for NaN under both the
+  ordered hardware predicates and the scalar default). Decide the intended
+  contract — unordered `_CMP_NEQ_UQ` to match the scalar default, or an ordered
+  contract documented on the trait and mirrored by the default — apply it to
+  every backend, and pin it with a cross-backend property test beside
+  `check_vector_to_mask_matches_cmp`. Acceptance: one documented NaN contract,
+  differential scalar-versus-native coverage, warning-denied Clippy and Nextest.
+
 - [x] [patch] **HS-403 — deterministic extrema and benchmark budgets.** Reject
   NaN-containing `argmin`/`argmax` inputs, preserve
   the first slice element's signed-zero representation, and exercise every

@@ -203,6 +203,23 @@ macro_rules! impl_emulated_kernel {
                     }
                 })
             }
+
+            #[inline(always)]
+            unsafe fn vector_to_mask(v: Self::Vector) -> Self::Mask {
+                core::array::from_fn(|i| {
+                    // Masking with `SIGN_MASK` and counting bits keeps the test
+                    // bit-level for every element type: comparing the masked
+                    // lane against `ZERO` would misreport floating-point lanes,
+                    // whose sign-only pattern is `-0.0` and compares *equal* to
+                    // `ZERO` under IEEE semantics.
+                    <$t as hermes_simd_core::scalar::NumericElement>::count_ones(
+                        <$t as hermes_simd_core::scalar::NumericElement>::bitand(
+                            v[i],
+                            <$t as hermes_simd_core::scalar::NumericElement>::SIGN_MASK,
+                        ),
+                    ) != 0
+                })
+            }
         }
     };
 }
