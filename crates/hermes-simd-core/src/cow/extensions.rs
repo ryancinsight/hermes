@@ -12,8 +12,11 @@
 //! raising the length only once every element is initialized. That avoids both
 //! a zero-fill of a buffer about to be overwritten and any `&mut [T]` spanning
 //! uninitialized elements, so each such site carries a `SAFETY` comment showing
-//! the write coverage. Where an existing API needs an initialized slice up
-//! front, the buffer comes from `AlignedVec::with_capacity_zeroed` instead.
+//! the write coverage. `gather` and `prefix_scan` reserve capacity and fill it
+//! through the view's `*_into_uninit` methods over
+//! [`AlignedVec::spare_capacity_mut`](crate::vec::AlignedVec::spare_capacity_mut),
+//! then raise the length once those report success, so those paths never zero
+//! the buffer either.
 
 use super::types::SimdCow;
 use crate::align::Alignment;
@@ -186,11 +189,15 @@ where
     #[inline]
     pub fn gather(&self, indices: &[i32]) -> Result<SimdCow<'static, T, Arch, Align>, SimdError> {
         let len = indices.len();
-        // Zeroed rather than reserved-and-lengthened: the filler below needs an
-        // initialized `&mut [T]`, and forming that over uninitialized elements
-        // is not a reference the language permits.
-        let mut out = AlignedVec::with_capacity_zeroed(len);
-        self.view().gather(indices, out.as_mut_slice())?;
+        let mut out = AlignedVec::with_capacity(len);
+        // Gather fills the reserved capacity directly and reports how many
+        // elements it wrote; nothing is written on the error path, so `out`
+        // stays length-zero and drops no uninitialized element.
+        self.view()
+            .gather_into_uninit(indices, out.spare_capacity_mut())?;
+        // SAFETY: `gather_into_uninit` returned `Ok`, so it initialized exactly
+        // `len` elements of the reserved capacity.
+        unsafe { out.set_len(len) };
         Ok(SimdCow::Owned(out))
     }
 
@@ -207,11 +214,15 @@ where
         SMode: crate::ops::ScanMode,
     {
         let len = self.len();
-        // Zeroed rather than reserved-and-lengthened: the filler below needs an
-        // initialized `&mut [T]`, and forming that over uninitialized elements
-        // is not a reference the language permits.
-        let mut out = AlignedVec::with_capacity_zeroed(len);
-        self.view().prefix_scan(out.as_mut_slice(), op, mode)?;
+        let mut out = AlignedVec::with_capacity(len);
+        // Scan fills the reserved capacity directly; the only error is an
+        // insufficient-length one it checks before writing, so on error `out`
+        // stays length-zero and drops no uninitialized element.
+        self.view()
+            .prefix_scan_into_uninit(out.spare_capacity_mut(), op, mode)?;
+        // SAFETY: `prefix_scan_into_uninit` returned `Ok`, so it initialized
+        // exactly `len` elements of the reserved capacity.
+        unsafe { out.set_len(len) };
         Ok(SimdCow::Owned(out))
     }
 

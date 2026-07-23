@@ -23,8 +23,11 @@
 //! raising the length only once every element is initialized. That avoids both
 //! a zero-fill of a buffer about to be overwritten and any `&mut [T]` spanning
 //! uninitialized elements, so each such site carries a `SAFETY` comment showing
-//! the write coverage. Where an existing API needs an initialized slice up
-//! front, the buffer comes from `AlignedVec::with_capacity_zeroed` instead.
+//! the write coverage. `gather` and `prefix_scan` reserve capacity and fill it
+//! through the view's `*_into_uninit` methods over
+//! [`AlignedVec::spare_capacity_mut`](crate::vec::AlignedVec::spare_capacity_mut),
+//! then raise the length once those report success, so those paths never zero
+//! the buffer either.
 
 use super::SimdCow;
 use crate::align::Alignment;

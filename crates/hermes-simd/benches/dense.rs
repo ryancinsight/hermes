@@ -5,6 +5,7 @@
 //! - `dot_f32`: dot product (fused multiply-add) over varying lengths.
 //! - `elementwise_mul_f32`: in-place elementwise multiplication.
 //! - `argmin_f32`: extremum reduction plus the locating scan.
+//! - `cow_f32`: owning copy-on-write constructors (allocate + fill).
 //! - `axpy_rows_batch_f32`: fused dense row-panel accumulation.
 //!
 //! Throughput is reported in `elements/second`, enabling direct comparison
@@ -16,8 +17,13 @@ use criterion::{
 };
 use hermes_simd::{
     argmin, axpy_rows, axpy_rows_batch, dot, elementwise_mul, gemv, gemv_strided, gemv_transpose,
-    sum,
+    sum, Inclusive, Neg, PreferredArch, ScanAdd, SimdCow, Unaligned,
 };
+
+/// Owning container as a default build ships it: `PreferredArch` is selected at
+/// compile time from the enabled target features, so this measures the same
+/// backend a consumer gets without per-crate feature flags.
+type BenchCow<'a> = SimdCow<'a, f32, PreferredArch, Unaligned>;
 use std::time::Duration;
 
 const SIZES: &[usize] = &[256, 1024, 4096, 16384];
@@ -265,6 +271,56 @@ fn bench_argmin_f32(c: &mut Criterion) {
     group.finish();
 }
 
+/// Copy-on-write constructors, each of which allocates its output and fills it.
+///
+/// These are the paths whose buffers are written through a raw pointer with the
+/// length raised last (`map_cow`, `mul_scalar_cow`, `splat_fill`, `fma_cow`) and
+/// the two that allocate zeroed because a view routine needs an initialized
+/// slice (`gather`, `prefix_scan`). Allocation is inside the timed region: it is
+/// part of what these constructors cost.
+fn bench_cow_f32(c: &mut Criterion) {
+    let mut group = benchmark_group(c, "cow_f32");
+    for &n in SIZES {
+        group.throughput(Throughput::Elements(n as u64));
+        let src: Vec<f32> = (0..n).map(|i| (i % 17) as f32 * 0.5 - 2.0).collect();
+        let cow = BenchCow::from_slice(&src);
+        // Reversed indices defeat any sequential-access shortcut in gather.
+        let indices: Vec<i32> = (0..n as i32).rev().collect();
+
+        group.bench_with_input(BenchmarkId::new("map_cow", n), &n, |b, _| {
+            b.iter(|| black_box(&cow).map_cow(Neg))
+        });
+        group.bench_with_input(BenchmarkId::new("mul_scalar_cow", n), &n, |b, _| {
+            b.iter(|| black_box(&cow).mul_scalar_cow(black_box(1.5)))
+        });
+        group.bench_with_input(BenchmarkId::new("splat_fill", n), &n, |b, &n| {
+            b.iter(|| BenchCow::splat_fill(black_box(0.25), n))
+        });
+        group.bench_with_input(BenchmarkId::new("fma_cow", n), &n, |b, _| {
+            b.iter(|| {
+                black_box(&cow)
+                    .fma_cow(black_box(&cow), black_box(&cow))
+                    .expect("invariant: benchmark operands share a length")
+            })
+        });
+        group.bench_with_input(BenchmarkId::new("gather", n), &n, |b, _| {
+            b.iter(|| {
+                black_box(&cow)
+                    .gather(black_box(&indices))
+                    .expect("invariant: benchmark indices are in range")
+            })
+        });
+        group.bench_with_input(BenchmarkId::new("prefix_scan", n), &n, |b, _| {
+            b.iter(|| {
+                black_box(&cow)
+                    .prefix_scan(ScanAdd, Inclusive)
+                    .expect("invariant: output length equals input length")
+            })
+        });
+    }
+    group.finish();
+}
+
 fn bench_axpy_rows_batch_f32(c: &mut Criterion) {
     let mut group = benchmark_group(c, "axpy_rows_batch_f32");
     for &case in AXPY_BATCH_CASES {
@@ -355,6 +411,7 @@ criterion_group! {
         bench_gemv_transpose_f32,
         bench_reflector_dots_f64,
         bench_argmin_f32,
+        bench_cow_f32,
         bench_axpy_rows_batch_f32
 }
 criterion_main!(dense_benches);

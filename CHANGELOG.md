@@ -6,6 +6,12 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Added
 
+- [minor] `SimdView::gather_into_uninit` and `prefix_scan_into_uninit` fill a
+  caller's `&mut [MaybeUninit<T>]` and return the initialized prefix, and
+  `AlignedVec::spare_capacity_mut` exposes the reserved-but-uninitialized tail.
+  Together they let a routine fill freshly reserved capacity without a prior
+  zero-fill. `gather`/`prefix_scan` (initialized-slice) now delegate to the
+  uninit forms, keeping one implementation each.
 - [minor] `SimdKernel::vector_to_mask` converts a comparison-result vector into
   the backend's native mask — the inverse of `mask_to_vector`. Composed with
   `mask_to_bitmask` it reduces any `cmp_*` result to one bit per lane, so a lane
@@ -75,6 +81,15 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch] The owning `SimdCow::gather` and `prefix_scan` fill reserved capacity
+  through the new `*_into_uninit` view methods instead of zeroing it first. The
+  zero-fill (introduced with the HS-407 soundness fix) cost 12-59% on this
+  path — benchmarked with a new `cow_f32` group in the dense suite — and the
+  uninit fill removes it: `gather` -18%/-5%/-12%/-11% and `prefix_scan`
+  -6%/-9%/-10%/-31% across 256/1024/4096/16384 elements versus the zeroing
+  version, back to pre-HS-407 throughput with the soundness kept. The
+  short-lived `AlignedVec::with_capacity_zeroed`, added and superseded within
+  this Unreleased cycle, is removed.
 - [patch] The copy-on-write constructors no longer form a `&mut [T]` over
   uninitialized elements. They reserved capacity, raised the length, then handed
   the buffer out as a slice while its tail was still unwritten — every element
@@ -84,11 +99,11 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   `add`/`sub`/`mul`/`div_scalar_cow` now write their tail through the same raw
   pointer as their vector body and raise the length only once every element is
   written. That removes work rather than adding it: the tail stores are no
-  longer bounds-checked. `gather` and `prefix_scan` hand their buffer to a view
-  routine that requires an initialized slice, so they allocate through the new
-  `AlignedVec::with_capacity_zeroed`, trading a zeroing pass for soundness.
-  Covered by a test that runs every constructor under miri across lengths
-  straddling the vector body, where a missed element surfaces as an
+  longer bounds-checked. `gather` and `prefix_scan` fill their reserved capacity
+  directly through the view's new `gather_into_uninit` / `prefix_scan_into_uninit`
+  methods over `AlignedVec::spare_capacity_mut`, so they too never zero the
+  buffer. Covered by a test that runs every constructor under miri across
+  lengths straddling the vector body, where a missed element surfaces as an
   uninitialized read.
 - [patch] `SimdCow::map_unary` and `SimdCow::map_cow` were the same operation
   implemented twice — one delegating to the view kernel, one with its own SIMD
