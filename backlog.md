@@ -70,6 +70,11 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   `unsafe` block in the module carries an obligation-specific comment, or is
   removed because the invariant makes it unnecessary; warning-denied Clippy and
   Nextest stay green.
+  Progress: `bitboard.rs` and `cow/` closed earlier; `sparse/spmv.rs` now done —
+  its ~30 single-call unsafe blocks consolidated to 9, each documented, a missing
+  `# Safety` doc added to `sellp_spmv_vectorized`, and a miri differential test
+  added over all four formats. Remaining: `view/reduce.rs`, `sparse/ops.rs`,
+  `tiling/`, `view/vector_reg.rs`.
 
 - [x] [patch] **HS-404 — `cmp_ne` NaN semantics diverged across backends.** The
   trait default returns all-ones for `NaN != NaN` (Rust `!=` is true), while the

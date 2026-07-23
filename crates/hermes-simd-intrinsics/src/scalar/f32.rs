@@ -446,4 +446,144 @@ mod tests {
             }
         }
     }
+
+    /// SpMV kernels index `x`, `values`, and `col_indices` through raw pointers
+    /// with the length bookkeeping stated in their `SAFETY` notes. The
+    /// integration tests exercise them on the host SIMD backend, but miri runs
+    /// only this crate and `hermes-simd-core`; driving each format through the
+    /// `Scalar` backend here puts that pointer arithmetic under the interpreter,
+    /// checked against an independent dense reference.
+    mod spmv {
+        use crate::Scalar;
+        use hermes_simd_core::sparse::{
+            CsrData, DenseWithMaskData, SellPData, SparseSpMv, SparseView, ValidatedData,
+        };
+
+        /// Dense reference: `y[r] += Σ_c A[r][c] * x[c]`, computed from a
+        /// row-major dense matrix independent of any sparse kernel.
+        fn dense_ref(a: &[f32], x: &[f32], nrows: usize, ncols: usize, y: &mut [f32]) {
+            for r in 0..nrows {
+                let mut acc = 0.0_f32;
+                for c in 0..ncols {
+                    acc += a[r * ncols + c] * x[c];
+                }
+                y[r] += acc;
+            }
+        }
+
+        #[test]
+        fn csr_matches_dense_across_row_lengths() {
+            // ncols 24, x[c] = c+1. Row 0 has 22 nonzeros so it spans the
+            // 4x-unrolled body [0,16), the SIMD tail [16,20), and the scalar
+            // tail [20,22) for LANE_COUNT 4; row 1 has 2 (< LANE_COUNT, wholly
+            // scalar); row 2 is empty (the `row_nnz == 0` early-continue).
+            let ncols = 24;
+            let x: Vec<f32> = (0..ncols).map(|c| c as f32 + 1.0).collect();
+
+            let mut values = Vec::new();
+            let mut col_indices = Vec::new();
+            let mut row_ptr = vec![0i32];
+            let mut dense = vec![0.0_f32; 3 * ncols];
+
+            for c in 0..22i32 {
+                let v = (c as f32 + 1.0) * 0.5;
+                values.push(v);
+                col_indices.push(c);
+                dense[c as usize] = v;
+            }
+            row_ptr.push(values.len() as i32);
+            for &(c, v) in &[(5i32, 2.0f32), (17, 3.0)] {
+                values.push(v);
+                col_indices.push(c);
+                dense[ncols + c as usize] = v;
+            }
+            row_ptr.push(values.len() as i32);
+            row_ptr.push(values.len() as i32); // empty row 2
+
+            let data = CsrData::new(&values[..], &col_indices[..], &row_ptr[..], 3, ncols);
+            let view = SparseView::<f32, _, Scalar>::from_validated_csr(
+                ValidatedData::new(data).expect("fixture validates"),
+            );
+
+            let mut y = vec![1.0_f32; 3];
+            view.spmv(&x, &mut y);
+
+            let mut want = vec![1.0_f32; 3];
+            dense_ref(&dense, &x, 3, ncols, &mut want);
+            assert_eq!(y, want);
+        }
+
+        #[test]
+        fn dense_with_mask_matches_dense() {
+            // 2 x 10: masked lanes must contribute zero. 10 columns cover the
+            // SIMD body [0,8) and the scalar tail [8,10) at LANE_COUNT 4.
+            let (nrows, ncols) = (2, 10);
+            let x: Vec<f32> = (0..ncols).map(|c| c as f32 - 3.0).collect();
+            let mut values = vec![0.0_f32; nrows * ncols];
+            let mut mask = vec![false; nrows * ncols];
+            let mut dense = vec![0.0_f32; nrows * ncols];
+            for r in 0..nrows {
+                for c in 0..ncols {
+                    if (r + c) % 3 == 0 {
+                        let v = (r * ncols + c) as f32 * 0.25 - 1.0;
+                        values[r * ncols + c] = v;
+                        mask[r * ncols + c] = true;
+                        dense[r * ncols + c] = v;
+                    }
+                }
+            }
+            let data = DenseWithMaskData::new(&values[..], &mask[..], nrows, ncols);
+            let view = SparseView::<f32, _, Scalar>::from_dense_with_mask(data);
+
+            let mut y = vec![0.0_f32; nrows];
+            view.spmv(&x, &mut y);
+
+            let mut want = vec![0.0_f32; nrows];
+            dense_ref(&dense, &x, nrows, ncols, &mut want);
+            assert_eq!(y, want);
+        }
+
+        #[test]
+        fn sellp_matches_dense() {
+            // One slice of C = LANE_COUNT = 4 rows takes the vectorized path.
+            // Padding lanes carry col_index 0 with value 0, contributing nothing.
+            const C: usize = 4;
+            let ncols = 6;
+            let x: Vec<f32> = (0..ncols).map(|c| c as f32 + 2.0).collect();
+            // Row r keeps two nonzeros at columns r and (r+2)%ncols.
+            let mut dense = vec![0.0_f32; C * ncols];
+            let col_count = 2usize;
+            let mut values = vec![0.0_f32; col_count * C];
+            let mut col_indices = vec![0i32; col_count * C];
+            for row in 0..C {
+                for (k, &c) in [row, (row + 2) % ncols].iter().enumerate() {
+                    let v = (row + k + 1) as f32;
+                    values[k * C + row] = v;
+                    col_indices[k * C + row] = c as i32;
+                    dense[row * ncols + c] = v;
+                }
+            }
+            // `slice_ptr` is CSR-like: one offset per slice plus the end.
+            let slice_ptr = [0i32, (col_count * C) as i32];
+            let slice_col_count = [col_count as i32];
+            let data = SellPData::<f32, C>::new(
+                &values[..],
+                &col_indices[..],
+                &slice_ptr[..],
+                &slice_col_count[..],
+                C,
+                ncols,
+            );
+            let view = SparseView::<f32, _, Scalar>::from_validated_sellp(
+                ValidatedData::new(data).expect("fixture validates"),
+            );
+
+            let mut y = vec![0.0_f32; C];
+            view.spmv(&x, &mut y);
+
+            let mut want = vec![0.0_f32; C];
+            dense_ref(&dense, &x, C, ncols, &mut want);
+            assert_eq!(y, want);
+        }
+    }
 }
