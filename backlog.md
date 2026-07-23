@@ -5,7 +5,7 @@ Tags: `[patch]` / `[minor]` / `[major]` / `[arch]` per SemVer change class.
 Tactical breakdown of the active items lives in [checklist.md](checklist.md).
 External gap findings live in [gap_audit.md](gap_audit.md).
 
-- [ ] [patch] **HS-407 — replace `set_len`-before-write with `spare_capacity_mut`.**
+- [x] [patch] **HS-407 — no `&mut [T]` spans uninitialized elements.**
   The `cow` constructors allocate with `with_capacity`, call `set_len`, and hand
   the buffer to a filler as `&mut [T]` while its tail is still unwritten
   (`extensions.rs` map/`splat_fill`/`gather`/`prefix_scan`, `unary.rs`,
@@ -17,6 +17,15 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   zero-fill-free property the perf budget depends on. Acceptance: no `&mut [T]`
   spans uninitialized elements, miri covers the constructors, and the
   `dense`/`cow` benchmarks show no regression.
+  Delivered: the four pointer-writing constructors (`map_cow`, `fma_cow`,
+  `splat_fill`, `broadcast_op`) write their tail through the same raw pointer as
+  their vector body and raise the length last, which removes the bounds checks
+  the slice tail carried; `gather` and `prefix_scan` feed a view routine that
+  needs an initialized slice, so they use the new
+  `AlignedVec::with_capacity_zeroed`. `map_unary` was a duplicate of `map_cow`
+  and now delegates to it. Miri covers every constructor across lengths
+  straddling the vector body. No cow-surface benchmark exists to measure the
+  zeroing pass — filed as HS-408.
 
 - [x] [patch] **HS-405 — safe code could execute an unsupported ISA.** A
   `SimdView`, `SparseView`, or owned `SimdCow` could be built for any `Arch`
@@ -28,6 +37,16 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   its kernels are callable. Runtime dispatch was never affected. Covered by
   tests asserting availability tracks the platform probe; no measured benchmark
   change.
+
+- [ ] [patch] **HS-408 — benchmark the copy-on-write surface.** No Criterion
+  target covers `map_cow`, the scalar-broadcast ops, `splat_fill`, `gather`, or
+  `prefix_scan`, so HS-407's claim that the pointer-tail rewrite adds no work
+  rests on reasoning (unchecked stores replacing bounds-checked ones) rather
+  than measurement, and the zeroing pass `gather`/`prefix_scan` now pay is
+  unquantified. Add a `cow` group to the dense suite within the committed 60s
+  smoke and 300s full budgets. Acceptance: baselines stored for each op, the
+  zeroing cost quantified, and a decision recorded on whether it justifies
+  teaching the view routines to fill `&mut [MaybeUninit<T>]`.
 
 - [ ] [patch] **HS-406 — per-site `SAFETY` comments for pointer obligations.**
   Progress: `bitboard.rs` is closed — auditing it found the `unsafe` unjustified

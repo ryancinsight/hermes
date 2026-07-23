@@ -75,6 +75,25 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch] The copy-on-write constructors no longer form a `&mut [T]` over
+  uninitialized elements. They reserved capacity, raised the length, then handed
+  the buffer out as a slice while its tail was still unwritten — every element
+  was initialized before anything read it, but that reference is not one the
+  language permits, and `AlignedVec` allocates with `alloc`, not `alloc_zeroed`.
+  `map_cow`, `fma_cow`, `splat_fill`, and the scalar-broadcast kernel behind
+  `add`/`sub`/`mul`/`div_scalar_cow` now write their tail through the same raw
+  pointer as their vector body and raise the length only once every element is
+  written. That removes work rather than adding it: the tail stores are no
+  longer bounds-checked. `gather` and `prefix_scan` hand their buffer to a view
+  routine that requires an initialized slice, so they allocate through the new
+  `AlignedVec::with_capacity_zeroed`, trading a zeroing pass for soundness.
+  Covered by a test that runs every constructor under miri across lengths
+  straddling the vector body, where a missed element surfaces as an
+  uninitialized read.
+- [patch] `SimdCow::map_unary` and `SimdCow::map_cow` were the same operation
+  implemented twice — one delegating to the view kernel, one with its own SIMD
+  loop. `map_unary` now delegates to `map_cow`, leaving a single implementation.
+
 - [patch] The unsafe-block audit continues (HS-406): `bitboard.rs` is fully
   documented, having gone from seven `unsafe` blocks to two — the raw pointer
   reborrows, each now carrying a `SAFETY` comment deriving the aliasing and

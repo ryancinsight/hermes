@@ -10,7 +10,7 @@ use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 
 #[cfg(not(feature = "mnemosyne-memory"))]
-use alloc::alloc::{alloc, dealloc};
+use alloc::alloc::{alloc, alloc_zeroed, dealloc};
 
 /// Zero-copy serialization support for aligned vectors using `rkyv`.
 pub mod rkyv;
@@ -59,6 +59,64 @@ where
             } else {
                 core::mem::align_of::<T>() as u32
             },
+            _marker: PhantomData,
+        }
+    }
+
+    /// Create an `AlignedVec` of `capacity` zeroed elements, length already set.
+    ///
+    /// For buffers handed to a routine that fills them through a `&mut [T]`,
+    /// this is the sound alternative to reserving capacity and raising the
+    /// length before writing: that would form a reference over uninitialized
+    /// elements. Every scalar type this crate supports has a valid all-zero
+    /// representation, so the allocation is fully initialized on return.
+    ///
+    /// Prefer `with_capacity` plus writes through a raw pointer where the
+    /// caller controls the write loop, since that avoids this zeroing pass
+    /// entirely; use this only when an existing API requires an initialized
+    /// slice up front.
+    pub fn with_capacity_zeroed(capacity: usize) -> Self {
+        if core::mem::size_of::<T>() == 0 || capacity == 0 {
+            let mut empty = Self::with_capacity(capacity);
+            // SAFETY: a zero-sized element type has no storage to initialize,
+            // and a zero capacity means no element exists, so the length is
+            // trivially covered in both cases.
+            unsafe {
+                empty.set_len(if core::mem::size_of::<T>() == 0 {
+                    capacity
+                } else {
+                    0
+                })
+            };
+            return empty;
+        }
+
+        let align = if Align::IS_ALIGNED {
+            Align::ALIGN_BYTES
+        } else {
+            core::mem::align_of::<T>()
+        };
+        let layout = Self::layout_for_capacity(capacity, align);
+
+        // SAFETY: `layout_for_capacity` rejects a capacity whose byte size
+        // overflows, so the layout is valid and non-zero here.
+        #[cfg(feature = "mnemosyne-memory")]
+        let ptr = unsafe {
+            core::alloc::GlobalAlloc::alloc_zeroed(&mnemosyne::Mnemosyne, layout) as *mut T
+        };
+        #[cfg(not(feature = "mnemosyne-memory"))]
+        let ptr = unsafe { alloc_zeroed(layout) as *mut T };
+
+        if ptr.is_null() {
+            alloc::alloc::handle_alloc_error(layout);
+        }
+
+        Self {
+            ptr,
+            len: capacity,
+            cap: capacity,
+            node: None,
+            alloc_align: align as u32,
             _marker: PhantomData,
         }
     }

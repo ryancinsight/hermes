@@ -383,6 +383,59 @@ mod tests {
         }
     }
 
+    /// The copy-on-write constructors build their output buffer with
+    /// `with_capacity` and fill it through a raw pointer. Running them under
+    /// miri is what proves every element is written: a missed one leaves
+    /// uninitialized memory that the value comparison then reads.
+    #[test]
+    fn cow_constructors_initialize_every_element() {
+        use hermes_simd_core::cow::SimdCow;
+        use hermes_simd_core::ops::{Inclusive, ScanAdd};
+
+        // Lengths straddling the 4-lane body leave a scalar tail of every size.
+        for len in [0_usize, 1, 3, 4, 5, 7, 8, 9, 17] {
+            let src: Vec<f32> = (0..len).map(|i| i as f32 + 1.0).collect();
+            let cow = SimdCow::<f32, Scalar, Unaligned>::from_slice(&src);
+
+            let scaled = cow.mul_scalar_cow(2.0);
+            let expected: Vec<f32> = src.iter().map(|v| v * 2.0).collect();
+            assert_eq!(scaled.as_ref(), expected.as_slice(), "mul_scalar len {len}");
+
+            let negated = cow.map_cow(hermes_simd_core::ops::Neg);
+            let expected: Vec<f32> = src.iter().map(|v| -v).collect();
+            assert_eq!(negated.as_ref(), expected.as_slice(), "map_cow len {len}");
+
+            let filled = SimdCow::<f32, Scalar, Unaligned>::splat_fill(-3.5, len);
+            assert_eq!(filled.as_ref(), vec![-3.5_f32; len], "splat_fill len {len}");
+
+            let fused = cow.fma_cow(&cow, &cow).expect("invariant: equal lengths");
+            let expected: Vec<f32> = src.iter().map(|v| v * v + v).collect();
+            assert_eq!(fused.as_ref(), expected.as_slice(), "fma_cow len {len}");
+
+            let indices: Vec<i32> = (0..len as i32).rev().collect();
+            let gathered = cow.gather(&indices).expect("invariant: indices in range");
+            let expected: Vec<f32> = indices.iter().map(|&i| src[i as usize]).collect();
+            assert_eq!(gathered.as_ref(), expected.as_slice(), "gather len {len}");
+
+            let scanned = cow
+                .prefix_scan(ScanAdd, Inclusive)
+                .expect("invariant: output length equals input length");
+            let mut running = 0.0_f32;
+            let expected: Vec<f32> = src
+                .iter()
+                .map(|v| {
+                    running += v;
+                    running
+                })
+                .collect();
+            assert_eq!(
+                scanned.as_ref(),
+                expected.as_slice(),
+                "prefix_scan len {len}"
+            );
+        }
+    }
+
     #[test]
     fn extremum_scan_rejects_nan_in_every_position() {
         for len in [1_usize, 4, 5, 9, 17] {
