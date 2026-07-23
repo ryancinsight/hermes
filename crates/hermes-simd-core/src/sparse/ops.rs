@@ -47,6 +47,25 @@ where
     fn elementwise_mul_dense(&self, dense: &[T], out_values: &mut [T]) {
         let d = &self.data;
         let lane_count = Arch::LANE_COUNT;
+
+        // SOUNDNESS: the SIMD path below gathers `dense[col_indices[j]]` with an
+        // unchecked `Arch::gather`. `SparseView<Csr>` is the *unvalidated* type
+        // (constructible from arbitrary `CsrData` via `from_csr`), so nothing
+        // otherwise guarantees `col_indices[j] < dense.len()` and the gather
+        // could read out of bounds from safe code. Validate the structure
+        // (`col_indices[k] < ncols`) via the SSOT checker and require
+        // `dense.len() >= ncols`, so every gathered index is in bounds. O(nnz)
+        // once per call, matching the SELL-p path in this file.
+        use super::types::SparseValidate;
+        d.validate()
+            .expect("CSR matrix failed structural validation before elementwise_mul_dense");
+        assert!(
+            dense.len() >= d.ncols,
+            "CSR elementwise_mul_dense: dense len {} < ncols {}",
+            dense.len(),
+            d.ncols
+        );
+
         for r in 0..d.nrows {
             let start = d.row_ptr[r] as usize;
             let end = d.row_ptr[r + 1] as usize;
@@ -56,14 +75,22 @@ where
             let out = &mut out_values[start..end];
 
             let simd_len = (row_nnz / lane_count) * lane_count;
+            // SAFETY: `Arch::*` are target-feature kernels (module invariant).
+            // The window `[j, j+LANE_COUNT)` stays within `vals`/`cols`/`out` for
+            // `j < simd_len <= row_nnz`, and `validate` above proved every
+            // `cols[k] < ncols <= dense.len()`, so each gathered `dense[cols[k]]`
+            // is in bounds.
             let mut j = 0usize;
-            while j < simd_len {
-                let idx = unsafe { build_index_vector::<T, Arch>(&cols[j..j + lane_count]) };
-                let dense_vec = unsafe { Arch::gather(dense.as_ptr(), idx) };
-                let v_vec = unsafe { Arch::load_unaligned(vals[j..].as_ptr()) };
-                let res_vec = unsafe { Arch::mul(v_vec, dense_vec) };
-                unsafe { Arch::store_unaligned(out[j..].as_mut_ptr(), res_vec) };
-                j += lane_count;
+            unsafe {
+                while j < simd_len {
+                    let idx = build_index_vector::<T, Arch>(&cols[j..j + lane_count]);
+                    let res_vec = Arch::mul(
+                        Arch::load_unaligned(vals[j..].as_ptr()),
+                        Arch::gather(dense.as_ptr(), idx),
+                    );
+                    Arch::store_unaligned(out[j..].as_mut_ptr(), res_vec);
+                    j += lane_count;
+                }
             }
             while j < row_nnz {
                 let c = cols[j] as usize;
@@ -132,22 +159,26 @@ where
                         }
                     }
 
-                    let idx = unsafe { build_index_vector::<T, Arch>(&idx_arr[..C]) };
-                    let mask = unsafe { Arch::mask_from_bools(&mask_arr[..C]) };
-                    let zero_vec = unsafe { Arch::zero() };
-
-                    let dense_vec =
-                        unsafe { Arch::gather_masked(dense.as_ptr(), idx, mask, zero_vec) };
-                    let val_vec = unsafe { Arch::load_unaligned(d.values[offset..].as_ptr()) };
-                    let res_vec = unsafe { Arch::mul(val_vec, dense_vec) };
-
+                    // SAFETY: `Arch::*` are target-feature kernels (module
+                    // invariant). `idx_arr`/`mask_arr` hold `C == LANE_COUNT`
+                    // valid entries; `mask` is set only where `r < nrows && c <
+                    // ncols`, so the masked gather touches `dense` only at those
+                    // computed in-bounds indices. `validate` and the output-length
+                    // assert above keep `values[offset..offset+C]` and the masked
+                    // store into `out_values[offset..]` in bounds.
                     unsafe {
+                        let idx = build_index_vector::<T, Arch>(&idx_arr[..C]);
+                        let mask = Arch::mask_from_bools(&mask_arr[..C]);
+                        let zero_vec = Arch::zero();
+                        let dense_vec = Arch::gather_masked(dense.as_ptr(), idx, mask, zero_vec);
+                        let res_vec =
+                            Arch::mul(Arch::load_unaligned(d.values[offset..].as_ptr()), dense_vec);
                         Arch::masked_store_unaligned(
                             out_values[offset..].as_mut_ptr(),
                             mask,
                             res_vec,
-                        )
-                    };
+                        );
+                    }
                 }
             }
         } else {
@@ -220,34 +251,47 @@ where
         }
 
         if BN == lane_count {
-            for b in 0..d.nblocks {
-                let br = d.block_row[b] as usize;
-                let bc = d.block_col[b] as usize;
-                for i in 0..BM {
-                    let offset = b * (BM * BN) + i * BN;
-                    let b_vec = unsafe { Arch::load_unaligned(d.blocks[offset..].as_ptr()) };
-                    let dense_idx = (br + i) * d.ncols + bc;
-                    let dense_vec = unsafe { Arch::load_unaligned(dense[dense_idx..].as_ptr()) };
-                    let res_vec = unsafe { Arch::mul(b_vec, dense_vec) };
-                    unsafe { Arch::store_unaligned(out_values[offset..].as_mut_ptr(), res_vec) };
+            // SAFETY: `Arch::*` are target-feature kernels (module invariant).
+            // The asserts above bound each block within the dense extent and the
+            // block/output buffers, so every `LANE_COUNT`-wide load of a block
+            // row `blocks[offset..offset+BN]`, the dense window
+            // `dense[(br+i)*ncols+bc ..][..BN]`, and the matching store into
+            // `out_values` stays in bounds.
+            unsafe {
+                for b in 0..d.nblocks {
+                    let br = d.block_row[b] as usize;
+                    let bc = d.block_col[b] as usize;
+                    for i in 0..BM {
+                        let offset = b * (BM * BN) + i * BN;
+                        let dense_idx = (br + i) * d.ncols + bc;
+                        let res_vec = Arch::mul(
+                            Arch::load_unaligned(d.blocks[offset..].as_ptr()),
+                            Arch::load_unaligned(dense[dense_idx..].as_ptr()),
+                        );
+                        Arch::store_unaligned(out_values[offset..].as_mut_ptr(), res_vec);
+                    }
                 }
             }
         } else if BN == lane_count * 2 {
-            for b in 0..d.nblocks {
-                let br = d.block_row[b] as usize;
-                let bc = d.block_col[b] as usize;
-                for i in 0..BM {
-                    let offset = b * (BM * BN) + i * BN;
-                    let b_vec0 = unsafe { Arch::load_unaligned(d.blocks[offset..].as_ptr()) };
-                    let b_vec1 =
-                        unsafe { Arch::load_unaligned(d.blocks[offset + lane_count..].as_ptr()) };
-                    let dense_idx = (br + i) * d.ncols + bc;
-                    let dense_vec0 = unsafe { Arch::load_unaligned(dense[dense_idx..].as_ptr()) };
-                    let dense_vec1 =
-                        unsafe { Arch::load_unaligned(dense[dense_idx + lane_count..].as_ptr()) };
-                    let res_vec0 = unsafe { Arch::mul(b_vec0, dense_vec0) };
-                    let res_vec1 = unsafe { Arch::mul(b_vec1, dense_vec1) };
-                    unsafe {
+            // SAFETY: as the `BN == LANE_COUNT` arm, with each block row and its
+            // dense window spanning two `LANE_COUNT` loads; both halves stay
+            // within `blocks`/`dense`/`out_values` by the same block-extent and
+            // buffer-length asserts.
+            unsafe {
+                for b in 0..d.nblocks {
+                    let br = d.block_row[b] as usize;
+                    let bc = d.block_col[b] as usize;
+                    for i in 0..BM {
+                        let offset = b * (BM * BN) + i * BN;
+                        let dense_idx = (br + i) * d.ncols + bc;
+                        let res_vec0 = Arch::mul(
+                            Arch::load_unaligned(d.blocks[offset..].as_ptr()),
+                            Arch::load_unaligned(dense[dense_idx..].as_ptr()),
+                        );
+                        let res_vec1 = Arch::mul(
+                            Arch::load_unaligned(d.blocks[offset + lane_count..].as_ptr()),
+                            Arch::load_unaligned(dense[dense_idx + lane_count..].as_ptr()),
+                        );
                         Arch::store_unaligned(out_values[offset..].as_mut_ptr(), res_vec0);
                         Arch::store_unaligned(
                             out_values[offset + lane_count..].as_mut_ptr(),
@@ -281,17 +325,25 @@ where
         let lane_count = Arch::LANE_COUNT;
         let len = self.data.values.len();
         let simd_len = (len / lane_count) * lane_count;
-        let mut acc_vec = unsafe { Arch::zero() };
+
+        // SAFETY: `Arch::*` are target-feature kernels (module invariant). Every
+        // masked load reads `values[i..i+LANE_COUNT]` and `mask[i..i+LANE_COUNT]`
+        // for `i < simd_len <= len`, which stay within the equal-length `values`
+        // and `mask` buffers.
         let mut i = 0usize;
-        while i < simd_len {
-            let msk = unsafe { Arch::mask_from_bools(&self.data.mask[i..i + lane_count]) };
-            let zero_vec = unsafe { Arch::zero() };
-            let v_vec = unsafe {
-                Arch::masked_load_unaligned(self.data.values[i..].as_ptr(), msk, zero_vec)
-            };
-            acc_vec = unsafe { Arch::add(acc_vec, v_vec) };
-            i += lane_count;
-        }
+        let acc_vec = unsafe {
+            let zero_vec = Arch::zero();
+            let mut acc_vec = zero_vec;
+            while i < simd_len {
+                let msk = Arch::mask_from_bools(&self.data.mask[i..i + lane_count]);
+                let v_vec =
+                    Arch::masked_load_unaligned(self.data.values[i..].as_ptr(), msk, zero_vec);
+                acc_vec = Arch::add(acc_vec, v_vec);
+                i += lane_count;
+            }
+            acc_vec
+        };
+        // SAFETY: target-feature kernel, covered by the module invariant.
         let mut s = unsafe { Arch::sum_reduce(acc_vec) };
         while i < len {
             if self.data.mask[i] {
@@ -308,15 +360,36 @@ where
         let len = d.values.len();
         let lane_count = Arch::LANE_COUNT;
         let simd_len = (len / lane_count) * lane_count;
+
+        // Bounds for the unchecked loads/stores: a `LANE_COUNT` window at
+        // `i < simd_len <= len` must stay within `dense` and `out_values` as
+        // well as `values`/`mask`. `dense` and the output are elementwise-shaped,
+        // so require them at least as long as `values`.
+        assert!(
+            dense.len() >= len && out_values.len() >= len,
+            "DenseWithMask elementwise_mul_dense: dense {} / out {} shorter than values {}",
+            dense.len(),
+            out_values.len(),
+            len
+        );
+
+        // SAFETY: `Arch::*` are target-feature kernels (module invariant). The
+        // assert above gives every windowed load/store `[i, i+LANE_COUNT)` room
+        // within `dense`, `out_values`, `values`, and `mask` for `i < simd_len`.
         let mut i = 0usize;
-        while i < simd_len {
-            let msk = unsafe { Arch::mask_from_bools(&d.mask[i..i + lane_count]) };
-            let v_vec = unsafe { Arch::load_unaligned(d.values[i..].as_ptr()) };
-            let dense_vec = unsafe { Arch::load_unaligned(dense[i..].as_ptr()) };
-            let zero_vec = unsafe { Arch::zero() };
-            let res_vec = unsafe { Arch::masked_mul(v_vec, dense_vec, msk, zero_vec) };
-            unsafe { Arch::store_unaligned(out_values[i..].as_mut_ptr(), res_vec) };
-            i += lane_count;
+        unsafe {
+            let zero_vec = Arch::zero();
+            while i < simd_len {
+                let msk = Arch::mask_from_bools(&d.mask[i..i + lane_count]);
+                let res_vec = Arch::masked_mul(
+                    Arch::load_unaligned(d.values[i..].as_ptr()),
+                    Arch::load_unaligned(dense[i..].as_ptr()),
+                    msk,
+                    zero_vec,
+                );
+                Arch::store_unaligned(out_values[i..].as_mut_ptr(), res_vec);
+                i += lane_count;
+            }
         }
         while i < len {
             if d.mask[i] {

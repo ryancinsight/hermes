@@ -75,6 +75,11 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   `# Safety` doc added to `sellp_spmv_vectorized`, and a miri differential test
   added over all four formats. Remaining: `view/reduce.rs`, `sparse/ops.rs`,
   `tiling/`, `view/vector_reg.rs`.
+  `sparse/ops.rs` now done too — its 35 undocumented unsafe blocks consolidated
+  to 7 documented ones, and the audit found a reachable OOB in the CSR
+  `elementwise_mul_dense` gather (unvalidated view, no dense-length guard; miri
+  confirmed the UB) now fixed with validate + length asserts. Remaining:
+  `view/reduce.rs`, `tiling/`, `view/vector_reg.rs`.
 
 - [x] [patch] **HS-404 — `cmp_ne` NaN semantics diverged across backends.** The
   trait default returns all-ones for `NaN != NaN` (Rust `!=` is true), while the
