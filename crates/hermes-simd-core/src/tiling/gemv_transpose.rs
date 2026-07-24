@@ -11,6 +11,16 @@
 //! than once per row — and the `TILE_N` independent chunks break the per-chunk
 //! FMA dependency chain. The `ncols mod lane` columns use a scalar tail, so any
 //! shape is supported. ∎
+//!
+//! # Safety
+//!
+//! The `Arch::*` kernels are `#[target_feature]`-gated and sound only on a host
+//! implementing `Arch` — established by the `SimdView` operands, whose
+//! constructor rejects an unsupported architecture. The raw-pointer loads/stores
+//! address `A`, `x`, and `y` at offsets derived from the caller-supplied dims;
+//! `check_gemv_t_dimensions` validates those against the actual operand lengths
+//! (overflow rejected) before any unchecked access, so per-site `SAFETY`
+//! comments cite that validation and the per-window bound.
 
 use crate::{
     align::Alignment,
@@ -96,6 +106,9 @@ where
     let lane_count = Arch::LANE_COUNT;
     let simd_cols = (ncols / lane_count) * lane_count;
 
+    // SAFETY: target-feature kernel (module invariant); every call passes a
+    // pointer whose `LANE_COUNT` read stays within `A` (offsets bounded below by
+    // `simd_cols` and the validated stride), gated on `Align` for the aligned form.
     let load = |ptr: *const T| -> Arch::Vector {
         if crate::align::is_aligned_for_arch::<Arch, Align>() {
             unsafe { Arch::load_aligned(ptr) }
@@ -107,34 +120,45 @@ where
     // Block TILE_N output lane-chunks; each accumulator is reused over all rows.
     // `y` is a caller slice of unknown alignment, so load/store it unaligned.
     let mut c = 0;
+    // SAFETY: the loop guard keeps `c + TILE_N*LANE_COUNT <= simd_cols <= ncols`,
+    // so every `y`/`A` window `[c + t*LANE_COUNT, +LANE_COUNT)` (t < TILE_N) is
+    // within `y` (len >= ncols) and, at row base `i*lda` for `i < nrows`, within
+    // the validated `A` span; `x_slice[i]` is checked indexing. Kernels covered
+    // by the module invariant.
     while c + TILE_N * lane_count <= simd_cols {
-        let mut acc = [unsafe { Arch::zero() }; TILE_N];
-        for (t, slot) in acc.iter_mut().enumerate() {
-            *slot = unsafe { Arch::load_unaligned(y.as_ptr().add(c + t * lane_count)) };
-        }
-        for i in 0..nrows {
-            let xi = unsafe { Arch::splat(x_slice[i]) };
-            let base = i * lda + c;
+        unsafe {
+            let mut acc = [Arch::zero(); TILE_N];
             for (t, slot) in acc.iter_mut().enumerate() {
-                let a_vec = load(unsafe { a_slice.as_ptr().add(base + t * lane_count) });
-                *slot = unsafe { Arch::fmadd(xi, a_vec, *slot) };
+                *slot = Arch::load_unaligned(y.as_ptr().add(c + t * lane_count));
             }
-        }
-        for (t, &accv) in acc.iter().enumerate() {
-            unsafe { Arch::store_unaligned(y.as_mut_ptr().add(c + t * lane_count), accv) };
+            for i in 0..nrows {
+                let xi = Arch::splat(x_slice[i]);
+                let base = i * lda + c;
+                for (t, slot) in acc.iter_mut().enumerate() {
+                    let a_vec = load(a_slice.as_ptr().add(base + t * lane_count));
+                    *slot = Arch::fmadd(xi, a_vec, *slot);
+                }
+            }
+            for (t, &accv) in acc.iter().enumerate() {
+                Arch::store_unaligned(y.as_mut_ptr().add(c + t * lane_count), accv);
+            }
         }
         c += TILE_N * lane_count;
     }
 
     // Remaining single lane-chunks (fewer than TILE_N).
+    // SAFETY: `c < simd_cols <= ncols`, so the `y`/`A` window `[c, c+LANE_COUNT)`
+    // is within `y` and the validated `A` span at each row `i < nrows`.
     while c < simd_cols {
-        let mut acc = unsafe { Arch::load_unaligned(y.as_ptr().add(c)) };
-        for i in 0..nrows {
-            let xi = unsafe { Arch::splat(x_slice[i]) };
-            let a_vec = load(unsafe { a_slice.as_ptr().add(i * lda + c) });
-            acc = unsafe { Arch::fmadd(xi, a_vec, acc) };
+        unsafe {
+            let mut acc = Arch::load_unaligned(y.as_ptr().add(c));
+            for i in 0..nrows {
+                let xi = Arch::splat(x_slice[i]);
+                let a_vec = load(a_slice.as_ptr().add(i * lda + c));
+                acc = Arch::fmadd(xi, a_vec, acc);
+            }
+            Arch::store_unaligned(y.as_mut_ptr().add(c), acc);
         }
-        unsafe { Arch::store_unaligned(y.as_mut_ptr().add(c), acc) };
         c += lane_count;
     }
 

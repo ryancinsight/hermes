@@ -60,6 +60,18 @@
 //! cache; below that threshold the pack's copy + allocation is pure overhead. The
 //! crossover is encoded by `GEMM_PACK_B_BYTES_THRESHOLD` (gated additionally on
 //! `m > TILE_M`, since with a single row block there is no reuse to amortize). ∎
+//!
+//! # Safety
+//!
+//! The `Arch::*` kernels are `#[target_feature]`-gated and sound only on a host
+//! implementing `Arch` — established by the `SimdView` operands, whose
+//! constructor rejects an unsupported architecture. `check_tiled_gemm_dimensions`
+//! validates the caller-supplied `m`, `n`, `k` against the actual `A`/`B`/`C`
+//! lengths (overflow rejected, closing the OOB path under release
+//! `overflow-checks = false`) before the register micro-kernel runs, so every
+//! tile offset `(r+i)*n + col_n + j*LANE_COUNT` and its `A`/`B` counterparts stay
+//! within the validated spans; `gemm_register_tile` carries the full contract in
+//! its own `# Safety` section.
 
 use crate::{
     align::Alignment,

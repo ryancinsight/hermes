@@ -21,6 +21,15 @@
 //! asymptotic bound. Hence `TILE_M` is a throughput knob with no accuracy-class
 //! regression. Verified empirically by the differential tests in
 //! `tiling_tests.rs` (bounded-epsilon equality against the scalar reduction).
+//!
+//! # Safety
+//!
+//! The `Arch::*` kernels are `#[target_feature]`-gated and sound only on a host
+//! implementing `Arch`; that holds by construction, since the operands are
+//! `SimdView`s and `SimdView::new` rejects an unsupported architecture. Every
+//! raw-pointer load addresses a `LANE_COUNT` window bounded by
+//! `tiled_len = (len / (LANE_COUNT*TILE_M)) * (LANE_COUNT*TILE_M) <= len`, where
+//! `len = a.len() = b.len()`; per-site `SAFETY` comments record only that bound.
 
 use crate::{
     align::Alignment,
@@ -57,6 +66,9 @@ where
     let tile_width = lane_count * TILE_M;
     let tiled_len = (len / tile_width) * tile_width;
 
+    // SAFETY: target-feature kernel (module invariant). Callers only pass a
+    // pointer whose `LANE_COUNT` read lies within `a`/`b` (offsets bounded by
+    // `tiled_len`), and the aligned variant is gated on `Align`.
     let load = |ptr: *const T| -> Arch::Vector {
         if crate::align::is_aligned_for_arch::<Arch, Align>() {
             unsafe { Arch::load_aligned(ptr) }
@@ -65,51 +77,54 @@ where
         }
     };
 
-    let mut ptr_a = a.as_slice().as_ptr();
-    let mut ptr_b = b.as_slice().as_ptr();
+    let base_a = a.as_slice().as_ptr();
+    let base_b = b.as_slice().as_ptr();
 
-    // TILE_M independent accumulators initialized via mul (not zero+fmadd)
-    // to avoid an extra dependency on the zero register.
-    let mut accumulators: [Arch::Vector; TILE_M] = {
-        let mut arr = [unsafe { Arch::zero() }; TILE_M];
+    // SAFETY: `tiled_len` is a multiple of `tile_width = LANE_COUNT * TILE_M`, so
+    // for every processed tile the offset `t*tile_width + i*LANE_COUNT` addresses
+    // a `LANE_COUNT` window within `a`/`b` (both length `len >= tiled_len`); the
+    // `Arch` ops are target-feature kernels covered by the module invariant.
+    let mut total: T = unsafe {
+        let mut ptr_a = base_a;
+        let mut ptr_b = base_b;
+
+        // TILE_M independent accumulators, seeded via mul (not zero+fmadd) to
+        // avoid an extra dependency on the zero register.
+        let mut accumulators: [Arch::Vector; TILE_M] = [Arch::zero(); TILE_M];
         if tiled_len > 0 {
             for i in 0..TILE_M {
-                let va = load(unsafe { ptr_a.add(i * lane_count) });
-                let vb = load(unsafe { ptr_b.add(i * lane_count) });
-                arr[i] = unsafe { Arch::mul(va, vb) };
+                let va = load(ptr_a.add(i * lane_count));
+                let vb = load(ptr_b.add(i * lane_count));
+                accumulators[i] = Arch::mul(va, vb);
             }
-            unsafe {
+            ptr_a = ptr_a.add(tile_width);
+            ptr_b = ptr_b.add(tile_width);
+        }
+
+        if tiled_len > tile_width {
+            let iterations = (tiled_len / tile_width) - 1;
+            for _ in 0..iterations {
+                for i in 0..TILE_M {
+                    let va = load(ptr_a.add(i * lane_count));
+                    let vb = load(ptr_b.add(i * lane_count));
+                    accumulators[i] = Arch::fmadd(va, vb, accumulators[i]);
+                }
                 ptr_a = ptr_a.add(tile_width);
                 ptr_b = ptr_b.add(tile_width);
             }
         }
-        arr
+
+        // Horizontal reduce across the TILE_M accumulators.
+        let mut total = T::ZERO;
+        if tiled_len > 0 {
+            let mut combined = accumulators[0];
+            for acc in accumulators.iter().take(TILE_M).skip(1) {
+                combined = Arch::add(combined, *acc);
+            }
+            total = Arch::sum_reduce(combined);
+        }
+        total
     };
-
-    if tiled_len > tile_width {
-        let iterations = (tiled_len / tile_width) - 1;
-        for _ in 0..iterations {
-            for i in 0..TILE_M {
-                let va = load(unsafe { ptr_a.add(i * lane_count) });
-                let vb = load(unsafe { ptr_b.add(i * lane_count) });
-                accumulators[i] = unsafe { Arch::fmadd(va, vb, accumulators[i]) };
-            }
-            unsafe {
-                ptr_a = ptr_a.add(tile_width);
-                ptr_b = ptr_b.add(tile_width);
-            }
-        }
-    }
-
-    // Horizontal reduce across TILE_M accumulators.
-    let mut total = T::ZERO;
-    if tiled_len > 0 {
-        let mut combined = accumulators[0];
-        for i in 1..TILE_M {
-            combined = unsafe { Arch::add(combined, accumulators[i]) };
-        }
-        total = unsafe { Arch::sum_reduce(combined) };
-    }
 
     // Scalar tail.
     let a_slice = a.as_slice();
