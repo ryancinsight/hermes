@@ -4,6 +4,13 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ## [Unreleased]
 
+### Fixed
+
+- [patch] Corrected stale `"0.5.0"` version requirements in `hermes-simd-benches`
+  and `hermes-simd-examples` path dependencies; the workspace is `0.4.1`, so
+  these must be `"0.4.0"` for Cargo to resolve the workspace graph. Tests and
+  benchmarks now discover their targets.
+
 ## [0.5.0] - 2026-07-24
 
 ### Added
