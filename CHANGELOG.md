@@ -4,6 +4,8 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-24
+
 ### Added
 
 - [minor] `SimdView::gather_into_uninit` and `prefix_scan_into_uninit` fill a
