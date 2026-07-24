@@ -19,7 +19,7 @@ mnemosyne = { workspace = true, optional = true }
 themis = { workspace = true }
 
 [dev-dependencies]
-hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.4.0" }
+hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.5.0" }
 
 [features]
 default = ["std", "mnemosyne-memory"]
