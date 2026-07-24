@@ -345,7 +345,6 @@ dependencies = [
 [[package]]
 name = "eunomia"
 version = "0.7.0"
-source = "git+https://github.com/ryancinsight/eunomia#7021628fe8eb3637c297105f626ee5df78abda84"
 dependencies = [
  "bytemuck",
  "libm",
@@ -462,7 +461,7 @@ dependencies = [
 
 [[package]]
 name = "hermes-simd"
-version = "0.5.0"
+version = "0.4.1"
 dependencies = [
  "criterion",
  "eunomia",
@@ -477,7 +476,7 @@ dependencies = [
 
 [[package]]
 name = "hermes-simd-benches"
-version = "0.5.0"
+version = "0.4.1"
 dependencies = [
  "chrono",
  "criterion",
@@ -490,7 +489,7 @@ dependencies = [
 
 [[package]]
 name = "hermes-simd-core"
-version = "0.5.0"
+version = "0.4.1"
 dependencies = [
  "bytemuck",
  "eunomia",
@@ -502,14 +501,14 @@ dependencies = [
 
 [[package]]
 name = "hermes-simd-examples"
-version = "0.5.0"
+version = "0.4.1"
 dependencies = [
  "hermes-simd",
 ]
 
 [[package]]
 name = "hermes-simd-intrinsics"
-version = "0.5.0"
+version = "0.4.1"
 dependencies = [
  "eunomia",
  "hermes-simd-core",
@@ -517,7 +516,7 @@ dependencies = [
 
 [[package]]
 name = "hermes-simd-macros"
-version = "0.5.0"
+version = "0.4.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -526,7 +525,7 @@ dependencies = [
 
 [[package]]
 name = "hermes-simd-types"
-version = "0.5.0"
+version = "0.4.1"
 dependencies = [
  "hermes-simd-core",
  "hermes-simd-intrinsics",

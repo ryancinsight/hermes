@@ -12,7 +12,7 @@ description.workspace = true
 publish = false
 
 [dependencies]
-hermes-simd-core = { path = "../hermes-simd-core", version = "0.5.0" }
+hermes-simd-core = { path = "../hermes-simd-core", version = "0.4.0" }
 eunomia = { workspace = true }
 
 [features]
