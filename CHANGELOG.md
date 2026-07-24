@@ -93,6 +93,18 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch] `view::reduce` — the `reduce` and `zip_reduce` hot loops each wrapped
+  every kernel call and `ptr.add` in its own `unsafe {}` block (66 total, 1
+  documented). Each loop region is now one `unsafe` block with a `SAFETY` comment
+  stating the pointer-bounds argument (offsets bounded by `unrolled_len`/
+  `simd_len`, so every `LANE_COUNT` window stays within the slice); the two
+  `reduce_popcount` families and the `load` closures gain the same. Blocks drop
+  to 35. The `reduce`/`zip_reduce` restructure is behavior-preserving code motion,
+  verified codegen-neutral: on `dense/sum_f32` and `dot_f32` the cross-version
+  deltas fall within this host's measured run variance (`dot_f32/256` shows ±31%
+  between successive runs of *identical* code). A new differential test drives
+  `reduce`/`zip_reduce` through the `Scalar` backend under miri across lengths
+  spanning the unrolled body, the vector tail, and the scalar remainder.
 - [patch] `view::vector_reg` — the `Vector<T, Arch>` register wrapper gains a
   module-level `# Safety` section documenting its two disciplines (safe methods
   gate on `assert_runtime_supported`/`runtime_support_result` before the kernel

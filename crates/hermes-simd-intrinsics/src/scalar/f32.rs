@@ -682,4 +682,46 @@ mod tests {
             assert_eq!(view.sum_values(), values.iter().sum::<f32>());
         }
     }
+
+    /// `reduce` and `zip_reduce` do raw-pointer chunked loads through the
+    /// register wrapper. The integration tests cover the host SIMD backend;
+    /// this drives them via the `Scalar` backend so miri checks the pointer
+    /// arithmetic across the 4×-unrolled body, the single-vector tail, and the
+    /// scalar remainder (`Scalar` uses `chunk_size = 16`).
+    mod reduce {
+        use crate::Scalar;
+        use hermes_simd_core::ops::{Dot, Sum};
+        use hermes_simd_core::{SimdView, Unaligned, Unmasked};
+
+        fn view(data: &[f32]) -> SimdView<'_, f32, Scalar, Unaligned, Unmasked, &[f32]> {
+            SimdView::new(data).expect("scalar view always constructs")
+        }
+
+        #[test]
+        fn reduce_and_zip_reduce_match_scalar_across_lengths() {
+            // 0 and 1 exercise the empty/short guards; 16/17 the unrolled body
+            // and its boundary; 38 spans unrolled (32) + simd tail (36) + scalar
+            // tail (2).
+            for len in [0usize, 1, 4, 15, 16, 17, 32, 38] {
+                let a: Vec<f32> = (0..len).map(|i| (i % 7) as f32 - 3.0).collect();
+                let b: Vec<f32> = (0..len).map(|i| (i % 5) as f32 + 1.0).collect();
+
+                let got_sum = view(&a).reduce(Sum);
+                let want_sum: f32 = a.iter().sum();
+                assert!(
+                    (got_sum - want_sum).abs() <= 1e-4 * (1.0 + want_sum.abs()),
+                    "sum len {len}: {got_sum} vs {want_sum}"
+                );
+
+                let got_dot = view(&a)
+                    .zip_reduce(&view(&b), Dot)
+                    .expect("equal-length views");
+                let want_dot: f32 = a.iter().zip(&b).map(|(x, y)| x * y).sum();
+                assert!(
+                    (got_dot - want_dot).abs() <= 1e-4 * (1.0 + want_dot.abs()),
+                    "dot len {len}: {got_dot} vs {want_dot}"
+                );
+            }
+        }
+    }
 }
