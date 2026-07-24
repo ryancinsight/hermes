@@ -724,4 +724,90 @@ mod tests {
             }
         }
     }
+
+    /// The register-blocked tiling kernels index `A`/`B`/`C` through raw pointers
+    /// at 2D tile offsets. The integration tests cover the host SIMD backend;
+    /// this drives dot/gemv/gemv-transpose/gemm via the `Scalar` backend so miri
+    /// checks that offset arithmetic against independent scalar references, at a
+    /// size that exercises the tiled body plus the row/column remainders.
+    mod tiling {
+        use crate::Scalar;
+        use hermes_simd_core::tiling::{
+            tiled_dot, tiled_gemm, tiled_gemv, TilingPolicy, TilingStrategy,
+        };
+        use hermes_simd_core::{SimdView, Unaligned};
+
+        fn v(data: &[f32]) -> SimdView<'_, f32, Scalar, Unaligned> {
+            SimdView::new(data).expect("scalar view")
+        }
+
+        fn approx(a: f32, b: f32) -> bool {
+            (a - b).abs() <= 1e-3 * (1.0 + a.abs().max(b.abs()))
+        }
+
+        #[test]
+        fn tiled_dot_matches_scalar() {
+            // 11 = one 8-wide tile (LANE_COUNT 4 * TILE_M 2) + 3-element tail.
+            let a: Vec<f32> = (0..11).map(|i| i as f32 * 0.5 - 1.0).collect();
+            let b: Vec<f32> = (0..11).map(|i| (11 - i) as f32 * 0.25).collect();
+            let got = tiled_dot::<f32, Scalar, Unaligned, 2>(&v(&a), &v(&b)).unwrap();
+            let want: f32 = a.iter().zip(&b).map(|(x, y)| x * y).sum();
+            assert!(approx(got, want), "dot {got} vs {want}");
+        }
+
+        #[test]
+        fn tiled_gemv_matches_scalar() {
+            // 5 rows (TILE_M 2 → two blocks + 1 cleanup row), 6 cols (lane body 4
+            // + 2-col masked tail).
+            let (nrows, ncols) = (5, 6);
+            let a: Vec<f32> = (0..nrows * ncols).map(|i| (i % 9) as f32 - 4.0).collect();
+            let x: Vec<f32> = (0..ncols).map(|i| i as f32 + 1.0).collect();
+            let mut y = vec![1.0f32; nrows];
+            tiled_gemv::<f32, Scalar, Unaligned, 2>(&v(&a), &v(&x), &mut y, nrows, ncols).unwrap();
+            for r in 0..nrows {
+                let want = 1.0 + (0..ncols).map(|c| a[r * ncols + c] * x[c]).sum::<f32>();
+                assert!(approx(y[r], want), "gemv row {r}: {} vs {want}", y[r]);
+            }
+        }
+
+        #[test]
+        fn gemv_transpose_matches_scalar() {
+            let (nrows, ncols) = (4, 6);
+            let a: Vec<f32> = (0..nrows * ncols).map(|i| (i % 7) as f32 - 3.0).collect();
+            let x: Vec<f32> = (0..nrows).map(|i| i as f32 + 1.0).collect();
+            let mut y = vec![0.5f32; ncols];
+            <TilingPolicy<2, 1> as TilingStrategy<f32, Scalar, Unaligned>>::gemv_transpose(
+                &v(&a),
+                &v(&x),
+                &mut y,
+                nrows,
+                ncols,
+            )
+            .unwrap();
+            for c in 0..ncols {
+                let want = 0.5 + (0..nrows).map(|r| a[r * ncols + c] * x[r]).sum::<f32>();
+                assert!(approx(y[c], want), "gemvT col {c}: {} vs {want}", y[c]);
+            }
+        }
+
+        #[test]
+        fn tiled_gemm_matches_scalar() {
+            // 3x5 · 5x6 → 3x6, exercising the register tile plus the column tail.
+            let (m, k, n) = (3usize, 5usize, 6usize);
+            let a: Vec<f32> = (0..m * k).map(|i| (i % 5) as f32 - 2.0).collect();
+            let b: Vec<f32> = (0..k * n).map(|i| (i % 4) as f32 - 1.0).collect();
+            let mut c = vec![0.25f32; m * n];
+            tiled_gemm::<f32, Scalar, Unaligned, 2, 1>(&v(&a), &v(&b), &mut c, m, n, k).unwrap();
+            for i in 0..m {
+                for j in 0..n {
+                    let want = 0.25 + (0..k).map(|p| a[i * k + p] * b[p * n + j]).sum::<f32>();
+                    assert!(
+                        approx(c[i * n + j], want),
+                        "gemm ({i},{j}): {} vs {want}",
+                        c[i * n + j]
+                    );
+                }
+            }
+        }
+    }
 }

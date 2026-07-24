@@ -93,6 +93,18 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch] `tiling` — the register-blocked `dot`, `gemv`, `gemv_transpose`, and
+  `gemm` kernels gain module-level `# Safety` sections, and their fragmented
+  single-call `unsafe {}` blocks (65 total, 11 documented) consolidate to 32,
+  each carrying a `SAFETY` comment. The audit confirmed all four already validate
+  their caller-supplied dimensions against the actual operand lengths — with
+  arithmetic-overflow rejection (`checked_area`/`checked_strided_span`) closing
+  the OOB path under release `overflow-checks = false` — before any unchecked
+  access, so no soundness gap was found (unlike `sparse/ops`). The
+  `dot`/`gemv`/`gemv_transpose` restructure is behavior-preserving code motion; a
+  new differential test drives all four kernels through the `Scalar` backend
+  under miri against scalar references, which also gives `gemm_register_tile`'s
+  2D tile indexing its first miri coverage.
 - [patch] `view::reduce` — the `reduce` and `zip_reduce` hot loops each wrapped
   every kernel call and `ptr.add` in its own `unsafe {}` block (66 total, 1
   documented). Each loop region is now one `unsafe` block with a `SAFETY` comment

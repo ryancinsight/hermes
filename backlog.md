@@ -86,7 +86,12 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   SAFETY comments); the code was already well-guarded, so this is
   documentation-only. `view/reduce.rs` now done — its 66 fragmented unsafe blocks
   consolidated to 35 documented ones (behavior-preserving code motion, verified
-  codegen-neutral against benchmark noise, miri-covered). Remaining: `tiling/`.
+  codegen-neutral against benchmark noise, miri-covered). `tiling/` now done —
+  its four kernels gain module `# Safety` sections, 65 unsafe blocks consolidate
+  to 32 documented ones, and a miri differential test covers all four (audit
+  found no defect; the kernels already validate dims with overflow rejection).
+  **HS-406 complete** — the whole `hermes-simd-core` unsafe surface is now
+  documented (module invariants + per-site obligations).
 
 - [x] [patch] **HS-404 — `cmp_ne` NaN semantics diverged across backends.** The
   trait default returns all-ones for `NaN != NaN` (Rust `!=` is true), while the

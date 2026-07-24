@@ -16,6 +16,17 @@
 //! block of a column-major working buffer in a reflector apply. The packed case
 //! is exactly `lda = ncols`; the contiguous per-row dot is unchanged, only the
 //! row base address advances by `lda`.
+//!
+//! # Safety
+//!
+//! The `Arch::*` kernels are `#[target_feature]`-gated and sound only on a host
+//! implementing `Arch` — established by the `SimdView` operands, whose
+//! constructor rejects an unsupported architecture. The raw-pointer loads read
+//! `A`, `x`, and `y` at offsets derived from the caller-supplied `nrows`,
+//! `ncols`, and `lda`; `check_gemv_dimensions` validates those against the actual
+//! operand lengths (with overflow rejected, closing the OOB path under release
+//! `overflow-checks = false`) before any unchecked access, so per-site `SAFETY`
+//! comments cite that validation and the per-window bound.
 
 use crate::{
     align::Alignment,
@@ -102,6 +113,9 @@ where
     let simd_len = (ncols / lane_count) * lane_count;
     let tail = ncols - simd_len;
 
+    // SAFETY: target-feature kernel (module invariant); every call passes a
+    // pointer whose `LANE_COUNT` read stays within `A`/`x` (offsets below bounded
+    // by `simd_len <= ncols` and the validated stride), gated on `Align`.
     let load = |ptr: *const T| -> Arch::Vector {
         if crate::align::is_aligned_for_arch::<Arch, Align>() {
             unsafe { Arch::load_aligned(ptr) }
@@ -114,78 +128,80 @@ where
     // accumulator as one final masked fmadd (inactive lanes load zero and
     // contribute `a·0 = 0`), replacing a per-row scalar tail loop. `x` beyond
     // `simd_len` is loaded once and reused across every row.
-    let tail_mask = unsafe { Arch::leading_k_mask(tail) };
-    let x_tail = if tail > 0 {
-        // SAFETY: masked load touches only lanes `[simd_len, ncols) ≤ ncols`, and
-        // `x.len() ≥ ncols` (checked by `check_gemv_dimensions`).
-        unsafe {
+    // SAFETY: kernels covered by the module invariant; the masked load touches
+    // only lanes `[simd_len, ncols) <= ncols` and `x.len() >= ncols` (checked by
+    // `check_gemv_dimensions`).
+    let (tail_mask, x_tail) = unsafe {
+        let tail_mask = Arch::leading_k_mask(tail);
+        let x_tail = if tail > 0 {
             Arch::masked_load_unaligned(x_slice.as_ptr().add(simd_len), tail_mask, Arch::zero())
-        }
-    } else {
-        unsafe { Arch::zero() }
+        } else {
+            Arch::zero()
+        };
+        (tail_mask, x_tail)
     };
 
     let mut r = 0;
+    // SAFETY: `r + TILE_M <= nrows`, so every `row_idx = r + i < nrows`; the
+    // vector loads read `[row_idx*lda + c, +LANE_COUNT)` with `c < simd_len <=
+    // ncols` and the tail masked load reads `[simd_len, ncols)` — both within the
+    // `A` span validated by `check_gemv_dimensions` (stride `lda`), and `x`
+    // windows within `x.len() >= ncols`. Kernels covered by the module invariant.
     while r + TILE_M <= nrows {
-        // Initialize TILE_M accumulators to zero.
-        let mut accumulators = [unsafe { Arch::zero() }; TILE_M];
+        unsafe {
+            let mut accumulators = [Arch::zero(); TILE_M];
 
-        let mut c = 0;
-        while c < simd_len {
-            // Load x vector (reused across all TILE_M rows).
-            let x_vec = load(unsafe { x_slice.as_ptr().add(c) });
+            let mut c = 0;
+            while c < simd_len {
+                // `x` vector reused across all TILE_M rows.
+                let x_vec = load(x_slice.as_ptr().add(c));
+                for i in 0..TILE_M {
+                    let a_vec = load(a_slice.as_ptr().add((r + i) * lda + c));
+                    accumulators[i] = Arch::fmadd(a_vec, x_vec, accumulators[i]);
+                }
+                c += lane_count;
+            }
 
             for i in 0..TILE_M {
                 let row_idx = r + i;
-                let a_vec = load(unsafe { a_slice.as_ptr().add(row_idx * lda + c) });
-                accumulators[i] = unsafe { Arch::fmadd(a_vec, x_vec, accumulators[i]) };
-            }
-            c += lane_count;
-        }
-
-        for i in 0..TILE_M {
-            let row_idx = r + i;
-            if tail > 0 {
-                // SAFETY: masked load of lanes `[simd_len, ncols) ≤ ncols` in row
-                // `row_idx < nrows` of the validated `A` span (stride `lda`).
-                let a_tail = unsafe {
-                    Arch::masked_load_unaligned(
+                if tail > 0 {
+                    let a_tail = Arch::masked_load_unaligned(
                         a_slice.as_ptr().add(row_idx * lda + simd_len),
                         tail_mask,
                         Arch::zero(),
-                    )
-                };
-                accumulators[i] = unsafe { Arch::fmadd(a_tail, x_tail, accumulators[i]) };
+                    );
+                    accumulators[i] = Arch::fmadd(a_tail, x_tail, accumulators[i]);
+                }
+                y[row_idx] += Arch::sum_reduce(accumulators[i]);
             }
-            y[row_idx] += unsafe { Arch::sum_reduce(accumulators[i]) };
         }
-
         r += TILE_M;
     }
 
     // Cleanup remaining rows (fewer than TILE_M).
+    // SAFETY: `r < nrows`; the loads read `[r*lda + c, +LANE_COUNT)` (`c <
+    // simd_len`) and the masked tail `[simd_len, ncols)` within the validated `A`
+    // span, and `x` within `x.len() >= ncols`.
     while r < nrows {
-        let mut acc = unsafe { Arch::zero() };
-        let mut c = 0;
-        while c < simd_len {
-            let x_vec = load(unsafe { x_slice.as_ptr().add(c) });
-            let a_vec = load(unsafe { a_slice.as_ptr().add(r * lda + c) });
-            acc = unsafe { Arch::fmadd(a_vec, x_vec, acc) };
-            c += lane_count;
-        }
-        if tail > 0 {
-            // SAFETY: masked load of lanes `[simd_len, ncols) ≤ ncols` in row
-            // `r < nrows` of the validated `A` span.
-            let a_tail = unsafe {
-                Arch::masked_load_unaligned(
+        unsafe {
+            let mut acc = Arch::zero();
+            let mut c = 0;
+            while c < simd_len {
+                let x_vec = load(x_slice.as_ptr().add(c));
+                let a_vec = load(a_slice.as_ptr().add(r * lda + c));
+                acc = Arch::fmadd(a_vec, x_vec, acc);
+                c += lane_count;
+            }
+            if tail > 0 {
+                let a_tail = Arch::masked_load_unaligned(
                     a_slice.as_ptr().add(r * lda + simd_len),
                     tail_mask,
                     Arch::zero(),
-                )
-            };
-            acc = unsafe { Arch::fmadd(a_tail, x_tail, acc) };
+                );
+                acc = Arch::fmadd(a_tail, x_tail, acc);
+            }
+            y[r] += Arch::sum_reduce(acc);
         }
-        y[r] += unsafe { Arch::sum_reduce(acc) };
         r += 1;
     }
 
