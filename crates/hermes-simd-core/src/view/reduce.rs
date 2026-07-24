@@ -61,6 +61,11 @@ where
         let chunk_size = lane_count * unroll_factor;
         let unrolled_len = (len / chunk_size) * chunk_size;
 
+        // SAFETY: `Arch::load_*` is a target-feature kernel (module invariant).
+        // Every caller only ever passes a pointer whose `LANE_COUNT`-element read
+        // stays within `data` (offsets are bounded by `simd_len`/`unrolled_len`),
+        // and the aligned variant is selected only when `Align` proves the base
+        // is arch-aligned.
         let load = |p: *const T| -> Arch::Vector {
             if crate::align::is_aligned_for_arch::<Arch, Align>() {
                 unsafe { Arch::load_aligned(p) }
@@ -69,7 +74,12 @@ where
             }
         };
 
-        // Initialize with identity vector so Min/Max start from the correct bound.
+        // SAFETY: the `Op::*` and `identity_vector` calls are target-feature
+        // kernels covered by the module invariant. `unrolled_len` is a multiple
+        // of `chunk_size = LANE_COUNT * UNROLL_FACTOR`, so each `ptr.add(k)` in
+        // the seeds/loop addresses a `LANE_COUNT` window fully within `data`
+        // (`ptr` advances by `chunk_size` per iteration while `i < unrolled_len`).
+        // Initialize with the identity vector so Min/Max start from the correct bound.
         let mut acc = unsafe { Op::identity_vector::<Arch>() };
         let mut i = 0usize;
 
@@ -78,38 +88,43 @@ where
             // abs for AbsSum/AbsMax) — a raw-load seed would skip it for the
             // first chunk. Cross-accumulator merges use combine_vectors, which
             // never re-applies the transform to already-transformed partials.
-            let ptr = data.as_ptr();
-            let mut acc0 = unsafe { Op::transform_vector::<Arch>(load(ptr)) };
-            let mut acc1 = unsafe { Op::transform_vector::<Arch>(load(ptr.add(lane_count))) };
-            let mut acc2 = unsafe { Op::transform_vector::<Arch>(load(ptr.add(lane_count * 2))) };
-            let mut acc3 = unsafe { Op::transform_vector::<Arch>(load(ptr.add(lane_count * 3))) };
-            i = chunk_size;
-            let mut ptr = unsafe { ptr.add(chunk_size) };
+            let base = data.as_ptr();
+            acc = unsafe {
+                let mut acc0 = Op::transform_vector::<Arch>(load(base));
+                let mut acc1 = Op::transform_vector::<Arch>(load(base.add(lane_count)));
+                let mut acc2 = Op::transform_vector::<Arch>(load(base.add(lane_count * 2)));
+                let mut acc3 = Op::transform_vector::<Arch>(load(base.add(lane_count * 3)));
+                let mut ptr = base.add(chunk_size);
+                i = chunk_size;
 
-            while i < unrolled_len {
-                acc0 = unsafe { Op::accumulate::<Arch>(acc0, load(ptr)) };
-                acc1 = unsafe { Op::accumulate::<Arch>(acc1, load(ptr.add(lane_count))) };
-                acc2 = unsafe { Op::accumulate::<Arch>(acc2, load(ptr.add(lane_count * 2))) };
-                acc3 = unsafe { Op::accumulate::<Arch>(acc3, load(ptr.add(lane_count * 3))) };
-                ptr = unsafe { ptr.add(chunk_size) };
-                i += chunk_size;
-            }
+                while i < unrolled_len {
+                    acc0 = Op::accumulate::<Arch>(acc0, load(ptr));
+                    acc1 = Op::accumulate::<Arch>(acc1, load(ptr.add(lane_count)));
+                    acc2 = Op::accumulate::<Arch>(acc2, load(ptr.add(lane_count * 2)));
+                    acc3 = Op::accumulate::<Arch>(acc3, load(ptr.add(lane_count * 3)));
+                    ptr = ptr.add(chunk_size);
+                    i += chunk_size;
+                }
 
-            acc0 = unsafe { Op::combine_vectors::<Arch>(acc0, acc1) };
-            acc2 = unsafe { Op::combine_vectors::<Arch>(acc2, acc3) };
-            acc = unsafe { Op::combine_vectors::<Arch>(acc0, acc2) };
+                acc0 = Op::combine_vectors::<Arch>(acc0, acc1);
+                acc2 = Op::combine_vectors::<Arch>(acc2, acc3);
+                Op::combine_vectors::<Arch>(acc0, acc2)
+            };
         }
 
-        // Remaining full SIMD vectors
+        // Remaining full SIMD vectors.
+        // SAFETY: `i < simd_len` and `simd_len = (len / LANE_COUNT) * LANE_COUNT`,
+        // so `ptr.add(i)` addresses a `LANE_COUNT` window within `data`;
+        // `Op::accumulate`/`finalize` are target-feature kernels (module invariant).
         let simd_len = (len / lane_count) * lane_count;
         let ptr = data.as_ptr();
-        while i < simd_len {
-            let v = load(unsafe { ptr.add(i) });
-            acc = unsafe { Op::accumulate::<Arch>(acc, v) };
-            i += lane_count;
-        }
-
-        let mut total = unsafe { Op::finalize::<Arch>(acc) };
+        let mut total = unsafe {
+            while i < simd_len {
+                acc = Op::accumulate::<Arch>(acc, load(ptr.add(i)));
+                i += lane_count;
+            }
+            Op::finalize::<Arch>(acc)
+        };
 
         // Scalar tail — use Op::scalar_accumulate so per-element transforms (e.g. SquaredSum)
         // apply correctly. For Sum/Min/Max the default delegates to scalar_combine.
@@ -144,6 +159,9 @@ where
         let chunk_size = lane_count * unroll_factor;
         let unrolled_len = (len / chunk_size) * chunk_size;
 
+        // SAFETY: identical contract to `reduce`'s `load` — target-feature kernel
+        // (module invariant), and every call passes a pointer whose `LANE_COUNT`
+        // read stays within its slice (offsets bounded by `simd_len`).
         let load = |p: *const T| -> Arch::Vector {
             if crate::align::is_aligned_for_arch::<Arch, Align>() {
                 unsafe { Arch::load_aligned(p) }
@@ -154,78 +172,74 @@ where
 
         let s = self.as_slice();
         let o = other.as_slice();
+        // SAFETY: target-feature kernels (module invariant). `s` and `o` are
+        // equal length (checked above), and `unrolled_len` is a multiple of
+        // `chunk_size`, so every `pa.add(k)`/`pb.add(k)` addresses a `LANE_COUNT`
+        // window within its slice while `i < unrolled_len`.
         let mut acc = unsafe { Op::identity_vector::<Arch>() };
         let mut i = 0usize;
 
         if unrolled_len >= chunk_size {
-            let mut pa = s.as_ptr();
-            let mut pb = o.as_ptr();
-
             // Seed the four accumulators with the first pairwise products.
             // (First chunk cannot use FMA into zero, so we use separate mul.)
-            let pair = |pa: *const T, pb: *const T| -> Arch::Vector {
-                unsafe { Arch::mul(load(pa), load(pb)) }
-            };
+            acc = unsafe {
+                let pair =
+                    |pa: *const T, pb: *const T| -> Arch::Vector { Arch::mul(load(pa), load(pb)) };
+                let base_a = s.as_ptr();
+                let base_b = o.as_ptr();
 
-            let mut acc0 = pair(pa, pb);
-            let mut acc1 = pair(unsafe { pa.add(lane_count) }, unsafe { pb.add(lane_count) });
-            let mut acc2 = pair(unsafe { pa.add(lane_count * 2) }, unsafe {
-                pb.add(lane_count * 2)
-            });
-            let mut acc3 = pair(unsafe { pa.add(lane_count * 3) }, unsafe {
-                pb.add(lane_count * 3)
-            });
-            pa = unsafe { pa.add(chunk_size) };
-            pb = unsafe { pb.add(chunk_size) };
-            i = chunk_size;
+                let mut acc0 = pair(base_a, base_b);
+                let mut acc1 = pair(base_a.add(lane_count), base_b.add(lane_count));
+                let mut acc2 = pair(base_a.add(lane_count * 2), base_b.add(lane_count * 2));
+                let mut acc3 = pair(base_a.add(lane_count * 3), base_b.add(lane_count * 3));
+                let mut pa = base_a.add(chunk_size);
+                let mut pb = base_b.add(chunk_size);
+                i = chunk_size;
 
-            // Main unrolled loop — use `fma_pair_accumulate` so `Dot` can emit a
-            // single `vfmadd` instead of a separate `mul` + `add`.
-            while i < unrolled_len {
-                acc0 = unsafe { Op::fma_pair_accumulate::<Arch>(acc0, load(pa), load(pb)) };
-                acc1 = unsafe {
-                    Op::fma_pair_accumulate::<Arch>(
+                // Main unrolled loop — `fma_pair_accumulate` lets `Dot` emit a
+                // single `vfmadd` instead of a separate `mul` + `add`.
+                while i < unrolled_len {
+                    acc0 = Op::fma_pair_accumulate::<Arch>(acc0, load(pa), load(pb));
+                    acc1 = Op::fma_pair_accumulate::<Arch>(
                         acc1,
                         load(pa.add(lane_count)),
                         load(pb.add(lane_count)),
-                    )
-                };
-                acc2 = unsafe {
-                    Op::fma_pair_accumulate::<Arch>(
+                    );
+                    acc2 = Op::fma_pair_accumulate::<Arch>(
                         acc2,
                         load(pa.add(lane_count * 2)),
                         load(pb.add(lane_count * 2)),
-                    )
-                };
-                acc3 = unsafe {
-                    Op::fma_pair_accumulate::<Arch>(
+                    );
+                    acc3 = Op::fma_pair_accumulate::<Arch>(
                         acc3,
                         load(pa.add(lane_count * 3)),
                         load(pb.add(lane_count * 3)),
-                    )
-                };
-                pa = unsafe { pa.add(chunk_size) };
-                pb = unsafe { pb.add(chunk_size) };
-                i += chunk_size;
-            }
+                    );
+                    pa = pa.add(chunk_size);
+                    pb = pb.add(chunk_size);
+                    i += chunk_size;
+                }
 
-            acc0 = unsafe { Op::accumulate::<Arch>(acc0, acc1) };
-            acc2 = unsafe { Op::accumulate::<Arch>(acc2, acc3) };
-            acc = unsafe { Op::accumulate::<Arch>(acc0, acc2) };
+                acc0 = Op::accumulate::<Arch>(acc0, acc1);
+                acc2 = Op::accumulate::<Arch>(acc2, acc3);
+                Op::accumulate::<Arch>(acc0, acc2)
+            };
         }
 
         // Remaining full SIMD vectors — use `fma_pair_accumulate` here too.
+        // SAFETY: `i < simd_len` bounds each `pa.add(i)`/`pb.add(i)` to a
+        // `LANE_COUNT` window within the equal-length slices; kernels covered by
+        // the module invariant.
         let simd_len = (len / lane_count) * lane_count;
         let pa = s.as_ptr();
         let pb = o.as_ptr();
-        while i < simd_len {
-            let va = load(unsafe { pa.add(i) });
-            let vb = load(unsafe { pb.add(i) });
-            acc = unsafe { Op::fma_pair_accumulate::<Arch>(acc, va, vb) };
-            i += lane_count;
-        }
-
-        let mut total = unsafe { Op::finalize::<Arch>(acc) };
+        let mut total = unsafe {
+            while i < simd_len {
+                acc = Op::fma_pair_accumulate::<Arch>(acc, load(pa.add(i)), load(pb.add(i)));
+                i += lane_count;
+            }
+            Op::finalize::<Arch>(acc)
+        };
 
         // Scalar tail — use scalar_combine for correctness with Min/Max.
         while i < len {
@@ -249,6 +263,9 @@ where
         let mut total: usize = 0;
         let mut i = 0usize;
 
+        // SAFETY: `Arch::load_*` is a target-feature kernel (module invariant),
+        // and every call site passes a pointer whose `LANE_COUNT` read stays
+        // within the source slice (offsets bounded by `simd_len`).
         let load = |p: *const T| -> Arch::Vector {
             if crate::align::is_aligned_for_arch::<Arch, Align>() {
                 unsafe { Arch::load_aligned(p) }
@@ -268,6 +285,10 @@ where
             let mut count = 0;
 
             while i < unrolled_simd_len {
+                // SAFETY: `unrolled_simd_len` is a multiple of `chunk_size`, so
+                // `i + lane_count*3 + LANE_COUNT <= unrolled_simd_len <= len`; each
+                // load reads a `LANE_COUNT` window within `data`. Kernels covered
+                // by the module invariant.
                 unsafe {
                     let v0 = load(data.as_ptr().add(i));
                     let v1 = load(data.as_ptr().add(i + lane_count));
@@ -309,6 +330,8 @@ where
         if i < simd_len {
             let mut acc = unsafe { Arch::zero() };
             while i < simd_len {
+                // SAFETY: `i < simd_len = (len / LANE_COUNT) * LANE_COUNT`, so the
+                // load reads a `LANE_COUNT` window within `data`.
                 unsafe {
                     let v = load(data.as_ptr().add(i));
                     acc = Arch::add(acc, Arch::popcount(v));
@@ -361,6 +384,9 @@ where
         let mut total: usize = 0;
         let mut i = 0usize;
 
+        // SAFETY: `Arch::load_*` is a target-feature kernel (module invariant),
+        // and every call site passes a pointer whose `LANE_COUNT` read stays
+        // within the source slice (offsets bounded by `simd_len`).
         let load = |p: *const T| -> Arch::Vector {
             if crate::align::is_aligned_for_arch::<Arch, Align>() {
                 unsafe { Arch::load_aligned(p) }
@@ -379,6 +405,9 @@ where
             let mut count = 0;
 
             while i < unrolled_simd_len {
+                // SAFETY: `unrolled_simd_len` is a multiple of `chunk_size` and
+                // `s`/`o` are equal length, so `i + lane_count*3 + LANE_COUNT`
+                // stays within both slices. Kernels covered by the module invariant.
                 unsafe {
                     let va0 = load(s.as_ptr().add(i));
                     let vb0 = load(o.as_ptr().add(i));
@@ -423,6 +452,8 @@ where
         if i < simd_len {
             let mut acc = unsafe { Arch::zero() };
             while i < simd_len {
+                // SAFETY: `i < simd_len` bounds both `s.add(i)`/`o.add(i)` loads
+                // to a `LANE_COUNT` window within the equal-length slices.
                 unsafe {
                     let va = load(s.as_ptr().add(i));
                     let vb = load(o.as_ptr().add(i));

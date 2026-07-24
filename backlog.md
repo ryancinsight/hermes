@@ -84,7 +84,9 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   `pub unsafe fn` docs corrected to state the target-feature obligation, and
   per-site comments added to the MaybeUninit and lane-guard blocks (6 to 23
   SAFETY comments); the code was already well-guarded, so this is
-  documentation-only. Remaining: `view/reduce.rs`, `tiling/`.
+  documentation-only. `view/reduce.rs` now done — its 66 fragmented unsafe blocks
+  consolidated to 35 documented ones (behavior-preserving code motion, verified
+  codegen-neutral against benchmark noise, miri-covered). Remaining: `tiling/`.
 
 - [x] [patch] **HS-404 — `cmp_ne` NaN semantics diverged across backends.** The
   trait default returns all-ones for `NaN != NaN` (Rust `!=` is true), while the
