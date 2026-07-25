@@ -163,12 +163,20 @@ where
     }
 
     // Scalar tail (ncols not a multiple of the lane count).
-    for c_tail in simd_cols..ncols {
-        let mut s = y[c_tail];
-        for i in 0..nrows {
-            s = s + x_slice[i] * a_slice[i * lda + c_tail];
+    // SAFETY: `check_gemv_t_dimensions` at function entry validated that every
+    // offset `i * lda + c_tail` for `i in [0, nrows)` and `c_tail in
+    // [simd_cols, ncols)` lies within the validated `A` span, and
+    // `x_slice.len() >= nrows`. Raw pointers match the SIMD paths above.
+    unsafe {
+        let a_ptr = a_slice.as_ptr();
+        let x_ptr = x_slice.as_ptr();
+        for c_tail in simd_cols..ncols {
+            let mut s = *y.as_mut_ptr().add(c_tail);
+            for i in 0..nrows {
+                s = s + *x_ptr.add(i) * *a_ptr.add(i * lda + c_tail);
+            }
+            *y.as_mut_ptr().add(c_tail) = s;
         }
-        y[c_tail] = s;
     }
 
     Ok(())
