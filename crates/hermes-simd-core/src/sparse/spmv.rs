@@ -369,19 +369,26 @@ where
                 }
             }
         } else {
-            for b in 0..data.nblocks {
-                let br = data.block_row[b] as usize;
-                let bc = data.block_col[b] as usize;
-                let block = &data.blocks[b * block_size..(b + 1) * block_size];
+            // SAFETY: `Validated<BlockedCoo>` guarantees all block coordinates
+            // are in bounds; `validate_spmv_sizes` at function entry asserted
+            // `x.len() >= ncols` and `y.len() >= nrows`. Raw pointers eliminate
+            // redundant bounds checks from sub-slicing.
+            unsafe {
+                let x_ptr = x.as_ptr();
+                let y_ptr = y.as_mut_ptr();
+                for b in 0..data.nblocks {
+                    let br = data.block_row[b] as usize;
+                    let bc = data.block_col[b] as usize;
+                    let block_ptr = data.blocks.as_ptr().add(b * block_size);
 
-                for i in 0..BM {
-                    let block_row_data = &block[i * BN..(i + 1) * BN];
-                    let x_slice = &x[bc..bc + BN];
-                    let mut s = T::ZERO;
-                    for k in 0..BN {
-                        s += block_row_data[k] * x_slice[k];
+                    for i in 0..BM {
+                        let row_ptr = block_ptr.add(i * BN);
+                        let mut s = T::ZERO;
+                        for k in 0..BN {
+                            s = s + *row_ptr.add(k) * *x_ptr.add(bc + k);
+                        }
+                        *y_ptr.add(br + i) += s;
                     }
-                    y[br + i] += s;
                 }
             }
         }
