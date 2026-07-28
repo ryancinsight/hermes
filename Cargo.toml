@@ -48,29 +48,3 @@ panic = "abort"
 opt-level = 3
 lto = "fat"
 codegen-units = 1
-
-
-# ATLAS-PATH-DEP-AUDIT-2: redirect git+https sibling pulls to local working
-# copies so the entire dep graph uses a single version of each Atlas
-# foundation crate. Unused patches emit warnings only; cargo treats the
-# block as defense-in-depth.
-# Last delivery: 2026-07-27 closure cycle.
-
-# ATLAS-PATH-DEP-AUDIT-2 round-4 closure
-
-# ATLAS-PATH-DEP-AUDIT-2 round-6b closure
-
-[patch."https://github.com/ryancinsight/Mnemosyne.git"]
-mnemosyne = { path = "../mnemosyne/crates/mnemosyne" }
-mnemosyne-arena = { path = "../mnemosyne/crates/mnemosyne-arena" }
-mnemosyne-backend = { path = "../mnemosyne/crates/mnemosyne-backend" }
-mnemosyne-build-util = { path = "../mnemosyne/crates/mnemosyne-build-util" }
-mnemosyne-core = { path = "../mnemosyne/crates/mnemosyne-core" }
-mnemosyne-decay = { path = "../mnemosyne/crates/mnemosyne-decay" }
-mnemosyne-hardened = { path = "../mnemosyne/crates/mnemosyne-hardened" }
-mnemosyne-local = { path = "../mnemosyne/crates/mnemosyne-local" }
-mnemosyne-prof = { path = "../mnemosyne/crates/mnemosyne-prof" }
-
-[patch."https://github.com/ryancinsight/themis"]
-themis = { path = "../themis" }
-
