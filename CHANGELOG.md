@@ -8,6 +8,8 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 - [patch] Bind the `themis` crate alias to the renamed `themis-topology`
   package so fresh Git dependency resolution follows the provider identity.
+- [patch] Bind the `mnemosyne` crate alias to the renamed `mnemosyne-memory`
+  package while preserving Rust imports.
 - [patch] Align CI with the pinned Rust 1.97.0 toolchain and make the AArch64
   cross-check install its target explicitly before compilation, while retaining
   Rust 1.95 as the workspace MSRV contract.
