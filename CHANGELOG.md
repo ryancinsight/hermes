@@ -4,6 +4,14 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ## [Unreleased]
 
+### Changed
+
+- [patch] Enabled crates.io publication for the five reusable workspace crates,
+  using the registry package identities `mnemosyne-memory` and
+  `themis-topology` while preserving their Rust-facing dependency names.
+- [patch] Kept the core crate's cyclic workspace-only intrinsics test dependency
+  path-only so Cargo excludes it from the registry archive.
+
 ### Fixed
 
 - [patch] Bind the `themis` crate alias to the renamed `themis-topology`

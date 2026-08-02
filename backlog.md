@@ -5,6 +5,11 @@ Tags: `[patch]` / `[minor]` / `[major]` / `[arch]` per SemVer change class.
 Tactical breakdown of the active items lives in [checklist.md](checklist.md).
 External gap findings live in [gap_audit.md](gap_audit.md).
 
+- [x] [patch] **HS-REL-001 — crates.io publication.** Make the five reusable
+  workspace packages independently packageable, preserve the benchmark and
+  example harnesses as non-publishable, and publish in dependency order through
+  the repository trusted-publishing workflow.
+
 - [x] [patch] **HERMES-MNEMOSYNE-PACKAGE-1 — restore Mnemosyne resolution.**
   Bind the existing Rust crate alias to package `mnemosyne-memory` 0.6.0,
   refresh the lockfile, and pass the focused core check.

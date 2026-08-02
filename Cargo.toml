@@ -23,6 +23,7 @@ authors = ["Ryan Clanton <ryanclanton@outlook.com>"]
 description = "High-performance, zero-overhead SIMD abstraction library"
 license = "MIT OR Apache-2.0"
 rust-version = "1.95"
+repository = "https://github.com/ryancinsight/hermes"
 
 [workspace.dependencies]
 mnemosyne = { package = "mnemosyne-memory", git = "https://github.com/ryancinsight/Mnemosyne.git", version = "0.6.0", default-features = false }
