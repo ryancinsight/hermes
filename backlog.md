@@ -5,6 +5,11 @@ Tags: `[patch]` / `[minor]` / `[major]` / `[arch]` per SemVer change class.
 Tactical breakdown of the active items lives in [checklist.md](checklist.md).
 External gap findings live in [gap_audit.md](gap_audit.md).
 
+- [x] [patch] **HERMES-THEMIS-PACKAGE-1 — restore Themis resolution.** Owner:
+  Codex on `codex/hermes-themis-package`. Bind the existing Rust crate alias to
+  upstream package `themis-topology` 0.10.1; refresh the lockfile; pass focused
+  checks; merge before dependent Hephaestus provider CI is retried.
+
 - [x] [patch] **HS-407 — no `&mut [T]` spans uninitialized elements.**
   The `cow` constructors allocate with `with_capacity`, call `set_len`, and hand
   the buffer to a filler as `&mut [T]` while its tail is still unwritten

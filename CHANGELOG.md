@@ -6,6 +6,9 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Fixed
 
+- [patch] Bind the `themis` crate alias to the renamed `themis-topology`
+  package so fresh Git dependency resolution follows the provider identity.
+
 - [patch] Corrected stale `"0.5.0"` version requirements in `hermes-simd-benches`
   and `hermes-simd-examples` path dependencies; the workspace is `0.4.1`, so
   these must be `"0.4.0"` for Cargo to resolve the workspace graph. Tests and
