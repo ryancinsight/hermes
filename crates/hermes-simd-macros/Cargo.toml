@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 description = "Procedural macros for hermes-simd code generation"
+repository.workspace = true
 
 [lib]
 proc-macro = true

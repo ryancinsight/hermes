@@ -6,10 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 description.workspace = true
-# Not currently publishable: transitively depends on eunomia/mnemosyne via
-# git (crates.io disallows git dependencies). Revisit once those SSOT crates
-# are registry-published.
-publish = false
+repository.workspace = true
 
 [dependencies]
 eunomia = { workspace = true, features = ["rkyv"] }
@@ -19,7 +16,7 @@ mnemosyne = { workspace = true, optional = true }
 themis = { workspace = true }
 
 [dev-dependencies]
-hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.5.0" }
+hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics" }
 
 [features]
 default = ["std", "mnemosyne-memory"]
