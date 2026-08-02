@@ -2,6 +2,12 @@
 
 **Target: Unreleased** · Strategy: [backlog.md](backlog.md) · Gap register: [gap_audit.md](gap_audit.md) · Phase: Execution
 
+## HERMES-THEMIS-PACKAGE-1 [patch] — Owner: Codex
+
+- [x] Bind `themis` to package `themis-topology` 0.10.1.
+- [x] Refresh dependency resolution and pass focused gates.
+- [x] Merge before rerunning dependent Hephaestus provider CI.
+
 ## HS-403 [patch] — deterministic extrema and benchmark budgets (Owner: Codex `/root`)
 
 - [x] Reject NaN-containing extrema inputs and return the first matching slice

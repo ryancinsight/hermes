@@ -24,7 +24,7 @@ jobs:
           path: hermes
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.95.0
+          toolchain: 1.97.0
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
@@ -67,7 +67,7 @@ jobs:
           path: hermes
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.95.0
+          toolchain: 1.97.0
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: hermes
@@ -127,7 +127,7 @@ jobs:
           path: hermes
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.95.0
+          toolchain: 1.97.0
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: hermes
@@ -149,8 +149,10 @@ jobs:
           path: hermes
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.95.0
+          toolchain: 1.97.0
           targets: aarch64-unknown-linux-gnu
+      - name: Ensure cross target is installed
+        run: rustup target add --toolchain 1.97.0 aarch64-unknown-linux-gnu
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: hermes
@@ -171,7 +173,7 @@ jobs:
       # rust-toolchain.toml; install the pinned toolchain + cargo-deny instead.
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.95.0
+          toolchain: 1.97.0
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-deny
