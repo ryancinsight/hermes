@@ -2,6 +2,11 @@
 
 **Target: Unreleased** · Strategy: [backlog.md](backlog.md) · Gap register: [gap_audit.md](gap_audit.md) · Phase: Execution
 
+## HERMES-MNEMOSYNE-PACKAGE-1 [patch] — Owner: Codex
+
+- [x] Bind `mnemosyne` to package `mnemosyne-memory` 0.6.0.
+- [x] Refresh dependency resolution and pass the focused core check.
+
 ## HERMES-THEMIS-PACKAGE-1 [patch] — Owner: Codex
 
 - [x] Bind `themis` to package `themis-topology` 0.10.1.

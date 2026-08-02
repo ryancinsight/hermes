@@ -5,6 +5,10 @@ Tags: `[patch]` / `[minor]` / `[major]` / `[arch]` per SemVer change class.
 Tactical breakdown of the active items lives in [checklist.md](checklist.md).
 External gap findings live in [gap_audit.md](gap_audit.md).
 
+- [x] [patch] **HERMES-MNEMOSYNE-PACKAGE-1 — restore Mnemosyne resolution.**
+  Bind the existing Rust crate alias to package `mnemosyne-memory` 0.6.0,
+  refresh the lockfile, and pass the focused core check.
+
 - [x] [patch] **HERMES-THEMIS-PACKAGE-1 — restore Themis resolution.** Owner:
   Codex on `codex/hermes-themis-package`. Bind the existing Rust crate alias to
   upstream package `themis-topology` 0.10.1; refresh the lockfile; pass focused
