@@ -8,9 +8,9 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 - [patch] Bind the `themis` crate alias to the renamed `themis-topology`
   package so fresh Git dependency resolution follows the provider identity.
-- [patch] Make the AArch64 cross-check install its target explicitly before
-  compilation so a cached host toolchain cannot omit the target standard
-  library.
+- [patch] Align CI with the pinned Rust 1.97.0 toolchain and make the AArch64
+  cross-check install its target explicitly before compilation, while retaining
+  Rust 1.95 as the workspace MSRV contract.
 
 - [patch] Corrected stale `"0.5.0"` version requirements in `hermes-simd-benches`
   and `hermes-simd-examples` path dependencies; the workspace is `0.4.1`, so
