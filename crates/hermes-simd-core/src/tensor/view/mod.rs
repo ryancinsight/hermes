@@ -14,7 +14,7 @@
 use core::marker::PhantomData;
 
 use super::error::TensorError;
-use super::helpers::{compute_offset, row_major_strides};
+use super::strides::{compute_offset, row_major_strides};
 use super::layout::{ColMajor, Layout, RowMajor};
 
 mod rank_ops;

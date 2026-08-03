@@ -33,7 +33,7 @@
 
 pub mod cow;
 pub mod error;
-mod helpers;
+mod strides;
 pub mod layout;
 pub mod view;
 
@@ -45,7 +45,7 @@ pub use view::TensorView;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use helpers::row_major_strides;
+    use strides::row_major_strides;
 
     #[test]
     fn test_row_major_strides_3d() {

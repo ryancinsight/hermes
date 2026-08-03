@@ -4,7 +4,7 @@ use crate::align::{Alignment, Unaligned};
 use crate::vec::AlignedVec;
 
 use super::error::TensorError;
-use super::helpers::row_major_strides;
+use super::strides::row_major_strides;
 use super::layout::{Layout, RowMajor};
 use super::view::TensorView;
 
