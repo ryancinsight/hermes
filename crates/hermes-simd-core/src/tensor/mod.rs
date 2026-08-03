@@ -33,8 +33,8 @@
 
 pub mod cow;
 pub mod error;
-mod strides;
 pub mod layout;
+mod strides;
 pub mod view;
 
 pub use cow::TensorCow;
