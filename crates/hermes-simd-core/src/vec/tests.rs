@@ -46,27 +46,34 @@ fn test_aligned_vec_zst_drops() {
 }
 
 #[test]
-// rkyv 0.7's ArchivedVec::as_slice violates Stacked Borrows (upstream crate
-// code, not hermes unsafe); Miri aborts inside the dependency. Value-semantic
-// coverage still runs under the normal test harness.
+// rkyv's `ArchivedVec::as_slice` violates Stacked Borrows (upstream crate
+// code, not hermes unsafe); Miri aborts inside the dependency. Re-probed on
+// rkyv 0.8.17 during the 0.7 -> 0.8 migration and it still reproduces:
+// "trying to retag from <_> for SharedReadOnly permission ... but that tag
+// does not exist in the borrow stack", raised inside
+// rkyv-0.8.17/src/vec.rs:56. Removal trigger: an upstream release that clears
+// this probe. Value-semantic coverage still runs under the normal harness.
 #[cfg_attr(miri, ignore)]
 fn test_aligned_vec_rkyv() {
-    use ::rkyv::Deserialize;
     let mut v = AlignedVec::<i32, Unaligned>::new();
     v.push(10);
     v.push(20);
     v.push(30);
 
-    let bytes = ::rkyv::to_bytes::<_, 256>(&v).unwrap();
+    let bytes = ::rkyv::to_bytes::<::rkyv::rancor::Error>(&v).unwrap();
 
-    let archived = unsafe { ::rkyv::archived_root::<AlignedVec<i32, Unaligned>>(&bytes[..]) };
+    let archived = ::rkyv::access::<
+        ::rkyv::Archived<AlignedVec<i32, Unaligned>>,
+        ::rkyv::rancor::Error,
+    >(&bytes)
+    .expect("validated access");
     assert_eq!(archived.elements.len(), 3);
     assert_eq!(archived.elements[0], 10);
     assert_eq!(archived.elements[1], 20);
     assert_eq!(archived.elements[2], 30);
 
     let deserialized: AlignedVec<i32, Unaligned> =
-        archived.deserialize(&mut ::rkyv::Infallible).unwrap();
+        ::rkyv::deserialize::<_, ::rkyv::rancor::Error>(archived).unwrap();
     assert_eq!(deserialized.len(), 3);
     assert_eq!(deserialized[0], 10);
     assert_eq!(deserialized[1], 20);

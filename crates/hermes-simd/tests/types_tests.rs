@@ -1496,7 +1496,6 @@ fn test_bf8_and_f8_unpacking() {
 #[test]
 fn test_packed_cow_rkyv_serialization() {
     use eunomia::{Bf4, Packed4Cow, PackedBf4Cow, PackedF4Cow, F4};
-    use rkyv::Deserialize;
 
     // 1. PackedBf4Cow test
     let bf4_bytes = vec![
@@ -1505,8 +1504,10 @@ fn test_packed_cow_rkyv_serialization() {
     ];
     let original_bf4_cow = PackedBf4Cow::from_packed_slice(&bf4_bytes, 4).unwrap();
 
-    let bytes_bf4 = rkyv::to_bytes::<_, 256>(&original_bf4_cow).unwrap();
-    let archived_bf4 = unsafe { rkyv::archived_root::<PackedBf4Cow>(&bytes_bf4[..]) };
+    let bytes_bf4 = rkyv::to_bytes::<rkyv::rancor::Error>(&original_bf4_cow).unwrap();
+    let archived_bf4 =
+        rkyv::access::<rkyv::Archived<PackedBf4Cow>, rkyv::rancor::Error>(&bytes_bf4)
+            .expect("validated access");
 
     assert_eq!(archived_bf4.len(), 4);
     assert!(!archived_bf4.is_empty());
@@ -1520,7 +1521,8 @@ fn test_packed_cow_rkyv_serialization() {
     assert_eq!(borrowed_bf4.get(3).unwrap().to_f32(), 0.0);
 
     // Test deserialization to owned
-    let deserialized_bf4: PackedBf4Cow = archived_bf4.deserialize(&mut rkyv::Infallible).unwrap();
+    let deserialized_bf4: PackedBf4Cow =
+        rkyv::deserialize::<_, rkyv::rancor::Error>(archived_bf4).unwrap();
     assert!(matches!(deserialized_bf4, Packed4Cow::Owned(_)));
     assert_eq!(deserialized_bf4.len(), 4);
     assert_eq!(deserialized_bf4.get(2).unwrap().to_f32(), 1.5);
@@ -1529,15 +1531,17 @@ fn test_packed_cow_rkyv_serialization() {
     let f4_bytes = vec![F4::pack_pair(F4::from_f32(-1.0), F4::from_f32(2.0))];
     let original_f4_cow = PackedF4Cow::from_packed_slice(&f4_bytes, 2).unwrap();
 
-    let bytes_f4 = rkyv::to_bytes::<_, 256>(&original_f4_cow).unwrap();
-    let archived_f4 = unsafe { rkyv::archived_root::<PackedF4Cow>(&bytes_f4[..]) };
+    let bytes_f4 = rkyv::to_bytes::<rkyv::rancor::Error>(&original_f4_cow).unwrap();
+    let archived_f4 = rkyv::access::<rkyv::Archived<PackedF4Cow>, rkyv::rancor::Error>(&bytes_f4)
+        .expect("validated access");
 
     assert_eq!(archived_f4.len(), 2);
     let borrowed_f4 = archived_f4.as_borrowed().unwrap();
     assert_eq!(borrowed_f4.get(0).unwrap().to_f32(), -1.0);
     assert_eq!(borrowed_f4.get(1).unwrap().to_f32(), 2.0);
 
-    let deserialized_f4: PackedF4Cow = archived_f4.deserialize(&mut rkyv::Infallible).unwrap();
+    let deserialized_f4: PackedF4Cow =
+        rkyv::deserialize::<_, rkyv::rancor::Error>(archived_f4).unwrap();
     assert_eq!(deserialized_f4.len(), 2);
 }
 

@@ -11,7 +11,7 @@ repository.workspace = true
 [dependencies]
 eunomia = { workspace = true, features = ["rkyv"] }
 bytemuck = { version = "1.14", features = ["derive"] }
-rkyv = { version = "0.7" }
+rkyv = { version = "0.8" }
 mnemosyne = { workspace = true, optional = true }
 themis = { workspace = true }
 

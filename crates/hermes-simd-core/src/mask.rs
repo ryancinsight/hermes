@@ -23,7 +23,7 @@
 ///
 /// `N` must satisfy `N <= 64`. Violations are caught by a const assertion in `ALL_ACTIVE`.
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
-#[archive_attr(derive(Clone, Copy, Debug, PartialEq, Eq, Hash))]
+#[rkyv(derive(Clone, Copy, Debug, PartialEq, Eq, Hash))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct BitMask<const N: usize>(pub u64);
@@ -319,17 +319,17 @@ mod rkyv_tests {
     use super::*;
 
     #[test]
-    // rkyv 0.7 archived access violates Stacked Borrows inside the dependency;
-    // see vec/tests.rs for the same exclusion rationale.
+    // rkyv archived access violates Stacked Borrows inside the dependency;
+    // see vec/tests.rs for the rationale and the 0.8.17 re-probe.
     #[cfg_attr(miri, ignore)]
     fn test_bitmask_rkyv() {
-        use rkyv::Deserialize;
-
         let mask = BitMask::<8>::from_bools(&[true, false, true, true, false, false, true, false]);
-        let bytes = rkyv::to_bytes::<_, 256>(&mask).unwrap();
+        let bytes = rkyv::to_bytes::<rkyv::rancor::Error>(&mask).unwrap();
 
-        let archived = unsafe { rkyv::archived_root::<BitMask<8>>(&bytes[..]) };
-        let deserialized: BitMask<8> = archived.deserialize(&mut rkyv::Infallible).unwrap();
+        let archived = rkyv::access::<rkyv::Archived<BitMask<8>>, rkyv::rancor::Error>(&bytes)
+            .expect("validated access");
+        let deserialized: BitMask<8> =
+            rkyv::deserialize::<_, rkyv::rancor::Error>(archived).unwrap();
         assert_eq!(deserialized, mask);
         assert_eq!(deserialized.0, mask.0);
     }
