@@ -8,8 +8,25 @@
 //! matched total work, so the per-element throughput gap between the two rows is
 //! the tail's marginal cost. Rows span a cache-resident class (where the tail's
 //! extra scalar cycles are visible) and a DRAM-resident class (where memory
-//! bandwidth may hide them) — the evidence gate for whether a masked-vector tail
-//! is worth implementing.
+//! bandwidth may hide them).
+//!
+//! The gate this was built for has since been answered: `e08ab17` folded the
+//! column tail into a masked vector accumulator, so there is no scalar tail
+//! left to measure. What the rows now guard is regression in that masked
+//! path.
+//!
+//! Measured 2026-08-04 on a quiet host: the cache-resident pair costs the
+//! tail ~18% throughput (25.5 vs 21.0 Gelem/s). The DRAM pair, however,
+//! reports the *tail-free* row ~2x SLOWER than the tail-having one (4.4 vs
+//! 8.1 Gelem/s, reproduced at p = 0.27), which is not a tail effect at all:
+//! 1504 * 4 B = 6016 B is exactly 94 cache lines, so every row of the
+//! tail-free matrix starts at the same cache-set alignment, while
+//! 1503 * 4 B = 6012 B does not. The comment's claim that a non-power-of-two
+//! `lda` avoids the set-conflict pathology does not hold -- what matters is
+//! that the byte stride not be a multiple of the line size. Until the sizes
+//! are re-chosen (a tail-free `ncols` with `ncols % 16 != 0`, e.g. 1512
+//! paired with 1511), read the DRAM row as a layout measurement, not as a
+//! tail measurement. Tracked in atlas backlog.md.
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use hermes_simd::gemv;
 
