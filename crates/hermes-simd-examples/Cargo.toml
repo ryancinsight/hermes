@@ -24,6 +24,14 @@ path = "examples/cow_example.rs"
 name = "complex_dot"
 path = "examples/complex_dot.rs"
 
+[[example]]
+name = "book_isa_dispatch"
+path = "examples/book_isa_dispatch.rs"
+
+[[example]]
+name = "book_reductions"
+path = "examples/book_reductions.rs"
+
 [features]
 default = ["mnemosyne-memory"]
 mnemosyne-memory = ["hermes-simd/mnemosyne-memory"]

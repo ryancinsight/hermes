@@ -1,0 +1,19 @@
+# mdBook configuration for the hermes-simd book.
+[book]
+title = "hermes-simd: SIMD/ISA Dispatch for Atlas"
+authors = ["Ryan Clanton"]
+description = "Runtime ISA detection, SIMD kernel dispatch, and aligned vector abstractions for the Atlas compute layer."
+src = "."
+language = "en"
+
+[build]
+build-dir = "../../target/book/hermes"
+create-missing = false
+
+[output.html]
+no-section-label = false
+mathjax-support = false
+site-url = "/hermes/"
+git-repository-url = "https://github.com/ryancinsight/hermes"
+edit-url-template = "https://github.com/ryancinsight/hermes/edit/main/docs/book/{path}"
+default-theme = "rust"
