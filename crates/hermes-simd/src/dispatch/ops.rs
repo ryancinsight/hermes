@@ -70,6 +70,16 @@ pub fn axpy<T: SimdOps>(alpha: T, x: &[T], out: &mut [T]) -> Result<(), SimdErro
     T::axpy(alpha, x, out)
 }
 
+/// Fused ternary update `out[i] += alpha * a[i] * b[i]` without a temporary.
+///
+/// # Errors
+/// Returns [`SimdError::LengthMismatch`] when `a`, `b`, and `out` do not have
+/// equal lengths.
+#[inline(always)]
+pub fn axpy_mul<T: SimdOps>(alpha: T, a: &[T], b: &[T], out: &mut [T]) -> Result<(), SimdError> {
+    T::axpy_mul(alpha, a, b, out)
+}
+
 /// Fused multi-row update `out[row, i] += alphas[row] * x[i]` via one
 /// runtime-dispatched SIMD kernel. `out` is a row-major strided window.
 #[inline(always)]

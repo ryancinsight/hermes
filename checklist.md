@@ -2,6 +2,15 @@
 
 **Target: Unreleased** · Strategy: [backlog.md](backlog.md) · Gap register: [gap_audit.md](gap_audit.md) · Phase: Execution
 
+## HS-409 [minor] — fused ternary AXPY provider facade
+
+- [x] Add `SimdOps::axpy_mul` and the public `axpy_mul` facade.
+- [x] Reuse the existing runtime-dispatch and `SimdKernel::mul`/`fmadd`
+      seams; do not add a parallel SIMD abstraction or package.
+- [x] Cover f32/f64 public-facade values, tails, and exact length errors.
+- [ ] Adopt the provider facade in Kwavers after its consumer tree and lock
+      are free; this remains a separate downstream increment.
+
 ## HERMES-MNEMOSYNE-PACKAGE-1 [patch] — Owner: Codex
 
 - [x] Bind `mnemosyne` to package `mnemosyne-memory` 0.6.0.

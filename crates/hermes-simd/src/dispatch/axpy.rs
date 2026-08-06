@@ -89,6 +89,81 @@ where
     Ok(())
 }
 
+/// Fused ternary update `out[i] += alpha * a[i] * b[i]` without a temporary.
+///
+/// The scaled first operand is multiplied in the SIMD register and accumulated
+/// with `fmadd`, so the output is written once per lane. The scalar tail uses
+/// the same `(alpha * a) * b + out` operation order as the vector path.
+#[runtime_dispatch(avx512f, avx2, neon, scalar)]
+pub(super) fn dispatch_axpy_mul_kernel<T, A>(
+    alpha: T,
+    a: &[T],
+    b: &[T],
+    out: &mut [T],
+) -> Result<(), SimdError>
+where
+    T: Scalar,
+    A: SimdArch + SimdKernel<T>,
+{
+    if a.len() != b.len() || a.len() != out.len() {
+        return Err(SimdError::LengthMismatch);
+    }
+    let len = out.len();
+    if len == 0 {
+        return Ok(());
+    }
+
+    let lane_count = A::LANE_COUNT;
+    let unroll_factor = A::UNROLL_FACTOR;
+    let chunk_size = lane_count * unroll_factor;
+    let unrolled_simd_len = (len / chunk_size) * chunk_size;
+    let a_ptr = a.as_ptr();
+    let b_ptr = b.as_ptr();
+    let out_ptr = out.as_mut_ptr();
+
+    // SAFETY: length validation proves every unrolled and vector load/store is
+    // within its corresponding slice; the dispatch wrapper proves the target
+    // feature required by `A` before entering this kernel.
+    unsafe {
+        let valpha = A::splat(alpha);
+        let mut i = 0usize;
+        while i < unrolled_simd_len {
+            for offset in [0, lane_count, lane_count * 2, lane_count * 3] {
+                let pa = a_ptr.add(i + offset);
+                let pb = b_ptr.add(i + offset);
+                let po = out_ptr.add(i + offset);
+                let scaled_a = A::mul(A::load_unaligned(pa), valpha);
+                A::store_unaligned(
+                    po,
+                    A::fmadd(scaled_a, A::load_unaligned(pb), A::load_unaligned(po)),
+                );
+            }
+            i += chunk_size;
+        }
+
+        let simd_len = (len / lane_count) * lane_count;
+        while i < simd_len {
+            let po = out_ptr.add(i);
+            let scaled_a = A::mul(A::load_unaligned(a_ptr.add(i)), valpha);
+            A::store_unaligned(
+                po,
+                A::fmadd(
+                    scaled_a,
+                    A::load_unaligned(b_ptr.add(i)),
+                    A::load_unaligned(po),
+                ),
+            );
+            i += lane_count;
+        }
+    }
+
+    let simd_len = (len / lane_count) * lane_count;
+    for i in simd_len..len {
+        out[i] = (alpha * a[i]).scalar_fmadd(b[i], out[i]);
+    }
+    Ok(())
+}
+
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
 pub(super) fn dispatch_axpy_rows_kernel<T, A>(
     alphas: &[T],
@@ -256,7 +331,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::{axpy, axpy_rows, axpy_rows_batch};
+    use super::super::{axpy, axpy_mul, axpy_rows, axpy_rows_batch};
     use hermes_simd_core::view::SimdError;
 
     #[test]
@@ -271,6 +346,38 @@ mod tests {
             axpy(alpha, &x, &mut out).unwrap();
             assert_eq!(out, expected, "len {len}");
         }
+    }
+
+    #[test]
+    fn axpy_mul_matches_scalar_fma_reference_across_tail_sizes() {
+        for &len in &[0usize, 1, 3, 7, 8, 9, 15, 16, 17, 63, 64, 65, 1027] {
+            let alpha = 1.75f64;
+            let a: Vec<f64> = (0..len).map(|i| i as f64 * 0.5 - 3.0).collect();
+            let b: Vec<f64> = (0..len).map(|i| i as f64 * 0.25 + 1.0).collect();
+            let mut out: Vec<f64> = (0..len).map(|i| 100.0 - i as f64).collect();
+            let expected: Vec<f64> = out
+                .iter()
+                .zip(&a)
+                .zip(&b)
+                .map(|((&out, &a), &b)| (alpha * a).mul_add(b, out))
+                .collect();
+
+            axpy_mul(alpha, &a, &b, &mut out).unwrap();
+            assert_eq!(out, expected, "len {len}");
+        }
+    }
+
+    #[test]
+    fn axpy_mul_rejects_length_mismatch() {
+        let mut out = [0.0f64; 2];
+        assert_eq!(
+            axpy_mul(1.0, &[1.0, 2.0], &[3.0], &mut out),
+            Err(SimdError::LengthMismatch)
+        );
+        assert_eq!(
+            axpy_mul(1.0, &[1.0], &[3.0], &mut out),
+            Err(SimdError::LengthMismatch)
+        );
     }
 
     #[test]

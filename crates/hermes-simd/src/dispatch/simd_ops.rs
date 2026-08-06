@@ -68,6 +68,8 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError>;
     /// Fused row update `out[i] += alpha * x[i]` (AXPY) with no temporaries.
     fn axpy(alpha: Self, x: &[Self], out: &mut [Self]) -> Result<(), SimdError>;
+    /// Fused ternary update `out[i] += alpha * a[i] * b[i]` with no temporary.
+    fn axpy_mul(alpha: Self, a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError>;
     /// Fused multi-row update `out[row, i] += alphas[row] * x[i]`.
     fn axpy_rows(
         alphas: &[Self],
@@ -236,6 +238,15 @@ macro_rules! impl_simd_ops_methods {
         #[inline(always)]
         fn axpy(alpha: Self, x: &[Self], out: &mut [Self]) -> Result<(), SimdError> {
             axpy::dispatch_axpy::<Self>(alpha, x, out)
+        }
+        #[inline(always)]
+        fn axpy_mul(
+            alpha: Self,
+            a: &[Self],
+            b: &[Self],
+            out: &mut [Self],
+        ) -> Result<(), SimdError> {
+            axpy::dispatch_axpy_mul::<Self>(alpha, a, b, out)
         }
         #[inline(always)]
         fn axpy_rows(

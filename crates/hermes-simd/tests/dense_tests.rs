@@ -33,6 +33,70 @@ fn test_elementwise_mul_f32() {
 }
 
 #[test]
+fn test_axpy_mul_public_facade_f32_and_f64() {
+    let a32 = [1.0f32, -2.0, 3.0, -4.0, 5.0];
+    let b32 = [2.0f32, 3.0, -4.0, 5.0, -6.0];
+    let mut out32 = [10.0f32; 5];
+    axpy_mul(0.5, &a32, &b32, &mut out32).unwrap();
+    for i in 0..a32.len() {
+        assert_eq!(
+            out32[i].to_bits(),
+            (0.5f32 * a32[i]).mul_add(b32[i], 10.0).to_bits()
+        );
+    }
+
+    let a64 = [1.0f64, -2.0, 3.0, -4.0, 5.0];
+    let b64 = [2.0f64, 3.0, -4.0, 5.0, -6.0];
+    let mut out64 = [10.0f64; 5];
+    axpy_mul(0.5, &a64, &b64, &mut out64).unwrap();
+    for i in 0..a64.len() {
+        assert_eq!(
+            out64[i].to_bits(),
+            (0.5f64 * a64[i]).mul_add(b64[i], 10.0).to_bits()
+        );
+    }
+}
+
+#[test]
+fn test_axpy_mul_public_facade_rejects_mismatched_lengths() {
+    let mut out = [0.0f32; 2];
+    assert_eq!(
+        axpy_mul(1.0, &[1.0, 2.0], &[3.0], &mut out),
+        Err(SimdError::LengthMismatch)
+    );
+    assert_eq!(
+        axpy_mul(1.0, &[1.0], &[3.0], &mut out),
+        Err(SimdError::LengthMismatch)
+    );
+}
+
+/// Pins the documented intermediate-rounding contract for the f32 provider:
+/// `(alpha * a) * b + out`, rather than `alpha * (a * b) + out`.
+#[test]
+fn test_axpy_mul_f32_pins_intermediate_rounding() {
+    let alpha = -21_624.873f32;
+    let a = 66_191_484.0f32;
+    let b = 4.032_053_5f32;
+    let initial = 29_956_176.0f32;
+    // 32 elements span the vector path on every supported backend, including
+    // AVX-512's 16-lane f32 vectors, while still avoiding a large fixture.
+    let a_values = [a; 32];
+    let b_values = [b; 32];
+    let mut out = [initial; 32];
+
+    let scaled_a = alpha * a;
+    let expected = scaled_a.mul_add(b, initial);
+    let alternate = alpha.mul_add(a * b, initial);
+    assert_ne!(expected.to_bits(), alternate.to_bits());
+    assert_eq!(expected.to_bits(), 0xd4a7_f822);
+
+    axpy_mul(alpha, &a_values, &b_values, &mut out).unwrap();
+    assert!(out
+        .iter()
+        .all(|value| value.to_bits() == expected.to_bits()));
+}
+
+#[test]
 fn test_elementwise_add_sub_div_f32() {
     let a = [1.0f32, 2.0, 3.0, 4.0, 5.0];
     let b = [2.0f32, 3.0, 4.0, 5.0, 6.0];

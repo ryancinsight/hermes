@@ -4,6 +4,20 @@ Persistent gap register. Evidence tiers follow the repository instruction
 hierarchy: machine-checked proof > type-level invariant > property/fuzz >
 differential/empirical > source audit.
 
+- Resolved 2026-08-06 — HS-409 fused ternary AXPY provider facade: Hermes now
+  exposes `axpy_mul(alpha, a, b, out)` and `SimdOps::axpy_mul` for the exact
+  in-place contract `out[i] += alpha * a[i] * b[i]`. The runtime-dispatched
+  kernel reuses `SimdKernel::mul` followed by `SimdKernel::fmadd`, writes each
+  output lane once, and performs no temporary allocation. Length validation is
+  centralized in the provider kernel; the scalar tail uses the same
+  `Scalar::scalar_fmadd` operation as the vector path. Public f32/f64 tests cover
+  the facade and tail-sized inputs; internal tests cover empty/tail/mismatch
+  cases. The operation is provider capability only: Kwavers adoption remains
+  downstream work and is not claimed here. Evidence tier: source implementation
+  plus value-semantic public-facade tests. Local locked gates remain blocked by
+  the pre-existing dirty Hermes lock overlay, which requires unrelated provider
+  lock regeneration; no lockfile rewrite was retained.
+
 - Resolved 2026-07-19 — HS-402 provider compatibility: Hermes' native
   `eunomia::F16`/`Bf16` source compiles against Eunomia 0.6 without restoring
   the retired foreign raw-half trait implementations. Cargo resolves the

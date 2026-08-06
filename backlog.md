@@ -5,6 +5,14 @@ Tags: `[patch]` / `[minor]` / `[major]` / `[arch]` per SemVer change class.
 Tactical breakdown of the active items lives in [checklist.md](checklist.md).
 External gap findings live in [gap_audit.md](gap_audit.md).
 
+- [x] [minor] **HS-409 — fused ternary AXPY provider facade.** Add the
+  Hermes-owned `axpy_mul` public operation for `out[i] += alpha * a[i] * b[i]`
+  without a temporary. Reuse the existing `SimdKernel::mul`/`fmadd` seam and
+  runtime-dispatch ladder; keep length validation and scalar-tail semantics in
+  the provider. The capability is now available for Kwavers' documented
+  `c += multiplier * a * b` residual, but downstream adoption remains a
+  separate consumer increment until its tree is free and its focused gates pass.
+
 - [x] [patch] **HS-REL-001 — crates.io publication.** Make the five reusable
   workspace packages independently packageable, preserve the benchmark and
   example harnesses as non-publishable, and publish in dependency order through
