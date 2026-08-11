@@ -28,9 +28,9 @@
 - [x] Route the final partial vector through `scatter_masked`, not a scalar tail.
 - [x] Cover per-backend differential equality, the gather∘scatter round-trip
       identity, duplicate-index last-writer-wins, and both error contracts.
-- [ ] Validate native AVX-512 execution on a hosted AVX-512 runner; the
-      developer host provides AVX2 only, so that path is compile-verified and
-      contract-tested but not executed here.
+- [x] Validate native AVX-512 execution. Delivered by HS-428: the Intel SDE
+      job executes the scatter property, round-trip, duplicate-index, and
+      error-contract tests against the `vscatterdps`/`vscatterdpd` override.
 
 ## HS-421 [arch] — native AVX-512 BF16 tile dispatch
 

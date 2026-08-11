@@ -71,6 +71,31 @@ assessed against a float-lane trait, not a general one.
   silent operation-by-operation accretion — it is not opened here because no
   consumer requirement is recorded for one.
 
+### Verification infrastructure — the finding that reframes the rest
+
+- [minor] Resolved 2026-08-11. Every AVX-512 branch is guarded by
+  `is_x86_feature_detected!`, so on a runner without the silicon those tests do
+  not fail — they *skip*. The capability-report step added with the SDE job
+  proved the GitHub x86 runner reports **no AVX-512 and no AMX flags at all**,
+  so the AVX-512 scatter override, the BF16 tile dispatch, VNNI, and AMX had
+  been carried by a green CI that never executed one of them. A passing suite
+  was asserting less than it appeared to, and nothing in the logs said so.
+  The `test-avx512-sde` job now runs the whole suite under Intel SDE emulating
+  Sapphire Rapids: 444/444 pass in 176s (about 11x native), with
+  `test_masked_ops_avx512`, `test_select_ops_avx512`, `test_vector_ops_avx512`,
+  `interleaved_complex_avx512_matches_scalar_backend`,
+  `avx512_tiling::int8_tests`, and `test_adaptive_dispatcher_and_amx_session`
+  all executing rather than skipping.
+  Reusable finding: a capability-gated test suite reports coverage it does not
+  have. Any `is_x86_feature_detected!`-guarded path needs either an emulator or
+  a log line naming what was skipped — silence must not read as coverage.
+- Consequence for the HS-422 and HS-424 records: both shipped their AVX-512
+  work marked "runner-gated, not executed". That caveat is now discharged for
+  scatter — `prop_scatter_matches_reference_all_backends`,
+  `prop_gather_scatter_roundtrip_all_backends`, and the duplicate-index and
+  error-contract tests all exercise the native `vscatterdps`/`vscatterdpd`
+  override under SDE.
+
 ### Backend matrix
 
 - [patch] `TargetId` omits `SveArch` although the workspace ships it as a

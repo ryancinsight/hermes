@@ -6,8 +6,8 @@
   f32/f64, and expose `SimdView::scatter` as the public dual of
   `SimdView::gather`. Full vectors use the unmasked seam and the final partial
   vector uses the masked seam, so no scalar tail remains. Indices are validated
-  before any write; duplicate indices are last-writer-wins. Native AVX-512
-  execution stays runner-gated.
+  before any write; duplicate indices are last-writer-wins. The native AVX-512
+  path is executed under the HS-428 Intel SDE job.
 
 - [ ] [minor] **HS-423 — rounding primitives.** The kernel trait has no
   `floor`/`ceil`/`round`/`trunc` although every target ISA provides them
@@ -33,7 +33,24 @@
   AVX-512 and NEON overrides, and native flat `interleave`/`deinterleave`, are
   deferred to HS-427 rather than shipped as unexecutable index math.
 
+- [x] [patch] **HS-428 — execute the capability-gated ISA paths in CI.** Every
+  AVX-512 branch is `is_x86_feature_detected!`-guarded, so on a runner without
+  the silicon it skips rather than fails. The new capability-report step proved
+  the GitHub x86 runner has **no** AVX-512 or AMX flags, so those paths had
+  never executed in CI. `test-avx512-sde` now runs the suite under Intel SDE
+  emulating Sapphire Rapids (444/444 in 176s, ~11x native), applying the
+  emulator through the cargo target runner so only test binaries pay the cost.
+  Uses a dedicated `[profile.sde]` 300s budget; the 30s native budget is
+  untouched and remains the authority on real-hardware performance.
+
 - [ ] [minor] **HS-427 — native permute overrides beyond AVX2 reverse.**
+  UNBLOCKED as of HS-428 — both preconditions were already satisfiable and the
+  original entry was wrong to defer on runner availability. aarch64 has had a
+  native `ubuntu-24.04-arm` job running the full suite all along (and
+  `cargo check --target aarch64-unknown-linux-gnu` type-checks NEON locally
+  with no ARM hardware); AVX-512 is now executed under SDE. The HS-424
+  differential and round-trip tests already contain the per-backend branches,
+  so an override is validated on push.
   HS-424 left `interleave`/`deinterleave` on the generic default for every
   backend, and `reverse` native only on AVX2. AVX-512 can express all three in
   one instruction (`_mm512_permutexvar_ps` for reverse, `_mm512_permutex2var_ps`
@@ -41,12 +58,14 @@
   and `vzip`/`vuzp` for the pair ops, which do match flat semantics at 128-bit
   width. AVX2 flat interleave needs `unpack` plus `permute2f128` because
   `unpack` is per-128-bit-half. Not shipped in HS-424 because the index math is
-  unverifiable here: this host reports avx512f=false and is not aarch64, and
-  untested permute index math is the kind of code that silently returns
-  plausible-but-wrong lanes. Precondition: an AVX-512 and an aarch64 runner.
-  Acceptance: the existing HS-424 differential and round-trip tests pass
-  unchanged against each native override, plus a benchmark showing the override
-  beats the store/permute/load default.
+  unverifiable on the developer host, which reports avx512f=false and is not
+  aarch64, and untested permute index math silently returns plausible-but-wrong
+  lanes. That reasoning was right about the risk and wrong about the remedy:
+  the verification exists in CI, so the overrides are written and pushed rather
+  than deferred. Acceptance: the existing HS-424 differential and round-trip
+  tests pass unchanged against each native override on the aarch64 and SDE
+  jobs, plus a benchmark showing the override beats the store/permute/load
+  default.
 
 - [ ] [major] **HS-425 — `TargetId` omits the SVE backend.** `SveArch` is a
   first-class emulated backend exercised throughout the test suite, but

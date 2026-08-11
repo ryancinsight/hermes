@@ -6,6 +6,15 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Added
 
+- [patch] CI now executes the capability-gated ISA paths instead of skipping
+  them. AVX-512 branches are `is_x86_feature_detected!`-guarded, and the
+  capability report added with the new `test-avx512-sde` job proved the x86
+  runner has no AVX-512 or AMX flags — so those paths, including the AVX-512
+  scatter override, BF16 tile dispatch, VNNI, and AMX, had never run in CI. The
+  job executes the suite under Intel SDE emulating Sapphire Rapids (444/444,
+  ~11x native) via the cargo target runner, so compilation stays native. A
+  dedicated `sde` nextest profile carries the emulation budget; the native 30s
+  budget is unchanged.
 - [minor] Cross-lane permutes: `SimdKernel::reverse`, `interleave`, and
   `deinterleave` join the trait as defaulted methods, so general lane
   reordering no longer requires leaving the vector domain and no existing
@@ -32,8 +41,8 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   resolve last-writer-wins, matching the hardware rule on both paths.
   Verification: per-backend differential property tests against the scalar
   reference, a gather∘scatter round-trip identity, duplicate-index and
-  error-contract tests. Native AVX-512 execution evidence remains runner-gated;
-  the developer host provides AVX2 only.
+  error-contract tests. The native AVX-512 path is executed under the Intel SDE
+  job, so the earlier "runner-gated" caveat on this entry is discharged.
 
 ### Changed
 
