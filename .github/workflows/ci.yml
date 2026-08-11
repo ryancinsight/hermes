@@ -37,8 +37,14 @@ jobs:
       # nextest applies the committed .config/nextest.toml timeout instrument
       # (30s slow / 60s terminate) — bare `cargo test` bypasses it. Doctests are
       # not executed by nextest, so they run as a separate step.
+      # Declares the backends this runner must actually execute. AVX-512 is
+      # deliberately absent: GitHub's x86 runners vary between parts that have
+      # it and parts that do not, so requiring it here would fail at random.
+      # That non-determinism is why the SDE job exists.
       - name: Tests (nextest, dev profile; release uses panic=abort which conflicts with the test harness)
         run: cargo nextest run --workspace
+        env:
+          HERMES_EXPECTED_TARGETS: scalar,avx2
       - name: Doctests
         run: cargo test --doc --workspace
       - name: Examples build (rot gate)
@@ -154,6 +160,7 @@ jobs:
       - name: Tests under emulated Sapphire Rapids
         env:
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER: "${{ env.SDE_PATH }}/sde64 -spr --"
+          HERMES_EXPECTED_TARGETS: scalar,avx2,avx512
         run: |
           cargo nextest run --workspace --profile sde \
             --target x86_64-unknown-linux-gnu
@@ -177,6 +184,8 @@ jobs:
       - uses: taiki-e/install-action@nextest
       - name: Tests (nextest, committed timeout config)
         run: cargo nextest run --workspace
+        env:
+          HERMES_EXPECTED_TARGETS: scalar,neon
       - name: Doctests
         run: cargo test --doc --workspace
 

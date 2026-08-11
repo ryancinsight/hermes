@@ -28,6 +28,31 @@ pub enum TargetId {
 }
 
 impl TargetId {
+    /// Every public CPU target, in ascending capability order.
+    ///
+    /// Enumerating the closed set is what lets a harness *identify* which
+    /// backends the host can execute rather than assume it. Combined with
+    /// [`TargetId::is_supported`], this turns a capability-gated suite's
+    /// coverage from an invisible property into a reportable one — a test
+    /// guarded by a feature probe otherwise skips silently, and a skip is
+    /// indistinguishable from a pass in the log.
+    pub const ALL: [Self; 4] = [Self::Scalar, Self::Avx2, Self::Avx512, Self::Neon];
+
+    /// Parses a target from the lowercase name emitted by [`TargetId::name`].
+    ///
+    /// The inverse of `name`, so a coverage expectation can be declared as
+    /// configuration (a CI environment variable) rather than compiled in.
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|t| t.name() == name)
+    }
+
+    /// Returns the targets this host can execute, in [`TargetId::ALL`] order.
+    #[must_use]
+    pub fn supported_on_host() -> Vec<Self> {
+        Self::ALL.into_iter().filter(|t| t.is_supported()).collect()
+    }
+
     /// Returns the stable lowercase target name used in reports and benchmarks.
     #[must_use]
     pub const fn name(self) -> &'static str {
