@@ -21,11 +21,32 @@
   be pinned explicitly), and the infinity/NaN contract.
   Re-open trigger: the eunomia rounding release lands.
 
-- [ ] [minor] **HS-424 — cross-lane permute family.** Lane shuffles exist only
-  as the complex adjacent-pair primitives (`swap_adjacent`, `dup_even`,
-  `dup_odd`). General `reverse`, `interleave`, and `deinterleave` have no seam,
-  so consumers needing them must leave the vector domain. Acceptance:
-  per-backend differential tests plus a permutation round-trip identity.
+- [x] [minor] **HS-424 — cross-lane permute family.** `SimdKernel::reverse`,
+  `interleave`, and `deinterleave` join the trait as defaulted methods, so lane
+  reordering no longer requires leaving the vector domain and no backend impl
+  changed. All three are specified on the *flat* lane sequence, not per 128-bit
+  sub-lane — the distinction that makes x86 `unpack` unusable as a drop-in
+  override. `deinterleave` is the exact inverse of `interleave` and `reverse`
+  is an involution; both identities are tested. AVX2 overrides `reverse`
+  natively (`vpermps` by index vector for f32, `vpermpd` by immediate for f64),
+  verified on this host and confirmed non-vacuous by a deliberate-break check.
+  AVX-512 and NEON overrides, and native flat `interleave`/`deinterleave`, are
+  deferred to HS-427 rather than shipped as unexecutable index math.
+
+- [ ] [minor] **HS-427 — native permute overrides beyond AVX2 reverse.**
+  HS-424 left `interleave`/`deinterleave` on the generic default for every
+  backend, and `reverse` native only on AVX2. AVX-512 can express all three in
+  one instruction (`_mm512_permutexvar_ps` for reverse, `_mm512_permutex2var_ps`
+  for the two-vector permutes); NEON needs `vrev` plus a half swap for reverse
+  and `vzip`/`vuzp` for the pair ops, which do match flat semantics at 128-bit
+  width. AVX2 flat interleave needs `unpack` plus `permute2f128` because
+  `unpack` is per-128-bit-half. Not shipped in HS-424 because the index math is
+  unverifiable here: this host reports avx512f=false and is not aarch64, and
+  untested permute index math is the kind of code that silently returns
+  plausible-but-wrong lanes. Precondition: an AVX-512 and an aarch64 runner.
+  Acceptance: the existing HS-424 differential and round-trip tests pass
+  unchanged against each native override, plus a benchmark showing the override
+  beats the store/permute/load default.
 
 - [ ] [major] **HS-425 — `TargetId` omits the SVE backend.** `SveArch` is a
   first-class emulated backend exercised throughout the test suite, but

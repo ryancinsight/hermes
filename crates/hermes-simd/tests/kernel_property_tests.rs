@@ -127,6 +127,135 @@ where
     assert_eq!(restored, values, "gather∘scatter is not the identity");
 }
 
+/// Cross-lane permutes must match the flat reference reordering, and satisfy
+/// their algebraic identities: `reverse` is an involution and `deinterleave` is
+/// the exact inverse of `interleave`.
+///
+/// The reference is written on plain slices, independent of any lane
+/// arithmetic in the kernel defaults, so a backend override and the default it
+/// replaces are both checked against the same external specification.
+fn check_permutes<A: SimdKernel<f32>>() {
+    let lanes = A::LANE_COUNT;
+    let a_vals: Vec<f32> = (0..lanes).map(|i| (i + 1) as f32).collect();
+    let b_vals: Vec<f32> = (0..lanes).map(|i| -((i + 1) as f32) * 10.0).collect();
+
+    let mut rev = vec![0.0f32; lanes];
+    let mut lo = vec![0.0f32; lanes];
+    let mut hi = vec![0.0f32; lanes];
+    let mut even = vec![0.0f32; lanes];
+    let mut odd = vec![0.0f32; lanes];
+    let mut rt_a = vec![0.0f32; lanes];
+    let mut rt_b = vec![0.0f32; lanes];
+    let mut rev_twice = vec![0.0f32; lanes];
+
+    // SAFETY: caller gates on the required target features for `A`.
+    unsafe {
+        let a = A::load_unaligned(a_vals.as_ptr());
+        let b = A::load_unaligned(b_vals.as_ptr());
+
+        A::store_unaligned(rev.as_mut_ptr(), A::reverse(a));
+        A::store_unaligned(rev_twice.as_mut_ptr(), A::reverse(A::reverse(a)));
+
+        let (i_lo, i_hi) = A::interleave(a, b);
+        A::store_unaligned(lo.as_mut_ptr(), i_lo);
+        A::store_unaligned(hi.as_mut_ptr(), i_hi);
+
+        let (d_even, d_odd) = A::deinterleave(a, b);
+        A::store_unaligned(even.as_mut_ptr(), d_even);
+        A::store_unaligned(odd.as_mut_ptr(), d_odd);
+
+        // Round-trip: deinterleave ∘ interleave == identity.
+        let (r_a, r_b) = A::deinterleave(i_lo, i_hi);
+        A::store_unaligned(rt_a.as_mut_ptr(), r_a);
+        A::store_unaligned(rt_b.as_mut_ptr(), r_b);
+    }
+
+    // Reference reversal.
+    let mut expected_rev = a_vals.clone();
+    expected_rev.reverse();
+    assert_eq!(rev, expected_rev, "reverse mismatch ({lanes} lanes)");
+    assert_eq!(rev_twice, a_vals, "reverse is not an involution");
+
+    // Reference interleave over the flat 2n-lane sequence.
+    let mut flat = Vec::with_capacity(2 * lanes);
+    for i in 0..lanes {
+        flat.push(a_vals[i]);
+        flat.push(b_vals[i]);
+    }
+    assert_eq!(lo, flat[..lanes], "interleave low half mismatch");
+    assert_eq!(hi, flat[lanes..], "interleave high half mismatch");
+
+    // Reference deinterleave over `a` followed by `b`.
+    let concat: Vec<f32> = a_vals.iter().chain(b_vals.iter()).copied().collect();
+    let expected_even: Vec<f32> = concat.iter().step_by(2).copied().collect();
+    let expected_odd: Vec<f32> = concat.iter().skip(1).step_by(2).copied().collect();
+    assert_eq!(even, expected_even, "deinterleave even mismatch");
+    assert_eq!(odd, expected_odd, "deinterleave odd mismatch");
+
+    assert_eq!(
+        rt_a, a_vals,
+        "deinterleave∘interleave lost the first operand"
+    );
+    assert_eq!(
+        rt_b, b_vals,
+        "deinterleave∘interleave lost the second operand"
+    );
+}
+
+/// The f64 permute path is a separate monomorphization with its own lane count
+/// and, on AVX2, a different instruction (`vpermpd` by immediate rather than
+/// `vpermps` by index vector), so it needs its own coverage.
+fn check_permutes_f64<A: SimdKernel<f64>>() {
+    let lanes = A::LANE_COUNT;
+    let a_vals: Vec<f64> = (0..lanes).map(|i| (i + 1) as f64).collect();
+    let b_vals: Vec<f64> = (0..lanes).map(|i| -((i + 1) as f64) * 10.0).collect();
+
+    let mut rev = vec![0.0f64; lanes];
+    let mut rt_a = vec![0.0f64; lanes];
+    let mut rt_b = vec![0.0f64; lanes];
+
+    // SAFETY: caller gates on the required target features for `A`.
+    unsafe {
+        let a = A::load_unaligned(a_vals.as_ptr());
+        let b = A::load_unaligned(b_vals.as_ptr());
+        A::store_unaligned(rev.as_mut_ptr(), A::reverse(a));
+        let (i_lo, i_hi) = A::interleave(a, b);
+        let (r_a, r_b) = A::deinterleave(i_lo, i_hi);
+        A::store_unaligned(rt_a.as_mut_ptr(), r_a);
+        A::store_unaligned(rt_b.as_mut_ptr(), r_b);
+    }
+
+    let mut expected_rev = a_vals.clone();
+    expected_rev.reverse();
+    assert_eq!(rev, expected_rev, "f64 reverse mismatch ({lanes} lanes)");
+    assert_eq!(rt_a, a_vals, "f64 round-trip lost the first operand");
+    assert_eq!(rt_b, b_vals, "f64 round-trip lost the second operand");
+}
+
+#[test]
+fn permutes_match_reference_all_backends() {
+    check_permutes::<Scalar>();
+    check_permutes::<SveArch>();
+    check_permutes_f64::<Scalar>();
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+            check_permutes::<hermes_simd::Avx2>();
+            check_permutes_f64::<hermes_simd::Avx2>();
+        }
+        if std::is_x86_feature_detected!("avx512f") {
+            check_permutes::<hermes_simd::Avx512>();
+            check_permutes_f64::<hermes_simd::Avx512>();
+        }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        check_permutes::<hermes_simd::Neon>();
+        check_permutes_f64::<hermes_simd::Neon>();
+    }
+}
+
 /// `masked_sum_reduce` with `leading_k_mask(k)` must sum exactly the first
 /// `min(k, LANE_COUNT)` lanes, including the k = 0 and k > LANE_COUNT bounds.
 fn check_leading_k_masked_sum<A: SimdKernel<f32>>() {

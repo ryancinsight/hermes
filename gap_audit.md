@@ -51,10 +51,17 @@ assessed against a float-lane trait, not a general one.
   fake generic. The correct sequence is an upstream eunomia increment adding
   rounding to `NumericElement` (identity on integer impls), then the Hermes
   default plus native overrides. Tracked as HS-423, gated on that upstream unit.
-- [minor] No general cross-lane permute (`reverse`, `interleave`,
-  `deinterleave`). The only lane shuffles are the complex adjacent-pair
-  primitives, which are shaped for interleaved complex and nothing else.
-  Tracked as HS-424.
+- [minor] Resolved as HS-424. General cross-lane permute (`reverse`,
+  `interleave`, `deinterleave`) had no seam; the only lane shuffles were the
+  complex adjacent-pair primitives. All three now exist as defaulted trait
+  methods on the flat lane sequence, with AVX2 native `reverse`. The reusable
+  finding is the flat-vs-sublane distinction: x86 `unpack` and `permute_ps`
+  operate within 128-bit halves, so they are *not* implementations of a flat
+  permute and cannot be substituted as overrides without extra cross-half
+  shuffles — a trap that would have produced a silently wrong fast path.
+  Remaining native overrides tracked as HS-427, deferred rather than written
+  unverified: this host has no AVX-512 and is not aarch64, and wrong permute
+  indices return plausible wrong lanes instead of failing loudly.
 - Corrected on the same pass: an earlier draft of this entry recorded missing
   integer shifts and missing saturating arithmetic as gaps. Both are withdrawn.
   Shifts are not well-founded against a float-only lane trait, and float

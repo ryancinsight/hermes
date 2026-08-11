@@ -816,6 +816,123 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     }
 
     // -------------------------------------------------------------------------
+    // Cross-Lane Permutes
+    // -------------------------------------------------------------------------
+    //
+    // General lane reordering, as opposed to the adjacent-pair shuffles below —
+    // those are shaped for interleaved complex and express nothing else.
+    //
+    // All three are defined on the *flat* lane sequence, never per 128-bit
+    // sub-lane. That distinction matters on x86: `_mm256_unpacklo_ps` and
+    // friends operate within 128-bit halves, so they do not implement
+    // `interleave` as specified here and cannot be dropped in as overrides
+    // without additional cross-half permutes.
+    //
+    // `deinterleave` is the exact inverse of `interleave`, and `reverse` is its
+    // own inverse; both identities are exercised as round-trip properties.
+
+    /// Reverse lane order: `[a0, a1, ..., a_{n-1}] -> [a_{n-1}, ..., a1, a0]`.
+    ///
+    /// Default: scalar emulation via store/reverse/load. Backends override with
+    /// a full cross-lane permute (`_mm256_permutevar8x32_ps`,
+    /// `_mm256_permute4x64_pd`, `_mm512_permutexvar_ps`, NEON `vrev` plus a
+    /// half swap).
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn reverse(v: Self::Vector) -> Self::Vector {
+        const { Self::LANE_BOUND_CHECK };
+        let lanes = Self::LANE_COUNT;
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        Self::store_unaligned(buf.as_mut_ptr() as *mut T, v);
+        buf[..lanes].reverse();
+        Self::load_unaligned(buf.as_ptr() as *const T)
+    }
+
+    /// Interleave two vectors lane-wise, returning the low and high halves of
+    /// the interleaved `2n`-lane sequence.
+    ///
+    /// The conceptual result is `[a0, b0, a1, b1, ..., a_{n-1}, b_{n-1}]`; the
+    /// first `n` elements are returned as `.0` and the last `n` as `.1`.
+    ///
+    /// Default: scalar emulation. This is the flat interleave, not the x86
+    /// in-128-bit-lane `unpack` semantics — see the module note above.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn interleave(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
+        const { Self::LANE_BOUND_CHECK };
+        let lanes = Self::LANE_COUNT;
+        let mut buf_a = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let mut buf_b = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        Self::store_unaligned(buf_a.as_mut_ptr() as *mut T, a);
+        Self::store_unaligned(buf_b.as_mut_ptr() as *mut T, b);
+
+        let mut lo = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let mut hi = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        for i in 0..lanes {
+            // Flat position `i` of the 2n-lane interleaving takes lane `i / 2`
+            // of `a` when `i` is even and of `b` when odd; the high half
+            // continues the same pattern from flat position `lanes`.
+            let (src_lo, src_hi) = (i, i + lanes);
+            let pick = |flat: usize| {
+                let lane = flat / 2;
+                if flat % 2 == 0 {
+                    buf_a[lane].assume_init()
+                } else {
+                    buf_b[lane].assume_init()
+                }
+            };
+            lo[i].write(pick(src_lo));
+            hi[i].write(pick(src_hi));
+        }
+        (
+            Self::load_unaligned(lo.as_ptr() as *const T),
+            Self::load_unaligned(hi.as_ptr() as *const T),
+        )
+    }
+
+    /// Deinterleave two vectors, the exact inverse of [`SimdKernel::interleave`].
+    ///
+    /// Treating `a` followed by `b` as one `2n`-lane sequence, `.0` collects its
+    /// even-indexed lanes and `.1` its odd-indexed lanes, so
+    /// `deinterleave(interleave(x, y)) == (x, y)` for every backend.
+    ///
+    /// Default: scalar emulation.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn deinterleave(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
+        const { Self::LANE_BOUND_CHECK };
+        let lanes = Self::LANE_COUNT;
+        let mut buf_a = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let mut buf_b = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        Self::store_unaligned(buf_a.as_mut_ptr() as *mut T, a);
+        Self::store_unaligned(buf_b.as_mut_ptr() as *mut T, b);
+
+        let mut even = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let mut odd = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        for i in 0..lanes {
+            let pick = |flat: usize| {
+                if flat < lanes {
+                    buf_a[flat].assume_init()
+                } else {
+                    buf_b[flat - lanes].assume_init()
+                }
+            };
+            even[i].write(pick(2 * i));
+            odd[i].write(pick(2 * i + 1));
+        }
+        (
+            Self::load_unaligned(even.as_ptr() as *const T),
+            Self::load_unaligned(odd.as_ptr() as *const T),
+        )
+    }
+
+    // -------------------------------------------------------------------------
     // Adjacent-Pair Shuffles & Alternating FMA (interleaved complex support)
     // -------------------------------------------------------------------------
     //

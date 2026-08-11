@@ -75,7 +75,9 @@ read-only view the `TargetId` matrix forces.
 The operation-family coverage map is tracked in
 [`backlog.md`](backlog.md#operation-family-coverage-map). Delivered families
 include arithmetic, reductions, masks/select, memory views/wrappers, consumer
-shuffle primitives, float-specialized kernels, and indexed gather/scatter.
+shuffle primitives, cross-lane permutes (`reverse`, `interleave`,
+`deinterleave`, all on the flat lane sequence), float-specialized kernels, and
+indexed gather/scatter.
 Scatter was admitted as the write-side dual of the already-public `gather`
 rather than from a consumer request: a one-directional lane-addressing model
 forces any scatter-shaped caller out of the vector domain entirely. Pending

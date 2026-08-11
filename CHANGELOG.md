@@ -6,6 +6,20 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Added
 
+- [minor] Cross-lane permutes: `SimdKernel::reverse`, `interleave`, and
+  `deinterleave` join the trait as defaulted methods, so general lane
+  reordering no longer requires leaving the vector domain and no existing
+  backend impl changed. Previously the only lane shuffles were the complex
+  adjacent-pair primitives (`swap_adjacent`, `dup_even`, `dup_odd`), which
+  express interleaved complex arithmetic and nothing else. All three are
+  specified on the flat lane sequence rather than per 128-bit sub-lane;
+  `deinterleave` is the exact inverse of `interleave`, and `reverse` is an
+  involution. AVX2 overrides `reverse` natively (`vpermps` for f32, `vpermpd`
+  for f64). Verification: per-backend differential tests against an external
+  slice reference plus both round-trip identities. Native AVX-512 and NEON
+  overrides remain open — see HS-427; they are deliberately not shipped
+  unverified, since wrong permute indices return plausible wrong lanes rather
+  than failing loudly.
 - [minor] Indirect indexed store (scatter), the write-side dual of `gather`.
   `SimdKernel::scatter` / `scatter_masked` join the trait as defaulted methods,
   so every existing backend gains them without an impl change; AVX-512 f32/f64

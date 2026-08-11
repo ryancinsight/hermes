@@ -144,6 +144,17 @@ impl SimdKernel<f32> for Avx2 {
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx2")]
     #[inline]
+    unsafe fn reverse(v: Self::Vector) -> Self::Vector {
+        // `vpermps` is a full cross-lane permute (unlike `_mm256_permute_ps`,
+        // which is per-128-bit-half), so one instruction expresses the flat
+        // reversal. Index lane `i` selects source lane `7 - i`.
+        let idx = _mm256_setr_epi32(7, 6, 5, 4, 3, 2, 1, 0);
+        Avx2F32Vec(_mm256_permutevar8x32_ps(v.0, idx))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx2")]
+    #[inline]
     unsafe fn dup_even(v: Self::Vector) -> Self::Vector {
         Avx2F32Vec(_mm256_moveldup_ps(v.0))
     }

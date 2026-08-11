@@ -1,5 +1,21 @@
 # Checklist — active sprint
 
+## HS-424 [minor] — cross-lane permute family
+
+- [x] Add `reverse`, `interleave`, `deinterleave` as defaulted `SimdKernel`
+      methods so no backend impl changes.
+- [x] Specify all three on the flat lane sequence and document why x86
+      `unpack`/`permute_ps` (per-128-bit-half) are not drop-in overrides.
+- [x] Override `reverse` natively on AVX2 f32 (`vpermps`) and f64 (`vpermpd`).
+- [x] Test against an external slice reference, not lane arithmetic mirroring
+      the implementation, across Scalar/SveArch/AVX2 for f32 and f64.
+- [x] Cover both algebraic identities: `reverse∘reverse == id` and
+      `deinterleave∘interleave == id`.
+- [x] Confirm the new assertions are non-vacuous by deliberately breaking the
+      AVX2 index vector and observing the expected failure.
+- [ ] Native AVX-512/NEON overlays and flat `interleave`/`deinterleave`
+      overrides — HS-427, blocked on an AVX-512 and an aarch64 runner.
+
 ## HS-422 [minor] — scatter seam
 
 - [x] Add `generic_scatter` / `generic_scatter_masked` helpers over the
