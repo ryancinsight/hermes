@@ -35,18 +35,34 @@ tail routing; every hot kernel runs the provider-owned masked seam).
 
 ### Open operation-catalog gaps (source-audit tier)
 
-- [minor] No integer shift primitives (`shift_left`/`shift_right`). Bit
-  manipulation and the sub-byte unpacking the precision ladder advertises cannot
-  stay in the vector domain without them. Tracked as HS-423.
-- [minor] No rounding family (`floor`/`ceil`/`round`/`trunc`). Tracked as HS-423.
+First, the fact that bounds the rest of this section: `SimdKernel` is
+implemented for `F16`, `f32`, and `f64` only — there is no generic integer lane
+backend. Integer SIMD lives outside this trait, in the AMX/VNNI tiling kernels
+and the SWAR bitboards, each with its own operation set. Gaps must therefore be
+assessed against a float-lane trait, not a general one.
+
+- [minor] No rounding family (`floor`/`ceil`/`round`/`trunc`). This is the
+  clearest catalog hole: the operations are float-native, every target ISA has
+  them (`_mm256_round_ps`, `_mm512_roundscale_ps`, NEON `vrndm`/`vrndp`/`vrndn`/
+  `vrnd`), and consumers currently have no vector-domain route to them. The
+  generic default is the blocker, not the overrides: `NumericElement` exposes no
+  rounding, so a default written today would have to widen through `to_f64` and
+  narrow back — the widen-compute-narrow shape the integrity rules classify as a
+  fake generic. The correct sequence is an upstream eunomia increment adding
+  rounding to `NumericElement` (identity on integer impls), then the Hermes
+  default plus native overrides. Tracked as HS-423, gated on that upstream unit.
 - [minor] No general cross-lane permute (`reverse`, `interleave`,
   `deinterleave`). The only lane shuffles are the complex adjacent-pair
   primitives, which are shaped for interleaved complex and nothing else.
   Tracked as HS-424.
-- [minor] No saturating arithmetic. Relevant to the i8/i16 VNNI and AMX paths,
-  where wrapping is the wrong domain contract for accumulation clamping. No
-  consumer requirement is recorded yet, so this stays a register entry rather
-  than a board item — open it when a caller needs it, not speculatively.
+- Corrected on the same pass: an earlier draft of this entry recorded missing
+  integer shifts and missing saturating arithmetic as gaps. Both are withdrawn.
+  Shifts are not well-founded against a float-only lane trait, and float
+  saturation is not the domain contract; `NumericElement` already carries
+  `saturating_add`/`saturating_mul` for the scalar integer types that want them.
+  A generic integer lane backend is an [arch] question deserving an ADR, not a
+  silent operation-by-operation accretion — it is not opened here because no
+  consumer requirement is recorded for one.
 
 ### Backend matrix
 
@@ -63,9 +79,14 @@ tail routing; every hot kernel runs the provider-owned masked seam).
 
 ### Documentation hygiene
 
-- [patch] `docs/adr/` has two ADRs numbered 007; seven of eleven carry no
-  `## Status` section (the generated index renders `—`); and those that do use
-  `Approved` instead of the canonical `Accepted`. Tracked as HS-426.
+- [patch] Resolved as HS-426. `docs/adr/` had two ADRs numbered 007, eight of
+  eleven with no `## Status` section (the generated index rendered `—`), and
+  `Approved` instead of the canonical `Accepted` on the rest. The later
+  duplicate renumbered to 011 with its references updated; all eleven now carry
+  `Accepted`, and `adr-index.py check` passes for this repository. Note the
+  generator already reported every one of these anomalies — the tooling was
+  correct and unheeded, which is the reusable finding: a check whose output
+  nobody burns down is not a gate.
 
 ### Cross-repo (reported, not owned here)
 

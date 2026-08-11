@@ -1,5 +1,8 @@
 # ADR 001: Precision Ladder and Representation Schemes
 
+## Status
+Accepted
+
 ## Context
 
 The hermes ecosystem requires memory-efficient representation of numerical datatypes to support ultra-quantized machine learning workloads and high-throughput vector computations. The system defines a precision ladder spanning from 4-bit to 64-bit float representations.

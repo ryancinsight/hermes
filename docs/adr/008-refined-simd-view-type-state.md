@@ -1,7 +1,7 @@
 # ADR 008: Refined SimdView Design with Reference Type-State Parameterization
 
 ## Status
-Approved
+Accepted
 
 ## Context
 Originally, `hermes-simd-core` had two separate view types: `SimdView` (read-only) and `SimdViewMut` (exclusive mutable). This duplicated many slice operation declarations (such as `len()`, `is_empty()`, `sum()`, and `dot()`) and required different method names or boilerplate conversion logic between the two types.

@@ -127,7 +127,7 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   `unsafe` now sits on those ISA fills, where the argument is real and local,
   instead of on every call. `cargo-semver-checks` classifies this as major
   (`trait_method_unsafe_removed`); see
-  [ADR 007](docs/adr/007-bitboard-kernel-safe-surface.md). The methods also gain
+  [ADR 011](docs/adr/011-bitboard-kernel-safe-surface.md). The methods also gain
   a `# Panics` section for an out-of-range square, their actual precondition.
 
 ### Migration

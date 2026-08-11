@@ -1,5 +1,8 @@
 # ADR 007: Arm SME Backend Feasibility Study
 
+## Status
+Accepted
+
 ## Context
 
 The NumKong comparison audit ([gap_audit.md](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17)) identified that modern AArch64 systems (including Apple M4/M5 and Arm Neoverse-V2/V3 server platforms) implement the **Scalable Matrix Extension (SME)**. SME provides hardware-accelerated outer-product operations and a dedicated matrix accumulator tile array (`ZA`) to accelerate matrix multiplication (GEMM) kernels.

@@ -1,4 +1,7 @@
-# ADR 007: Make `BitBoardKernel` a Safe Trait
+# ADR 011: Make `BitBoardKernel` a Safe Trait
+
+## Status
+Accepted
 
 ## Context
 

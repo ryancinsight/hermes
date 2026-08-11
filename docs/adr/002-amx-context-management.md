@@ -1,5 +1,8 @@
 # ADR 002: AMX Context Management and State Tracking
 
+## Status
+Accepted
+
 ## Context
 
 Intel Advanced Matrix Extensions (AMX) provide tile matrix multiplication accelerators. However, AMX registers (8 tiles, 8KB state) introduce system overhead:

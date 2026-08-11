@@ -1,5 +1,8 @@
 # ADR 005: Code Generation vs Macros for Per-Type x86 Kernel Deduplication
 
+## Status
+Accepted
+
 ## Context
 
 The x86 specialized hardware kernels (`avx2_f32.rs`, `avx2_f64.rs`, `avx512_f32.rs`, `avx512_f64.rs`, etc.) share highly redundant method-body structures. Standard arithmetic (addition, subtraction, multiplication, division), fused multiply-accumulate operations, masked load/store, conversions, and simple comparison predicates contain identical logic flow, differing only in:

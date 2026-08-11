@@ -1,5 +1,8 @@
 # ADR 004: Generic Interleaved Complex Kernels via Adjacent-Pair Primitives
 
+## Status
+Accepted
+
 ## Context
 
 The initial interleaved complex implementation (commits 55efd38, b7f1a90, b148fed)

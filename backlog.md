@@ -9,13 +9,17 @@
   before any write; duplicate indices are last-writer-wins. Native AVX-512
   execution stays runner-gated.
 
-- [ ] [minor] **HS-423 — integer shift and rounding primitives.** The kernel
-  trait has no `shift_left`/`shift_right` (blocking bit-manipulation and
-  sub-byte unpacking kernels from staying in the vector domain) and no
-  `floor`/`ceil`/`round`/`trunc`. Both families are defaultable over the
-  generic scalar-lane helpers with native x86/NEON overrides, the same shape
-  HS-422 used. Acceptance: per-backend differential tests against the scalar
-  reference, including the negative-value and halfway-rounding boundaries.
+- [ ] [minor] **HS-423 — rounding primitives.** The kernel trait has no
+  `floor`/`ceil`/`round`/`trunc` although every target ISA provides them
+  natively. Blocked on an upstream eunomia unit: `NumericElement` exposes no
+  rounding, so the Hermes default would have to widen through `to_f64` and
+  narrow back — a fake generic. Sequence: eunomia adds rounding to
+  `NumericElement` (identity on integer impls) and releases; Hermes bumps, adds
+  the defaults over `generic_unary_op`, and overrides on AVX2/AVX-512/NEON.
+  Acceptance: per-backend differential tests against the scalar reference,
+  covering negative values, halfway cases (the round-half-to-even contract must
+  be pinned explicitly), and the infinity/NaN contract.
+  Re-open trigger: the eunomia rounding release lands.
 
 - [ ] [minor] **HS-424 — cross-lane permute family.** Lane shuffles exist only
   as the complex adjacent-pair primitives (`swap_adjacent`, `dup_even`,
@@ -30,12 +34,15 @@
   in the cross-target conformance matrix. Acceptance: `TargetId::Sve` routed
   through `dispatch_view_to`/`dispatch_view_mut_to` with conformance coverage.
 
-- [ ] [patch] **HS-426 — ADR index hygiene.** `docs/adr/` has two ADRs numbered
-  007 (`007-arm-sme-backend-feasibility`, `007-bitboard-kernel-safe-surface`);
-  seven of eleven ADRs carry no `## Status` section, so the generated index
-  renders them as `—`; and the ones that do use `Approved` rather than the
-  canonical `Accepted`. Acceptance: unique numbering, a canonical status on
-  every ADR, and a regenerated index that `adr-index.py check` passes.
+- [x] [patch] **HS-426 — ADR index hygiene.** `docs/adr/` carried two ADRs
+  numbered 007, eight of eleven with no `## Status` section (the generated index
+  rendered them `—`), and `Approved` rather than the canonical `Accepted` on the
+  three that had one. The later duplicate (`007-bitboard-kernel-safe-surface`,
+  added 2026-07-23) renumbered to 011 with its CHANGELOG and backlog references
+  updated; every ADR now carries a canonical status, and the index is
+  regenerated. All eleven are `Accepted`: the two feasibility studies (006 SSE2,
+  007 SME) record decisions *not* to build, which is an accepted decision, not a
+  rejected proposal.
 
 - [x] [patch] **HS-420 — mutable generic view tails.** Route the final
   `SimdView::transform_in_place` partial vector through initialized local
@@ -224,7 +231,7 @@ External gap findings live in [gap_audit.md](gap_audit.md).
 
 - [ ] [patch] **HS-406 — per-site `SAFETY` comments for pointer obligations.**
   Progress: `bitboard.rs` is closed — auditing it found the `unsafe` unjustified
-  rather than undocumented, so `BitBoardKernel` became a safe trait (ADR 007)
+  rather than undocumented, so `BitBoardKernel` became a safe trait (ADR 011)
   and the module went from seven blocks to two, both documented. The six `cow`
   modules now carry module-level `# Safety` sections plus per-site comments on
   their `with_capacity`/`set_len` buffers. Remaining:

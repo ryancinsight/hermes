@@ -1,5 +1,8 @@
 # ADR 010: NUMA Memory Layout and Topology Integration
 
+## Status
+Accepted
+
 ## Context
 
 High-performance numerical computing on multi-socket servers faces latency penalties when threads access memory across socket boundaries (Non-Uniform Memory Access). Cross-node access degrades bandwidth and increases L3 cache coherency overhead. For dense operations (such as AMX/AVX-512 GEMM), allocating tensors local to the executing NUMA node is critical.

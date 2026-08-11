@@ -1,5 +1,8 @@
 # ADR 006: SSE2 Backend Feasibility Study
 
+## Status
+Accepted
+
 ## Context
 
 The initial Highway comparison audit ([gap_audit.md](file:///d:/atlas/repos/hermes/gap_audit.md#highway-2026-06-14)) identified that Hermes currently lacks an intermediate 128-bit x86_64 SIMD backend (SSE2/SSE4). On older x86_64 hardware, VMs, or conservative CI targets lacking AVX2 support, Hermes falls back to the portable `Scalar` backend. 

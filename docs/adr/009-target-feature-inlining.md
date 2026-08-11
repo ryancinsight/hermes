@@ -1,7 +1,7 @@
 # ADR 009: Monomorphized Target-Feature Gate Helpers for Zero-Overhead Inlining
 
 ## Status
-Approved
+Accepted
 
 ## Context
 In Rust, `#[target_feature]` attributes restrict compiler inlining. A function marked with `#[target_feature(enable = "avx2")]` cannot be inlined into a function that lacks that attribute, because doing so could leak AVX2 instructions into context where they might execute on non-AVX2 hardware (causing `SIGILL`).

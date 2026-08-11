@@ -1,7 +1,7 @@
 # ADR 003: Intel AMX Session Cache and AVX-512 VNNI Runtime Dispatch on Stable Rust
 
 ## Status
-Approved
+Accepted
 
 ## Context
 High-performance machine learning (ML) and neural network inference workloads require high-throughput matrix multiplication engines. Intel AMX (Advanced Matrix Extensions) and AVX-512 VNNI (Vector Neural Network Instructions) provide hardware-accelerated GEMM operations. However, implementing these backends in a safe, generic, and stable Rust library introduces several architectural challenges:
