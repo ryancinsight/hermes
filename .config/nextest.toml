@@ -6,3 +6,16 @@
 # workload); a 60s termination is a hang/deadlock to root-cause.
 [profile.default]
 slow-timeout = { period = "30s", terminate-after = 2 }
+
+# Instrumented profile for the Intel SDE job, which executes every test binary
+# under whole-program ISA emulation so the AVX-512 and AMX paths run on hosts
+# that lack the silicon. SDE costs roughly one to two orders of magnitude in
+# execution time, so the default 30s bound would fire on emulation overhead
+# rather than on a defect in the code under test.
+#
+# The bound is derived, not guessed: the slowest default-profile test is a few
+# seconds, and 300s covers a 100x emulation factor over that with margin. This
+# profile is used *only* by the SDE job — it never relaxes the native budget,
+# which stays the authority on real-hardware performance.
+[profile.sde]
+slow-timeout = { period = "300s", terminate-after = 2 }
