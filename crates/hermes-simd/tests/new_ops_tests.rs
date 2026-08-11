@@ -4,8 +4,13 @@
 
 use hermes_simd::{
     argmax, argmin, max, min, scale, Abs, Clamp, Exclusive, Inclusive, Neg, Scalar, ScanAdd,
-    ScanMax, ScanMin, ScanMul, SimdArch, SimdError, SimdView, Sqrt, Unaligned, Unmasked,
+    ScanMax, ScanMin, ScanMul, SimdError, SimdView, Sqrt, Unaligned, Unmasked,
 };
+// `SimdArch` is in scope only to resolve `Avx2::is_runtime_supported()` in the
+// x86-gated backend check below; importing it unconditionally is an unused
+// import on aarch64, where that block is compiled out.
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+use hermes_simd::SimdArch;
 use hermes_simd_core::ops::{Max, Min, Sum};
 use proptest::prelude::*;
 
