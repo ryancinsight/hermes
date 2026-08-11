@@ -123,14 +123,18 @@
   separate follow-ups. Verification: non-dyadic f32 row and depth-batched tail
   regressions, warning-denied package Clippy, Nextest, rustfmt, and diff checks.
 
-- [ ] [patch] **HS-406 follow-up — clean-worktree package gate.** Re-run the full
+- [x] [patch] **HS-406 follow-up — clean-worktree package gate.** Re-run the full
   Hermes package gate after unrelated Cargo.lock/overlay dirt is reconciled;
   focused provider slices must not claim this gate from a dirty worktree.
-  Owner: codex-session (claimed 2026-08-11); Cargo.lock reconciled to origin.
-  **Blocked 2026-08-11:** live peer mid-flight on a scatter-module change touching
-  `kernel*.rs`, `view/mod.rs`, `view/scatter.rs` (new), AVX-512 files, and
-  `kernel_property_tests.rs` — the gate cannot run from this worktree. Re-open
-  trigger: peer's scatter change lands (committed) and the tree settles.
+  Owner: codex-session (claimed + delivered 2026-08-11); Cargo.lock overlay churn
+  restored to origin before the run. Evidence (rustc 1.97.0, x86_64, shared
+  `D:\atlas\target`): `cargo fmt --check` clean; `cargo clippy --workspace
+  --all-targets -- -D warnings` clean; `cargo nextest run --workspace` 443/443
+  within the committed 30s/60s budget; doctests pass (18 + 4, ignores excluded);
+  `cargo build --examples --workspace` clean; `cargo doc --no-deps` clean under
+  `RUSTDOCFLAGS=-D warnings`; `cargo check --workspace --no-default-features`
+  clean. Benchmark-budget, miri, and aarch64 jobs are CI-only (host lacks the
+  runners); they run on the merged branch's push.
 
 
 Strategic roadmap. Triage order: correctness → architecture → tests → docs → PM.
