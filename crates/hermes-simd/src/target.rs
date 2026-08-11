@@ -47,6 +47,24 @@ impl TargetId {
         Self::ALL.into_iter().find(|t| t.name() == name)
     }
 
+    /// Returns whether this target belongs to the architecture being compiled
+    /// for at all.
+    ///
+    /// Distinct from [`TargetId::is_supported`], which asks whether *this CPU*
+    /// implements the feature. A coverage report must separate the two: AVX-512
+    /// unsupported on an x86 host is a real gap in what was exercised, whereas
+    /// AVX-512 on aarch64 is simply not part of that build and can never be a
+    /// gap. Collapsing both into one "unsupported" reads as missing coverage
+    /// where none is possible.
+    #[must_use]
+    pub const fn is_architecture_applicable(self) -> bool {
+        match self {
+            Self::Scalar => true,
+            Self::Avx2 | Self::Avx512 => cfg!(any(target_arch = "x86", target_arch = "x86_64")),
+            Self::Neon => cfg!(target_arch = "aarch64"),
+        }
+    }
+
     /// Returns the targets this host can execute, in [`TargetId::ALL`] order.
     #[must_use]
     pub fn supported_on_host() -> Vec<Self> {

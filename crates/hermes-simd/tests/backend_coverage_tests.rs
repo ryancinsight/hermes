@@ -26,10 +26,14 @@ const EXPECTED_TARGETS: &str = "HERMES_EXPECTED_TARGETS";
 fn coverage_report() -> String {
     let mut report = String::from("host backend coverage:\n");
     for target in TargetId::ALL {
-        let mark = if target.is_supported() {
-            "executes"
-        } else {
-            "SKIPPED (host cannot execute)"
+        // Three outcomes, not two: a target absent from this architecture can
+        // never be a coverage gap, whereas one this architecture has but this
+        // CPU lacks is exactly the gap worth seeing. Reporting both as
+        // "unsupported" makes an ARM log look like it is missing AVX-512.
+        let mark = match (target.is_architecture_applicable(), target.is_supported()) {
+            (false, _) => "n/a (not part of this target architecture)",
+            (true, true) => "executes",
+            (true, false) => "NOT COVERED (architecture applies, this CPU lacks the feature)",
         };
         report.push_str(&format!("  {:<8} {}\n", target.name(), mark));
     }
@@ -102,5 +106,37 @@ fn scalar_is_always_supported() {
     assert!(
         supported.contains(&TargetId::Scalar),
         "scalar must execute on every host; got {supported:?}"
+    );
+}
+
+/// A supported target is necessarily applicable to the architecture being
+/// built, so the report can never claim a target both executes and is absent
+/// from this architecture.
+#[test]
+fn support_implies_architecture_applicability() {
+    for target in TargetId::ALL {
+        if target.is_supported() {
+            assert!(
+                target.is_architecture_applicable(),
+                "{} reports supported but not applicable to this architecture",
+                target.name()
+            );
+        }
+    }
+}
+
+/// Exactly the targets of the architecture being compiled for are applicable,
+/// so a future backend cannot be silently dropped from the report by defaulting
+/// to inapplicable on every host.
+#[test]
+fn architecture_applicability_matches_the_build_target() {
+    assert!(TargetId::Scalar.is_architecture_applicable());
+
+    let x86 = cfg!(any(target_arch = "x86", target_arch = "x86_64"));
+    assert_eq!(TargetId::Avx2.is_architecture_applicable(), x86);
+    assert_eq!(TargetId::Avx512.is_architecture_applicable(), x86);
+    assert_eq!(
+        TargetId::Neon.is_architecture_applicable(),
+        cfg!(target_arch = "aarch64")
     );
 }
