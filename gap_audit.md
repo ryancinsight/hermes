@@ -87,8 +87,16 @@ assessed against a float-lane trait, not a general one.
   `avx512_tiling::int8_tests`, and `test_adaptive_dispatcher_and_amx_session`
   all executing rather than skipping.
   Reusable finding: a capability-gated test suite reports coverage it does not
-  have. Any `is_x86_feature_detected!`-guarded path needs either an emulator or
-  a log line naming what was skipped — silence must not read as coverage.
+  have. Automated backend selection is the right design, but it must be paired
+  with automated *identification* — the suite now enumerates `TargetId::ALL`,
+  prints which backends the runner actually executed, and asserts a per-runner
+  expectation supplied as configuration. Silence must never read as coverage.
+  Emulation is the fallback, not the mechanism: real silicon is used wherever
+  it can be requested (aarch64 NEON on `ubuntu-24.04-arm`, AVX2 on x86), and
+  SDE covers only the ISAs GitHub cannot supply — AVX-512, which is not
+  selectable on hosted runners, and AMX, which is unavailable there entirely.
+  SDE's limit is that it validates semantics and never performance, so a
+  benchmark claim on those ISAs still needs real hardware (HS-429).
 - Consequence for the HS-422 and HS-424 records: both shipped their AVX-512
   work marked "runner-gated, not executed". That caveat is now discharged for
   scatter — `prop_scatter_matches_reference_all_backends`,

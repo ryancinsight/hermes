@@ -33,15 +33,42 @@
   AVX-512 and NEON overrides, and native flat `interleave`/`deinterleave`, are
   deferred to HS-427 rather than shipped as unexecutable index math.
 
-- [x] [patch] **HS-428 — execute the capability-gated ISA paths in CI.** Every
-  AVX-512 branch is `is_x86_feature_detected!`-guarded, so on a runner without
-  the silicon it skips rather than fails. The new capability-report step proved
-  the GitHub x86 runner has **no** AVX-512 or AMX flags, so those paths had
-  never executed in CI. `test-avx512-sde` now runs the suite under Intel SDE
-  emulating Sapphire Rapids (444/444 in 176s, ~11x native), applying the
-  emulator through the cargo target runner so only test binaries pay the cost.
-  Uses a dedicated `[profile.sde]` 300s budget; the 30s native budget is
-  untouched and remains the authority on real-hardware performance.
+- [x] [patch] **HS-428 — identify and assert per-runner backend coverage.**
+  Backend selection is automated from runtime probes, which is correct, but a
+  probe-guarded test that does not run does not fail either — it skips, and a
+  skip is indistinguishable from a pass. That is how this workspace carried a
+  green CI in which no AVX-512 path had ever executed.
+  Primary mechanism (real hardware, no emulation): `TargetId::{ALL, from_name,
+  supported_on_host, is_architecture_applicable}` let a harness enumerate the
+  closed set and identify what the host executes. A coverage test prints the
+  matrix in every job via a `--no-capture` step and asserts against
+  `HERMES_EXPECTED_TARGETS`, declared per runner as configuration: the aarch64
+  runner must execute NEON on real silicon, the x86 runner must execute AVX2.
+  The report distinguishes three outcomes — executes, NOT COVERED (architecture
+  applies, CPU lacks it), n/a (different architecture) — because collapsing the
+  last two makes an ARM log read as missing AVX-512.
+  Fallback only where no selectable silicon exists: AVX-512 cannot be requested
+  on GitHub-hosted runners (some x86 machines have it, some do not, and this
+  repository has no self-hosted runners), and AMX is unavailable there
+  entirely. `test-avx512-sde` therefore runs the suite under Intel SDE emulating
+  Sapphire Rapids (447/447 in 176s, ~11x native) through the cargo target
+  runner, so only test binaries pay the cost. Its identification step runs under
+  the emulator too, so passing is a hard assertion that SDE satisfies the
+  runtime probes rather than merely not breaking. Uses a dedicated
+  `[profile.sde]` 300s budget; the 30s native budget is untouched.
+  Known limit: SDE validates semantics, never performance — any benchmark claim
+  still requires real silicon. See HS-429.
+
+- [ ] [minor] **HS-429 — real AVX-512/AMX silicon for performance evidence.**
+  SDE gives deterministic semantic coverage but cannot support a performance
+  claim, so HS-427's "override beats the default" acceptance is unsatisfiable
+  under emulation. A runner provider that pins instance families (RunsOn-class,
+  resolving e.g. `family=c7i` — Sapphire Rapids, AVX-512 plus AMX) supplies
+  genuine hardware in the project's own cloud account. Acceptance: an AVX-512
+  job on real silicon whose coverage step asserts `scalar,avx2,avx512` without
+  the emulator, plus a criterion baseline captured there. If adopted, the SDE
+  job becomes redundant and is deleted rather than kept alongside.
+  Precondition: a cost/infrastructure decision, which is the user's to make.
 
 - [ ] [minor] **HS-427 — native permute overrides beyond AVX2 reverse.**
   UNBLOCKED as of HS-428 — both preconditions were already satisfiable and the
