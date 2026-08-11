@@ -24,6 +24,24 @@ fn test_dot_f32() {
 }
 
 #[test]
+fn test_dot_f32_non_dyadic_tail_matches_within_tolerance() {
+    let a: Vec<f32> = (0..13)
+        .map(|i| ((i * 19 + 7) as f32) / 23.0 - 2.0)
+        .collect();
+    let b: Vec<f32> = (0..13)
+        .map(|i| ((i * 11 + 5) as f32) / 17.0 - 1.5)
+        .collect();
+
+    let actual = dot::<f32>(&a, &b).unwrap();
+    let expected = a.iter().zip(&b).map(|(&lhs, &rhs)| lhs * rhs).sum::<f32>();
+
+    assert!(
+        (actual - expected).abs() <= 4.0e-6 * expected.abs().max(1.0),
+        "dot tail mismatch: got {actual}, expected {expected}"
+    );
+}
+
+#[test]
 fn test_elementwise_mul_f32() {
     let a = [1.0f32, 2.0, 3.0, 4.0, 5.0];
     let b = [2.0f32, 3.0, 4.0, 5.0, 6.0];

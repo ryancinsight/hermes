@@ -23,6 +23,16 @@ use crate::scalar::Scalar;
 /// `T::MIN_VALUE` for Max). It is used for empty-slice fast paths and for combining the
 /// scalar tail with the SIMD result via `scalar_combine`.
 pub trait ReductionOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
+    /// Whether the final partial vector should use the masked reduction path.
+    ///
+    /// Masking a tail can change floating-point grouping, so each operation opts
+    /// in only after its numerical and identity contract is documented. The
+    /// provider supplies initialized lanes and merges inactive lanes with the
+    /// operation identity; integer/extremum operations retain their value
+    /// semantics, while floating-point sums use the established SIMD grouping
+    /// envelope rather than a scalar left fold.
+    const USE_MASKED_TAIL: bool = false;
+
     /// Merge a new data vector `v` into accumulator `acc`.
     ///
     /// # Safety
@@ -73,6 +83,22 @@ pub trait ReductionOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
     #[inline(always)]
     fn scalar_accumulate(acc: T, elem: T) -> T {
         Self::scalar_combine(acc, elem)
+    }
+
+    /// Reduce a fully initialized partial vector while ignoring inactive lanes.
+    ///
+    /// The transform is applied before inactive lanes are replaced by the
+    /// operation identity. This is correct for transform-bearing reductions such
+    /// as `AbsSum` and `AbsMax`, and avoids reading beyond the caller's live tail.
+    ///
+    /// # Safety
+    /// Processor must support the target feature of `Arch`.
+    #[inline(always)]
+    unsafe fn masked_finalize<Arch: SimdKernel<T>>(v: Arch::Vector, mask: Arch::Mask) -> T {
+        let transformed = Self::transform_vector::<Arch>(v);
+        let identity = Self::identity_vector::<Arch>();
+        let active = Arch::blend(Arch::mask_to_vector(mask), transformed, identity);
+        Self::finalize::<Arch>(active)
     }
 
     /// Splat the identity element into a vector register.
@@ -194,6 +220,8 @@ impl crate::private::Sealed for Product {}
 // ---------------------------------------------------------------------------
 
 impl<T: Scalar> ReductionOp<T> for Sum {
+    const USE_MASKED_TAIL: bool = true;
+
     #[inline(always)]
     unsafe fn accumulate<Arch: SimdKernel<T>>(acc: Arch::Vector, v: Arch::Vector) -> Arch::Vector {
         Arch::add(acc, v)
@@ -214,6 +242,11 @@ impl<T: Scalar> ReductionOp<T> for Sum {
 
 impl<T: Scalar> ReductionOp<T> for Dot {
     /// Dot accumulation: `acc = fmadd(a, b, acc)` — called with the pairwise product vector.
+    ///
+    /// The pairwise tail uses the initialized-buffer masked reduction seam;
+    /// floating-point callers should allow its documented reassociation envelope.
+    const USE_MASKED_TAIL: bool = true;
+
     ///
     /// The `zip_reduce` loop computes `v = mul(a_chunk, b_chunk)` then calls `accumulate(acc, v)`.
     #[inline(always)]
@@ -250,6 +283,8 @@ impl<T: Scalar> ReductionOp<T> for Dot {
 }
 
 impl<T: Scalar> ReductionOp<T> for Min {
+    const USE_MASKED_TAIL: bool = true;
+
     #[inline(always)]
     unsafe fn accumulate<Arch: SimdKernel<T>>(acc: Arch::Vector, v: Arch::Vector) -> Arch::Vector {
         Arch::min(acc, v)
@@ -269,6 +304,8 @@ impl<T: Scalar> ReductionOp<T> for Min {
 }
 
 impl<T: Scalar> ReductionOp<T> for Max {
+    const USE_MASKED_TAIL: bool = true;
+
     #[inline(always)]
     unsafe fn accumulate<Arch: SimdKernel<T>>(acc: Arch::Vector, v: Arch::Vector) -> Arch::Vector {
         Arch::max(acc, v)
@@ -288,6 +325,8 @@ impl<T: Scalar> ReductionOp<T> for Max {
 }
 
 impl<T: Scalar> ReductionOp<T> for AbsSum {
+    const USE_MASKED_TAIL: bool = true;
+
     #[inline(always)]
     unsafe fn accumulate<Arch: SimdKernel<T>>(acc: Arch::Vector, v: Arch::Vector) -> Arch::Vector {
         Arch::add(acc, Arch::abs(v))
@@ -322,6 +361,8 @@ impl<T: Scalar> ReductionOp<T> for AbsSum {
 }
 
 impl<T: Scalar> ReductionOp<T> for AbsMax {
+    const USE_MASKED_TAIL: bool = true;
+
     #[inline(always)]
     unsafe fn accumulate<Arch: SimdKernel<T>>(acc: Arch::Vector, v: Arch::Vector) -> Arch::Vector {
         Arch::max(acc, Arch::abs(v))

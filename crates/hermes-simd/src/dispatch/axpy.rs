@@ -5,8 +5,58 @@
 //! updates of `out`, with no temporary allocation. SIMD chunks use the fused
 //! multiply-add primitive; scalar tails are covered element-by-element.
 
-use hermes_simd_core::{arch::SimdArch, kernel::SimdKernel, scalar::Scalar, view::SimdError};
+use hermes_simd_core::{
+    arch::SimdArch,
+    kernel::{SimdKernel, MAX_SIMD_LANES},
+    scalar::Scalar,
+    view::SimdError,
+};
 use hermes_simd_macros::runtime_dispatch;
+
+/// Apply the final partial AXPY vector through the provider's masked arithmetic
+/// seam without ever reading or writing beyond the live tail. The temporary
+/// lane buffers are fully initialized before a full-width register load, which
+/// keeps the helper sound for backends whose emulated masked load still performs
+/// a full-width memory read (notably AVX2 blend-based masks).
+#[inline(always)]
+unsafe fn axpy_masked_tail<T, A>(alpha: T, x: *const T, out: *mut T, tail: usize)
+where
+    T: Scalar,
+    A: SimdArch + SimdKernel<T>,
+{
+    const { A::LANE_BOUND_CHECK };
+    debug_assert!(tail > 0 && tail < A::LANE_COUNT);
+
+    let mut x_lanes = [T::ZERO; MAX_SIMD_LANES];
+    let mut out_lanes = [T::ZERO; MAX_SIMD_LANES];
+    for lane in 0..tail {
+        // SAFETY: the caller supplies exactly `tail` live elements in each
+        // source, and this loop stays within that validated prefix.
+        x_lanes[lane] = *x.add(lane);
+        out_lanes[lane] = *out.add(lane);
+    }
+
+    let mask = A::leading_k_mask(tail);
+    let result = A::masked_fmadd(
+        A::load_unaligned(x_lanes.as_ptr()),
+        A::splat(alpha),
+        A::load_unaligned(out_lanes.as_ptr()),
+        mask,
+    );
+    A::store_unaligned(out_lanes.as_mut_ptr(), result);
+
+    for lane in 0..tail {
+        // SAFETY: the destination has exactly `tail` writable elements and the
+        // loop writes only those active lanes.
+        *out.add(lane) = out_lanes[lane];
+    }
+}
+
+/// Apply a full-width SIMD AXPY tail using a local initialized lane buffer.
+///
+/// The buffer is deliberately provider-local rather than a new public SIMD
+/// abstraction: the backend owns mask semantics, while this dispatch kernel
+/// owns the live-slice boundary proof.
 
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
 pub(super) fn dispatch_axpy_kernel<T, A>(alpha: T, x: &[T], out: &mut [T]) -> Result<(), SimdError>
@@ -81,12 +131,63 @@ where
         }
     }
 
-    // Scalar tail.
+    // Masked tail. The local lane buffer avoids the full-width load hazard of
+    // blend-based backends while still routing the arithmetic through the
+    // provider-owned masked FMA operation.
     let simd_len = (len / lane_count) * lane_count;
-    for i in simd_len..len {
-        out[i] = out[i] + x[i] * alpha;
+    let tail = len - simd_len;
+    if tail != 0 {
+        // SAFETY: `simd_len` is the start of the remaining in-bounds prefix;
+        // `tail` is its exact length and is smaller than the lane width.
+        unsafe {
+            axpy_masked_tail::<T, A>(
+                alpha,
+                x.as_ptr().add(simd_len),
+                out.as_mut_ptr().add(simd_len),
+                tail,
+            );
+        }
     }
     Ok(())
+}
+
+/// Apply the final partial fused ternary update without reading or writing
+/// beyond the live tail. Every lane buffer is initialized before the full-width
+/// loads needed by blend-based masked backends such as AVX2.
+#[inline(always)]
+unsafe fn axpy_mul_masked_tail<T, A>(alpha: T, a: *const T, b: *const T, out: *mut T, tail: usize)
+where
+    T: Scalar,
+    A: SimdArch + SimdKernel<T>,
+{
+    const { A::LANE_BOUND_CHECK };
+    debug_assert!(tail > 0 && tail < A::LANE_COUNT);
+
+    let mut a_lanes = [T::ZERO; MAX_SIMD_LANES];
+    let mut b_lanes = [T::ZERO; MAX_SIMD_LANES];
+    let mut out_lanes = [T::ZERO; MAX_SIMD_LANES];
+    for lane in 0..tail {
+        // SAFETY: the caller supplies exactly `tail` live elements in each
+        // source and destination, and this loop stays within those bounds.
+        a_lanes[lane] = *a.add(lane);
+        b_lanes[lane] = *b.add(lane);
+        out_lanes[lane] = *out.add(lane);
+    }
+
+    let mask = A::leading_k_mask(tail);
+    let scaled_a = A::mul(A::load_unaligned(a_lanes.as_ptr()), A::splat(alpha));
+    let result = A::masked_fmadd(
+        scaled_a,
+        A::load_unaligned(b_lanes.as_ptr()),
+        A::load_unaligned(out_lanes.as_ptr()),
+        mask,
+    );
+    A::store_unaligned(out_lanes.as_mut_ptr(), result);
+
+    for lane in 0..tail {
+        // SAFETY: only the validated live tail is written back.
+        *out.add(lane) = out_lanes[lane];
+    }
 }
 
 /// Fused ternary update `out[i] += alpha * a[i] * b[i]` without a temporary.
@@ -158,8 +259,19 @@ where
     }
 
     let simd_len = (len / lane_count) * lane_count;
-    for i in simd_len..len {
-        out[i] = (alpha * a[i]).scalar_fmadd(b[i], out[i]);
+    let tail = len - simd_len;
+    if tail != 0 {
+        // SAFETY: `simd_len` is the start of the remaining in-bounds prefix and
+        // `tail` is its exact length, strictly smaller than the lane width.
+        unsafe {
+            axpy_mul_masked_tail::<T, A>(
+                alpha,
+                a.as_ptr().add(simd_len),
+                b.as_ptr().add(simd_len),
+                out.as_mut_ptr().add(simd_len),
+                tail,
+            );
+        }
     }
     Ok(())
 }
@@ -214,14 +326,70 @@ where
                 col += lane_count;
             }
 
-            for col in simd_len..cols {
-                let out_ref = row_ptr.add(col);
-                *out_ref = *out_ref + *x_ptr.add(col) * alpha;
+            let tail = cols - simd_len;
+            if tail != 0 {
+                // SAFETY: `simd_len` is the start of the validated row prefix;
+                // the helper copies and writes only its exact live tail.
+                axpy_masked_tail::<T, A>(alpha, x_ptr.add(simd_len), row_ptr.add(simd_len), tail);
             }
         }
     }
 
     Ok(())
+}
+
+/// Apply one row's final partial AXPY vector through initialized local lanes.
+///
+/// The caller has already validated the row and tail bounds. Keeping the
+/// boundary handling here reuses the same provider-owned masked FMA contract as
+/// the one-row AXPY path without exposing a second public SIMD abstraction.
+#[inline(always)]
+unsafe fn axpy_rows_batch_masked_tail<T, A>(
+    alphas: *const T,
+    x_panel: *const T,
+    out: *mut T,
+    row: usize,
+    rows: usize,
+    depth: usize,
+    cols: usize,
+    simd_len: usize,
+    tail: usize,
+) where
+    T: Scalar,
+    A: SimdArch + SimdKernel<T>,
+{
+    const { A::LANE_BOUND_CHECK };
+    debug_assert!(tail > 0 && tail < A::LANE_COUNT);
+
+    let mut out_lanes = [T::ZERO; MAX_SIMD_LANES];
+    for lane in 0..tail {
+        // SAFETY: the caller supplies exactly `tail` writable output elements.
+        out_lanes[lane] = *out.add(lane);
+    }
+
+    let mask = A::leading_k_mask(tail);
+    let mut acc = A::load_unaligned(out_lanes.as_ptr());
+    for shared in 0..depth {
+        let mut x_lanes = [T::ZERO; MAX_SIMD_LANES];
+        for lane in 0..tail {
+            // SAFETY: extent validation proves this panel row contains the
+            // requested tail at `shared * cols + simd_len`.
+            x_lanes[lane] = *x_panel.add(shared * cols + simd_len + lane);
+        }
+        let alpha = *alphas.add(shared * rows + row);
+        acc = A::masked_fmadd(
+            A::load_unaligned(x_lanes.as_ptr()),
+            A::splat(alpha),
+            acc,
+            mask,
+        );
+    }
+    A::store_unaligned(out_lanes.as_mut_ptr(), acc);
+
+    for lane in 0..tail {
+        // SAFETY: the destination has exactly `tail` writable elements.
+        *out.add(lane) = out_lanes[lane];
+    }
 }
 
 /// Type-independent extent validation for `axpy_rows_batch`, extracted so it is
@@ -313,15 +481,21 @@ where
                 col += lane_count;
             }
 
-            for col in simd_len..cols {
-                let out_ref = row_ptr.add(col);
-                let mut acc = *out_ref;
-                for shared in 0..depth {
-                    let alpha = *alphas.get_unchecked(shared * rows + row);
-                    let x_row = x_ptr.add(shared * cols);
-                    acc = acc + *x_row.add(col) * alpha;
-                }
-                *out_ref = acc;
+            let tail = cols - simd_len;
+            if tail != 0 {
+                // SAFETY: extent validation proves every panel and output row
+                // contains this exact tail, and the helper writes only it.
+                axpy_rows_batch_masked_tail::<T, A>(
+                    alphas.as_ptr(),
+                    x_ptr,
+                    row_ptr.add(simd_len),
+                    row,
+                    rows,
+                    depth,
+                    cols,
+                    simd_len,
+                    tail,
+                );
             }
         }
     }
@@ -346,6 +520,22 @@ mod tests {
             axpy(alpha, &x, &mut out).unwrap();
             assert_eq!(out, expected, "len {len}");
         }
+    }
+
+    #[test]
+    fn axpy_tail_preserves_fused_operation_order() {
+        let len = 9usize;
+        let alpha = 1.0_f32 / 3.0;
+        let x: Vec<f32> = (0..len).map(|i| i as f32 + 0.125).collect();
+        let mut out: Vec<f32> = (0..len).map(|i| i as f32 * 0.75 + 0.2).collect();
+        let expected: Vec<f32> = out
+            .iter()
+            .zip(&x)
+            .map(|(&out, &x)| x.mul_add(alpha, out))
+            .collect();
+
+        axpy(alpha, &x, &mut out).unwrap();
+        assert_eq!(out, expected);
     }
 
     #[test]
@@ -378,6 +568,24 @@ mod tests {
             axpy_mul(1.0, &[1.0], &[3.0], &mut out),
             Err(SimdError::LengthMismatch)
         );
+    }
+
+    #[test]
+    fn axpy_mul_tail_preserves_fused_operation_order() {
+        let len = 9usize;
+        let alpha = 1.0_f32 / 3.0;
+        let a: Vec<f32> = (0..len).map(|i| i as f32 + 0.125).collect();
+        let b: Vec<f32> = (0..len).map(|i| 0.75 - i as f32 * 0.0625).collect();
+        let mut out: Vec<f32> = (0..len).map(|i| i as f32 * 0.5 + 0.2).collect();
+        let expected: Vec<f32> = out
+            .iter()
+            .zip(&a)
+            .zip(&b)
+            .map(|((&out, &a), &b)| (alpha * a).mul_add(b, out))
+            .collect();
+
+        axpy_mul(alpha, &a, &b, &mut out).unwrap();
+        assert_eq!(out, expected);
     }
 
     #[test]
@@ -423,6 +631,51 @@ mod tests {
 
         axpy_rows(&alphas, &x, &mut out, row_stride, rows, cols).unwrap();
         assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn axpy_rows_tail_preserves_fused_operation_order() {
+        let rows = 2usize;
+        let cols = 9usize;
+        let row_stride = 11usize;
+        let alphas = [1.0_f32 / 3.0, -0.25];
+        let x: Vec<f32> = (0..cols).map(|i| i as f32 + 0.125).collect();
+        let mut out: Vec<f32> = (0..rows * row_stride)
+            .map(|i| i as f32 * 0.5 + 0.2)
+            .collect();
+        let mut expected = out.clone();
+        for row in 0..rows {
+            let start = row * row_stride;
+            for col in 0..cols {
+                expected[start + col] = x[col].mul_add(alphas[row], expected[start + col]);
+            }
+        }
+
+        axpy_rows(&alphas, &x, &mut out, row_stride, rows, cols).unwrap();
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn axpy_rows_masked_tails_cover_multiple_widths_and_f64() {
+        for &cols in &[1usize, 2, 3, 5, 9, 17, 65] {
+            let rows = 3usize;
+            let row_stride = cols + 3;
+            let alphas: Vec<f64> = (0..rows).map(|row| row as f64 * 0.125 - 0.25).collect();
+            let x: Vec<f64> = (0..cols).map(|col| col as f64 * 0.375 + 0.0625).collect();
+            let mut out: Vec<f64> = (0..rows * row_stride)
+                .map(|index| index as f64 * 0.25 - 0.5)
+                .collect();
+            let mut expected = out.clone();
+            for row in 0..rows {
+                let start = row * row_stride;
+                for col in 0..cols {
+                    expected[start + col] = x[col].mul_add(alphas[row], expected[start + col]);
+                }
+            }
+
+            axpy_rows(&alphas, &x, &mut out, row_stride, rows, cols).unwrap();
+            assert_eq!(out, expected, "cols {cols}");
+        }
     }
 
     #[test]
@@ -476,6 +729,68 @@ mod tests {
 
         axpy_rows_batch(&alphas, &x_panel, &mut out, row_stride, rows, depth, cols).unwrap();
         assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn axpy_rows_batch_tail_preserves_fused_operation_order() {
+        let rows = 2usize;
+        let depth = 2usize;
+        let cols = 9usize;
+        let row_stride = 11usize;
+        let alphas = [1.0_f32 / 3.0, -0.25, 0.2, -1.0 / 7.0];
+        let x_panel: Vec<f32> = (0..depth * cols)
+            .map(|i| i as f32 * 0.125 + 0.0625)
+            .collect();
+        let mut out: Vec<f32> = (0..rows * row_stride)
+            .map(|i| i as f32 * 0.5 + 0.2)
+            .collect();
+        let mut expected = out.clone();
+        for row in 0..rows {
+            let start = row * row_stride;
+            for col in 0..cols {
+                let mut value = expected[start + col];
+                for shared in 0..depth {
+                    value =
+                        x_panel[shared * cols + col].mul_add(alphas[shared * rows + row], value);
+                }
+                expected[start + col] = value;
+            }
+        }
+
+        axpy_rows_batch(&alphas, &x_panel, &mut out, row_stride, rows, depth, cols).unwrap();
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn axpy_rows_batch_masked_tails_cover_multiple_widths_and_depths() {
+        for &(cols, depth) in &[(1usize, 1usize), (3, 2), (5, 3), (9, 4), (17, 4), (65, 3)] {
+            let rows = 3usize;
+            let row_stride = cols + 2;
+            let alphas: Vec<f64> = (0..rows * depth)
+                .map(|index| index as f64 * 0.125 - 0.375)
+                .collect();
+            let x_panel: Vec<f64> = (0..depth * cols)
+                .map(|index| index as f64 * 0.25 + 0.0625)
+                .collect();
+            let mut out: Vec<f64> = (0..rows * row_stride)
+                .map(|index| index as f64 * 0.125 - 0.25)
+                .collect();
+            let mut expected = out.clone();
+            for row in 0..rows {
+                let start = row * row_stride;
+                for col in 0..cols {
+                    let mut value = expected[start + col];
+                    for shared in 0..depth {
+                        value = x_panel[shared * cols + col]
+                            .mul_add(alphas[shared * rows + row], value);
+                    }
+                    expected[start + col] = value;
+                }
+            }
+
+            axpy_rows_batch(&alphas, &x_panel, &mut out, row_stride, rows, depth, cols).unwrap();
+            assert_eq!(out, expected, "cols {cols}, depth {depth}");
+        }
     }
 
     #[test]

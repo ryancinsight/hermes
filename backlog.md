@@ -1,9 +1,113 @@
 # Backlog — hermes-simd
 
+- [x] [patch] **HS-420 — mutable generic view tails.** Route the final
+  `SimdView::transform_in_place` partial vector through initialized local
+  operand/result buffers and the provider's generic `ElementOp` vector seam.
+  Only live result lanes are copied back, so Add/Sub/Mul/Div and future sealed
+  operations share one bounds-safe tail implementation. Forced emulated-SVE
+  coverage verifies an odd non-dyadic length.
+
+- [x] [arch] **HS-421 — native AVX-512 BF16 tile dispatch.** Add the exact
+  `avx512bf16` capability SSOT and route the existing `Bf16 × Bf16 → F32` tile
+  provider through native `DPBF16PS` when available, retaining the
+  AVX-512F/BW/VL conversion/FMA fallback on non-BF16 AVX-512 hosts. Native
+  coverage uses a nonzero `C` accumulation oracle and remains capability-gated
+  on ordinary hosts.
+
+- [x] [patch] **HS-419 — pairwise reduction tails.** Route the final partial
+  `SimdView::zip_reduce` vector through two initialized provider-local buffers
+  and the generic masked reduction seam. `Dot` now avoids its element-at-a-time
+  cleanup while preserving the full-width masked-memory contract; `Product` and
+  future non-opted-in operations retain their scalar pairwise contract. Forced
+  emulated-SVE coverage uses non-dyadic f32 inputs with a reassociation tolerance.
+
+- [x] [patch] **HS-418 — dense dot-product tails.** Route the final partial
+  `SimdView::dot` lanes through initialized provider-local buffers and the
+  existing masked-FMA seam. The full-width masked-memory contract remains
+  valid for every backend, only live lanes contribute to the final reduction,
+  and odd non-dyadic f32 coverage records the expected fused-rounding tolerance.
+
+- [x] [patch] **HS-417 — transposed GEMV column tails.** Route the final
+  `gemv_transpose` partial columns through initialized provider-local lane
+  buffers and the existing masked-FMA seam. The local buffers preserve the
+  full-width masked-memory contract for scalar, AVX2, AVX-512, NEON, and the
+  emulated SVE backend; only live tail elements are copied back. Non-dyadic f32
+  coverage uses the documented tolerance for fused-operation rounding. The
+  operation remains a single Hermes provider implementation; no consumer-local
+  SIMD copy was introduced.
+
+- [x] [patch] **HS-416 — generic reduction and view tails.** Route generic
+  `Sum`/`Min`/`Max` final partial vectors through the provider-owned masked
+  reduction seam, and consolidate `SimdView::sum` onto `reduce(Sum)` so there
+  is one reduction implementation. `masked_add`, `masked_mul`,
+  `masked_fmadd`, `elementwise_mul`, and generic `zip_into` now use initialized
+  local lane buffers plus a leading live-tail mask instead of element-at-a-time
+  tail loops. The operation preserves the existing Eunomia min/max NaN and
+  signed-zero contract; floating sums use the established SIMD grouping
+  envelope. Verification: scalar-contract and odd-length view differential
+  tests, warning-denied core/package Clippy, Nextest, rustfmt, and diff checks.
+
+- [x] [patch] **HS-415 — masked popcount tails.** Route the final partial
+  vectors in `reduce_popcount` and the shared binary `reduce_popcount_op` through
+  `SimdKernel::masked_sum_reduce`. Source lanes are copied into  initialized
+  provider-local buffers before full-width loads, and each masked tail count is
+  exact; the existing whole-reduction accumulator contract is unchanged.  The increment is limited to popcount reductions; generic sum/min/max and other view tails are covered by HS-416. Verification: multi-width integer differential tests, warning-denied core/package Clippy, Nextest, rustfmt, and diff checks.
+
+- [x] [patch] **HS-414 — masked absolute-reduction tails.** Route the final
+  partial vector for `AbsSum` and `AbsMax` through the generic provider-owned
+  masked reduction seam. The reduction strategy applies its transform before
+  merging inactive lanes with its neutral identity, while the view copies only
+  live elements into an initialized local buffer.  The increment is limited to absolute reductions; generic sum/min/max and broader views are covered by HS-416, while popcount and unrelated hot kernels remain separate follow-ups. Verification: f32/f64 odd-length value
+
+  regressions, warning-denied core/package Clippy, Nextest, rustfmt, and diff
+  checks.
+
+- [x] [patch] **HS-413 — masked row-update tails.** Route the final partial
+  vectors in `axpy_rows` and `axpy_rows_batch` through Hermes' provider-owned
+  `masked_fmadd` seam. The helpers copy only live elements into fully initialized
+  local lane buffers, preserving the AVX2 blend-based bounds proof; the batched
+  path retains its existing depth accumulation order. The increment is limited
+  to row updates; reductions, views, and other hot-kernel scalar tails remain
+  separate follow-ups. Verification: non-dyadic f32 row and depth-batched tail
+  regressions, warning-denied package Clippy, Nextest, rustfmt, and diff checks.
+
+- [ ] [patch] **HS-406 follow-up — clean-worktree package gate.** Re-run the full
+  Hermes package gate after unrelated Cargo.lock/overlay dirt is reconciled;
+  focused provider slices must not claim this gate from a dirty worktree.
+
+
 Strategic roadmap. Triage order: correctness → architecture → tests → docs → PM.
 Tags: `[patch]` / `[minor]` / `[major]` / `[arch]` per SemVer change class.
 Tactical breakdown of the active items lives in [checklist.md](checklist.md).
 External gap findings live in [gap_audit.md](gap_audit.md).
+
+- [x] [patch] **HS-412 — masked fused AXPY-mul tail boundary.** Route the final
+  partial `axpy_mul` vector through Hermes' provider-owned `masked_fmadd` seam
+  after register scaling, using initialized local lane buffers so blend-based
+  backends never read beyond the live slice. The increment is limited to
+  `axpy_mul`; row updates, reductions, views, and other hot-kernel scalar tails
+  remain separate follow-ups until each has its own bounds proof and
+  value-semantic coverage. Verification: focused f32/f64 tail tests including
+  fused-operation order, warning-denied package Clippy, Nextest, rustfmt, and
+  diff checks.
+
+- [x] [patch] **HS-411 — masked scale tail boundary.** Route the final partial
+  in-place `scale` vector through Hermes' provider-owned `masked_mul` seam while
+  using initialized local lane buffers so blend-based backends never read beyond
+  the live slice. The increment is limited to `scale`; reductions, views,
+  `axpy_mul`, row updates, and other hot-kernel scalar tails remain separate
+  follow-ups until each has its own bounds proof and value-semantic coverage.
+  Verification: focused f32/f64 tail tests, warning-denied package Clippy,
+  Nextest, rustfmt, and diff checks.
+
+- [x] [patch] **HS-410 — masked AXPY tail boundary.** Route the final partial
+  `axpy` vector through Hermes' provider-owned `masked_fmadd` seam while using
+  initialized local lane buffers so blend-based backends never perform a
+  full-width load beyond the live slice. The increment is limited to `axpy`;
+  `axpy_mul`, row, reduction, and other hot-kernel scalar tails remain separate
+  follow-ups until each has its own bounds proof and value-semantic coverage.
+  Verification: focused f32/f64 tail tests plus an f32 fused-operation-order
+  regression, warning-denied package Clippy, Nextest, rustfmt, and diff checks.
 
 - [x] [minor] **HS-409 — fused ternary AXPY provider facade.** Add the
   Hermes-owned `axpy_mul` public operation for `out[i] += alpha * a[i] * b[i]`
@@ -355,6 +459,10 @@ complete SIMD substrate for leto-ops/coeus hot kernels:
   delivered 2026-06-13 by re-exporting it from `hermes-simd` and adding it to
   the host-independent kernel property suite.
 - [ ] [minor] Stage C1: native SVE intrinsic backend for AArch64 server targets.
+  Blocked by the pinned stable Rust toolchain: `SveArch` remains a safe,
+  value-semantic lane-emulated backend, while `SveArch::is_native_hardware_supported`
+  reports hardware capability separately. Revisit when stable scalable SVE
+  vector types are available or an explicitly approved asm/C boundary is added.
 - [ ] [minor] Stage C2: expand op/dtype coverage on demand from leto-ops/coeus
   (gather/scatter variants, additional reductions/scans, complex precisions) so every
   leto/coeus CPU hot kernel has a hermes path rather than a scalar fallback.
@@ -549,7 +657,8 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
       compress/expand, gather, and leading-tail invariants on every host.
 - [ ] **[minor] Native SVE backend**: hardware intrinsic implementation remains
       blocked on stable `core::arch::aarch64` SVE vector types; revisit on
-      toolchain updates.
+      toolchain updates. The delivered `SveArch` path is emulated and its
+      hardware capability probe is separate from `SimdArch::is_runtime_supported`.
 - [x] **[minor] Arm SME target feasibility study**: evaluate outer-product based
       tiled matrix multiplication kernels for Apple M4/M5 platforms. Driver:
       [gap_audit.md](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17).

@@ -10,12 +10,63 @@ use hermes_simd_core::view::TileMatrixMultiply;
 // AVX-512 Implementations
 // ---------------------------------------------------------------------------
 
+/// Native AVX-512 BF16 dot-product tile implementation.
+///
+/// The two BF16 operands are loaded as 512-bit integer vectors and reinterpreted
+/// as `__m512bh`; `DPBF16PS` consumes one BF16 pair per f32 accumulator lane.
+/// The `K = 32` tile therefore emits 16 dot-product instructions per output row.
+#[target_feature(enable = "avx512f,avx512bf16")]
+unsafe fn tile_matmul_bf16_native(
+    c: *mut F32,
+    c_stride: usize,
+    a: *const Bf16,
+    a_stride: usize,
+    b: *const Bf16,
+    b_stride: usize,
+) {
+    use core::arch::x86_64::*;
+
+    let mut c_regs = [_mm512_setzero_ps(); 16];
+    for (row, accumulator) in c_regs.iter_mut().enumerate() {
+        *accumulator = _mm512_loadu_ps(c.add(row * c_stride).cast::<f32>());
+    }
+
+    for k in (0..32).step_by(2) {
+        // DPBF16PS consumes adjacent BF16 pairs for each f32 lane. Interleave
+        // the two depth rows so lane `column` receives b[k,column] and
+        // b[k+1,column].
+        let mut b_values = [0u16; 32];
+        for column in 0..16 {
+            b_values[2 * column] = (*b.add(k * b_stride + column)).to_bits();
+            b_values[2 * column + 1] = (*b.add((k + 1) * b_stride + column)).to_bits();
+        }
+        let b_vec =
+            core::mem::transmute::<__m512i, __m512bh>(_mm512_loadu_si512(b_values.as_ptr().cast()));
+
+        for (row, accumulator) in c_regs.iter_mut().enumerate() {
+            let a0 = (*a.add(row * a_stride + k)).to_bits();
+            let a1 = (*a.add(row * a_stride + k + 1)).to_bits();
+            let mut a_values = [0u16; 32];
+            for pair in a_values.chunks_exact_mut(2) {
+                pair[0] = a0;
+                pair[1] = a1;
+            }
+            let a_vec = core::mem::transmute::<__m512i, __m512bh>(_mm512_loadu_si512(
+                a_values.as_ptr().cast(),
+            ));
+            *accumulator = _mm512_dpbf16_ps(*accumulator, a_vec, b_vec);
+        }
+    }
+
+    for (row, accumulator) in c_regs.iter().enumerate() {
+        _mm512_storeu_ps(c.add(row * c_stride).cast::<f32>(), *accumulator);
+    }
+}
+
 impl TileMatrixMultiply<Bf16, Bf16, F32, Avx512, Avx512, 16, 16, 32> for Avx512 {
-    // SAFETY: caller must ensure the target CPU supports `avx512f,avx512bw,avx512vl`
-    // (enforced by the `#[target_feature]` gate below plus runtime
-    // `is_x86_feature_detected!` selection at the dispatch site) and that `a`, `b`, and
-    // `c` point to a valid 16x16x32 tile addressable at the given strides; all loads and
-    // stores stay within that caller-declared tile.
+    // SAFETY: the dispatch site selects this native helper only after the exact
+    // `avx512bf16` probe, or the conversion helper after `avx512f,bw,vl`. All
+    // pointers address a complete 16x16x32 tile at the supplied strides.
     #[target_feature(enable = "avx512f,avx512bw,avx512vl")]
     unsafe fn tile_matmul(
         c: *mut F32,
@@ -25,6 +76,21 @@ impl TileMatrixMultiply<Bf16, Bf16, F32, Avx512, Avx512, 16, 16, 32> for Avx512 
         b: *const Bf16,
         b_stride: usize,
     ) {
+        #[cfg(feature = "std")]
+        if crate::has_avx512_bf16() {
+            // SAFETY: the runtime probe above enables the exact instruction
+            // set required by the native helper; tile pointers satisfy this
+            // trait's complete-tile precondition.
+            tile_matmul_bf16_native(c, c_stride, a, a_stride, b, b_stride);
+            return;
+        }
+        #[cfg(all(not(feature = "std"), target_feature = "avx512bf16"))]
+        {
+            // SAFETY: this no-std build statically enables the helper's ISA.
+            tile_matmul_bf16_native(c, c_stride, a, a_stride, b, b_stride);
+            return;
+        }
+
         use core::arch::x86_64::*;
 
         let mut c_regs = [_mm512_setzero_ps(); 16];

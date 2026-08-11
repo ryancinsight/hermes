@@ -1,11 +1,51 @@
 //! Generic runtime-dispatch in-place scale kernel.
 //!
 //! `scale_in_place<T>(data, scalar)` broadcasts `scalar` to all SIMD lanes
-//! then multiplies each chunk of `data` by it, covering the scalar tail
-//! element-by-element.
+//! then multiplies each chunk of `data` by it. The final partial vector uses
+//! provider-owned masked multiplication over initialized local lane buffers so
+//! blend-based backends never read beyond the live slice.
 
-use hermes_simd_core::{arch::SimdArch, kernel::SimdKernel, scalar::Scalar};
+use hermes_simd_core::{
+    arch::SimdArch,
+    kernel::{SimdKernel, MAX_SIMD_LANES},
+    scalar::Scalar,
+};
 use hermes_simd_macros::runtime_dispatch;
+
+/// Apply the final partial scale vector without reading or writing beyond the
+/// live tail. The local buffers are initialized before any full-width register
+/// load because AVX2's emulated masked load/arithmetic path still operates on a
+/// full register and blends afterward.
+#[inline(always)]
+unsafe fn scale_masked_tail<T, A>(data: *mut T, scalar: T, tail: usize)
+where
+    T: Scalar,
+    A: SimdArch + SimdKernel<T>,
+{
+    const { A::LANE_BOUND_CHECK };
+    debug_assert!(tail > 0 && tail < A::LANE_COUNT);
+
+    let mut lanes = [T::ZERO; MAX_SIMD_LANES];
+    for lane in 0..tail {
+        // SAFETY: the caller passes the first element of the remaining
+        // in-bounds tail, and this loop visits exactly its live elements.
+        lanes[lane] = *data.add(lane);
+    }
+
+    let mask = A::leading_k_mask(tail);
+    let value = A::masked_mul(
+        A::load_unaligned(lanes.as_ptr()),
+        A::splat(scalar),
+        mask,
+        A::load_unaligned(lanes.as_ptr()),
+    );
+    A::store_unaligned(lanes.as_mut_ptr(), value);
+
+    for lane in 0..tail {
+        // SAFETY: only the validated live tail is written back.
+        *data.add(lane) = lanes[lane];
+    }
+}
 
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
 pub(super) fn dispatch_scale_kernel<T, A>(data: &mut [T], scalar: T)
@@ -23,6 +63,8 @@ where
     let unrolled_simd_len = (len / chunk_size) * chunk_size;
     let ptr = data.as_mut_ptr();
 
+    // SAFETY: the unrolled and full-vector bounds are derived from `len`, and
+    // the dispatch wrapper proves the target feature required by `A`.
     unsafe {
         let vsplat = A::splat(scalar);
 
@@ -49,9 +91,38 @@ where
         }
     }
 
-    // Scalar tail
     let simd_len = (len / lane_count) * lane_count;
-    for i in simd_len..len {
-        data[i] = data[i] * scalar;
+    let tail = len - simd_len;
+    if tail != 0 {
+        // SAFETY: `simd_len` is the start of the remaining in-bounds prefix and
+        // `tail` is its exact length, strictly smaller than the lane width.
+        unsafe { scale_masked_tail::<T, A>(data.as_mut_ptr().add(simd_len), scalar, tail) };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::scale;
+
+    #[test]
+    fn scale_matches_scalar_reference_across_tail_sizes() {
+        for &len in &[0usize, 1, 3, 7, 8, 9, 15, 16, 17, 63, 64, 65, 1027] {
+            let mut data: Vec<f64> = (0..len).map(|i| i as f64 * 0.5 - 3.0).collect();
+            let expected: Vec<f64> = data.iter().map(|&value| value * 1.75).collect();
+
+            scale(&mut data, 1.75);
+            assert_eq!(data, expected, "len {len}");
+        }
+    }
+
+    #[test]
+    fn scale_single_precision_matches_reference_at_partial_lengths() {
+        for &len in &[5usize, 9, 17, 33, 65] {
+            let mut data: Vec<f32> = (0..len).map(|i| i as f32 + 0.125).collect();
+            let expected: Vec<f32> = data.iter().map(|&value| value * -0.75).collect();
+
+            scale(&mut data, -0.75);
+            assert_eq!(data, expected, "len {len}");
+        }
     }
 }

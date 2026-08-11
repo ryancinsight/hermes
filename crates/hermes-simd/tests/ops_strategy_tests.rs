@@ -3,8 +3,10 @@
 //! `add_assign`/`mul_assign`/`elementwise_mul` produce identical results.
 
 use hermes_simd::{
-    Add, BitAnd, BitOr, BitXor, Div, Mul, Scalar, SimdError, SimdView, Sub, Unaligned, Unmasked,
+    Add, BitAnd, BitOr, BitXor, Div, Mul, Scalar, SimdError, SimdView, Sub, SveArch, Unaligned,
+    Unmasked,
 };
+use hermes_simd_core::kernel::SimdKernel;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -270,6 +272,28 @@ fn test_transform_in_place_odd_length() {
     a_view.transform_in_place(&b_view, Add).unwrap();
 
     assert_eq!(&a[..], expected.as_slice());
+}
+
+#[test]
+fn test_transform_in_place_masked_tail_forced_sve() {
+    let len = <SveArch as SimdKernel<f32>>::LANE_COUNT + 3;
+    let a: Vec<f32> = (0..len).map(|index| index as f32 + 0.25).collect();
+    let b: Vec<f32> = (0..len).map(|index| index as f32 * -0.5).collect();
+    let expected: Vec<f32> = a
+        .iter()
+        .zip(&b)
+        .map(|(&left, &right)| left + right)
+        .collect();
+
+    let b_view = SimdView::<f32, SveArch, Unaligned, Unmasked, &[f32]>::new(&b)
+        .expect("emulated SVE backend is always constructible");
+    let mut actual = a;
+    let mut a_view =
+        SimdView::<f32, SveArch, Unaligned, Unmasked, &mut [f32]>::new_mut(&mut actual)
+            .expect("emulated SVE backend is always constructible");
+    a_view.transform_in_place(&b_view, Add).unwrap();
+
+    assert_eq!(actual, expected);
 }
 
 #[test]

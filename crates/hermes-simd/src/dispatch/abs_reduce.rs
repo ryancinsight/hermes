@@ -78,6 +78,38 @@ mod tests {
     }
 
     #[test]
+    fn abs_reductions_masked_tails_cover_multiple_widths_and_f32() {
+        for &len in &[1usize, 2, 3, 5, 9, 17, 65, 133] {
+            let data: Vec<f32> = (0..len)
+                .map(|index| (index as f32 - 2.25) * if index % 2 == 0 { 0.75 } else { -0.5 })
+                .collect();
+            let expected_sum: f32 = data.iter().map(|value| value.abs()).sum();
+            let expected_max = data.iter().map(|value| value.abs()).fold(0.0f32, f32::max);
+            assert!(
+                (abs_sum(&data) - expected_sum).abs() <= 2.0e-5,
+                "sum len {len}"
+            );
+            assert_eq!(abs_max(&data), expected_max, "max len {len}");
+        }
+    }
+
+    #[test]
+    fn abs_reductions_masked_tails_cover_multiple_widths_and_f64() {
+        for &len in &[1usize, 2, 3, 5, 9, 17, 65, 133] {
+            let data: Vec<f64> = (0..len)
+                .map(|index| (index as f64 - 3.5) * if index % 2 == 0 { -0.625 } else { 0.375 })
+                .collect();
+            let expected_sum: f64 = data.iter().map(|value| value.abs()).sum();
+            let expected_max = data.iter().map(|value| value.abs()).fold(0.0f64, f64::max);
+            assert!(
+                (abs_sum(&data) - expected_sum).abs() <= 2.0e-12,
+                "sum len {len}"
+            );
+            assert_eq!(abs_max(&data), expected_max, "max len {len}");
+        }
+    }
+
+    #[test]
     fn abs_reductions_empty_are_zero() {
         let empty: [f64; 0] = [];
         assert_eq!(abs_sum(&empty), 0.0);

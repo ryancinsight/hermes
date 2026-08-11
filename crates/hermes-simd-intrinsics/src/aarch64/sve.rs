@@ -2,7 +2,9 @@
 //!
 //! Stable Rust does not yet expose production-ready SVE vector register types
 //! for Hermes' generic [`SimdKernel`](hermes_simd_core::kernel::SimdKernel)
-//! contract. This module therefore provides an honest portable implementation:
+//! contract. This module therefore provides an honest portable implementation;
+//! native hardware capability is probed separately and never confused with the
+//! emulated execution path:
 //! [`crate::SveArch`] is callable and value-preserving through lane-emulated
 //! monomorphized arrays, while the native SVE intrinsic backend remains tracked
 //! as a separate backlog item.
@@ -22,6 +24,30 @@ use hermes_simd_core::arch::{IsaFamily, SimdArch};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SveArch;
 
+impl SveArch {
+    /// Returns whether the current process can execute native AArch64 SVE.
+    ///
+    /// The stable Hermes backend remains lane-emulated, so this capability is
+    /// intentionally separate from [`SimdArch::is_runtime_supported`]: the
+    /// latter reports that the emulated backend is safe to construct on every
+    /// host, while this probe reports hardware capability only.
+    #[inline]
+    pub fn is_native_hardware_supported() -> bool {
+        #[cfg(all(target_arch = "aarch64", feature = "std"))]
+        {
+            std::arch::is_aarch64_feature_detected!("sve")
+        }
+        #[cfg(all(target_arch = "aarch64", not(feature = "std")))]
+        {
+            cfg!(target_feature = "sve")
+        }
+        #[cfg(not(target_arch = "aarch64"))]
+        {
+            false
+        }
+    }
+}
+
 impl SimdArch for SveArch {
     const NAME: &'static str = "sve-emulated";
     const REGISTER_WIDTH_BITS: u32 = 512;
@@ -30,6 +56,8 @@ impl SimdArch for SveArch {
 
     #[inline]
     fn is_runtime_supported() -> bool {
+        // This marker executes the lane-emulated implementation, not native
+        // SVE instructions; native hardware capability is exposed separately.
         true
     }
 }
@@ -44,6 +72,11 @@ mod tests {
 
     #[test]
     fn emulated_sve_f32_kernel_is_value_semantic() {
+        // Runtime SVE detection is intentionally independent from compile-time
+        // `target_feature`: a host may support SVE even when this stable,
+        // lane-emulated crate was not compiled with `+sve`.
+        #[cfg(not(target_arch = "aarch64"))]
+        assert!(!SveArch::is_native_hardware_supported());
         let lhs = [1.0_f32; 16];
         let rhs = [2.0_f32; 16];
         let addend = [3.0_f32; 16];

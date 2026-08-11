@@ -203,14 +203,73 @@ order (correctness → architecture → tests → docs → PM).
   differential (n=21, nrows=11, dyadic-exact ⇒ bitwise) + existing f64 tail-shape
   suite. Follow-on candidate: same masked-tail treatment for `gemv_transpose`
   and `axpy` (both still scalar-tailed, both now benchmarkable).
-- **[open] AVX-512 bf16 tile kernel: 32 scalar bf16→f32 converts + stack
-  round-trip per k-step (HIGH on that path).** `avx512_tiling.rs:35`; vectorize as
-  `loadu_si256 + cvtepu16_epi32 + slli_epi32(,16)`, and use `_mm512_dpbf16_ps`
-  (AVX512-BF16 already probed, never issued). `[minor]`.
+- **Resolved 2026-08-09 — HS-417 transposed GEMV column tail.**
+  `gemv_transpose_strided_impl` now handles `ncols % LANE_COUNT` through one
+  initialized local lane-buffer path and `SimdKernel::masked_fmadd`, preserving
+  the full-width-valid masked-memory contract even on blend-based backends.
+  Only the live tail is copied back to `y`; no caller slice is over-read or
+  over-written. The f32 facade has a non-dyadic tolerance regression because
+  the provider-owned fused operation may round differently from scalar
+  multiply-plus-add. Evidence tier: provider implementation plus differential
+  shape tests and non-dyadic f32 tolerance coverage. Native SVE remains a
+  separate stable-toolchain-blocked item.
+- **Resolved 2026-08-09 — HS-421 native AVX-512 BF16 tile kernel.** The
+  `Bf16 × Bf16 → F32` tile now has a native `DPBF16PS` path on hosts reporting
+  `avx512bf16`, with a single lower-level capability SSOT in
+  `hermes-simd-intrinsics`. The existing AVX-512F/BW/VL conversion/FMA tile
+  remains the fallback for AVX-512 hosts without BF16 dot products. The native
+  differential uses non-dyadic BF16 inputs and nonzero `C`, validating the
+  `C += A·B` contract; ordinary hosts skip only the hardware-specific execution
+  while still compiling and testing the fallback. A hosted AVX-512 BF16 runtime
+  and benchmark gate remains open.
 - **[open] Scalar tails on every hot kernel (MED-HIGH).** `view/reduce.rs`,
   `view/ops.rs`, `dispatch/axpy.rs`, etc. end in element-at-a-time loops although
   `leading_k_mask` exists on every backend; up to 15 scalar iters on AVX-512 f32
-  tails, dominating short/odd-length vectors. `[minor]`.
+  tails, dominating short/odd-length vectors. `[minor]`. **Partial closure
+  2026-08-07 (HS-410/HS-411/HS-412):** `dispatch/axpy.rs` now routes its final
+  partial vector through `masked_fmadd`, `dispatch/scale.rs` routes its final
+  partial vector through `masked_mul`, and `dispatch/axpy.rs`'s `axpy_mul` path routes its
+  final partial vector through register scaling plus `masked_fmadd`; all use
+  initialized local lane buffers that preserve safety for AVX2 blend-based
+  masked operations.  **HS-415 (2026-08-07):** `reduce_popcount` and the shared binary
+  `reduce_popcount_op` now route their final partial vectors through
+  `masked_sum_reduce` after copying source lanes into initialized local buffers;
+  each masked tail count is exact while the existing whole-reduction accumulator
+  contract remains unchanged. Generic reduction and broader view tails are
+  covered by HS-416; other kernels remain open. **HS-414 (2026-08-07):** `AbsSum` and
+  `AbsMax` now route their final
+  partial vector through a generic masked reduction seam after copying live
+  elements into initialized local lanes and applying the transform before
+  identity merge. Generic reduction and broader view tails are covered by
+  HS-416; other kernels remain open. **HS-413 (2026-08-07):**
+  `axpy_rows` now routes its final partial vector
+  through the same initialized-buffer `masked_fmadd` helper, and `axpy_rows_batch`
+  does so per row after preserving its depth accumulation order. Non-dyadic f32
+  regressions cover both paths. Reductions, view operations, and other kernels
+  remain open; no repo-wide closure or performance claim is made.
+- **Resolved 2026-08-09 — HS-418 dense dot-product tail.**
+- **Resolved 2026-08-09 — HS-419 pairwise reduction tail.** `SimdView::zip_reduce(Dot)`
+  now copies live pairwise inputs into initialized provider-local buffers and
+  uses the generic masked reduction seam for its final partial vector. This
+  removes the dot cleanup loop without violating the full-width masked-load
+  contract; forced emulated-SVE non-dyadic f32 coverage allows the documented
+  reassociation tolerance.  `Product` remains on its scalar pairwise tail path
+  because its multiplicative identity and reduction ordering are distinct.
+- **Resolved 2026-08-09 — HS-420 mutable generic view tail.**
+  `SimdView::transform_in_place` now stages its final partial operands in
+  initialized provider-local buffers, applies the generic `ElementOp` vector
+  seam, and copies back only live result lanes. Add/Sub/Mul/Div therefore share
+  one bounds-safe implementation; forced emulated-SVE odd-length coverage pins
+  the tail path. Remaining scalar tails are tracked per kernel rather than
+  claimed closed globally.
+  `SimdView::dot` now copies its short remainder into initialized local lane
+
+  buffers and folds it through `SimdKernel::masked_fmadd`, avoiding caller-slice
+  over-read while retaining the provider's fused arithmetic path. The final
+  reduction includes only live lanes. Odd non-dyadic f32 coverage uses the
+  documented tolerance for fused-rounding differences. Remaining scalar tails
+  are tracked per kernel rather than claimed closed globally.
+
 - **[REJECTED 2026-07-03, measured] No K/M cache blocking in GEMM.** Hypothesis:
   the full `k × block_n` B panel spilling L1d degrades large-`k` GEMM, and a
   BLIS KC loop bounding the panel to L1d would recover it. **Falsified by
@@ -805,8 +864,10 @@ Resolved this sprint:
 ## Residual Risks
 
 - AVX-512 and AMX runtime validation still depends on matching hardware.
-- Native SVE remains a planned backend; current `SveArch` coverage is an
-  emulated value-semantic backend. When a native SVE backend lands, `LANE_COUNT`
+- Native SVE remains a planned backend blocked by the pinned stable Rust
+  toolchain: current `SveArch` coverage is an emulated value-semantic backend.
+  `SveArch::is_native_hardware_supported` reports hardware capability separately
+  and does not claim native execution. When a native SVE backend lands, `LANE_COUNT`
   may exceed `MAX_SIMD_LANES` for narrow element types; the new
   `LANE_BOUND_CHECK` will flag it at compile time so the scalar-fallback buffers
   are widened (or the backend overrides the affected methods natively) before it

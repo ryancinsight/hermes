@@ -146,12 +146,10 @@ fn has_amx_int8() -> bool {
     *CACHED.get_or_init(|| false)
 }
 
-/// The AVX-512 bf16 tile kernels (`avx512_tiling`) enable
-/// `avx512f,avx512bw,avx512vl` — they widen bf16 to f32 and FMA in f32, so they
-/// need the base 512-bit + byte/word + 128/256-bit-lane extensions, **not** the
-/// `avx512bf16` dot-product ISA. Detecting the exact enabled set (rather than the
-/// old, mismatched `avx512bf16` bit) both closes the `#UD` window and stops
-/// falsely skipping the kernel on capable non-bf16 parts.
+/// The AVX-512 BF16 conversion/FMA tile fallback enables
+/// `avx512f,avx512bw,avx512vl` — it widens BF16 to f32 and performs f32 FMA.
+/// This is intentionally separate from [`has_avx512_bf16`], which reports the
+/// native `DPBF16PS` instruction capability.
 #[cfg(target_arch = "x86_64")]
 #[inline]
 fn has_avx512_bf16_tile() -> bool {
@@ -162,6 +160,16 @@ fn has_avx512_bf16_tile() -> bool {
             && std::is_x86_feature_detected!("avx512bw")
             && std::is_x86_feature_detected!("avx512vl")
     })
+}
+
+/// Returns whether native AVX-512 BF16 dot-product instructions are usable.
+///
+/// This probe is distinct from [`Avx512Support::has_avx512`]: the latter also
+/// admits the conversion/FMA fallback on AVX-512F/BW/VL hosts. Native callers
+/// must use this exact capability before entering `DPBF16PS` code.
+#[inline]
+pub fn has_avx512_bf16() -> bool {
+    hermes_simd_intrinsics::has_avx512_bf16()
 }
 
 /// 256-bit VEX-encoded AVX-VNNI (`vpdpbusd`/`vpdpwssd` on YMM without AVX-512).

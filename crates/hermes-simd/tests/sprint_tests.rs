@@ -11,9 +11,11 @@
 
 #[cfg(test)]
 mod tests {
+    use hermes_simd::SveArch;
     use hermes_simd_core::{
         align::Unaligned,
         execution::Unmasked,
+        kernel::SimdKernel,
         ops::{Dot, Max, Min, ReductionOp, Sum},
         scalar::NumericElement,
         view::SimdView,
@@ -158,6 +160,29 @@ mod tests {
         // 1*4 + 2*5 + 3*6 = 4 + 10 + 18 = 32
         let result = va.zip_reduce(&vb, Dot).unwrap();
         assert!((result - 32.0_f32).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_zip_reduce_dot_masked_tail_forced_sve() {
+        let len = <SveArch as SimdKernel<f32>>::LANE_COUNT + 3;
+        let a: Vec<f32> = (0..len).map(|index| (index as f32 + 0.25) * 0.7).collect();
+        let b: Vec<f32> = (0..len)
+            .map(|index| (index as f32 - 1.75) * -0.35)
+            .collect();
+        let va = SimdView::<f32, SveArch, Unaligned, Unmasked, &[f32]>::new(&a)
+            .expect("emulated SVE backend is always constructible");
+        let vb = SimdView::<f32, SveArch, Unaligned, Unmasked, &[f32]>::new(&b)
+            .expect("emulated SVE backend is always constructible");
+
+        let expected = a
+            .iter()
+            .zip(&b)
+            .fold(0.0_f32, |sum, (&left, &right)| sum + left * right);
+        let actual = va.zip_reduce(&vb, Dot).unwrap();
+        assert!(
+            (actual - expected).abs() <= 4.0e-6 * expected.abs().max(1.0),
+            "masked dot tail mismatch: actual={actual}, expected={expected}"
+        );
     }
 
     // ---------------------------------------------------------------------------

@@ -22,6 +22,32 @@ fn test_tiled_dot_matches_dot() {
     );
 }
 
+/// Forced SVE-shaped emulation keeps this regression host-independent: its
+/// 16-lane f32 backend makes the 13-element input enter the initialized masked
+/// tail path even on scalar-only machines.
+#[test]
+fn test_dot_non_dyadic_tail_forced_sve_backend() {
+    let a: Vec<f32> = (0..13)
+        .map(|i| ((i * 19 + 7) as f32) / 23.0 - 2.0)
+        .collect();
+    let b: Vec<f32> = (0..13)
+        .map(|i| ((i * 11 + 5) as f32) / 17.0 - 1.5)
+        .collect();
+    let lhs = SimdView::<f32, SveArch, Unaligned, Unmasked, &[f32]>::new(&a).unwrap();
+    let rhs = SimdView::<f32, SveArch, Unaligned, Unmasked, &[f32]>::new(&b).unwrap();
+
+    let actual = lhs.dot(&rhs).unwrap();
+    let expected = a
+        .iter()
+        .zip(&b)
+        .map(|(&left, &right)| left * right)
+        .sum::<f32>();
+    assert!(
+        (actual - expected).abs() <= 4.0e-6 * expected.abs().max(1.0),
+        "dot tail mismatch: got {actual}, expected {expected}"
+    );
+}
+
 #[test]
 fn test_tiled_gemv_correctness() {
     let a = [
@@ -95,6 +121,19 @@ fn test_tiled_gemm() {
 }
 
 #[test]
+fn test_native_bf16_capability_probe_matches_std_detector() {
+    #[cfg(target_arch = "x86_64")]
+    assert_eq!(
+        has_avx512_bf16(),
+        std::is_x86_feature_detected!("avx512bf16"),
+        "native BF16 capability must use the Rust runtime detector"
+    );
+
+    #[cfg(not(target_arch = "x86_64"))]
+    assert!(!has_avx512_bf16());
+}
+
+#[test]
 fn test_tile_matrix_multiply_bf16() {
     use eunomia::{Bf16, F32};
     let mut c = vec![F32(0.0); 16 * 16];
@@ -107,6 +146,53 @@ fn test_tile_matrix_multiply_bf16() {
 
     for val in c {
         assert_eq!(val, F32(64.0));
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[test]
+fn test_native_bf16_tile_matches_scalar_when_available() {
+    if !has_avx512_bf16() {
+        return;
+    }
+
+    use eunomia::{Bf16, F32};
+    let c_initial: Vec<f32> = (0..16 * 16).map(|i| (i % 7) as f32 - 3.0).collect();
+    let mut actual: Vec<F32> = c_initial.iter().copied().map(F32).collect();
+    let a: Vec<Bf16> = (0..16 * 32)
+        .map(|i| Bf16::from_f32(((i * 13 + 5) % 29) as f32 / 8.0 - 1.5))
+        .collect();
+    let b: Vec<Bf16> = (0..32 * 16)
+        .map(|i| Bf16::from_f32(((i * 17 + 3) % 31) as f32 / 7.0 - 2.0))
+        .collect();
+
+    unsafe {
+        dispatch_tile_matmul::<Bf16, Bf16, F32>(
+            actual.as_mut_ptr(),
+            16,
+            a.as_ptr(),
+            32,
+            b.as_ptr(),
+            16,
+        );
+    }
+
+    let mut expected = c_initial;
+    for row in 0..16 {
+        for column in 0..16 {
+            expected[row * 16 + column] += (0..32)
+                .map(|k| a[row * 32 + k].to_f32() * b[k * 16 + column].to_f32())
+                .sum::<f32>();
+        }
+    }
+
+    for (index, value) in actual.iter().enumerate() {
+        assert!(
+            (value.0 - expected[index]).abs() <= 2.0e-3 * expected[index].abs().max(1.0),
+            "native BF16 mismatch at {index}: got {}, expected {}",
+            value.0,
+            expected[index]
+        );
     }
 }
 

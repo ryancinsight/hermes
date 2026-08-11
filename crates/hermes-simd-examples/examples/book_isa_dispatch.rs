@@ -44,4 +44,3 @@ fn main() {
 
     println!("\nall ISA-dispatch assertions passed");
 }
-

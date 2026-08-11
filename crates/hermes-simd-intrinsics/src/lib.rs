@@ -239,6 +239,37 @@ pub use bitboard::kogge_stone::KoggeStone;
 pub use bitboard::magic::Magic;
 pub use bitboard::swar::{Swar, SwarUtils};
 
+/// Returns whether the current x86 host supports native AVX-512 BF16 dot products.
+///
+/// This is the capability SSOT for the intrinsic backend. It is deliberately
+/// separate from the AVX-512F/BW/VL conversion fallback and includes the OS
+/// register-state checks provided by Rust's runtime feature detector.
+#[inline]
+pub fn has_avx512_bf16() -> bool {
+    #[cfg(all(target_arch = "x86_64", feature = "std"))]
+    {
+        use core::sync::atomic::{AtomicU8, Ordering};
+        static CACHED: AtomicU8 = AtomicU8::new(0);
+        match CACHED.load(Ordering::Relaxed) {
+            1 => false,
+            2 => true,
+            _ => {
+                let supported = std::is_x86_feature_detected!("avx512bf16");
+                CACHED.store(if supported { 2 } else { 1 }, Ordering::Relaxed);
+                supported
+            }
+        }
+    }
+    #[cfg(all(target_arch = "x86_64", not(feature = "std")))]
+    {
+        cfg!(target_feature = "avx512bf16")
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        false
+    }
+}
+
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub use x86_64::amx::{AmxBatchSession, AmxBf16, AmxConfig, AmxInt8, AmxSession, AmxSessionError};
 

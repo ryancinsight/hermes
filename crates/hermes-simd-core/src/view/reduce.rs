@@ -126,11 +126,28 @@ where
             Op::finalize::<Arch>(acc)
         };
 
-        // Scalar tail — use Op::scalar_accumulate so per-element transforms (e.g. SquaredSum)
-        // apply correctly. For Sum/Min/Max the default delegates to scalar_combine.
-        while i < len {
-            total = Op::scalar_accumulate(total, data[i]);
-            i += 1;
+        // Final partial vector. Transform-bearing reductions with a neutral
+        // identity use the provider masked-reduction seam; other operations keep
+        // their established scalar-tail contract until their ordering semantics
+        // receive a dedicated proof. The masked reduction may change floating-
+        // point grouping within this final vector, so callers must use the
+        // reduction's documented numerical-order envelope rather than assume a
+        // scalar left fold for this opt-in family.
+        let tail = len - simd_len;
+        if tail != 0 && Op::USE_MASKED_TAIL {
+            const { Arch::LANE_BOUND_CHECK };
+            let mut lanes = [T::ZERO; crate::kernel::MAX_SIMD_LANES];
+            lanes[..tail].copy_from_slice(&data[simd_len..simd_len + tail]);
+            let tail_value = unsafe {
+                let mask = Arch::leading_k_mask(tail);
+                Op::masked_finalize::<Arch>(Arch::load_unaligned(lanes.as_ptr()), mask)
+            };
+            total = Op::scalar_combine(total, tail_value);
+        } else {
+            while i < len {
+                total = Op::scalar_accumulate(total, data[i]);
+                i += 1;
+            }
         }
 
         total
@@ -241,10 +258,34 @@ where
             Op::finalize::<Arch>(acc)
         };
 
-        // Scalar tail — use scalar_combine for correctness with Min/Max.
-        while i < len {
-            total = Op::scalar_combine(total, s[i] * o[i]);
-            i += 1;
+        // Pairwise final vector. Both buffers are fully initialized because the
+        // provider's masked-memory contract still requires a valid full-width
+        // load even when inactive lanes are discarded by `masked_finalize`.
+        // The reduction strategy applies its own transform and identity, so this
+        // remains correct for every operation that opts into masked tails.
+        let tail = len - simd_len;
+        if tail != 0 && Op::USE_MASKED_TAIL {
+            const { Arch::LANE_BOUND_CHECK };
+            let mut left = [T::ZERO; crate::kernel::MAX_SIMD_LANES];
+            let mut right = [T::ZERO; crate::kernel::MAX_SIMD_LANES];
+            left[..tail].copy_from_slice(&s[simd_len..simd_len + tail]);
+            right[..tail].copy_from_slice(&o[simd_len..simd_len + tail]);
+            let tail_value = unsafe {
+                let mask = Arch::leading_k_mask(tail);
+                let pair = Arch::mul(
+                    Arch::load_unaligned(left.as_ptr()),
+                    Arch::load_unaligned(right.as_ptr()),
+                );
+                Op::masked_finalize::<Arch>(pair, mask)
+            };
+            total = Op::scalar_combine(total, tail_value);
+        } else {
+            // Product and any future strategy that does not opt into masked
+            // tails retain the scalar pairwise contract.
+            while i < len {
+                total = Op::scalar_combine(total, s[i] * o[i]);
+                i += 1;
+            }
         }
 
         Ok(total)
@@ -341,10 +382,20 @@ where
             total += unsafe { Arch::sum_reduce(acc) }.to_f64() as usize;
         }
 
-        // Scalar tail loop
-        while i < len {
-            total += data[i].count_ones() as usize;
-            i += 1;
+        // Masked final vector. Popcount is integer-valued, so reducing the
+        // live tail as one masked vector preserves the exact count while
+        // removing the element-at-a-time cleanup loop.
+        let tail = len - simd_len;
+        if tail != 0 {
+            const { Arch::LANE_BOUND_CHECK };
+            let mut lanes = [T::ZERO; crate::kernel::MAX_SIMD_LANES];
+            lanes[..tail].copy_from_slice(&data[simd_len..simd_len + tail]);
+            let tail_count = unsafe {
+                let mask = Arch::leading_k_mask(tail);
+                Arch::masked_sum_reduce(Arch::popcount(Arch::load_unaligned(lanes.as_ptr())), mask)
+                    .to_f64() as usize
+            };
+            total += tail_count;
         }
 
         total
@@ -464,9 +515,25 @@ where
             total += unsafe { Arch::sum_reduce(acc) }.to_f64() as usize;
         }
 
-        while i < len {
-            total += op.apply_scalar(s[i], o[i]).count_ones() as usize;
-            i += 1;
+        // Masked final vector. Both source buffers are initialized before the
+        // full-width loads required by blend-based backends; the integer count
+        // remains exact while the operation stays in the provider's SIMD seam.
+        let tail = len - simd_len;
+        if tail != 0 {
+            const { Arch::LANE_BOUND_CHECK };
+            let mut left = [T::ZERO; crate::kernel::MAX_SIMD_LANES];
+            let mut right = [T::ZERO; crate::kernel::MAX_SIMD_LANES];
+            left[..tail].copy_from_slice(&s[simd_len..simd_len + tail]);
+            right[..tail].copy_from_slice(&o[simd_len..simd_len + tail]);
+            let tail_count = unsafe {
+                let mask = Arch::leading_k_mask(tail);
+                let combined = op.apply::<Arch>(
+                    Arch::load_unaligned(left.as_ptr()),
+                    Arch::load_unaligned(right.as_ptr()),
+                );
+                Arch::masked_sum_reduce(Arch::popcount(combined), mask).to_f64() as usize
+            };
+            total += tail_count;
         }
 
         Ok(total)

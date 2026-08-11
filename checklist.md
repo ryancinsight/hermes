@@ -1,6 +1,110 @@
 # Checklist — active sprint
 
+## HS-421 [arch] — native AVX-512 BF16 tile dispatch
+
+- [x] Keep `avx512f,avx512bw,avx512vl` as the conversion/FMA fallback
+      capability and add a distinct `avx512bf16` runtime capability SSOT.
+- [x] Execute native `DPBF16PS` only after the exact BF16 probe; preserve the
+      existing scalar/conversion fallback on unsupported hosts.
+- [x] Preserve the `Bf16 × Bf16 → F32` and `C += A·B` contracts with a nonzero
+      accumulation differential test.
+- [ ] Validate native execution and benchmark speedup on a hosted AVX-512 BF16
+      runner; ordinary CI continues to skip capability-specific execution.
+
+## HS-416 [patch] — generic reduction and broader view tails
+
+> Native SVE remains a separate blocked architecture item: stable Rust cannot
+> express Hermes' scalable native vector contract yet. `SveArch` is emulated;
+> its hardware probe is informational and never gates the emulated backend.
+
+- [x] Route generic `Sum`/`Min`/`Max` partial vectors through the initialized
+      provider-local masked reduction seam.
+- [x] Consolidate `SimdView::sum` onto `reduce(Sum)` as the reduction SSOT.
+- [x] Replace scalar tails in masked add/multiply/FMA, elementwise multiply,
+      and generic `zip_into` with leading-mask buffered provider operations.
+- [x] Preserve Eunomia generic min/max NaN and signed-zero semantics.
+- [x] Add odd-length differential coverage for reductions and view kernels.
+- [x] Route transposed GEMV column tails through initialized local lane buffers
+      and the provider-owned masked-FMA seam; cover non-dyadic f32 tolerance.
+- [x] Route dense dot-product tails through initialized local lane buffers and
+      the provider-owned masked-FMA seam; cover odd non-dyadic f32 inputs.
+- [x] Route `SimdView::zip_reduce(Dot)` pairwise tails through two initialized
+      local lane buffers and the generic masked reduction seam; retain the
+      scalar contract for non-opted-in multiplicative operations.
+- [x] Route mutable `SimdView::transform_in_place` tails through initialized
+      operand/result buffers and the generic `ElementOp` vector seam; cover
+      forced emulated-SVE odd-length mutation.
+- [ ] Re-run the full clean-worktree Hermes package gate after unrelated
+      Cargo.lock/overlay dirt is reconciled.
+
+
+## HS-415 [patch] — masked popcount tails
+
+- [x] Route single-input popcount tails through `masked_sum_reduce`.
+- [x] Route shared binary popcount tails through the same masked sum seam.
+- [x] Initialize source lane buffers before blend-based full-width loads.
+- [x] Cover multiple tail widths and integer bitwise combinations.
+- [x] Preserve generic sum/min/max and unrelated view tails as open follow-ups.
+- [ ] Re-run the full clean-worktree Hermes package gate after unrelated
+      Cargo.lock/overlay dirt is reconciled.
+
+
+## HS-414 [patch] — masked absolute-reduction tails
+
+- [x] Opt `AbsSum` and `AbsMax` into the generic masked-tail reduction seam.
+- [x] Copy only live tail elements into an initialized provider-local lane buffer.
+- [x] Apply the absolute transform before merging inactive lanes with the
+      reduction identity.
+- [x] Preserve generic sum/min/max and other reduction tails as open follow-ups.
+- [ ] Re-run the full clean-worktree Hermes package gate after unrelated
+      Cargo.lock/overlay dirt is reconciled.
+
+
+## HS-413 [patch] — masked row-update tails
+
+- [x] Route `axpy_rows` partial vectors through `SimdKernel::masked_fmadd`.
+- [x] Route `axpy_rows_batch` partial vectors through masked fused arithmetic
+      while preserving depth accumulation order.
+- [x] Keep both helpers sound for AVX2 blend-based masks with fully initialized
+      provider-local lane buffers and exact live-tail writeback.
+- [x] Cover non-dyadic f32 row and depth-batched tail semantics.
+- [x] Preserve reductions, views, and other hot-kernel scalar tails as open.
+- [ ] Re-run the full clean-worktree Hermes package gate after unrelated
+      Cargo.lock/overlay dirt is reconciled.
+
+
 **Target: Unreleased** · Strategy: [backlog.md](backlog.md) · Gap register: [gap_audit.md](gap_audit.md) · Phase: Execution
+
+## HS-412 [patch] — masked fused AXPY-mul tail boundary
+
+- [x] Route the final partial `axpy_mul` vector through
+      `SimdKernel::masked_fmadd` after register scaling.
+- [x] Keep the helper sound for AVX2 blend-based masked arithmetic by copying
+      only live tail elements into fully initialized provider-local lane buffers.
+- [x] Cover f32/f64 partial lengths and f32 fused-operation-order semantics.
+- [x] Preserve the broader scalar-tail gap as open for separate kernels.
+- [ ] Re-run the full clean-worktree Hermes package gate after the existing
+      Cargo.lock/overlay dirt is reconciled.
+
+## HS-411 [patch] — masked scale tail boundary
+
+- [x] Route the final partial `scale` vector through `SimdKernel::masked_mul`.
+- [x] Keep the helper sound for AVX2 blend-based masked arithmetic by copying
+      only live tail elements into fully initialized provider-local lane buffers.
+- [x] Cover f32/f64 partial lengths through the public scale facade.
+- [x] Preserve the broader scalar-tail gap as open for separate kernels.
+- [ ] Re-run the full clean-worktree Hermes package gate after the existing
+      Cargo.lock/overlay dirt is reconciled.
+
+## HS-410 [patch] — masked AXPY tail boundary
+
+- [x] Route the final partial `axpy` vector through `SimdKernel::masked_fmadd`.
+- [x] Keep the helper sound for AVX2 blend-based masked loads by copying only
+      live tail elements into fully initialized provider-local lane buffers.
+- [x] Cover f32/f64 tail sizes and add an f32 non-dyadic fused-operation-order regression.
+- [x] Preserve the broader scalar-tail gap as open for separate kernels.
+- [ ] Re-run the full clean-worktree Hermes package gate after the existing
+      Cargo.lock/overlay dirt is reconciled.
 
 ## HS-409 [minor] — fused ternary AXPY provider facade
 

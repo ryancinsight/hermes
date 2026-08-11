@@ -114,6 +114,27 @@ mod tests {
     }
 
     #[test]
+    fn gemv_transpose_non_dyadic_tail_matches_within_f32_tolerance() {
+        let (nrows, ncols) = (5usize, 13usize);
+        let a: Vec<f32> = (0..nrows * ncols)
+            .map(|i| ((i * 17 + 3) as f32) / 19.0 - 2.0)
+            .collect();
+        let x: Vec<f32> = (0..nrows).map(|i| (i as f32 + 0.25) / 7.0).collect();
+        let mut y = vec![0.125f32; ncols];
+        let initial = y.clone();
+        gemv_transpose::dispatch_gemv_transpose::<f32>(&a, &x, &mut y, nrows, ncols).unwrap();
+
+        for j in 0..ncols {
+            let expected = initial[j] + (0..nrows).map(|i| a[i * ncols + j] * x[i]).sum::<f32>();
+            assert!(
+                (y[j] - expected).abs() <= 4.0e-6 * expected.abs().max(1.0),
+                "column {j}: got {} expected {expected}",
+                y[j]
+            );
+        }
+    }
+
+    #[test]
     fn gemv_transpose_accumulates_into_y() {
         let a = vec![1.0f64, 2.0, 3.0, 4.0]; // 2x2: rows [1,2], [3,4]
         let x = vec![1.0f64, 1.0];

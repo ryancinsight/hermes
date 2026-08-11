@@ -4,7 +4,7 @@
 
 use hermes_simd::{
     argmax, argmin, max, min, scale, Abs, Clamp, Exclusive, Inclusive, Neg, Scalar, ScanAdd,
-    ScanMax, ScanMin, ScanMul, SimdError, SimdView, Sqrt, Unaligned, Unmasked,
+    ScanMax, ScanMin, ScanMul, SimdArch, SimdError, SimdView, Sqrt, Unaligned, Unmasked,
 };
 use hermes_simd_core::ops::{Max, Min, Sum};
 use proptest::prelude::*;
@@ -646,6 +646,122 @@ fn test_scale_odd_length() {
     let mut data = [1.0f32, 2.0, 3.0]; // odd
     scale(&mut data, 2.0);
     assert_eq!(&data, &[2.0f32, 4.0, 6.0]);
+}
+
+#[test]
+fn test_reduce_popcount_masked_tails_cover_multiple_widths() {
+    use hermes_simd::{
+        reduce_popcount, reduce_popcount_and, reduce_popcount_or, reduce_popcount_xor,
+    };
+
+    for &len in &[1usize, 2, 3, 5, 9, 17, 65, 133] {
+        let a: Vec<i32> = (0..len)
+            .map(|index| (index as i32).wrapping_mul(0x1357_9bdf))
+            .collect();
+        let b: Vec<i32> = (0..len)
+            .map(|index| (index as i32).wrapping_mul(0x2468_ace1))
+            .collect();
+        let expected = |value: i32| value.count_ones() as usize;
+        assert_eq!(
+            reduce_popcount(&a),
+            a.iter().map(|&value| expected(value)).sum::<usize>(),
+            "single len {len}"
+        );
+        assert_eq!(
+            reduce_popcount_and(&a, &b).unwrap(),
+            a.iter()
+                .zip(&b)
+                .map(|(&left, &right)| expected(left & right))
+                .sum::<usize>(),
+            "and len {len}"
+        );
+        assert_eq!(
+            reduce_popcount_or(&a, &b).unwrap(),
+            a.iter()
+                .zip(&b)
+                .map(|(&left, &right)| expected(left | right))
+                .sum::<usize>(),
+            "or len {len}"
+        );
+        assert_eq!(
+            reduce_popcount_xor(&a, &b).unwrap(),
+            a.iter()
+                .zip(&b)
+                .map(|(&left, &right)| expected(left ^ right))
+                .sum::<usize>(),
+            "xor len {len}"
+        );
+    }
+}
+
+#[test]
+fn generic_reductions_and_masked_view_tails_match_scalar_contracts() {
+    use hermes_simd_core::mask::BitMask;
+
+    // Scalar uses four lanes, so length five exercises a one-element masked
+    // tail while the mask still contains inactive lanes beyond the live range.
+    let values = [1.0_f32, -2.0, 3.0, 4.0, 5.0];
+    let view = v(&values);
+    assert_eq!(view.reduce(Sum), 11.0);
+    assert_eq!(view.reduce(Min), -2.0);
+    assert_eq!(view.reduce(Max), 5.0);
+
+    let left = [1.0_f32, 2.0, 3.0, 4.0, 5.0];
+    let right = [10.0_f32, 20.0, 30.0, 40.0, 50.0];
+    let left_view = v(&left);
+    let right_view = v(&right);
+    let mask = BitMask::<4>::from_bools(&[true, false, true, false]);
+    let mut out = [0.0_f32; 5];
+
+    left_view.masked_add(&right_view, &mask, &mut out).unwrap();
+    assert_eq!(out, [11.0, 2.0, 33.0, 4.0, 55.0]);
+
+    left_view.masked_mul(&right_view, &mask, &mut out).unwrap();
+    assert_eq!(out, [10.0, 2.0, 90.0, 4.0, 250.0]);
+
+    left_view
+        .masked_fmadd(&right_view, &left_view, &mask, &mut out)
+        .unwrap();
+    assert_eq!(out, [11.0, 2.0, 93.0, 4.0, 255.0]);
+
+    left_view.elementwise_mul(&right_view, &mut out).unwrap();
+    assert_eq!(out, [10.0, 40.0, 90.0, 160.0, 250.0]);
+
+    left_view
+        .zip_into(&right_view, &mut out, hermes_simd::Add)
+        .unwrap();
+    assert_eq!(out, [11.0, 22.0, 33.0, 44.0, 55.0]);
+}
+
+#[test]
+fn generic_extrema_tail_preserves_ordering_contract() {
+    // Generic Min/Max use Eunomia's NumericElement min/max contract, which
+    // ignores a NaN operand (argmin/argmax separately reject NaN inputs).
+    let nan_tail = [1.0_f32, 2.0, 3.0, 4.0, f32::NAN];
+    let scalar_nan = v(&nan_tail);
+    assert_eq!(scalar_nan.reduce(Min), 1.0);
+    assert_eq!(scalar_nan.reduce(Max), 4.0);
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    if hermes_simd::Avx2::is_runtime_supported() {
+        // The runtime-dispatch path uses the native AVX2 min/max kernels on
+        // supported hosts; keep this differential check host-conditional.
+        let native_nan = hermes_simd::SimdView::<
+            f32,
+            hermes_simd::Avx2,
+            hermes_simd::Unaligned,
+            hermes_simd::Unmasked,
+            &[f32],
+        >::new(&nan_tail)
+        .expect("AVX2 probe succeeded");
+        assert_eq!(native_nan.reduce(Min), 1.0);
+        assert_eq!(native_nan.reduce(Max), 4.0);
+    }
+
+    let negative_zero_tail = [1.0_f32, 2.0, 3.0, 4.0, -0.0];
+    let zero_view = v(&negative_zero_tail);
+    assert_eq!(zero_view.reduce(Min).to_bits(), (-0.0_f32).to_bits());
+    assert_eq!(zero_view.reduce(Max), 4.0);
 }
 
 #[test]

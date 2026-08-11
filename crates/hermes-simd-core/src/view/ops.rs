@@ -14,7 +14,7 @@
 use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
-use crate::kernel::SimdKernel;
+use crate::kernel::{SimdKernel, MAX_SIMD_LANES};
 use crate::ops::ElementOp;
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
@@ -40,82 +40,10 @@ where
     /// accumulating into multiple registers in parallel to break loop dependencies.
     #[inline(always)]
     pub fn sum(&self) -> T {
-        let data = self.as_slice();
-        let len = data.len();
-        let lane_count = Arch::LANE_COUNT;
-        let unroll_factor = Arch::UNROLL_FACTOR;
-        let chunk_size = lane_count * unroll_factor;
-        let unrolled_simd_len = (len / chunk_size) * chunk_size;
-        let simd_len = (len / lane_count) * lane_count;
-        let mut ptr = data.as_ptr();
-
-        let accumulator = unsafe {
-            if unrolled_simd_len > 0 {
-                let load = |p| {
-                    if crate::align::is_aligned_for_arch::<Arch, Align>() {
-                        Arch::load_aligned(p)
-                    } else {
-                        Arch::load_unaligned(p)
-                    }
-                };
-
-                let mut acc0 = load(ptr);
-                let mut acc1 = load(ptr.add(lane_count));
-                let mut acc2 = load(ptr.add(lane_count * 2));
-                let mut acc3 = load(ptr.add(lane_count * 3));
-                ptr = ptr.add(chunk_size);
-
-                for _ in 1..(unrolled_simd_len / chunk_size) {
-                    let v0 = load(ptr);
-                    let v1 = load(ptr.add(lane_count));
-                    let v2 = load(ptr.add(lane_count * 2));
-                    let v3 = load(ptr.add(lane_count * 3));
-
-                    acc0 = Arch::add(acc0, v0);
-                    acc1 = Arch::add(acc1, v1);
-                    acc2 = Arch::add(acc2, v2);
-                    acc3 = Arch::add(acc3, v3);
-
-                    ptr = ptr.add(chunk_size);
-                }
-
-                let mut acc = Arch::add(acc0, acc1);
-                acc = Arch::add(acc, acc2);
-                acc = Arch::add(acc, acc3);
-                Some(acc)
-            } else {
-                None
-            }
-        };
-
-        let mut acc = if let Some(a) = accumulator {
-            a
-        } else {
-            unsafe { Arch::zero() }
-        };
-
-        // Middle SIMD loop for elements that didn't fit into the unrolled loop
-        unsafe {
-            let mut middle_ptr = data.as_ptr().add(unrolled_simd_len);
-            for _ in 0..((simd_len - unrolled_simd_len) / lane_count) {
-                let val = if crate::align::is_aligned_for_arch::<Arch, Align>() {
-                    Arch::load_aligned(middle_ptr)
-                } else {
-                    Arch::load_unaligned(middle_ptr)
-                };
-                acc = Arch::add(acc, val);
-                middle_ptr = middle_ptr.add(lane_count);
-            }
-        }
-
-        let mut total = unsafe { Arch::sum_reduce(acc) };
-
-        // Scalar tail loop
-        for i in simd_len..len {
-            total += data[i];
-        }
-
-        total
+        // Keep the public sum facade on the generic reduction SSOT so its final
+        // partial vector receives the same initialized-buffer masked-tail proof
+        // as `reduce(Sum)` and the runtime-dispatched sum path.
+        self.reduce(crate::ops::Sum)
     }
 
     /// Compute the dot product between this view and another view of the same architecture and alignment.
@@ -235,11 +163,26 @@ where
             None => T::ZERO,
         };
 
-        // Scalar tail loop
-        let s_slice = self.as_slice();
-        let o_slice = other.as_slice();
-        for i in simd_len..len {
-            total += s_slice[i] * o_slice[i];
+        // Masked tail. The masked-memory contract requires a full-width-valid
+        // pointer, so copy the short tail into initialized local lane buffers
+        // before using the provider-owned fused multiply-add seam. Only the live
+        // lanes contribute; this avoids reading beyond either caller slice.
+        let tail = len - simd_len;
+        if tail != 0 {
+            const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+            let mut left = [T::ZERO; MAX_SIMD_LANES];
+            let mut right = [T::ZERO; MAX_SIMD_LANES];
+            left[..tail].copy_from_slice(&self.as_slice()[simd_len..]);
+            right[..tail].copy_from_slice(&other.as_slice()[simd_len..]);
+            // SAFETY: the buffers are fully initialized and have at least
+            // LANE_COUNT elements; the mask selects exactly the live tail.
+            unsafe {
+                let mask = Arch::leading_k_mask(tail);
+                let lhs = Arch::load_unaligned(left.as_ptr());
+                let rhs = Arch::load_unaligned(right.as_ptr());
+                let contribution = Arch::masked_fmadd(lhs, rhs, Arch::zero(), mask);
+                total += Arch::sum_reduce(contribution);
+            }
         }
 
         Ok(total)
@@ -302,10 +245,25 @@ where
             }
         }
 
-        let s_slice = self.as_slice();
-        let o_slice = other.as_slice();
-        for i in simd_len..len {
-            out[i] = s_slice[i] * o_slice[i];
+        let tail = len - simd_len;
+        if tail != 0 {
+            const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+            let mut left = [T::ZERO; MAX_SIMD_LANES];
+            let mut right = [T::ZERO; MAX_SIMD_LANES];
+            let mut result = [T::ZERO; MAX_SIMD_LANES];
+            left[..tail].copy_from_slice(&self.as_slice()[simd_len..]);
+            right[..tail].copy_from_slice(&other.as_slice()[simd_len..]);
+            unsafe {
+                let mask = Arch::leading_k_mask(tail);
+                let value = Arch::masked_mul(
+                    Arch::load_unaligned(left.as_ptr()),
+                    Arch::load_unaligned(right.as_ptr()),
+                    mask,
+                    Arch::zero(),
+                );
+                Arch::store_unaligned(result.as_mut_ptr(), value);
+            }
+            out[simd_len..].copy_from_slice(&result[..tail]);
         }
 
         Ok(())
@@ -383,10 +341,24 @@ where
             }
         }
 
-        let s_slice = self.as_slice();
-        let o_slice = other.as_slice();
-        for i in simd_len..len {
-            out[i] = op.apply_scalar(s_slice[i], o_slice[i]);
+        let tail = len - simd_len;
+        if tail != 0 {
+            const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+            let mut left = [T::ZERO; MAX_SIMD_LANES];
+            let mut right = [T::ZERO; MAX_SIMD_LANES];
+            let mut result = [T::ZERO; MAX_SIMD_LANES];
+            left[..tail].copy_from_slice(&self.as_slice()[simd_len..]);
+            right[..tail].copy_from_slice(&other.as_slice()[simd_len..]);
+            unsafe {
+                let mask = Arch::leading_k_mask(tail);
+                let value = op.apply::<Arch>(
+                    Arch::load_unaligned(left.as_ptr()),
+                    Arch::load_unaligned(right.as_ptr()),
+                );
+                let masked = Arch::blend(Arch::mask_to_vector(mask), value, Arch::zero());
+                Arch::store_unaligned(result.as_mut_ptr(), masked);
+            }
+            out[simd_len..].copy_from_slice(&result[..tail]);
         }
 
         Ok(())

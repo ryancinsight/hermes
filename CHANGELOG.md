@@ -6,6 +6,58 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [arch] Native AVX-512 BF16 tile dispatch is now available when Rust's exact
+  `avx512bf16` runtime probe succeeds. The `Bf16 × Bf16 → F32` tile uses
+  `DPBF16PS` while retaining the AVX-512F/BW/VL conversion/FMA fallback for
+  non-BF16 AVX-512 hosts. Differential coverage validates nonzero `C += A·B`;
+  hardware-specific runtime and benchmark evidence remains runner-gated.
+- [minor] Native SVE remains explicitly blocked on the pinned stable Rust
+  toolchain. `SveArch` continues to provide a safe lane-emulated backend, and
+  `is_native_hardware_supported` reports hardware capability separately without
+  claiming native execution.
+- [patch] Mutable `SimdView::transform_in_place` tails now stage both
+  operands in initialized provider-local buffers, use the generic `ElementOp`
+  vector seam, and copy back only live result lanes. Add/Sub/Mul/Div share the
+  same bounds-safe tail implementation, with forced emulated-SVE odd-length
+  coverage.
+- [patch] `SimdView::zip_reduce(Dot)` now routes its final pairwise vector
+  through two initialized provider-local buffers and the generic masked
+  reduction seam, removing the scalar dot tail while preserving full-width
+  masked-memory safety. Forced emulated-SVE non-dyadic f32 coverage records
+  the expected reassociation tolerance; multiplicative reductions retain their
+  scalar contract.
+- [patch] Generic `Sum`/`Min`/`Max` reductions and reusable view kernels now
+  route final partial vectors through initialized provider-local buffers and
+  leading masks. `SimdView::sum` delegates to `reduce(Sum)`, while masked
+  add/multiply/FMA, elementwise multiply, and generic `zip_into` avoid scalar
+  cleanup loops without reading beyond the live slice. Eunomia min/max NaN and
+  signed-zero behavior remains the contract; floating sums retain the existing
+  SIMD reduction-order envelope.
+- [patch] Popcount reductions now route their final partial vectors through
+  `SimdKernel::masked_sum_reduce`, including the shared bitwise binary path.
+  Initialized local lane buffers preserve bounds safety for blend-based backends,
+  and each masked tail count is exact; the existing whole-reduction accumulator
+  contract is unchanged. Generic reduction and broader view tails are covered
+  by the HS-416 increment; other hot kernels remain separate follow-ups.
+- [patch] Absolute reductions (`AbsSum`/`AbsMax`) now route their final partial
+  vector through a generic masked reduction seam. The view copies live elements
+  into initialized local lanes, applies the absolute transform once, and merges
+  inactive lanes with the neutral identity. Generic sum/min/max and other
+  reduction tails remain separate follow-ups.
+- [patch] Hermes row-update tails now route `axpy_rows` and `axpy_rows_batch`
+  through provider-owned masked fused multiply-add. Fully initialized local lane
+  buffers preserve the AVX2 blend-based bounds proof, and the batched path keeps
+  its existing depth accumulation order. Reductions, views, and other scalar
+  tails remain separate follow-ups.
+- [patch] Transposed GEMV column tails now use initialized provider-local lane
+  buffers plus the existing masked-FMA seam. The full-width masked-memory
+  contract is preserved for every backend, including blend-based AVX2; only live
+  tail elements are copied back to the caller. Non-dyadic f32 coverage records
+  the documented tolerance for fused-operation rounding.
+- [patch] Dense dot-product tails now use initialized provider-local lane buffers
+  and masked FMA before the final horizontal reduction. This removes the scalar
+  remainder loop without widening caller pointers; odd non-dyadic f32 coverage
+  records the expected fused-rounding tolerance.
 - [patch] Enabled crates.io publication for the five reusable workspace crates,
   using the registry package identities `mnemosyne-memory` and
   `themis-topology` while preserving their Rust-facing dependency names.

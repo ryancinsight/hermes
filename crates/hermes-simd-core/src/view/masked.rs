@@ -22,7 +22,11 @@ where
     where
         ORef: 'a,
     {
-        debug_assert_eq!(N, Arch::LANE_COUNT);
+        assert_eq!(
+            N,
+            Arch::LANE_COUNT,
+            "mask lane count must match SIMD lane count"
+        );
         super::check_lengths_equal(self.len(), other.len())?;
         super::check_output_length(self.len(), out.len())?;
 
@@ -68,15 +72,30 @@ where
             }
         }
 
-        let s_slice = self.as_slice();
-        let o_slice = other.as_slice();
-        for i in simd_len..len {
-            let lane_idx = i - simd_len;
-            out[i] = if mask.is_lane_active(lane_idx) {
-                s_slice[i] + o_slice[i]
-            } else {
-                s_slice[i]
-            };
+        let tail = len - simd_len;
+        if tail != 0 {
+            // Blend-based backends perform a full-width vector load even when
+            // only part of the final logical vector is live. Copying the live
+            // prefix into initialized provider-local buffers makes that load
+            // bounded by the local allocation; the combined mask prevents the
+            // inactive tail lanes from reaching the output.
+            const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+            let mut left = [T::ZERO; MAX_SIMD_LANES];
+            let mut right = [T::ZERO; MAX_SIMD_LANES];
+            let mut result = [T::ZERO; MAX_SIMD_LANES];
+            left[..tail].copy_from_slice(&self.as_slice()[simd_len..]);
+            right[..tail].copy_from_slice(&other.as_slice()[simd_len..]);
+            unsafe {
+                let tail_mask = *mask & BitMask::<N>::leading_k(tail);
+                let value = Arch::masked_add(
+                    Arch::load_unaligned(left.as_ptr()),
+                    Arch::load_unaligned(right.as_ptr()),
+                    tail_mask.to_native_mask::<T, Arch>(),
+                    Arch::load_unaligned(left.as_ptr()),
+                );
+                Arch::store_unaligned(result.as_mut_ptr(), value);
+            }
+            out[simd_len..].copy_from_slice(&result[..tail]);
         }
 
         Ok(())
@@ -93,7 +112,11 @@ where
     where
         ORef: 'a,
     {
-        debug_assert_eq!(N, Arch::LANE_COUNT);
+        assert_eq!(
+            N,
+            Arch::LANE_COUNT,
+            "mask lane count must match SIMD lane count"
+        );
         super::check_lengths_equal(self.len(), other.len())?;
         super::check_output_length(self.len(), out.len())?;
 
@@ -139,15 +162,25 @@ where
             }
         }
 
-        let s_slice = self.as_slice();
-        let o_slice = other.as_slice();
-        for i in simd_len..len {
-            let lane_idx = i - simd_len;
-            out[i] = if mask.is_lane_active(lane_idx) {
-                s_slice[i] * o_slice[i]
-            } else {
-                s_slice[i]
-            };
+        let tail = len - simd_len;
+        if tail != 0 {
+            const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+            let mut left = [T::ZERO; MAX_SIMD_LANES];
+            let mut right = [T::ZERO; MAX_SIMD_LANES];
+            let mut result = [T::ZERO; MAX_SIMD_LANES];
+            left[..tail].copy_from_slice(&self.as_slice()[simd_len..]);
+            right[..tail].copy_from_slice(&other.as_slice()[simd_len..]);
+            unsafe {
+                let tail_mask = *mask & BitMask::<N>::leading_k(tail);
+                let value = Arch::masked_mul(
+                    Arch::load_unaligned(left.as_ptr()),
+                    Arch::load_unaligned(right.as_ptr()),
+                    tail_mask.to_native_mask::<T, Arch>(),
+                    Arch::load_unaligned(left.as_ptr()),
+                );
+                Arch::store_unaligned(result.as_mut_ptr(), value);
+            }
+            out[simd_len..].copy_from_slice(&result[..tail]);
         }
 
         Ok(())
@@ -166,7 +199,11 @@ where
         ORef1: 'a,
         ORef2: 'a,
     {
-        debug_assert_eq!(N, Arch::LANE_COUNT);
+        assert_eq!(
+            N,
+            Arch::LANE_COUNT,
+            "mask lane count must match SIMD lane count"
+        );
         super::check_lengths_equal(self.len(), b.len())?;
         super::check_lengths_equal(self.len(), c.len())?;
         super::check_output_length(self.len(), out.len())?;
@@ -216,16 +253,27 @@ where
             }
         }
 
-        let a_slice = self.as_slice();
-        let b_slice = b.as_slice();
-        let c_slice = c.as_slice();
-        for i in simd_len..len {
-            let lane_idx = i - simd_len;
-            out[i] = if mask.is_lane_active(lane_idx) {
-                a_slice[i].scalar_fmadd(b_slice[i], c_slice[i])
-            } else {
-                c_slice[i]
-            };
+        let tail = len - simd_len;
+        if tail != 0 {
+            const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+            let mut left = [T::ZERO; MAX_SIMD_LANES];
+            let mut right = [T::ZERO; MAX_SIMD_LANES];
+            let mut addend = [T::ZERO; MAX_SIMD_LANES];
+            let mut result = [T::ZERO; MAX_SIMD_LANES];
+            left[..tail].copy_from_slice(&self.as_slice()[simd_len..]);
+            right[..tail].copy_from_slice(&b.as_slice()[simd_len..]);
+            addend[..tail].copy_from_slice(&c.as_slice()[simd_len..]);
+            unsafe {
+                let tail_mask = *mask & BitMask::<N>::leading_k(tail);
+                let value = Arch::masked_fmadd(
+                    Arch::load_unaligned(left.as_ptr()),
+                    Arch::load_unaligned(right.as_ptr()),
+                    Arch::load_unaligned(addend.as_ptr()),
+                    tail_mask.to_native_mask::<T, Arch>(),
+                );
+                Arch::store_unaligned(result.as_mut_ptr(), value);
+            }
+            out[simd_len..].copy_from_slice(&result[..tail]);
         }
 
         Ok(())
@@ -238,7 +286,11 @@ where
         mask: &BitMask<N>,
         out: &mut [T],
     ) -> Result<usize, SimdError> {
-        debug_assert_eq!(N, Arch::LANE_COUNT);
+        assert_eq!(
+            N,
+            Arch::LANE_COUNT,
+            "mask lane count must match SIMD lane count"
+        );
         super::check_output_length(self.len(), out.len())?;
 
         let len = self.len();
@@ -308,7 +360,11 @@ where
     where
         ORef: 'a,
     {
-        debug_assert_eq!(N, Arch::LANE_COUNT);
+        assert_eq!(
+            N,
+            Arch::LANE_COUNT,
+            "mask lane count must match SIMD lane count"
+        );
         let out_len = out.len();
         let lane_count = Arch::LANE_COUNT;
         let simd_len = (out_len / lane_count) * lane_count;
