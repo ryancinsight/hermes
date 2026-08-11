@@ -377,6 +377,43 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     ) -> Self::Vector;
 
     // -------------------------------------------------------------------------
+    // Scatter (indirect indexed store)
+    // -------------------------------------------------------------------------
+
+    /// Scatter: store lane `i` of `val` to `base + indices[i]` for each lane `i`.
+    ///
+    /// The write-side dual of [`SimdKernel::gather`]. When `indices` repeats a
+    /// value the highest lane holding it wins, matching the hardware
+    /// last-writer-wins rule; callers needing a deterministic combine over
+    /// duplicate indices must deduplicate before scattering.
+    ///
+    /// Default: a lane-sequential store loop. AVX-512 overrides this with
+    /// `vscatterdps`/`vscatterdpd`; AVX2 and NEON have no scatter instruction
+    /// and keep the default.
+    ///
+    /// # Safety
+    /// All `base + indices[i]` must be valid for writes.
+    unsafe fn scatter(base: *mut T, indices: Self::IndexVector, val: Self::Vector) {
+        crate::kernel_helpers::generic_scatter::<T, Self>(base, indices, val);
+    }
+
+    /// Masked scatter: store only the lanes active in `mask`.
+    ///
+    /// Inactive lanes' indices are never dereferenced, so they may be out of
+    /// range — which is what makes this the tail-safe form.
+    ///
+    /// # Safety
+    /// Active `base + indices[i]` must be valid for writes.
+    unsafe fn scatter_masked(
+        base: *mut T,
+        indices: Self::IndexVector,
+        mask: Self::Mask,
+        val: Self::Vector,
+    ) {
+        crate::kernel_helpers::generic_scatter_masked::<T, Self>(base, indices, mask, val);
+    }
+
+    // -------------------------------------------------------------------------
     // Mask Construction Helpers
     // -------------------------------------------------------------------------
 

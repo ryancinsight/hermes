@@ -1,5 +1,42 @@
 # Backlog — hermes-simd
 
+- [x] [minor] **HS-422 — scatter seam.** Add `SimdKernel::scatter` and
+  `scatter_masked` as defaulted trait methods over a generic lane-sequential
+  helper, override them with native `vscatterdps`/`vscatterdpd` on AVX-512
+  f32/f64, and expose `SimdView::scatter` as the public dual of
+  `SimdView::gather`. Full vectors use the unmasked seam and the final partial
+  vector uses the masked seam, so no scalar tail remains. Indices are validated
+  before any write; duplicate indices are last-writer-wins. Native AVX-512
+  execution stays runner-gated.
+
+- [ ] [minor] **HS-423 — integer shift and rounding primitives.** The kernel
+  trait has no `shift_left`/`shift_right` (blocking bit-manipulation and
+  sub-byte unpacking kernels from staying in the vector domain) and no
+  `floor`/`ceil`/`round`/`trunc`. Both families are defaultable over the
+  generic scalar-lane helpers with native x86/NEON overrides, the same shape
+  HS-422 used. Acceptance: per-backend differential tests against the scalar
+  reference, including the negative-value and halfway-rounding boundaries.
+
+- [ ] [minor] **HS-424 — cross-lane permute family.** Lane shuffles exist only
+  as the complex adjacent-pair primitives (`swap_adjacent`, `dup_even`,
+  `dup_odd`). General `reverse`, `interleave`, and `deinterleave` have no seam,
+  so consumers needing them must leave the vector domain. Acceptance:
+  per-backend differential tests plus a permutation round-trip identity.
+
+- [ ] [patch] **HS-425 — `TargetId` omits the SVE backend.** `SveArch` is a
+  first-class emulated backend exercised throughout the test suite, but
+  `TargetId` enumerates only Scalar/Avx2/Avx512/Neon. The public forced-dispatch
+  token API therefore cannot reach a backend the workspace ships, leaving a hole
+  in the cross-target conformance matrix. Acceptance: `TargetId::Sve` routed
+  through `dispatch_view_to`/`dispatch_view_mut_to` with conformance coverage.
+
+- [ ] [patch] **HS-426 — ADR index hygiene.** `docs/adr/` has two ADRs numbered
+  007 (`007-arm-sme-backend-feasibility`, `007-bitboard-kernel-safe-surface`);
+  seven of eleven ADRs carry no `## Status` section, so the generated index
+  renders them as `—`; and the ones that do use `Approved` rather than the
+  canonical `Accepted`. Acceptance: unique numbering, a canonical status on
+  every ADR, and a regenerated index that `adr-index.py check` passes.
+
 - [x] [patch] **HS-420 — mutable generic view tails.** Route the final
   `SimdView::transform_in_place` partial vector through initialized local
   operand/result buffers and the provider's generic `ElementOp` vector seam.
@@ -74,6 +111,11 @@
 - [ ] [patch] **HS-406 follow-up — clean-worktree package gate.** Re-run the full
   Hermes package gate after unrelated Cargo.lock/overlay dirt is reconciled;
   focused provider slices must not claim this gate from a dirty worktree.
+  Owner: codex-session (claimed 2026-08-11); Cargo.lock reconciled to origin.
+  **Blocked 2026-08-11:** live peer mid-flight on a scatter-module change touching
+  `kernel*.rs`, `view/mod.rs`, `view/scatter.rs` (new), AVX-512 files, and
+  `kernel_property_tests.rs` — the gate cannot run from this worktree. Re-open
+  trigger: peer's scatter change lands (committed) and the tree settles.
 
 
 Strategic roadmap. Triage order: correctness → architecture → tests → docs → PM.

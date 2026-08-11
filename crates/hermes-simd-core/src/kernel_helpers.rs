@@ -59,6 +59,99 @@ where
     }
 }
 
+/// Generic indexed-store (scatter) default: lane `i` of `val` is written to
+/// `base + indices[i]`, for the lanes selected by `bitmask`.
+///
+/// This is the write-side dual of [`SimdKernel::gather`]. Backends with a native
+/// scatter instruction (AVX-512 `vscatterdps`/`vscatterdpd`) override
+/// [`SimdKernel::scatter`] and [`SimdKernel::scatter_masked`]; every other
+/// backend inherits this lane-sequential default, since neither AVX2 nor NEON
+/// has a scatter instruction to dispatch to.
+///
+/// Lanes are written in ascending order, so when `indices` repeats a value the
+/// highest active lane holding it wins — the same last-writer-wins rule the
+/// hardware instructions document. `T: Scalar` is `Copy`, so no store drops a
+/// previous value.
+///
+/// # Safety
+/// - Every active `base + indices[i]` must be valid for writing one `T`.
+/// - `Arch::IndexVector` must be `Arch::LANE_COUNT` packed `i32`s, the
+///   workspace-wide layout invariant asserted at compile time below.
+#[inline(always)]
+unsafe fn generic_scatter_bitmask<T, Arch>(
+    base: *mut T,
+    indices: Arch::IndexVector,
+    val: Arch::Vector,
+    bitmask: u64,
+) where
+    T: Scalar,
+    Arch: SimdKernel<T>,
+{
+    const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+    // Compile-time guard binding the soundness condition the SAFETY note relies
+    // on: a backend whose `IndexVector` is not `LANE_COUNT` packed `i32`s fails
+    // to build rather than reading uninitialized index lanes below.
+    const {
+        assert!(
+            core::mem::size_of::<Arch::IndexVector>()
+                == <Arch as SimdKernel<T>>::LANE_COUNT * core::mem::size_of::<i32>(),
+            "IndexVector size must equal LANE_COUNT * size_of::<i32>()"
+        )
+    };
+
+    let mut idx = [0_i32; MAX_SIMD_LANES];
+    // The const assert above bounds the write to `LANE_COUNT <= MAX_SIMD_LANES`
+    // index slots; the pointer is `i32`-aligned, which is all an unaligned write
+    // of the packed-`i32` `IndexVector` requires.
+    core::ptr::write_unaligned(idx.as_mut_ptr().cast::<Arch::IndexVector>(), indices);
+
+    let mut lanes = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+    Arch::store_unaligned(lanes.as_mut_ptr() as *mut T, val);
+
+    for i in 0..Arch::LANE_COUNT {
+        if (bitmask >> i) & 1 == 1 {
+            *base.offset(idx[i] as isize) = lanes[i].assume_init();
+        }
+    }
+}
+
+/// Generic unmasked scatter default: every lane of `val` is stored.
+///
+/// # Safety
+/// Carries [`generic_scatter_bitmask`]'s contract with all lanes active.
+#[inline(always)]
+pub unsafe fn generic_scatter<T, Arch>(base: *mut T, indices: Arch::IndexVector, val: Arch::Vector)
+where
+    T: Scalar,
+    Arch: SimdKernel<T>,
+{
+    let all_active = if Arch::LANE_COUNT >= u64::BITS as usize {
+        u64::MAX
+    } else {
+        (1_u64 << Arch::LANE_COUNT) - 1
+    };
+    generic_scatter_bitmask::<T, Arch>(base, indices, val, all_active);
+}
+
+/// Generic masked scatter default: only lanes active in `mask` are stored.
+///
+/// # Safety
+/// Carries [`generic_scatter_bitmask`]'s contract for the active lanes only;
+/// inactive lanes' indices are never dereferenced.
+#[inline(always)]
+pub unsafe fn generic_scatter_masked<T, Arch>(
+    base: *mut T,
+    indices: Arch::IndexVector,
+    mask: Arch::Mask,
+    val: Arch::Vector,
+) where
+    T: Scalar,
+    Arch: SimdKernel<T>,
+{
+    let bitmask = Arch::mask_to_bitmask(mask);
+    generic_scatter_bitmask::<T, Arch>(base, indices, val, bitmask);
+}
+
 #[inline(always)]
 pub unsafe fn generic_binary_op<T, Arch, F>(
     a: Arch::Vector,

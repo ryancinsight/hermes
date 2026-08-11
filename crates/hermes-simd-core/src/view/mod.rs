@@ -20,6 +20,8 @@ pub mod ops_mut;
 pub mod reduce;
 /// Inclusive/exclusive prefix scans and running min/max.
 pub mod scan;
+/// Vectorized indirect store (scatter) operations.
+pub mod scatter;
 /// Lane-wise conditional select and masked-negate.
 pub mod select;
 /// 2D matrix tile views and operations.

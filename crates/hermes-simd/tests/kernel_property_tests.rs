@@ -73,6 +73,60 @@ where
     }
 }
 
+/// View-level scatter must equal the scalar reference for arbitrary in-bounds
+/// index sequences, including repeats — where the highest lane writing an index
+/// wins, the documented last-writer-wins contract.
+fn check_scatter_matches_reference<A>(len: usize, indices: &[i32])
+where
+    A: hermes_simd_core::arch::SimdArch + SimdKernel<f32>,
+{
+    let src: Vec<f32> = (0..indices.len()).map(|i| (i + 1) as f32 * 0.5).collect();
+
+    let mut expected = vec![0.0f32; len];
+    for (k, &idx) in indices.iter().enumerate() {
+        expected[idx as usize] = src[k];
+    }
+
+    let mut actual = vec![0.0f32; len];
+    {
+        let mut view =
+            SimdView::<f32, A, Unaligned, Unmasked, &mut [f32]>::new_mut(&mut actual).unwrap();
+        view.scatter(indices, &src).unwrap();
+    }
+    assert_eq!(actual, expected, "scatter mismatch (len {len})");
+}
+
+/// Scatter is the write-side inverse of gather: scattering a permutation and
+/// gathering back through the same indices must restore the source exactly.
+/// This oracle is independent of the element-wise reference loop above.
+fn check_gather_scatter_roundtrip<A>(values: &[f32])
+where
+    A: hermes_simd_core::arch::SimdArch + SimdKernel<f32>,
+{
+    let n = values.len();
+    // A permutation guarantees every destination is written exactly once, so
+    // the round-trip is well defined regardless of the duplicate-index rule.
+    let perm: Vec<i32> = (0..n).map(|i| ((i * 7 + 3) % n) as i32).collect();
+    let perm: Vec<i32> = if perm.iter().collect::<std::collections::HashSet<_>>().len() == n {
+        perm
+    } else {
+        (0..n as i32).rev().collect()
+    };
+
+    let mut scattered = vec![0.0f32; n];
+    {
+        let mut view =
+            SimdView::<f32, A, Unaligned, Unmasked, &mut [f32]>::new_mut(&mut scattered).unwrap();
+        view.scatter(&perm, values).unwrap();
+    }
+
+    let view = SimdView::<f32, A, Unaligned, Unmasked, &[f32]>::new(&scattered).unwrap();
+    let mut restored = vec![0.0f32; n];
+    view.gather(&perm, &mut restored).unwrap();
+
+    assert_eq!(restored, values, "gather∘scatter is not the identity");
+}
+
 /// `masked_sum_reduce` with `leading_k_mask(k)` must sum exactly the first
 /// `min(k, LANE_COUNT)` lanes, including the k = 0 and k > LANE_COUNT bounds.
 fn check_leading_k_masked_sum<A: SimdKernel<f32>>() {
@@ -342,6 +396,98 @@ proptest! {
             check_gather_matches_reference::<hermes_simd::Neon>(&values, &indices);
         }
     }
+
+    #[test]
+    fn prop_scatter_matches_reference_all_backends(
+        (len, indices) in (1usize..256)
+            .prop_flat_map(|n| {
+                (Just(n), prop::collection::vec(0..n as i32, 0..64))
+            }),
+    ) {
+        check_scatter_matches_reference::<Scalar>(len, &indices);
+        check_scatter_matches_reference::<SveArch>(len, &indices);
+
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+                check_scatter_matches_reference::<hermes_simd::Avx2>(len, &indices);
+            }
+            if std::is_x86_feature_detected!("avx512f") {
+                check_scatter_matches_reference::<hermes_simd::Avx512>(len, &indices);
+            }
+        }
+        #[cfg(target_arch = "aarch64")]
+        {
+            check_scatter_matches_reference::<hermes_simd::Neon>(len, &indices);
+        }
+    }
+
+    #[test]
+    fn prop_gather_scatter_roundtrip_all_backends(
+        values in prop::collection::vec(-1000.0f32..1000.0, 1..256),
+    ) {
+        check_gather_scatter_roundtrip::<Scalar>(&values);
+        check_gather_scatter_roundtrip::<SveArch>(&values);
+
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+                check_gather_scatter_roundtrip::<hermes_simd::Avx2>(&values);
+            }
+            if std::is_x86_feature_detected!("avx512f") {
+                check_gather_scatter_roundtrip::<hermes_simd::Avx512>(&values);
+            }
+        }
+        #[cfg(target_arch = "aarch64")]
+        {
+            check_gather_scatter_roundtrip::<hermes_simd::Neon>(&values);
+        }
+    }
+}
+
+#[test]
+fn scatter_rejects_out_of_bounds_indices() {
+    let mut values = [1.0f32, 2.0, 3.0];
+    let mut view =
+        SimdView::<f32, Scalar, Unaligned, Unmasked, &mut [f32]>::new_mut(&mut values).unwrap();
+    let src = [9.0f32, 9.0];
+    assert!(matches!(
+        view.scatter(&[0, 3], &src),
+        Err(hermes_simd_core::view::SimdError::IndexOutOfBounds)
+    ));
+    assert!(matches!(
+        view.scatter(&[-1, 0], &src),
+        Err(hermes_simd_core::view::SimdError::IndexOutOfBounds)
+    ));
+    // The rejected calls wrote nothing.
+    assert_eq!(values, [1.0f32, 2.0, 3.0]);
+}
+
+#[test]
+fn scatter_rejects_short_source() {
+    let mut values = [1.0f32, 2.0, 3.0];
+    let mut view =
+        SimdView::<f32, Scalar, Unaligned, Unmasked, &mut [f32]>::new_mut(&mut values).unwrap();
+    let src = [9.0f32];
+    assert!(matches!(
+        view.scatter(&[0, 1], &src),
+        Err(hermes_simd_core::view::SimdError::InsufficientInputLength)
+    ));
+    assert_eq!(values, [1.0f32, 2.0, 3.0]);
+}
+
+/// Duplicate indices resolve last-writer-wins, matching the hardware scatter
+/// rule on both the native AVX-512 path and the lane-sequential fallback.
+#[test]
+fn scatter_duplicate_indices_take_the_highest_lane() {
+    let mut values = [0.0f32; 4];
+    {
+        let mut view =
+            SimdView::<f32, Scalar, Unaligned, Unmasked, &mut [f32]>::new_mut(&mut values).unwrap();
+        view.scatter(&[1, 1, 1, 2], &[10.0f32, 20.0, 30.0, 40.0])
+            .unwrap();
+    }
+    assert_eq!(values, [0.0, 30.0, 40.0, 0.0]);
 }
 
 #[test]

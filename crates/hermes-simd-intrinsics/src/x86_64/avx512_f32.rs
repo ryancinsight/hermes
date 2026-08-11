@@ -269,6 +269,29 @@ impl SimdKernel<f32> for Avx512 {
     }
 
     // -----------------------------------------------------------------------
+    // Scatter (native `vscatterdps`)
+    // -----------------------------------------------------------------------
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn scatter(base: *mut f32, indices: Self::IndexVector, val: Self::Vector) {
+        _mm512_i32scatter_ps(base, indices, val.0, 4);
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds. Inactive mask lanes are not dereferenced by the instruction.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn scatter_masked(
+        base: *mut f32,
+        indices: Self::IndexVector,
+        mask: Self::Mask,
+        val: Self::Vector,
+    ) {
+        _mm512_mask_i32scatter_ps(base, mask, indices, val.0, 4);
+    }
+
+    // -----------------------------------------------------------------------
     // Mask construction
     // -----------------------------------------------------------------------
 

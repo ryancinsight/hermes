@@ -68,13 +68,19 @@ load/store primitives.
 
 Dense target conformance is covered by host-capability tests that force every
 supported `TargetId` and compare sum, dot, elementwise arithmetic, gather, and
-select against the scalar target.
+select against the scalar target. Scatter is covered by per-backend property
+tests instead, since it needs a mutable view per backend rather than the shared
+read-only view the `TargetId` matrix forces.
 
 The operation-family coverage map is tracked in
 [`backlog.md`](backlog.md#operation-family-coverage-map). Delivered families
 include arithmetic, reductions, masks/select, memory views/wrappers, consumer
-shuffle primitives, and float-specialized kernels. Pending families are admitted
-only from consumer demand: scatter/compress-store, comparison predicates,
+shuffle primitives, float-specialized kernels, and indexed gather/scatter.
+Scatter was admitted as the write-side dual of the already-public `gather`
+rather than from a consumer request: a one-directional lane-addressing model
+forces any scatter-shaped caller out of the vector domain entirely. Pending
+families remain admitted only from consumer demand: compress-store,
+comparison predicates,
 standalone conversions, broad bitwise public facades, and crypto/hash
 primitives. This keeps Hermes as the SIMD SSOT without cloning Highway's full
 catalog or claiming unsupported operations.

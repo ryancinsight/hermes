@@ -4,6 +4,78 @@ Persistent gap register. Evidence tiers follow the repository instruction
 hierarchy: machine-checked proof > type-level invariant > property/fuzz >
 differential/empirical > source audit.
 
+## SIMD/SIMT Capability and Completeness Audit - 2026-08-11 <a id="simd-simt-2026-08-11"></a>
+
+Scope: the `SimdKernel` operation catalog, the backend/`TargetId` matrix, and
+the SIMT question. Method: full read of `kernel.rs`, `kernel_helpers.rs`, the
+per-ISA impls, `target.rs`, `cpu.rs`, and the ADR set; source-audit tier except
+where a delivered increment carries its own differential evidence.
+
+### SIMT scope — closed, not a gap
+
+Hermes owns lane-parallel CPU execution; device-resident SIMT execution belongs
+to Hephaestus, consumed through Coeus/Apollo (README, "Atlas Compute
+Boundaries"). Adding GPU dispatch here would fork a dimension another stack
+member owns, so no SIMT work is opened against Hermes. What Hermes does own of
+the SIMT *programming model* — per-lane predication, masked memory, indexed
+gather/scatter, compress/expand, cross-lane reduction — is the axis audited
+below, and the masked-memory half is now complete (HS-413..HS-421 landed the
+tail routing; every hot kernel runs the provider-owned masked seam).
+
+### Delivered
+
+- [minor] Indexed-store asymmetry (delivered as HS-422): `gather` and
+  `gather_masked` existed with no write-side dual, so the lane-addressing model
+  was read-only and any scatter-shaped consumer had to leave the vector domain.
+  `SimdKernel::scatter`/`scatter_masked` plus `SimdView::scatter` close it, with
+  native AVX-512 `vscatterdps`/`vscatterdpd` and the lane-sequential default on
+  AVX2/NEON (neither ISA has a scatter instruction). Evidence: per-backend
+  differential property tests, a gather∘scatter round-trip identity, and
+  duplicate-index/error-contract tests. AVX-512 native execution is runner-gated.
+
+### Open operation-catalog gaps (source-audit tier)
+
+- [minor] No integer shift primitives (`shift_left`/`shift_right`). Bit
+  manipulation and the sub-byte unpacking the precision ladder advertises cannot
+  stay in the vector domain without them. Tracked as HS-423.
+- [minor] No rounding family (`floor`/`ceil`/`round`/`trunc`). Tracked as HS-423.
+- [minor] No general cross-lane permute (`reverse`, `interleave`,
+  `deinterleave`). The only lane shuffles are the complex adjacent-pair
+  primitives, which are shaped for interleaved complex and nothing else.
+  Tracked as HS-424.
+- [minor] No saturating arithmetic. Relevant to the i8/i16 VNNI and AMX paths,
+  where wrapping is the wrong domain contract for accumulation clamping. No
+  consumer requirement is recorded yet, so this stays a register entry rather
+  than a board item — open it when a caller needs it, not speculatively.
+
+### Backend matrix
+
+- [patch] `TargetId` omits `SveArch` although the workspace ships it as a
+  first-class emulated backend used throughout the suite. The forced-dispatch
+  token API — the mechanism the Highway audit added for exactly this purpose —
+  therefore cannot reach it, so the cross-target conformance matrix has a hole
+  in a backend that exists. Tracked as HS-425.
+- Native SVE remains blocked on stable Rust (scalable vectors are not
+  expressible); `SveArch` stays lane-emulated and its hardware probe stays
+  informational. Unchanged, correctly documented, not a defect.
+- SSE2 and Arm SME each have a feasibility ADR (006, 007) and no backend. That
+  is a recorded decision, not drift.
+
+### Documentation hygiene
+
+- [patch] `docs/adr/` has two ADRs numbered 007; seven of eleven carry no
+  `## Status` section (the generated index renders `—`); and those that do use
+  `Approved` instead of the canonical `Accepted`. Tracked as HS-426.
+
+### Cross-repo (reported, not owned here)
+
+- The atlas stack overlay in `.cargo/config.toml` had gone stale against gaia's
+  rename to package `gaia-mesh`, breaking dependency resolution under the
+  umbrella. Regenerated via `scripts/atlas-stack-overlay.py generate` (the
+  overlay is generated state, never hand-edited). Consumers still declaring
+  `gaia = { git = ... }` remain unpatched until they rename the dependency —
+  an atlas-level follow-up, outside Hermes.
+
 - Resolved 2026-08-06 — HS-409 fused ternary AXPY provider facade: Hermes now
   exposes `axpy_mul(alpha, a, b, out)` and `SimdOps::axpy_mul` for the exact
   in-place contract `out[i] += alpha * a[i] * b[i]`. The runtime-dispatched

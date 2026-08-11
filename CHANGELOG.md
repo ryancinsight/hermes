@@ -4,6 +4,23 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ## [Unreleased]
 
+### Added
+
+- [minor] Indirect indexed store (scatter), the write-side dual of `gather`.
+  `SimdKernel::scatter` / `scatter_masked` join the trait as defaulted methods,
+  so every existing backend gains them without an impl change; AVX-512 f32/f64
+  override them with native `vscatterdps`/`vscatterdpd`, while AVX2 and NEON
+  keep the lane-sequential default because neither ISA has a scatter
+  instruction. `SimdView::scatter` is the public surface, mirroring
+  `SimdView::gather`: indices are fully validated before any write, so the
+  error path leaves the view untouched, and the final partial vector routes
+  through `scatter_masked` rather than a scalar tail loop. Duplicate indices
+  resolve last-writer-wins, matching the hardware rule on both paths.
+  Verification: per-backend differential property tests against the scalar
+  reference, a gather∘scatter round-trip identity, duplicate-index and
+  error-contract tests. Native AVX-512 execution evidence remains runner-gated;
+  the developer host provides AVX2 only.
+
 ### Changed
 
 - [arch] Native AVX-512 BF16 tile dispatch is now available when Rust's exact

@@ -1,5 +1,21 @@
 # Checklist — active sprint
 
+## HS-422 [minor] — scatter seam
+
+- [x] Add `generic_scatter` / `generic_scatter_masked` helpers over the
+      workspace `IndexVector` layout invariant, const-asserted at the helper.
+- [x] Add `SimdKernel::scatter` / `scatter_masked` as defaulted methods so no
+      existing backend impl changes.
+- [x] Override both with native `vscatterdps`/`vscatterdpd` on AVX-512 f32/f64.
+- [x] Expose `SimdView::scatter` in a `view/scatter.rs` leaf module mirroring
+      `view/gather.rs`; validate every index before any write.
+- [x] Route the final partial vector through `scatter_masked`, not a scalar tail.
+- [x] Cover per-backend differential equality, the gather∘scatter round-trip
+      identity, duplicate-index last-writer-wins, and both error contracts.
+- [ ] Validate native AVX-512 execution on a hosted AVX-512 runner; the
+      developer host provides AVX2 only, so that path is compile-verified and
+      contract-tested but not executed here.
+
 ## HS-421 [arch] — native AVX-512 BF16 tile dispatch
 
 - [x] Keep `avx512f,avx512bw,avx512vl` as the conversion/FMA fallback
