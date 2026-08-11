@@ -41,10 +41,15 @@ jobs:
       # deliberately absent: GitHub's x86 runners vary between parts that have
       # it and parts that do not, so requiring it here would fail at random.
       # That non-determinism is why the SDE job exists.
-      - name: Tests (nextest, dev profile; release uses panic=abort which conflicts with the test harness)
-        run: cargo nextest run --workspace
+      # --no-capture is required: nextest swallows stdout for passing tests,
+      # so without it the matrix would print only when the assertion fails —
+      # exactly the silence this step exists to remove.
+      - name: Identify host backend coverage
+        run: cargo nextest run -p hermes-simd -E 'test(host_backend_coverage)' --no-capture
         env:
           HERMES_EXPECTED_TARGETS: scalar,avx2
+      - name: Tests (nextest, dev profile; release uses panic=abort which conflicts with the test harness)
+        run: cargo nextest run --workspace
       - name: Doctests
         run: cargo test --doc --workspace
       - name: Examples build (rot gate)
@@ -157,10 +162,20 @@ jobs:
       # The cargo target runner applies the emulator to the *test binaries*
       # only, so compilation stays native and only execution pays the cost.
       # An explicit --target is required for cargo to honor the runner.
-      - name: Tests under emulated Sapphire Rapids
+      # Identification runs under the emulator too; against the bare host it
+      # would report no AVX-512 and fail its own expectation. Passing here is
+      # the assertion that SDE genuinely satisfies the runtime probes rather
+      # than merely failing to break anything.
+      - name: Identify emulated backend coverage
         env:
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER: "${{ env.SDE_PATH }}/sde64 -spr --"
           HERMES_EXPECTED_TARGETS: scalar,avx2,avx512
+        run: |
+          cargo nextest run -p hermes-simd -E 'test(host_backend_coverage)' \
+            --profile sde --target x86_64-unknown-linux-gnu --no-capture
+      - name: Tests under emulated Sapphire Rapids
+        env:
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER: "${{ env.SDE_PATH }}/sde64 -spr --"
         run: |
           cargo nextest run --workspace --profile sde \
             --target x86_64-unknown-linux-gnu
@@ -182,10 +197,12 @@ jobs:
         with:
           workspaces: hermes
       - uses: taiki-e/install-action@nextest
-      - name: Tests (nextest, committed timeout config)
-        run: cargo nextest run --workspace
+      - name: Identify host backend coverage
+        run: cargo nextest run -p hermes-simd -E 'test(host_backend_coverage)' --no-capture
         env:
           HERMES_EXPECTED_TARGETS: scalar,neon
+      - name: Tests (nextest, committed timeout config)
+        run: cargo nextest run --workspace
       - name: Doctests
         run: cargo test --doc --workspace
 
