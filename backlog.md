@@ -27,12 +27,20 @@
   so consumers needing them must leave the vector domain. Acceptance:
   per-backend differential tests plus a permutation round-trip identity.
 
-- [ ] [patch] **HS-425 — `TargetId` omits the SVE backend.** `SveArch` is a
+- [ ] [major] **HS-425 — `TargetId` omits the SVE backend.** `SveArch` is a
   first-class emulated backend exercised throughout the test suite, but
   `TargetId` enumerates only Scalar/Avx2/Avx512/Neon. The public forced-dispatch
   token API therefore cannot reach a backend the workspace ships, leaving a hole
   in the cross-target conformance matrix. Acceptance: `TargetId::Sve` routed
-  through `dispatch_view_to`/`dispatch_view_mut_to` with conformance coverage.
+  through `dispatch_view_to`/`dispatch_view_mut_to` with conformance coverage,
+  and `dispatch_view` auto-selection left untouched — an emulated backend must
+  stay explicitly requested, never auto-selected.
+  Reclassified from [patch] on inspection: `TargetId` and `DispatchedView` are
+  both public enums without `#[non_exhaustive]`, so adding a variant breaks
+  every downstream exhaustive match. The item therefore needs an ADR covering
+  the variant addition, whether to apply `#[non_exhaustive]` to both enums in
+  the same break so this never recurs, and the pre-1.0 minor-bump migration
+  note. Precondition: that ADR drafted and the version decision made.
 
 - [x] [patch] **HS-426 — ADR index hygiene.** `docs/adr/` carried two ADRs
   numbered 007, eight of eleven with no `## Status` section (the generated index

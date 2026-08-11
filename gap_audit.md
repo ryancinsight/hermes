@@ -70,7 +70,10 @@ assessed against a float-lane trait, not a general one.
   first-class emulated backend used throughout the suite. The forced-dispatch
   token API — the mechanism the Highway audit added for exactly this purpose —
   therefore cannot reach it, so the cross-target conformance matrix has a hole
-  in a backend that exists. Tracked as HS-425.
+  in a backend that exists. Tracked as HS-425 — reclassified [patch] → [major]
+  on inspection, because `TargetId` and `DispatchedView` are public enums
+  without `#[non_exhaustive]`, so the variant addition breaks downstream
+  exhaustive matches and needs an ADR plus a migration note.
 - Native SVE remains blocked on stable Rust (scalable vectors are not
   expressible); `SveArch` stays lane-emulated and its hardware probe stays
   informational. Unchanged, correctly documented, not a defect.
