@@ -6,6 +6,17 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Added
 
+- [minor] Native cross-lane permute overrides on AVX-512 (`vpermps`/`vpermpd`,
+  `vpermi2ps`/`vpermi2pd`) and NEON (`rev64`+`ext`, `zip1`/`zip2`,
+  `uzp1`/`uzp2`), verified by the existing differential and round-trip tests on
+  the SDE and aarch64 runners. `benches/permute.rs` is the committed regression
+  baseline. Note the AVX2 interleave/deinterleave overrides were written,
+  measured, and **removed**: `unpack` + `permute2f128` runs 37% slower than the
+  generic default at L1-resident size, because LLVM already lowers the
+  default's stack round-trip into good shuffle sequences. AVX2 `reverse` was
+  kept on measurement (10.4% faster at 1024 f32). AVX-512 and NEON override
+  performance is not yet measured — they are correctness-equivalent canonical
+  lowerings, not a speed claim.
 - [patch] CI now executes the capability-gated ISA paths instead of skipping
   them. AVX-512 branches are `is_x86_feature_detected!`-guarded, and the
   capability report added with the new `test-avx512-sde` job proved the x86

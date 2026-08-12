@@ -70,7 +70,39 @@
   job becomes redundant and is deleted rather than kept alongside.
   Precondition: a cost/infrastructure decision, which is the user's to make.
 
-- [ ] [minor] **HS-427 — native permute overrides beyond AVX2 reverse.**
+- [x] [minor] **HS-427 — native permute overrides beyond AVX2 reverse.**
+  Delivered with one premise falsified. AVX-512 f32/f64 override all three ops
+  (`vpermps`/`vpermpd` for reverse, `vpermi2ps`/`vpermi2pd` for the two-vector
+  permutes, whose index space is the flat `a || b` concatenation the trait
+  contract is written on); NEON f32/f64 override all three (`rev64` + `ext`,
+  `zip1`/`zip2`, `uzp1`/`uzp2` — NEON's zip/uzp are whole-register, so at
+  128-bit width they *are* the flat operations). Correctness is verified by the
+  existing HS-424 differential and round-trip tests on the SDE and aarch64
+  runners, unchanged.
+  **The AVX2 interleave/deinterleave overrides were written, measured, and
+  removed.** `unpack` + `permute2f128` is a *37% regression* against the
+  generic store/permute/load default at L1-resident size (two runs agree,
+  p < 0.05), and deinterleave was neutral-to-negative. LLVM already lowers the
+  generic default's stack round-trip into good shuffle sequences, so the
+  hand-written cross-half fixup buys nothing and costs latency. AVX2 `reverse`
+  survives on measurement: 10.4% faster at 1024 f32, 2.8% at 1024 f64.
+  Committed `benches/permute.rs` is the regression baseline. Measure at the
+  L1-resident size — at 16384 elements the working set spills and the permute
+  cost disappears into memory traffic, which is why the two sizes disagree.
+  Residual: AVX-512 and NEON override *performance* is unverified. SDE cannot
+  measure it (HS-429) and the aarch64 job runs no benchmark. Given the AVX2
+  result, these may not pay either; they are kept as correctness-equivalent
+  canonical lowerings, not as a speed claim. Follow-up HS-430.
+
+- [ ] [patch] **HS-430 — measure the AVX-512 and NEON permute overrides.**
+  HS-427 shipped them on correctness alone. The AVX2 result — a hand-written
+  native sequence losing 37% to the generic default — is the reason this cannot
+  be assumed. Method: the override-versus-default comparison HS-427 used, which
+  is a `#[cfg(any())]` gate on the override plus a criterion
+  `--save-baseline`/`--baseline` pair on a quiet host. NEON needs a bench step
+  on the existing aarch64 runner; AVX-512 needs HS-429's real silicon.
+  Acceptance: each override either shows a significant win and stays, or is
+  deleted like the AVX2 pair.
   UNBLOCKED as of HS-428 — both preconditions were already satisfiable and the
   original entry was wrong to defer on runner availability. aarch64 has had a
   native `ubuntu-24.04-arm` job running the full suite all along (and

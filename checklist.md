@@ -1,5 +1,22 @@
 # Checklist — active sprint
 
+## HS-427 [minor] — native permute overrides
+
+- [x] AVX-512 f32/f64: reverse via `vpermxvar`, interleave/deinterleave via
+      `vpermi2ps`/`vpermi2pd` over the flat `a || b` index space.
+- [x] NEON f32/f64: `rev64`+`ext`, `zip1`/`zip2`, `uzp1`/`uzp2` — whole-register
+      at 128-bit width, so they are the flat operations directly.
+- [x] Correctness via the unchanged HS-424 differential and round-trip tests on
+      the SDE and aarch64 runners.
+- [x] Commit `benches/permute.rs` as the regression baseline, sized inside the
+      committed per-binary runtime budget.
+- [x] Measure AVX2 override versus generic default on a quiet host
+      (`#[cfg(any())]` gate plus criterion save/compare baselines).
+- [x] Act on the measurement: remove AVX2 interleave/deinterleave (37%
+      regression), keep AVX2 reverse (10.4% faster at 1024 f32).
+- [ ] Measure the AVX-512 and NEON overrides — HS-430. Not a speed claim until
+      then; SDE cannot time, and the aarch64 job runs no benchmark.
+
 ## HS-424 [minor] — cross-lane permute family
 
 - [x] Add `reverse`, `interleave`, `deinterleave` as defaulted `SimdKernel`

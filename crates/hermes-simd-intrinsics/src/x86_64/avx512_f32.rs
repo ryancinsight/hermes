@@ -269,6 +269,56 @@ impl SimdKernel<f32> for Avx512 {
     }
 
     // -----------------------------------------------------------------------
+    // Cross-lane permutes (native `vpermps` / `vpermi2ps`)
+    // -----------------------------------------------------------------------
+    //
+    // AVX-512 expresses each of these as one full-width permute, so no
+    // cross-half fixup is needed: `vpermps` reads any source lane, and
+    // `vpermi2ps` indexes the 32-lane concatenation `a || b` (0..15 selects
+    // `a`, 16..31 selects `b`), which is exactly the flat sequence the trait
+    // contract is written on.
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn reverse(v: Self::Vector) -> Self::Vector {
+        // Result lane i takes source lane idx[i], so descending indices reverse.
+        let idx = _mm512_setr_epi32(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
+        Avx512F32Vec(_mm512_permutexvar_ps(idx, v.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn interleave(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
+        // Flat position p holds a[p/2] for even p and b[p/2] for odd p. The low
+        // half covers p = 0..15 and the high half p = 16..31; `b` lanes are
+        // selected by adding 16 to the index.
+        let lo_idx = _mm512_setr_epi32(0, 16, 1, 17, 2, 18, 3, 19, 4, 20, 5, 21, 6, 22, 7, 23);
+        let hi_idx =
+            _mm512_setr_epi32(8, 24, 9, 25, 10, 26, 11, 27, 12, 28, 13, 29, 14, 30, 15, 31);
+        (
+            Avx512F32Vec(_mm512_permutex2var_ps(a.0, lo_idx, b.0)),
+            Avx512F32Vec(_mm512_permutex2var_ps(a.0, hi_idx, b.0)),
+        )
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn deinterleave(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
+        // Over the concatenation `a || b`, the even output is positions 2i and
+        // the odd output positions 2i+1 — the indices are the positions
+        // themselves, since 0..15 already selects `a` and 16..31 selects `b`.
+        let even_idx = _mm512_setr_epi32(0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30);
+        let odd_idx = _mm512_setr_epi32(1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31);
+        (
+            Avx512F32Vec(_mm512_permutex2var_ps(a.0, even_idx, b.0)),
+            Avx512F32Vec(_mm512_permutex2var_ps(a.0, odd_idx, b.0)),
+        )
+    }
+
+    // -----------------------------------------------------------------------
     // Scatter (native `vscatterdps`)
     // -----------------------------------------------------------------------
 

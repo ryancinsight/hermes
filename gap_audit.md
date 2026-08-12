@@ -104,6 +104,27 @@ assessed against a float-lane trait, not a general one.
   error-contract tests all exercise the native `vscatterdps`/`vscatterdpd`
   override under SDE.
 
+### Hand-written intrinsics versus LLVM's lowering (HS-427, 2026-08-12)
+
+- [minor] A native AVX2 `interleave` written as `unpack` + `permute2f128` — the
+  textbook flat-interleave sequence — measured **37% slower** than the generic
+  store/permute/load default it was meant to replace (two runs, p < 0.05, quiet
+  host, L1-resident size). `deinterleave` was neutral-to-negative. Both were
+  removed. AVX2 `reverse` survived on measurement (10.4% faster at 1024 f32).
+  Reusable finding: LLVM already lowers the generic default's stack round-trip
+  into good shuffle sequences, so "replace the portable path with intrinsics"
+  is a hypothesis to measure, not a foregone win — the vectorization ladder's
+  rule to escalate only on a measured shortfall applies to *lane permutes* as
+  much as to arithmetic. Corollary for benchmark design: measure at a
+  cache-resident size. The same comparison at 16384 elements shows no
+  difference, because the working set spills and the permute cost vanishes into
+  memory traffic — a size that would have hidden the regression entirely.
+- Consequence: the AVX-512 and NEON permute overrides shipped in the same
+  increment carry correctness evidence only. They are canonical single-
+  instruction lowerings, but after the AVX2 result they are explicitly *not* a
+  speed claim until measured (HS-430, gated on HS-429 silicon for AVX-512 and
+  an aarch64 bench step for NEON).
+
 ### Backend matrix
 
 - [patch] `TargetId` omits `SveArch` although the workspace ships it as a

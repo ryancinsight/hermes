@@ -26,6 +26,10 @@ name = "dense"
 harness = false
 
 [[bench]]
+name = "permute"
+harness = false
+
+[[bench]]
 name = "complex"
 harness = false
 
