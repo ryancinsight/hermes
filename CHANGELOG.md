@@ -4,6 +4,15 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ## [Unreleased]
 
+### Fixed
+
+- [patch] `compress_bench` aborted on its scalar rows: it built a
+  `BitMask::<1>` for a backend whose f32 lane count is 4, tripping
+  `SimdView::compress`'s lane-count assertion. Broken since 2026-07-07 and
+  unnoticed because the benchmark job runs only on pull requests and manual
+  dispatches. The mask width now derives from the backend's `LANE_COUNT`
+  instead of a literal.
+
 ### Added
 
 - [minor] Native cross-lane permute overrides on AVX-512 (`vpermps`/`vpermpd`,

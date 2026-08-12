@@ -94,6 +94,29 @@
   result, these may not pay either; they are kept as correctness-equivalent
   canonical lowerings, not as a speed claim. Follow-up HS-430.
 
+- [x] [patch] **HS-431 — repair the panicking compress benchmark.**
+  `compress_bench`'s scalar rows built a `BitMask::<1>` for a backend whose f32
+  lane count is 4, so `SimdView::compress`'s lane-count assertion aborted the
+  binary. Broken since 2afe675 (2026-07-07) and undetected because the
+  benchmark job runs only on pull requests and dispatches, and the one
+  intervening pull request failed earlier at the gates — the budget job never
+  reached it. The width now derives from
+  `<Scalar as SimdKernel<f32>>::LANE_COUNT` rather than a literal, so a backend
+  width change cannot silently rot it again. All thirteen bench targets smoke
+  clean locally.
+  Trigger-coverage finding: a job gated to pull requests is not a gate for work
+  that lands by direct push. Either the budget job runs on push too, or bench
+  rot is caught only when someone opens a pull request — filed as HS-432.
+
+- [ ] [patch] **HS-432 — benchmark budget job never runs on pushed work.**
+  `benchmark-budgets` is gated to `pull_request` and `workflow_dispatch`, so
+  every commit that reaches `main` by direct push — which is how this stream
+  delivers — skips it entirely. HS-431's panic survived a month that way.
+  Options: run the smoke subset on push (cheap: `--test` single-iteration only)
+  while keeping full timing runs on pull requests, or require pull requests for
+  this repository. Acceptance: a bench that panics or breaches its budget fails
+  CI on the same event that introduced it.
+
 - [ ] [patch] **HS-430 — measure the AVX-512 and NEON permute overrides.**
   HS-427 shipped them on correctness alone. The AVX2 result — a hand-written
   native sequence losing 37% to the generic default — is the reason this cannot

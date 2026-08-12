@@ -7,14 +7,19 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use hermes_simd::{Avx2, SimdArch};
 use hermes_simd::{BitMask, Scalar, SimdView, Unaligned, Unmasked};
+use hermes_simd_core::kernel::SimdKernel;
 
 const LENGTHS: [usize; 3] = [1_024, 16_384, 262_144];
+
+/// `SimdView::compress` asserts that the mask's lane count equals the backend's,
+/// so the width is taken from the backend rather than written as a literal —
+/// a hardcoded width silently rots the moment a backend's lane count changes.
+const SCALAR_LANES: usize = <Scalar as SimdKernel<f32>>::LANE_COUNT;
 
 fn data(len: usize) -> Vec<f32> {
     (0..len).map(|idx| idx as f32 * 0.25 + 1.0).collect()
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 fn mask_from<const LANES: usize>(active: impl Fn(usize) -> bool) -> BitMask<LANES> {
     let mut lanes = [false; LANES];
     for (lane, value) in lanes.iter_mut().enumerate() {
@@ -25,7 +30,7 @@ fn mask_from<const LANES: usize>(active: impl Fn(usize) -> bool) -> BitMask<LANE
 
 fn bench_scalar(c: &mut Criterion) {
     let mut group = c.benchmark_group("SimdView compress");
-    let mask = BitMask::<1>::from_bools(&[true]);
+    let mask = mask_from::<SCALAR_LANES>(|_| true);
 
     for len in LENGTHS {
         let input = data(len);
