@@ -308,7 +308,7 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   constructors now skip the zero-fill (-5% to -31% vs the zeroed version) and
   `with_capacity_zeroed` is removed. Miri covers the uninit fill.
 
-- [ ] [patch] **HS-406 — per-site `SAFETY` comments for pointer obligations.**
+- [x] [patch] **HS-406 — per-site `SAFETY` comments for pointer obligations.**
   Progress: `bitboard.rs` is closed — auditing it found the `unsafe` unjustified
   rather than undocumented, so `BitBoardKernel` became a safe trait (ADR 011)
   and the module went from seven blocks to two, both documented. The six `cow`
@@ -346,6 +346,11 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   found no defect; the kernels already validate dims with overflow rejection).
   **HS-406 complete** — the whole `hermes-simd-core` unsafe surface is now
   documented (module invariants + per-site obligations).
+  Verified 2026-08-12: full-source scan of all 48 unsafe-bearing files found no
+  undocumented `unsafe {` (flagged sites were scanner false positives — SAFETY
+  comments sit above the enclosing closures/functions, e.g. `view/reduce.rs:64`,
+  `tiling/gemv.rs:117`); CI miri job green on main (run 31546997718), clippy
+  `-D warnings` green in the same run.
 
 - [x] [patch] **HS-404 — `cmp_ne` NaN semantics diverged across backends.** The
   trait default returns all-ones for `NaN != NaN` (Rust `!=` is true), while the
