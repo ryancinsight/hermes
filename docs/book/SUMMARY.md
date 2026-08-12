@@ -20,8 +20,11 @@
 
 - [7. AlignedVec](aligned_vec.md)
 - [8. SimdView and Tiling](simd_view.md)
+  - [Example: Tiling](examples/tiling.md)
 - [9. Sparse Formats](sparse.md)
+  - [Example: Sparse](examples/sparse.md)
 
 # Part IV — The Atlas Stack
 
 - [10. Position in the Stack](stack_position.md)
+- [11. Verification: How We Know the Kernels Are Right](verification.md)

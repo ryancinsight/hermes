@@ -18,11 +18,25 @@ linear algebra) in the Atlas layer hierarchy.
 
 ## What this book covers
 
-1. ISA detection: `has_fma3()`, `FmaSupport`, `Avx512Support`.
-2. Runtime vs. compile-time dispatch and the `SimdKernel` trait.
-3. Core reductions: `sum`, `min`, `max`, `abs_sum`, `argmin`, `argmax`.
-4. Dot product, AXPY, and FMA-accelerated kernels.
-5. Masked execution: `masked_dot` and the `ExecutionMode` ZSTs.
-6. `AlignedVec<T>` and aligned allocation via mnemosyne.
-7. `SimdView` and tile-matrix multiplication.
-8. Sparse formats: CSR, SELL-P, Blocked COO.
+**Part I — Dispatch Model**
+
+1. ISA detection and the runtime capability probes.
+2. Runtime vs. compile-time dispatch and the scalar floor.
+3. The `SimdArch` / `SimdKernel` seam and its backends.
+
+**Part II — Core Operations**
+
+4. Horizontal reductions: `sum`, `min`, `max`, `abs_sum`, `argmin`, `argmax`.
+5. Dot product, AXPY, and the register-blocked GEMV/GEMM family.
+6. Masked execution and the `ExecutionMode` typestates.
+
+**Part III — Data Structures**
+
+7. `AlignedVec<T, Align>` and aligned, NUMA-aware allocation.
+8. `SimdView` and register-blocked tiling.
+9. Sparse formats: CSR, SELL-P, Blocked COO, Dense-with-mask.
+
+**Part IV — The Atlas Stack**
+
+10. `hermes`'s position in the Atlas provider graph.
+11. The verification ladder: differential, property, and coverage tests.
