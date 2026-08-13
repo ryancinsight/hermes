@@ -5,6 +5,13 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 // Lint policy is inherited from the workspace table (`[lints] workspace = true`).
+// Library-only denials; see the note in hermes-simd-core's crate root.
+#![deny(missing_docs)]
+#![deny(clippy::unwrap_used, clippy::print_stdout, clippy::print_stderr)]
+#![cfg_attr(
+    test,
+    allow(clippy::unwrap_used, clippy::print_stdout, clippy::print_stderr)
+)]
 
 pub use hermes_simd_core::scalar::{Bf16, Bf4, Bf8, F16, F32, F4, F64, F8, I16, I32, I8};
 pub use hermes_simd_core::view::{Mask, Vector};

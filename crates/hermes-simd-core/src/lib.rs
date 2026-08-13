@@ -20,7 +20,15 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 // Lint policy is inherited from the workspace table (`[lints] workspace = true`).
-#![cfg_attr(test, allow(clippy::unwrap_used))]
+// These are library-only and so cannot live in that package-scoped table: a
+// panic, a write to the process's stdio, or an undocumented item is a defect in
+// library code and routine (or irrelevant) in a test, bench, or example.
+#![deny(missing_docs)]
+#![deny(clippy::unwrap_used, clippy::print_stdout, clippy::print_stderr)]
+#![cfg_attr(
+    test,
+    allow(clippy::unwrap_used, clippy::print_stdout, clippy::print_stderr)
+)]
 
 extern crate alloc;
 

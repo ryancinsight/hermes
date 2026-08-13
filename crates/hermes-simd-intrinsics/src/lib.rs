@@ -23,9 +23,15 @@
 // off across the whole crate, which is how `unsafe` public functions came to
 // ship without a `# Safety` section.
 //
-// In-crate `#[cfg(test)]` modules print skip notices when the host lacks an ISA,
-// which is test output rather than library output.
-#![cfg_attr(test, allow(clippy::print_stderr, clippy::unwrap_used))]
+// Library-only denials; see the note in hermes-simd-core's crate root. In-crate
+// `#[cfg(test)]` modules print skip notices when the host lacks an ISA, which is
+// test output rather than library output.
+#![deny(missing_docs)]
+#![deny(clippy::unwrap_used, clippy::print_stdout, clippy::print_stderr)]
+#![cfg_attr(
+    test,
+    allow(clippy::unwrap_used, clippy::print_stdout, clippy::print_stderr)
+)]
 extern crate alloc;
 
 use hermes_simd_core::arch::SimdArch;

@@ -36,7 +36,10 @@ categories = ["hardware-support", "algorithms", "no-std"]
 # years later, which is how `missing_safety_doc` came to be off across the
 # whole intrinsics crate.
 [workspace.lints.rust]
-missing_docs = "deny"
+# `missing_docs` is deliberately absent: like the clippy denials below it is a
+# library-only rule, and a package-scoped table would also impose it on every
+# test, bench, and example crate root. It is denied at each library crate root.
+#
 # Declared workspace-wide because `[lints] workspace = true` cannot coexist with
 # a member-local `[lints.rust]` table; the benchmark cfg is only *set* by
 # hermes-simd-intrinsics, and declaring it known elsewhere costs nothing.
@@ -49,10 +52,16 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 pedantic = { level = "warn", priority = -1 }
 
 # Safety and hygiene floor.
-unwrap_used = "deny"
+#
+# `dbg!` is never legitimate in committed code, in any target, so it is denied
+# here. `unwrap_used`, `print_stdout`, and `print_stderr` are NOT: they must
+# apply to library code but not to tests, benchmarks, examples, or the two
+# `publish = false` tooling packages, and a Cargo `[lints]` table is
+# package-scoped with no way to express that. They are therefore denied at each
+# library crate root, where `#![cfg_attr(test, allow(..))]` can carve out the
+# in-crate test modules. Putting them here instead would fail 29 test, bench,
+# and example targets whose `unwrap()` calls are entirely legitimate.
 dbg_macro = "deny"
-print_stdout = "deny"
-print_stderr = "deny"
 # Mechanizes the `#[allow]` -> `#[expect]` migration: `expect` self-expires when
 # the underlying finding is fixed, so stale suppressions cannot accumulate.
 allow_attributes = "warn"

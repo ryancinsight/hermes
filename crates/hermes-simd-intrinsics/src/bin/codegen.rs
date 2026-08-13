@@ -5,8 +5,8 @@
 //! Run from the workspace root; the output paths are relative to it.
 //!
 //! This is developer tooling, not library code: writing progress to stdout is
-//! its output contract, so `print_stdout` is allowed here and nowhere else.
-#![allow(clippy::print_stdout)]
+//! its output contract. The `print_stdout` denial is scoped to the library
+//! crate roots, so this binary needs no suppression.
 
 use std::fs::File;
 use std::io::Write;

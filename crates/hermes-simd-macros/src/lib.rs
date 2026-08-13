@@ -9,6 +9,13 @@
 //! This crate executes no `unsafe` itself (the `unsafe` it emits lives in the
 //! generated token streams, compiled in the consumer crate), so it forbids it.
 #![forbid(unsafe_code)]
+// Library-only denials; see the note in hermes-simd-core's crate root.
+#![deny(missing_docs)]
+#![deny(clippy::unwrap_used, clippy::print_stdout, clippy::print_stderr)]
+#![cfg_attr(
+    test,
+    allow(clippy::unwrap_used, clippy::print_stdout, clippy::print_stderr)
+)]
 
 extern crate proc_macro;
 use proc_macro::TokenStream;

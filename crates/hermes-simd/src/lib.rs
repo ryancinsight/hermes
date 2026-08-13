@@ -40,7 +40,13 @@
 // `#[target_feature]` functions, which are written explicitly so each intrinsic
 // call site still carries its own SAFETY reasoning.
 #![allow(unused_unsafe)]
-#![cfg_attr(test, allow(clippy::unwrap_used))]
+// Library-only denials; see the note in hermes-simd-core's crate root.
+#![deny(missing_docs)]
+#![deny(clippy::unwrap_used, clippy::print_stdout, clippy::print_stderr)]
+#![cfg_attr(
+    test,
+    allow(clippy::unwrap_used, clippy::print_stdout, clippy::print_stderr)
+)]
 
 extern crate alloc;
 
