@@ -135,6 +135,7 @@ impl SimdKernel<f32> for Neon {
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn reverse(v: Self::Vector) -> Self::Vector {
         // `rev64` reverses within each 64-bit pair, giving [a1, a0, a3, a2];
         // `ext` by 2 lanes then rotates the halves into [a3, a2, a1, a0].
@@ -144,6 +145,7 @@ impl SimdKernel<f32> for Neon {
     // SAFETY: caller must ensure the target CPU supports `neon` (as above); operands are whole registers, so no pointer validity is involved.
     #[target_feature(enable = "neon")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn interleave(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
         // zip1 = [a0, b0, a1, b1] and zip2 = [a2, b2, a3, b3] are exactly the
         // low and high halves of the flat 8-lane interleaving.
@@ -156,6 +158,7 @@ impl SimdKernel<f32> for Neon {
     // SAFETY: caller must ensure the target CPU supports `neon` (as above); operands are whole registers, so no pointer validity is involved.
     #[target_feature(enable = "neon")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn deinterleave(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
         // uzp1 collects the even positions of `a || b` and uzp2 the odd ones.
         (

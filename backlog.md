@@ -138,6 +138,13 @@
   is a `#[cfg(any())]` gate on the override plus a criterion
   `--save-baseline`/`--baseline` pair on a quiet host. NEON needs a bench step
   on the existing aarch64 runner; AVX-512 needs HS-429's real silicon.
+  The aarch64 workflow now runs the existing `permute` Criterion target twice:
+  first with the native NEON methods and a `neon-native` saved baseline, then
+  with the three NEON overrides disabled by the explicit
+  `hermes_benchmark_generic_default` benchmark configuration and compared
+  against that baseline. The command is bounded at 300 seconds and uses the
+  same inputs, groups, and Criterion settings in both runs, so the result is a
+  real-silicon A/B measurement rather than a compile-only claim.
   Acceptance: each override either shows a significant win and stays, or is
   deleted like the AVX2 pair.
   UNBLOCKED as of HS-428 — both preconditions were already satisfiable and the
@@ -162,6 +169,9 @@
   tests pass unchanged against each native override on the aarch64 and SDE
   jobs, plus a benchmark showing the override beats the store/permute/load
   default.
+  The remaining delivery step is to collect the hosted aarch64 comparison and
+  either retain or delete each NEON override from its measured result. AVX-512
+  performance remains open under HS-429 because SDE is semantic evidence only.
 
 - [ ] [major] **HS-425 — `TargetId` omits the SVE backend.** `SveArch` is a
   first-class emulated backend exercised throughout the test suite, but

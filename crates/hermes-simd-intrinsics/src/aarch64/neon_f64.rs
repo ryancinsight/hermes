@@ -134,6 +134,7 @@ impl SimdKernel<f64> for Neon {
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); operands are whole registers, so no pointer validity is involved.
     #[target_feature(enable = "neon")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn reverse(v: Self::Vector) -> Self::Vector {
         NeonF64Vec(vextq_f64(v.0, v.0, 1))
     }
@@ -141,6 +142,7 @@ impl SimdKernel<f64> for Neon {
     // SAFETY: caller must ensure the target CPU supports `neon` (as above); operands are whole registers, so no pointer validity is involved.
     #[target_feature(enable = "neon")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn interleave(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
         (
             NeonF64Vec(vzip1q_f64(a.0, b.0)),
@@ -151,6 +153,7 @@ impl SimdKernel<f64> for Neon {
     // SAFETY: caller must ensure the target CPU supports `neon` (as above); operands are whole registers, so no pointer validity is involved.
     #[target_feature(enable = "neon")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn deinterleave(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
         (
             NeonF64Vec(vuzp1q_f64(a.0, b.0)),

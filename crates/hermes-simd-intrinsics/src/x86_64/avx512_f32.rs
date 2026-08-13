@@ -281,6 +281,7 @@ impl SimdKernel<f32> for Avx512 {
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn reverse(v: Self::Vector) -> Self::Vector {
         // Result lane i takes source lane idx[i], so descending indices reverse.
         let idx = _mm512_setr_epi32(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
@@ -290,6 +291,7 @@ impl SimdKernel<f32> for Avx512 {
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn interleave(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
         // Flat position p holds a[p/2] for even p and b[p/2] for odd p. The low
         // half covers p = 0..15 and the high half p = 16..31; `b` lanes are
@@ -306,6 +308,7 @@ impl SimdKernel<f32> for Avx512 {
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn deinterleave(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
         // Over the concatenation `a || b`, the even output is positions 2i and
         // the odd output positions 2i+1 — the indices are the positions

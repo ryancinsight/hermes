@@ -205,6 +205,25 @@ jobs:
         run: cargo nextest run --workspace
       - name: Doctests
         run: cargo test --doc --workspace
+      - name: Benchmark native NEON permutes
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --foreground --kill-after=10s 300s \
+            cargo bench --locked -p hermes-simd --bench permute \
+              -- --save-baseline neon-native --noplot
+      - name: Compare NEON overrides with the generic default
+        shell: bash
+        env:
+          RUSTFLAGS: >-
+            -D warnings
+            --check-cfg=cfg(hermes_benchmark_generic_default)
+            --cfg hermes_benchmark_generic_default
+        run: |
+          set -euo pipefail
+          timeout --foreground --kill-after=10s 300s \
+            cargo bench --locked -p hermes-simd --bench permute \
+              -- --baseline neon-native --noplot
 
   cross-check:
     name: cross-compile check (aarch64 target from x86_64)

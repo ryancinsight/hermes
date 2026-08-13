@@ -13,6 +13,17 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   dispatches. The mask width now derives from the backend's `LANE_COUNT`
   instead of a literal.
 
+### Changed
+
+- [patch] The native aarch64 CI job now measures the NEON cross-lane permute
+  overrides against the generic store/permute/load defaults. It saves a
+  `neon-native` Criterion baseline, rebuilds with the explicit
+  `hermes_benchmark_generic_default` comparison configuration, and reruns the
+  same bounded benchmark rows. The workflow records evidence on real ARM
+  silicon; it makes no speed claim until the comparison is adjudicated. AVX-512
+  performance remains gated on HS-429 real silicon because Intel SDE cannot
+  provide timing evidence.
+
 ### Added
 
 - [minor] Native cross-lane permute overrides on AVX-512 (`vpermps`/`vpermpd`,
