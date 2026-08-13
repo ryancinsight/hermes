@@ -71,11 +71,11 @@ pub use numa::{
     NumaAllocator, NumaBinding,
 };
 pub use ops::{
-    Abs, AbsMax, AbsSum, Add, BitAnd, BitOr, BitXor, Clamp, Div, Dot, ElementOp, Exclusive, FmaAdd,
-    Inclusive, Max, Min, Mul, Neg, Popcount, Product, RecipSqrt, ReductionOp, ScanAdd, ScanMax,
-    ScanMin, ScanMode, ScanMul, ScanOp, Sqrt, Sub, Sum, UnaryOp,
+    Abs, AbsMax, AbsSum, Add, BitAnd, BitOr, BitXor, Ceil, Clamp, Div, Dot, ElementOp, Exclusive,
+    Floor, FmaAdd, Inclusive, Max, Min, Mul, Neg, Popcount, Product, RecipSqrt, ReductionOp, Round,
+    ScanAdd, ScanMax, ScanMin, ScanMode, ScanMul, ScanOp, Sqrt, Sub, Sum, Trunc, UnaryOp,
 };
-pub use scalar::{FloatElement, NumericElement, Scalar};
+pub use scalar::{FloatElement, NumericElement, RoundTiesEven, Scalar};
 pub use sparse::{
     BlockedCoo, BlockedCooData, Csr, CsrData, DenseWithMask, DenseWithMaskData, SellP, SellPData,
     SparseFormat, SparseShape, SparseView, Validated, ValidatedData,

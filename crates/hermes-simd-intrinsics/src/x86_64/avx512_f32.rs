@@ -461,6 +461,50 @@ impl SimdKernel<f32> for Avx512 {
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
+    unsafe fn floor(a: Self::Vector) -> Self::Vector {
+        // `_mm512_floor_ps` is not exposed in Rust stdarch; use the equivalent
+        // `vrndscaleps` with round-toward-negative-infinity mode.
+        Avx512F32Vec(_mm512_roundscale_ps::<
+            { _MM_FROUND_TO_NEG_INF | _MM_FROUND_NO_EXC },
+        >(a.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn ceil(a: Self::Vector) -> Self::Vector {
+        // `_mm512_ceil_ps` is not exposed in Rust stdarch; use the equivalent
+        // `vrndscaleps` with round-toward-positive-infinity mode.
+        Avx512F32Vec(_mm512_roundscale_ps::<
+            { _MM_FROUND_TO_POS_INF | _MM_FROUND_NO_EXC },
+        >(a.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn round(a: Self::Vector) -> Self::Vector {
+        // `vrndscaleps` in `_MM_FROUND_TO_NEAREST_INT` mode (imm low bits 00)
+        // rounds ties to the even neighbor, matching the scalar `round_ties_even`
+        // contract. `_MM_FROUND_NO_EXC` (imm bit 3) suppresses the inexact exception.
+        Avx512F32Vec(_mm512_roundscale_ps::<
+            { _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC },
+        >(a.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn trunc(a: Self::Vector) -> Self::Vector {
+        // `vrndscaleps` in `_MM_FROUND_TO_ZERO` mode (imm low bits 11) rounds toward zero.
+        Avx512F32Vec(_mm512_roundscale_ps::<
+            { _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC },
+        >(a.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
     unsafe fn popcount(a: Self::Vector) -> Self::Vector {
         use core::arch::x86_64::*;
         let v_si512 = _mm512_castps_si512(a.0);

@@ -11,7 +11,7 @@
 //! |---|---|
 //! | [`reduction`] | `ReductionOp<T>`, `Sum`, `Dot`, `Min`, `Max`, `Product` |
 //! | [`elementwise`] | `ElementOp<T>`, `Mul`, `Add`, `Sub`, `Div`, `BitAnd`, `BitOr`, `BitXor`, `FmaAdd`, `Clamp` |
-//! | [`unary`] | `UnaryOp<T>`, `Abs`, `Neg`, `Sqrt` (and `Clamp` as `UnaryOp`) |
+//! | [`unary`] | `UnaryOp<T>`, `Abs`, `Neg`, `Sqrt`, `Floor`, `Ceil`, `Round`, `Trunc` (and `Clamp` as `UnaryOp`) |
 //! | [`scan`] | `ScanOp<T>`, `ScanMode`, `ScanAdd`, `ScanMul`, `ScanMin`, `ScanMax`, `Inclusive`, `Exclusive` |
 //!
 //! # Usage
@@ -42,4 +42,4 @@ pub mod unary;
 pub use elementwise::{Add, BitAnd, BitOr, BitXor, Clamp, Div, ElementOp, FmaAdd, Mul, Sub};
 pub use reduction::{AbsMax, AbsSum, Dot, Max, Min, Product, ReductionOp, Sum};
 pub use scan::{Exclusive, Inclusive, ScanAdd, ScanMax, ScanMin, ScanMode, ScanMul, ScanOp};
-pub use unary::{Abs, Neg, Popcount, RecipSqrt, Sqrt, UnaryOp};
+pub use unary::{Abs, Ceil, Floor, Neg, Popcount, RecipSqrt, Round, Sqrt, Trunc, UnaryOp};

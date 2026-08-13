@@ -6,7 +6,7 @@
 
 use crate::kernel::SimdKernel;
 use crate::ops::elementwise::Clamp;
-use crate::scalar::{NumericElement, Scalar};
+use crate::scalar::{FloatElement, NumericElement, Scalar};
 
 // ---------------------------------------------------------------------------
 // UnaryOp — single-operand elementwise strategy
@@ -65,6 +65,22 @@ pub struct RecipSqrt;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Popcount;
 
+/// Elementwise floor: the largest integer ≤ each lane.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Floor;
+
+/// Elementwise ceiling: the smallest integer ≥ each lane.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Ceil;
+
+/// Elementwise round to the nearest integer, ties to the even neighbor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Round;
+
+/// Elementwise truncation toward zero.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Trunc;
+
 // ---------------------------------------------------------------------------
 // Sealing impls
 // ---------------------------------------------------------------------------
@@ -74,6 +90,10 @@ impl crate::private::Sealed for Neg {}
 impl crate::private::Sealed for Sqrt {}
 impl crate::private::Sealed for RecipSqrt {}
 impl crate::private::Sealed for Popcount {}
+impl crate::private::Sealed for Floor {}
+impl crate::private::Sealed for Ceil {}
+impl crate::private::Sealed for Round {}
+impl crate::private::Sealed for Trunc {}
 
 // ---------------------------------------------------------------------------
 // UnaryOp impls
@@ -146,5 +166,49 @@ impl<T: Scalar> UnaryOp<T> for Popcount {
     #[inline(always)]
     fn apply_scalar(self, a: T) -> T {
         T::cast_from(a.count_ones() as i32)
+    }
+}
+
+impl<T: FloatElement> UnaryOp<T> for Floor {
+    #[inline(always)]
+    unsafe fn apply<Arch: SimdKernel<T>>(self, v: Arch::Vector) -> Arch::Vector {
+        Arch::floor(v)
+    }
+    #[inline(always)]
+    fn apply_scalar(self, a: T) -> T {
+        a.floor()
+    }
+}
+
+impl<T: FloatElement> UnaryOp<T> for Ceil {
+    #[inline(always)]
+    unsafe fn apply<Arch: SimdKernel<T>>(self, v: Arch::Vector) -> Arch::Vector {
+        Arch::ceil(v)
+    }
+    #[inline(always)]
+    fn apply_scalar(self, a: T) -> T {
+        a.ceil()
+    }
+}
+
+impl<T: crate::scalar::RoundTiesEven> UnaryOp<T> for Round {
+    #[inline(always)]
+    unsafe fn apply<Arch: SimdKernel<T>>(self, v: Arch::Vector) -> Arch::Vector {
+        Arch::round(v)
+    }
+    #[inline(always)]
+    fn apply_scalar(self, a: T) -> T {
+        crate::scalar::RoundTiesEven::round_ties_even(a)
+    }
+}
+
+impl<T: FloatElement> UnaryOp<T> for Trunc {
+    #[inline(always)]
+    unsafe fn apply<Arch: SimdKernel<T>>(self, v: Arch::Vector) -> Arch::Vector {
+        Arch::trunc(v)
+    }
+    #[inline(always)]
+    fn apply_scalar(self, a: T) -> T {
+        a.trunc()
     }
 }

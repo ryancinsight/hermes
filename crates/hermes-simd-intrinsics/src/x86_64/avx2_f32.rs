@@ -449,6 +449,40 @@ impl SimdKernel<f32> for Avx2 {
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx2")]
     #[inline]
+    unsafe fn floor(a: Self::Vector) -> Self::Vector {
+        Avx2F32Vec(_mm256_floor_ps(a.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn ceil(a: Self::Vector) -> Self::Vector {
+        Avx2F32Vec(_mm256_ceil_ps(a.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn round(a: Self::Vector) -> Self::Vector {
+        // `vroundps` in `_MM_FROUND_TO_NEAREST_INT` mode (imm low bits 00) rounds
+        // ties to the even neighbor, matching the scalar `round_ties_even` contract.
+        // `_MM_FROUND_NO_EXC` (imm bit 3) suppresses the per-element inexact exception.
+        Avx2F32Vec(_mm256_round_ps::<
+            { _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC },
+        >(a.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn trunc(a: Self::Vector) -> Self::Vector {
+        // `vroundps` in `_MM_FROUND_TO_ZERO` mode (imm low bits 11) rounds toward zero.
+        Avx2F32Vec(_mm256_round_ps::<{ _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC }>(a.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx2")]
+    #[inline]
     unsafe fn popcount(a: Self::Vector) -> Self::Vector {
         let v = _mm256_castps_si256(a.0);
         let low_mask = _mm256_set1_epi8(0x0F);
