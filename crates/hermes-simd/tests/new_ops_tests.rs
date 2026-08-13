@@ -3,8 +3,9 @@
 //! select/masked_negate, gather, zip_transform, and ZipChunks.
 
 use hermes_simd::{
-    argmax, argmin, max, min, scale, Abs, Clamp, Exclusive, Inclusive, Neg, Scalar, ScanAdd,
-    ScanMax, ScanMin, ScanMul, SimdError, SimdView, Sqrt, Unaligned, Unmasked,
+    argmax, argmin, max, min, scale, Abs, Ceil, Clamp, Exclusive, Floor, Inclusive, Neg, Round,
+    Scalar, ScanAdd, ScanMax, ScanMin, ScanMul, SimdError, SimdView, Sqrt, Trunc, Unaligned,
+    Unmasked,
 };
 // `SimdArch` is in scope only to resolve `Avx2::is_runtime_supported()` in the
 // x86-gated backend check below; importing it unconditionally is an unused
@@ -376,6 +377,79 @@ fn test_map_unary_output_too_short() {
     let mut out = vec![0.0f32; 4];
     let err = v(&data).map_unary(Abs, &mut out);
     assert_eq!(err, Err(SimdError::InsufficientOutputLength));
+}
+
+/// The rounding ops (`Round`, ties to even; `Floor`; `Ceil`; `Trunc`) reach the
+/// `UnaryOp` seam exactly as the kernel-level differential tests define them:
+/// the reference is the plain-scalar rounding family, and the input list
+/// exercises exact halfway ties, values straddling a tie, ±Inf, and signed
+/// zeros. Value semantics are asserted bit-exactly so a wrong tie resolution or
+/// a lost sign bit cannot pass.
+#[test]
+fn test_map_unary_rounding_ops() {
+    let data = [
+        -2.5f32,
+        -1.5,
+        -0.5,
+        0.0,
+        0.5,
+        1.5,
+        2.5,
+        3.5,
+        1.499_999_9,
+        -1.500_000_1,
+        f32::INFINITY,
+        f32::NEG_INFINITY,
+        -0.0,
+        1.0e20,
+    ];
+    let expected_round: Vec<f32> = data.iter().map(|&x| f32::round_ties_even(x)).collect();
+    let expected_floor: Vec<f32> = data.iter().map(|&x| x.floor()).collect();
+    let expected_ceil: Vec<f32> = data.iter().map(|&x| x.ceil()).collect();
+    let expected_trunc: Vec<f32> = data.iter().map(|&x| x.trunc()).collect();
+
+    let mut round_out = vec![0.0f32; data.len()];
+    let mut floor_out = vec![0.0f32; data.len()];
+    let mut ceil_out = vec![0.0f32; data.len()];
+    let mut trunc_out = vec![0.0f32; data.len()];
+
+    v(&data).map_unary(Round, &mut round_out).unwrap();
+    v(&data).map_unary(Floor, &mut floor_out).unwrap();
+    v(&data).map_unary(Ceil, &mut ceil_out).unwrap();
+    v(&data).map_unary(Trunc, &mut trunc_out).unwrap();
+
+    for (i, &x) in data.iter().enumerate() {
+        assert_eq!(
+            round_out[i].to_bits(),
+            expected_round[i].to_bits(),
+            "round({x:e})"
+        );
+        assert_eq!(
+            floor_out[i].to_bits(),
+            expected_floor[i].to_bits(),
+            "floor({x:e})"
+        );
+        assert_eq!(
+            ceil_out[i].to_bits(),
+            expected_ceil[i].to_bits(),
+            "ceil({x:e})"
+        );
+        assert_eq!(
+            trunc_out[i].to_bits(),
+            expected_trunc[i].to_bits(),
+            "trunc({x:e})"
+        );
+    }
+}
+
+#[test]
+fn test_map_unary_in_place_round() {
+    let mut data = [-2.5f32, -0.5, 0.5, 1.5, 2.5, -0.0, 1.0e20];
+    let expected: Vec<f32> = data.iter().map(|&x| f32::round_ties_even(x)).collect();
+    v_mut(&mut data).map_unary_in_place(Round);
+    for (got, exp) in data.iter().zip(expected.iter()) {
+        assert_eq!(got.to_bits(), exp.to_bits());
+    }
 }
 
 // ---------------------------------------------------------------------------

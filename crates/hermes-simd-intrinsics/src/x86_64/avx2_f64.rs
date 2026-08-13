@@ -465,7 +465,9 @@ impl SimdKernel<f64> for Avx2 {
         // `vroundpd` in `_MM_FROUND_TO_NEAREST_INT` mode (imm low bits 00) rounds
         // ties to the even neighbor, matching the scalar `round_ties_even` contract.
         // `_MM_FROUND_NO_EXC` (imm bit 3) suppresses the per-element inexact exception.
-        Avx2F64Vec(_mm256_round_pd::<{ _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC }>(a.0))
+        Avx2F64Vec(_mm256_round_pd::<
+            { _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC },
+        >(a.0))
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.

@@ -70,11 +70,13 @@ pub use hermes_simd_core::{
     BitAnd,
     BitOr,
     BitXor,
+    Ceil,
     Clamp,
     Div,
     Dot,
     ElementOp,
     Exclusive,
+    Floor,
     // Extended strategy ZSTs (v2)
     FmaAdd,
     Inclusive,
@@ -86,6 +88,7 @@ pub use hermes_simd_core::{
     RecipSqrt,
     // Operation strategy ZSTs and sealed traits — zero-cost, erased at monomorphization.
     ReductionOp,
+    Round,
     ScanAdd,
     ScanMax,
     ScanMin,
@@ -96,6 +99,7 @@ pub use hermes_simd_core::{
     Sqrt,
     Sub,
     Sum,
+    Trunc,
     UnaryOp,
 };
 
