@@ -249,6 +249,38 @@ impl SimdKernel<f64> for Neon {
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 2-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
+    unsafe fn floor(a: Self::Vector) -> Self::Vector {
+        // `FRINTM`: round toward minus infinity.
+        NeonF64Vec(vrndmq_f64(a.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 2-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn ceil(a: Self::Vector) -> Self::Vector {
+        // `FRINTP`: round toward plus infinity.
+        NeonF64Vec(vrndpq_f64(a.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 2-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn round(a: Self::Vector) -> Self::Vector {
+        // `FRINTN`: round to nearest, ties to even — the `round_ties_even` contract.
+        NeonF64Vec(vrndq_f64(a.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 2-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn trunc(a: Self::Vector) -> Self::Vector {
+        // `FRINTZ`: round toward zero.
+        NeonF64Vec(vrndzq_f64(a.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 2-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "neon")]
+    #[inline]
     unsafe fn popcount(a: Self::Vector) -> Self::Vector {
         let v_u8 = vreinterpretq_u8_f64(a.0);
         let pop_bytes = vcntq_u8(v_u8);

@@ -616,6 +616,83 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
         crate::kernel_helpers::generic_unary_op::<T, Self, _>(a, |x| T::ONE / x.sqrt())
     }
 
+    /// Elementwise floor: the largest integer ≤ each lane.
+    ///
+    /// Matches the scalar `floor` contract bit-exactly on every backend,
+    /// including the NaN/±Inf/signed-zero behavior. Native overrides use the
+    /// hardware directed-rounding instructions, which implement the same
+    /// round-toward-minus-infinity semantics as libm `floorf`/`floor`.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    unsafe fn floor(a: Self::Vector) -> Self::Vector
+    where
+        T: crate::scalar::FloatElement,
+    {
+        crate::kernel_helpers::generic_unary_op::<T, Self, _>(
+            a,
+            <T as crate::scalar::FloatElement>::floor,
+        )
+    }
+
+    /// Elementwise ceiling: the smallest integer ≥ each lane.
+    ///
+    /// Matches the scalar `ceil` contract bit-exactly on every backend; the
+    /// hardware directed-rounding instructions implement round-toward-plus-
+    /// infinity, identical to libm `ceilf`/`ceil`.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    unsafe fn ceil(a: Self::Vector) -> Self::Vector
+    where
+        T: crate::scalar::FloatElement,
+    {
+        crate::kernel_helpers::generic_unary_op::<T, Self, _>(
+            a,
+            <T as crate::scalar::FloatElement>::ceil,
+        )
+    }
+
+    /// Elementwise round to the nearest integer, ties to the even neighbor.
+    ///
+    /// This is the SIMD-hardware rounding contract: x86 `roundps`/
+    /// `vrndscaleps` `_MM_FROUND_TO_NEAREST_INT` and NEON `FRINTN` both resolve
+    /// exact halfway values to the even integer. The scalar default therefore
+    /// uses [`crate::scalar::RoundTiesEven`], NOT libm's `round`
+    /// (half-away-from-zero), so a native override and its default agree
+    /// bit-exactly on every input including ties, negatives, ±Inf, NaN, and
+    /// signed zeros.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    unsafe fn round(a: Self::Vector) -> Self::Vector
+    where
+        T: crate::scalar::RoundTiesEven,
+    {
+        crate::kernel_helpers::generic_unary_op::<T, Self, _>(
+            a,
+            crate::scalar::RoundTiesEven::round_ties_even,
+        )
+    }
+
+    /// Elementwise truncation toward zero.
+    ///
+    /// Matches the scalar `trunc` contract bit-exactly on every backend; the
+    /// hardware directed-rounding instructions implement round-toward-zero,
+    /// identical to libm `truncf`/`trunc`.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    unsafe fn trunc(a: Self::Vector) -> Self::Vector
+    where
+        T: crate::scalar::FloatElement,
+    {
+        crate::kernel_helpers::generic_unary_op::<T, Self, _>(
+            a,
+            <T as crate::scalar::FloatElement>::trunc,
+        )
+    }
+
     /// Elementwise equal: `a == b`.
     ///
     /// # Safety

@@ -716,3 +716,181 @@ fn recip_sqrt_is_full_precision_all_backends() {
         check_recip_sqrt_f64::<hermes_simd::Neon>();
     }
 }
+
+/// Elementwise rounding must match the plain-slice reference bit-exactly on
+/// every backend: `round` (ties to the even neighbor), `floor`, `ceil`, and
+/// `trunc`, plus the NaN/±Inf/signed-zero contract. The reference is written on
+/// plain `f32` scalars, independent of any lane arithmetic in the kernel
+/// defaults, so a native override and the default it replaces are both checked
+/// against the same external specification.
+///
+/// The case list covers every contract edge: exact halfway values (in both
+/// signs, where the tie must resolve to the even neighbor), values straddling a
+/// tie by the smallest representable margin, large magnitudes whose fractional
+/// part is representable, magnitudes far beyond the integer range (identity),
+/// subnormals, infinities, and a quiet NaN. The `-0.5..` half-grid sweep pushes
+/// tie resolution across the whole lane count.
+fn check_rounding_f32<A: SimdKernel<f32>>() {
+    let lanes = A::LANE_COUNT;
+    let mut cases: Vec<f32> = vec![
+        0.0,
+        -0.0,
+        0.5,
+        -0.5,
+        1.5,
+        -1.5,
+        2.5,
+        -2.5,
+        3.5,
+        -3.5,
+        0.49,
+        -0.49,
+        1.499_999_9,
+        1.500_000_1,
+        -1.499_999_9,
+        -1.500_000_1,
+        1_048_576.5,
+        -1_048_576.5,
+        1.0e20,
+        3.0e38,
+        f32::MIN_POSITIVE,
+        -f32::MIN_POSITIVE,
+        f32::INFINITY,
+        f32::NEG_INFINITY,
+        f32::NAN,
+    ];
+    for i in 0..(3 * lanes) {
+        cases.push((i as f32) * 0.5 - (1.5 * lanes as f32));
+    }
+
+    let mut floor_out = vec![0.0f32; lanes];
+    let mut ceil_out = vec![0.0f32; lanes];
+    let mut round_out = vec![0.0f32; lanes];
+    let mut trunc_out = vec![0.0f32; lanes];
+
+    for chunk in cases.chunks(lanes) {
+        let mut v = vec![0.0f32; lanes];
+        v[..chunk.len()].copy_from_slice(chunk);
+        // SAFETY: caller gates on the required target features for `A`; every
+        // buffer covers exactly `LANE_COUNT` elements, so the unaligned loads
+        // and stores stay in bounds.
+        unsafe {
+            let x = A::load_unaligned(v.as_ptr());
+            A::store_unaligned(floor_out.as_mut_ptr(), A::floor(x));
+            A::store_unaligned(ceil_out.as_mut_ptr(), A::ceil(x));
+            A::store_unaligned(round_out.as_mut_ptr(), A::round(x));
+            A::store_unaligned(trunc_out.as_mut_ptr(), A::trunc(x));
+        }
+        for i in 0..lanes {
+            let y = v[i];
+            // Bitwise equality: `==` treats NaN as unequal and merges ±0,
+            // hiding exactly the special-value behavior this contract pins.
+            assert_eq!(
+                floor_out[i].to_bits(),
+                y.floor().to_bits(),
+                "f32 floor({y:e})"
+            );
+            assert_eq!(ceil_out[i].to_bits(), y.ceil().to_bits(), "f32 ceil({y:e})");
+            assert_eq!(
+                round_out[i].to_bits(),
+                f32::round_ties_even(y).to_bits(),
+                "f32 round({y:e})"
+            );
+            assert_eq!(
+                trunc_out[i].to_bits(),
+                y.trunc().to_bits(),
+                "f32 trunc({y:e})"
+            );
+        }
+    }
+}
+
+/// The f64 rounding path is a separate monomorphization (4 lanes on AVX2,
+/// `vroundpd` instead of `vroundps`), so it needs its own coverage, including
+/// a tie at the top of the exact-representable range.
+fn check_rounding_f64<A: SimdKernel<f64>>() {
+    let lanes = A::LANE_COUNT;
+    let mut cases: Vec<f64> = vec![
+        0.0,
+        -0.0,
+        0.5,
+        -0.5,
+        2.5,
+        -2.5,
+        4_503_599_627_370_497.5, // 2^52 + 0.5: tie at the integer-range edge
+        -4_503_599_627_370_497.5,
+        1.0e20,
+        1.0e300,
+        f64::MIN_POSITIVE,
+        -f64::MIN_POSITIVE,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        f64::NAN,
+    ];
+    for i in 0..(3 * lanes) {
+        cases.push((i as f64) * 0.5 - (1.5 * lanes as f64));
+    }
+
+    let mut floor_out = vec![0.0f64; lanes];
+    let mut ceil_out = vec![0.0f64; lanes];
+    let mut round_out = vec![0.0f64; lanes];
+    let mut trunc_out = vec![0.0f64; lanes];
+
+    for chunk in cases.chunks(lanes) {
+        let mut v = vec![0.0f64; lanes];
+        v[..chunk.len()].copy_from_slice(chunk);
+        // SAFETY: caller gates on the required target features for `A`; every
+        // buffer covers exactly `LANE_COUNT` elements.
+        unsafe {
+            let x = A::load_unaligned(v.as_ptr());
+            A::store_unaligned(floor_out.as_mut_ptr(), A::floor(x));
+            A::store_unaligned(ceil_out.as_mut_ptr(), A::ceil(x));
+            A::store_unaligned(round_out.as_mut_ptr(), A::round(x));
+            A::store_unaligned(trunc_out.as_mut_ptr(), A::trunc(x));
+        }
+        for i in 0..lanes {
+            let y = v[i];
+            assert_eq!(
+                floor_out[i].to_bits(),
+                y.floor().to_bits(),
+                "f64 floor({y:e})"
+            );
+            assert_eq!(ceil_out[i].to_bits(), y.ceil().to_bits(), "f64 ceil({y:e})");
+            assert_eq!(
+                round_out[i].to_bits(),
+                f64::round_ties_even(y).to_bits(),
+                "f64 round({y:e})"
+            );
+            assert_eq!(
+                trunc_out[i].to_bits(),
+                y.trunc().to_bits(),
+                "f64 trunc({y:e})"
+            );
+        }
+    }
+}
+
+#[test]
+fn rounding_matches_reference_all_backends() {
+    check_rounding_f32::<Scalar>();
+    check_rounding_f64::<Scalar>();
+    check_rounding_f32::<SveArch>();
+    check_rounding_f64::<SveArch>();
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+            check_rounding_f32::<hermes_simd::Avx2>();
+            check_rounding_f64::<hermes_simd::Avx2>();
+        }
+        if std::is_x86_feature_detected!("avx512f") {
+            check_rounding_f32::<hermes_simd::Avx512>();
+            check_rounding_f64::<hermes_simd::Avx512>();
+        }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        check_rounding_f32::<hermes_simd::Neon>();
+        check_rounding_f64::<hermes_simd::Neon>();
+    }
+}
