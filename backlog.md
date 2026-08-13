@@ -9,7 +9,7 @@
   before any write; duplicate indices are last-writer-wins. The native AVX-512
   path is executed under the HS-428 Intel SDE job.
 
-- [ ] [minor] **HS-423 — rounding primitives.** The kernel trait has no
+- [x] [minor] **HS-423 — rounding primitives.** The kernel trait has no
   `floor`/`ceil`/`round`/`trunc` although every target ISA provides them
   natively. Blocked on an upstream eunomia unit: `NumericElement` exposes no
   rounding, so the Hermes default would have to widen through `to_f64` and
@@ -20,6 +20,17 @@
   covering negative values, halfway cases (the round-half-to-even contract must
   be pinned explicitly), and the infinity/NaN contract.
   Re-open trigger: the eunomia rounding release lands.
+  Delivered on `feat/hermes-rounding` (58c31a9 + df32296): trait defaults over
+  `generic_unary_op`; AVX2 (`vroundps`/`vroundpd`), AVX-512
+  (`_mm512_roundscale_ps/pd` — stdarch lacks `_mm512_floor/ceil_*`), and NEON
+  (`frintm`/`frintp`/`frintn`/`frintz`) overrides; `RoundTiesEven` sealed trait
+  routing `f32`/`f64` to inherent `round_ties_even` and the reduced-precision
+  wrappers to the exact round-narrow path; `Floor`/`Ceil`/`Round`/`Trunc`
+  UnaryOp strategies re-exported from `hermes_simd`. Differential coverage:
+  `rounding_matches_reference_all_backends` pins bit-exact equality against the
+  plain-scalar family over ties, straddling values, ±Inf, NaN, and signed
+  zeros on Scalar/SveArch/AVX2 (this host) and AVX-512/NEON (compile-only here,
+  exercised in CI); the UnaryOp seam is covered via `map_unary`/in-place.
 
 - [x] [minor] **HS-424 — cross-lane permute family.** `SimdKernel::reverse`,
   `interleave`, and `deinterleave` join the trait as defaulted methods, so lane
