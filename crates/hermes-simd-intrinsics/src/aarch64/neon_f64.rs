@@ -267,7 +267,7 @@ impl SimdKernel<f64> for Neon {
     #[inline]
     unsafe fn round(a: Self::Vector) -> Self::Vector {
         // `FRINTN`: round to nearest, ties to even — the `round_ties_even` contract.
-        NeonF64Vec(vrndq_f64(a.0))
+        NeonF64Vec(vrndnq_f64(a.0))
     }
 
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 2-lane vector width within caller-validated bounds.
@@ -275,7 +275,7 @@ impl SimdKernel<f64> for Neon {
     #[inline]
     unsafe fn trunc(a: Self::Vector) -> Self::Vector {
         // `FRINTZ`: round toward zero.
-        NeonF64Vec(vrndzq_f64(a.0))
+        NeonF64Vec(vrndq_f64(a.0))
     }
 
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 2-lane vector width within caller-validated bounds.
