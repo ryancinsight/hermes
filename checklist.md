@@ -1,5 +1,16 @@
 # Checklist — active sprint
 
+## HS-432 [patch] — push benchmark-budget coverage
+
+- [x] Run the benchmark-budget job on push, pull request, and manual dispatch.
+- [x] Keep the 60-second smoke pass on every event and the 300-second
+      canonical measurements on pull requests and manual runs.
+- [x] Preserve the existing timeout, locked commands, target inventory, and
+      benchmark workloads.
+- [ ] Validate workflow syntax and the PM acceptance record through the exact
+      hosted workflow before delivery. Local `actionlint` and YAML parsers are
+      unavailable in this environment.
+
 ## HS-427 [minor] — native permute overrides
 
 - [x] AVX-512 f32/f64: reverse via `vpermxvar`, interleave/deinterleave via
