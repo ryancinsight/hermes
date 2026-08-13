@@ -10,6 +10,14 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   panicking through four `unwrap()`s, and carries the crate documentation it
   previously lacked.
 
+- [patch] `test_packed4_cow_state_accessors_preserve_packed_borrow` asserted
+  `F4` values where it means raw nibble codes. Upstream eunomia made
+  `PartialEq` on the sub-byte float wrappers float-semantic instead of bitwise
+  (correctly: the derived bitwise ordering was sign-inverted), and code 7 is a
+  NaN, so `F4(7) == F4(7)` is now properly false. The test pins copy-on-write
+  promotion round-tripping the exact stored nibble, so it compares `.0`
+  directly — which also keeps the NaN codes covered rather than avoiding them.
+
 - [patch] `compress_bench` aborted on its scalar rows: it built a
   `BitMask::<1>` for a backend whose f32 lane count is 4, tripping
   `SimdView::compress`'s lane-count assertion. Broken since 2026-07-07 and

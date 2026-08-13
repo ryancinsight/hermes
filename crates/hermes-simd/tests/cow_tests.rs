@@ -137,7 +137,7 @@ fn test_packed4_cow_state_accessors_preserve_packed_borrow() {
     assert!(cow.is_borrowed());
     assert!(!cow.is_owned());
     assert_eq!(cow.as_view().as_packed_slice().as_ptr(), packed.as_ptr());
-    assert_eq!(cow.get(2), Some(F4(3)));
+    assert_eq!(cow.get(2).map(|v| v.0), Some(3));
 
     cow.set(1, F4(7));
 
@@ -148,10 +148,15 @@ fn test_packed4_cow_state_accessors_preserve_packed_borrow() {
         packed,
         [F4::pack_pair(F4(1), F4(2)), F4::pack_pair(F4(3), F4(4))]
     );
-    assert_eq!(cow.get(0), Some(F4(1)));
-    assert_eq!(cow.get(1), Some(F4(7)));
-    assert_eq!(cow.get(2), Some(F4(3)));
-    assert_eq!(cow.get(3), Some(F4(4)));
+    // Assert raw nibble codes, not `F4` values. `F4`'s `PartialEq` is
+    // float-semantic rather than bitwise, and code 7 is a NaN, so
+    // `F4(7) == F4(7)` is correctly false and a value comparison would say
+    // nothing here. What this test pins is that copy-on-write promotion
+    // round-trips the exact stored nibble, including the NaN codes.
+    assert_eq!(cow.get(0).map(|v| v.0), Some(1));
+    assert_eq!(cow.get(1).map(|v| v.0), Some(7));
+    assert_eq!(cow.get(2).map(|v| v.0), Some(3));
+    assert_eq!(cow.get(3).map(|v| v.0), Some(4));
 }
 
 #[test]
