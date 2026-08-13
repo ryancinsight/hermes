@@ -122,8 +122,13 @@ assessed against a float-lane trait, not a general one.
 - Consequence: the AVX-512 and NEON permute overrides shipped in the same
   increment carry correctness evidence only. They are canonical single-
   instruction lowerings, but after the AVX2 result they are explicitly *not* a
-  speed claim until measured (HS-430, gated on HS-429 silicon for AVX-512 and
-  an aarch64 bench step for NEON).
+  speed claim until measured. HS-430 now supplies the NEON measurement path:
+  the native aarch64 job saves the existing `permute` Criterion rows, rebuilds
+  with only the three NEON overrides disabled, and compares the identical rows
+  on the same ARM host under a finite 300-second command. The hosted result
+  still requires review before retaining or deleting an override. AVX-512
+  remains gated on HS-429 real silicon; SDE is semantic evidence, not timing
+  evidence.
 
 ### Backend matrix
 

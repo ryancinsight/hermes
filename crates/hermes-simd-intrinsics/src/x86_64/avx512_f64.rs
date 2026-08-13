@@ -279,6 +279,7 @@ impl SimdKernel<f64> for Avx512 {
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn reverse(v: Self::Vector) -> Self::Vector {
         let idx = _mm512_setr_epi64(7, 6, 5, 4, 3, 2, 1, 0);
         Avx512F64Vec(_mm512_permutexvar_pd(idx, v.0))
@@ -287,6 +288,7 @@ impl SimdKernel<f64> for Avx512 {
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn interleave(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
         let lo_idx = _mm512_setr_epi64(0, 8, 1, 9, 2, 10, 3, 11);
         let hi_idx = _mm512_setr_epi64(4, 12, 5, 13, 6, 14, 7, 15);
@@ -299,6 +301,7 @@ impl SimdKernel<f64> for Avx512 {
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn deinterleave(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
         let even_idx = _mm512_setr_epi64(0, 2, 4, 6, 8, 10, 12, 14);
         let odd_idx = _mm512_setr_epi64(1, 3, 5, 7, 9, 11, 13, 15);
