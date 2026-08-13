@@ -108,14 +108,17 @@
   that lands by direct push. Either the budget job runs on push too, or bench
   rot is caught only when someone opens a pull request — filed as HS-432.
 
-- [ ] [patch] **HS-432 — benchmark budget job never runs on pushed work.**
+- [x] [patch] **HS-432 — benchmark budget job never runs on pushed work.**
+  Owner: Codex on `codex/hermes-benchmark-trigger`; claimed 2026-08-12.
   `benchmark-budgets` is gated to `pull_request` and `workflow_dispatch`, so
   every commit that reaches `main` by direct push — which is how this stream
   delivers — skips it entirely. HS-431's panic survived a month that way.
-  Options: run the smoke subset on push (cheap: `--test` single-iteration only)
-  while keeping full timing runs on pull requests, or require pull requests for
-  this repository. Acceptance: a bench that panics or breaches its budget fails
-  CI on the same event that introduced it.
+  Resolution: the job now runs on push, pull request, and manual dispatch. The
+  compile and every-binary 60-second smoke run execute for all events; the two
+  300-second canonical measurements remain on pull requests and manual runs.
+  A bench that panics or breaches its smoke budget therefore fails CI on the
+  same event that introduced it. The push path does not claim full benchmark
+  performance evidence.
 
 - [ ] [patch] **HS-430 — measure the AVX-512 and NEON permute overrides.**
   HS-427 shipped them on correctness alone. The AVX2 result — a hand-written

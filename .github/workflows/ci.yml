@@ -63,7 +63,6 @@ jobs:
 
   benchmark-budgets:
     name: benchmark runtime budgets
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     # Twelve smoke targets at 60 seconds plus two canonical full targets at
     # 300 seconds yield a 22-minute analytical ceiling. Compilation and runner
@@ -94,7 +93,8 @@ jobs:
             timeout --foreground --kill-after=10s 60s \
               cargo bench --locked -p "$package" --bench "$benchmark" -- --test
           done
-      - name: Run changed canonical benchmarks within 300 seconds
+      - name: Run changed canonical benchmarks within 300 seconds (pull requests and manual runs)
+        if: github.event_name != 'push'
         shell: bash
         run: |
           set -euo pipefail
