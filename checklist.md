@@ -28,9 +28,12 @@
 - [x] Add the bounded native-NEON A/B gate for HS-430: save the native
       `permute` baseline, rebuild with the explicit generic-default benchmark
       configuration, and compare the identical rows on the aarch64 runner.
-- [ ] Collect and adjudicate the hosted aarch64 result. This remains a speed
-      claim only after the exact workflow output is reviewed; SDE cannot time
-      AVX-512, which remains gated on HS-429 real silicon.
+- [x] Collect and adjudicate the hosted aarch64 result: `reverse` is neutral on
+      both f32/f64 rows and its NEON overrides are deleted; large f32
+      `interleave` and `deinterleave` improve 1.27% and 1.40% respectively and
+      remain. Small rows are within Criterion's noise threshold.
+- [ ] Measure AVX-512 on HS-429 real silicon; SDE remains semantic evidence
+      only.
 
 ## HS-424 [minor] — cross-lane permute family
 
@@ -46,9 +49,10 @@
 - [x] Confirm the new assertions are non-vacuous by deliberately breaking the
       AVX2 index vector and observing the expected failure.
 - [x] Native AVX-512/NEON overlays and flat `interleave`/`deinterleave`
-      overrides — HS-427, correctness verified on SDE and aarch64.
-- [ ] Measure those overrides — HS-430; performance evidence is a separate
-      acceptance condition from semantic coverage.
+      overrides — HS-427, correctness verified on SDE and aarch64. Neutral
+      NEON `reverse` overrides were removed after the HS-430 measurement.
+- [ ] Measure the remaining AVX-512 overrides — HS-430/HS-429; performance
+      evidence is separate from semantic coverage.
 
 ## HS-422 [minor] — scatter seam
 

@@ -169,9 +169,13 @@
   tests pass unchanged against each native override on the aarch64 and SDE
   jobs, plus a benchmark showing the override beats the store/permute/load
   default.
-  The remaining delivery step is to collect the hosted aarch64 comparison and
-  either retain or delete each NEON override from its measured result. AVX-512
-  performance remains open under HS-429 because SDE is semantic evidence only.
+  The hosted aarch64 comparison ran in PR #37's exact source-head workflow
+  (run `31694336159`). `reverse_f32` and `reverse_f64` were statistically
+  unchanged against the generic default, so both NEON overrides were deleted.
+  Large `interleave_f32` and `deinterleave_f32` improved 1.27% and 1.40%
+  respectively; their native overrides remain. The smaller rows were within
+  Criterion's noise threshold. AVX-512 performance remains open under HS-429
+  because SDE is semantic evidence only.
 
 - [ ] [major] **HS-425 — `TargetId` omits the SVE backend.** `SveArch` is a
   first-class emulated backend exercised throughout the test suite, but

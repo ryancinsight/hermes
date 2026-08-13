@@ -132,16 +132,6 @@ impl SimdKernel<f32> for Neon {
     // deinterleave the trait specifies — unlike x86 `unpack`, which works
     // within 128-bit halves of a wider register and needs a cross-half fixup.
 
-    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
-    #[target_feature(enable = "neon")]
-    #[inline]
-    #[cfg(not(hermes_benchmark_generic_default))]
-    unsafe fn reverse(v: Self::Vector) -> Self::Vector {
-        // `rev64` reverses within each 64-bit pair, giving [a1, a0, a3, a2];
-        // `ext` by 2 lanes then rotates the halves into [a3, a2, a1, a0].
-        NeonF32Vec(vextq_f32::<2>(vrev64q_f32(v.0), vrev64q_f32(v.0)))
-    }
-
     // SAFETY: caller must ensure the target CPU supports `neon` (as above); operands are whole registers, so no pointer validity is involved.
     #[target_feature(enable = "neon")]
     #[inline]

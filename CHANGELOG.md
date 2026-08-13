@@ -34,9 +34,12 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   measured, and **removed**: `unpack` + `permute2f128` runs 37% slower than the
   generic default at L1-resident size, because LLVM already lowers the
   default's stack round-trip into good shuffle sequences. AVX2 `reverse` was
-  kept on measurement (10.4% faster at 1024 f32). AVX-512 and NEON override
-  performance is not yet measured — they are correctness-equivalent canonical
-  lowerings, not a speed claim.
+  kept on measurement (10.4% faster at 1024 f32). AVX-512 override performance
+  is not yet measured. On native aarch64, the HS-430 A/B gate found
+  NEON reverse neutral against the generic default and removed both f32/f64
+  overrides; large f32 interleave and deinterleave improved 1.27% and 1.40%
+  respectively and remain. The exact hosted run was 31694336159; AVX-512
+  timing remains gated on HS-429 real silicon.
 - [patch] CI now executes the capability-gated ISA paths instead of skipping
   them. AVX-512 branches are `is_x86_feature_detected!`-guarded, and the
   capability report added with the new `test-avx512-sde` job proved the x86
