@@ -35,3 +35,6 @@ path = "examples/book_reductions.rs"
 [features]
 default = ["mnemosyne-memory"]
 mnemosyne-memory = ["hermes-simd/mnemosyne-memory"]
+
+[lints]
+workspace = true

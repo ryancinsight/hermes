@@ -52,3 +52,6 @@ std = [
     "hermes-simd-types/std",
     "themis/std",
 ]
+
+[lints]
+workspace = true

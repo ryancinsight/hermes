@@ -64,3 +64,6 @@ mnemosyne-memory = [
     "hermes-simd/mnemosyne-memory",
     "hermes-simd-core/mnemosyne-memory",
 ]
+
+[lints]
+workspace = true

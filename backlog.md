@@ -1,5 +1,86 @@
 # Backlog — hermes-simd
 
+- [x] [patch] **HS-434 — workspace lint floor.** The workspace had no
+  `[workspace.lints]` table at all, so the lint policy lived in three
+  overlapping per-crate `#![allow(..)]` blocks and four copies of
+  `#![deny(missing_docs)]`. The blanket suppressions were the real cost:
+  `clippy::missing_safety_doc` was off across the whole of
+  `hermes-simd-intrinsics` — the crate with ~1270 `unsafe` sites — so an
+  `unsafe` public function could ship with no `# Safety` section and nothing
+  would say so.
+  Delivered: one `[workspace.lints]` table (`clippy::pedantic` at warn, plus
+  denied `unwrap_used`/`dbg_macro`/`print_stdout`/`print_stderr` and
+  `allow_attributes` to drive `#[allow]` -> `#[expect]`), inherited by all
+  seven members with `[lints] workspace = true`; the per-crate blocks are
+  deleted and their still-valid entries consolidated into the one table, each
+  carrying the domain reason it is allowed. Fixed in the same change: the
+  `codegen` bin gained crate docs and propagates its file-I/O errors instead of
+  four `unwrap()`s, and the AMX downgrade notice carries a per-site `#[expect]`
+  (HS-433).
+  Measured floor: 2152 library-src pedantic findings remain at warn; they are
+  the HS-435 ratchet, not a silent allow.
+
+- [ ] [patch] **HS-433 — AMX downgrade notice writes to stderr.**
+  `dispatcher.rs` surfaces the cross-NUMA-node AMX -> AVX-512 re-route with a
+  debug-only `eprintln!`, so in release builds the downgrade is silent — the
+  fallback-must-surface-its-trigger rule wants a `tracing` event. Not done now:
+  `hermes-simd` has no `tracing` dependency and adding one to a
+  `no_std`-capable facade is an ADR-level call that is not worth making for a
+  branch which cannot currently execute (AMX is quarantined, so `has_amx()` is
+  unconditionally false and the notice is unreachable). Carries a per-site
+  `#[expect(clippy::print_stderr)]` naming this item.
+  Re-open trigger: the AMX un-quarantine (see the README's Intel AMX status).
+  Acceptance: the re-route emits a `tracing` event in release builds, asserted
+  by a test capturing the subscriber.
+
+- [ ] [minor] **HS-435 — pedantic ratchet.** The lint floor (HS-434) is set to
+  warn against 2152 library-src findings. Non-increasing baseline, burnt down
+  by class rather than by file. Measured distribution: 437 numeric casts (most
+  legitimate lane/index arithmetic — the four `cast_*` lints are already
+  allowed workspace-wide, so this residue is the genuinely suspect remainder),
+  168 `ptr_as_ptr` (mechanical, `.cast()` preserves constness and is the safer
+  form), 162 missing `#[must_use]`, 83 missing `# Errors` and 19 missing
+  `# Panics` sections (both required by the documentation standard), 51
+  `doc_markdown` backticks, 45 elidable lifetimes.
+  Sequence: `ptr_as_ptr` and the doc sections first — they are safety- and
+  contract-bearing; `#[must_use]` next; cosmetics last. Acceptance: each
+  increment lowers the recorded count and never raises it.
+
+- [ ] [major] [arch] **HS-436 — `SimdKernel` is a god trait.** One sealed trait
+  carries ~60 methods across load/store, streaming, dense arithmetic, masked
+  load/store, masked arithmetic, compress/expand, gather, scatter, mask
+  construction, scan, elementwise math, comparison, reduction, cross-lane
+  permute, and adjacent-pair complex support.
+  Note on the file size: `kernel.rs` is 1115 lines but 622 of those are doc
+  comments, so it holds roughly 490 lines of code and is *not* over the
+  500-line target. This item is therefore about interface segregation, not
+  file length — do not justify it on line count.
+  Interface segregation wants role supertraits (`SimdLoadStore`, `SimdArith`,
+  `SimdMask`, `SimdPermute`, `SimdReduce`, ...) with `SimdKernel` retained as
+  the aggregate so call-site bounds and the five backend impls keep working.
+  Not free: every `#[target_feature]` impl block splits per role, which
+  multiplies impl blocks across 5 backends x several scalar types.
+  Needs an ADR before implementation — record the split, the aggregate-trait
+  compatibility argument, and the measured impl-block cost. Acceptance: no
+  behavioural change, `cargo bloat`/codegen evidence that dispatch stays
+  monomorphized, and each role module under the 500-line target.
+
+- [ ] [minor] **HS-437 — lane scratch buffers are sized to the workspace
+  maximum.** The `SimdKernel` default methods and `kernel_helpers` declare
+  scratch as `[MaybeUninit<T>; MAX_SIMD_LANES]` with `MAX_SIMD_LANES = 64`,
+  the widest backend/type pair in the workspace, rather than the backend's own
+  `LANE_COUNT`. `interleave`/`deinterleave` each declare four such buffers, so
+  a NEON `f64` call (2 live lanes) reserves 2 KB of stack to move 32 bytes.
+  Correctness is not affected — the buffers are deliberately over-sized, not
+  over-read, and `LANE_BOUND_CHECK` pins the bound at compile time.
+  `Self::LANE_COUNT` cannot be an array length in a default body on stable, so
+  the fix is an associated `type LaneBuffer` (or const-generic lane parameter)
+  that each backend fixes to its exact width.
+  Evidence required before implementing: stack-frame measurement on the
+  default-path backends, since LLVM may already narrow the frame through the
+  `store_unaligned`/`load_unaligned` pair. If it does, this closes as
+  "no measurable effect" rather than being implemented on principle.
+
 - [x] [minor] **HS-422 — scatter seam.** Add `SimdKernel::scatter` and
   `scatter_masked` as defaulted trait methods over a generic lane-sequential
   helper, override them with native `vscatterdps`/`vscatterdpd` on AVX-512

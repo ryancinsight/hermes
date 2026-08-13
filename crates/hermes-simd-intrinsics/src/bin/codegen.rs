@@ -1,3 +1,13 @@
+//! Generator for the per-scalar AVX2 and AVX-512 kernel modules.
+//!
+//! Emits `x86_64/avx2_<scalar>.rs` and `x86_64/avx512_<scalar>.rs` from one
+//! template per ISA, so the two families cannot drift apart by hand-editing.
+//! Run from the workspace root; the output paths are relative to it.
+//!
+//! This is developer tooling, not library code: writing progress to stdout is
+//! its output contract, so `print_stdout` is allowed here and nowhere else.
+#![allow(clippy::print_stdout)]
+
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
@@ -34,7 +44,7 @@ struct Param {
     three_val: &'static str,
 }
 
-fn main() {
+fn main() -> std::io::Result<()> {
     let avx2_params = vec![
         Param {
             scalar_type: "f32",
@@ -294,18 +304,20 @@ fn main() {
     for p in avx2_params {
         let content = render_avx2(&p);
         let file_path = base_dir.join(format!("avx2_{}.rs", p.scalar_type));
-        let mut file = File::create(&file_path).unwrap();
-        file.write_all(content.as_bytes()).unwrap();
-        println!("Generated {:?}", file_path);
+        let mut file = File::create(&file_path)?;
+        file.write_all(content.as_bytes())?;
+        println!("Generated {}", file_path.display());
     }
 
     for p in avx512_params {
         let content = render_avx512(&p);
         let file_path = base_dir.join(format!("avx512_{}.rs", p.scalar_type));
-        let mut file = File::create(&file_path).unwrap();
-        file.write_all(content.as_bytes()).unwrap();
-        println!("Generated {:?}", file_path);
+        let mut file = File::create(&file_path)?;
+        file.write_all(content.as_bytes())?;
+        println!("Generated {}", file_path.display());
     }
+
+    Ok(())
 }
 
 fn render_avx2(p: &Param) -> String {

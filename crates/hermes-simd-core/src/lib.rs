@@ -19,15 +19,8 @@
 //! | [`tensor`] | N-D tensor views, GEMM, softmax, LayerNorm, Attention |
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![deny(missing_docs)]
-#![allow(
-    clippy::needless_range_loop,
-    clippy::let_unit_value,
-    clippy::manual_div_ceil,
-    clippy::manual_is_multiple_of,
-    clippy::assign_op_pattern,
-    clippy::unit_arg
-)]
+// Lint policy is inherited from the workspace table (`[lints] workspace = true`).
+#![cfg_attr(test, allow(clippy::unwrap_used))]
 
 extern crate alloc;
 

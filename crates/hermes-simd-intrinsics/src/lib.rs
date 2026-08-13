@@ -18,15 +18,14 @@
 //! support probe reports `false` unconditionally; see the repository README).
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![deny(missing_docs)]
-#![allow(
-    clippy::needless_range_loop,
-    clippy::missing_safety_doc,
-    clippy::new_without_default,
-    clippy::too_many_arguments,
-    clippy::manual_is_multiple_of,
-    clippy::missing_const_for_thread_local
-)]
+// Lint policy is inherited from the workspace table (`[lints] workspace = true`).
+// `missing_safety_doc` is deliberately NOT suppressed here any more: it had been
+// off across the whole crate, which is how `unsafe` public functions came to
+// ship without a `# Safety` section.
+//
+// In-crate `#[cfg(test)]` modules print skip notices when the host lacks an ISA,
+// which is test output rather than library output.
+#![cfg_attr(test, allow(clippy::print_stderr, clippy::unwrap_used))]
 extern crate alloc;
 
 use hermes_simd_core::arch::SimdArch;

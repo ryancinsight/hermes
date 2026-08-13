@@ -22,3 +22,6 @@ mnemosyne-memory = [
     "hermes-simd-core/mnemosyne-memory",
     "hermes-simd-intrinsics/mnemosyne-memory",
 ]
+
+[lints]
+workspace = true

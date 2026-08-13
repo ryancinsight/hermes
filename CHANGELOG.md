@@ -6,6 +6,10 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Fixed
 
+- [patch] The `codegen` binary propagates its file-I/O failures instead of
+  panicking through four `unwrap()`s, and carries the crate documentation it
+  previously lacked.
+
 - [patch] `compress_bench` aborted on its scalar rows: it built a
   `BitMask::<1>` for a backend whose f32 lane count is 4, tripping
   `SimdView::compress`'s lane-count assertion. Broken since 2026-07-07 and
@@ -14,6 +18,21 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   instead of a literal.
 
 ### Changed
+
+- [patch] Lint policy is now a single `[workspace.lints]` table inherited by
+  every member, replacing three overlapping per-crate `#![allow(..)]` blocks
+  and four copies of `#![deny(missing_docs)]`. `clippy::pedantic` is the floor;
+  `unwrap_used`, `dbg_macro`, `print_stdout`, and `print_stderr` are denied, and
+  `allow_attributes` drives the `#[allow]` -> `#[expect]` migration. The
+  allowed pedantic lints are listed once, each with the domain reason it does
+  not apply to vector kernels.
+  Notably `clippy::missing_safety_doc` is no longer suppressed: it had been
+  allowed across the whole of `hermes-simd-intrinsics`, the crate holding
+  roughly 1270 `unsafe` sites, so an `unsafe` public function could ship
+  without a `# Safety` section unnoticed.
+  The floor is set against 2152 remaining library-src pedantic findings, which
+  are recorded as a non-increasing ratchet (backlog HS-435) rather than
+  silently allowed.
 
 - [patch] The native aarch64 CI job now measures the NEON cross-lane permute
   overrides against the generic store/permute/load defaults. It saves a

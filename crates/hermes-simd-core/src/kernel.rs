@@ -1,31 +1,40 @@
 //! Low-level SIMD operations trait implemented per architecture and primitive type.
 //!
-//! # Extension Surface (v2+)
+//! # Operation Families
 //!
-//! New in this iteration:
-//! - `sub(a, b)` — elementwise subtraction, required for `Sub` ElementOp strategy.
-//! - `mask_from_bitmask(bm)` — convert `BitMask<LANE_COUNT>` to native mask; default
-//!   calls `mask_from_bools` via `BitMask::to_bools()`. AVX-512 impls override with direct cast.
-//! - `zero()` — returns a vector of zeros; default implementation uses `splat(T::ZERO)`.
-//!   Backends may override with an architecture-specific XOR-zero idiom if profiling shows benefit.
+//! [`SimdKernel`] is the single seam every backend implements. Its methods group
+//! into the families below; a backend must supply the required ones and may
+//! override any default where the ISA has a native instruction.
 //!
-//! # Extension Surface (v2)
-//!
-//! Beyond the base load/store/arithmetic/reduce methods, `SimdKernel` now exposes:
-//!
-//! - **Masked operations** (`masked_load_unaligned`, `masked_store_unaligned`,
-//!   `masked_add`, `masked_mul`, `masked_fmadd`, `masked_sum_reduce`) — predicated
-//!   arithmetic using hardware mask registers. The `src` parameter follows AVX-512
-//!   merge-masking semantics: lanes where `mask[i] = 0` are taken from `src`.
-//!
-//! - **Compress / expand** — scatter/gather from/to contiguous storage:
-//!   - `compress`: packs selected lanes (`mask[i]=1`) to low lanes of result.
-//!   - `expand`: scatters low lanes of `src` to positions where `mask[i]=1`.
-//!
-//! - **Gather** (`gather`, `gather_masked`) — indirect indexed load from a base pointer.
-//!
-//! - **Mask construction** (`mask_from_bools`, `leading_k_mask`) — build masks from
-//!   boolean arrays or lane counts for tail handling.
+//! - **Load / store** — aligned, unaligned, and non-temporal (`store_streaming`,
+//!   gated on `SUPPORTS_NT_STORE` with `stream_write_barrier` for ordering).
+//! - **Dense arithmetic** — `add`, `sub`, `mul`, `div`, `fmadd`, `neg`, `abs`,
+//!   `min`, `max`, `sqrt`, `recip_sqrt`, and the `floor`/`ceil`/`round`/`trunc`
+//!   rounding set.
+//! - **Bitwise** — `bitand`, `bitor`, `bitxor`, `bitnot`, `popcount`.
+//! - **Comparison** — `cmp_eq`/`ne`/`lt`/`le`/`gt`/`ge`, returning lane masks as
+//!   vectors, plus `blend`.
+//! - **Reduction** — `sum_reduce`, `min_reduce`, `max_reduce`, and the
+//!   `horizontal_bitwise_*` family.
+//! - **Masked operations** — `masked_load_unaligned`, `masked_store_unaligned`,
+//!   `masked_add`, `masked_mul`, `masked_fmadd`, `masked_sum_reduce`. Predication
+//!   follows AVX-512 merge-masking semantics: lanes where `mask[i] = 0` are taken
+//!   from `src`.
+//! - **Compress / expand** — `compress` packs selected lanes (`mask[i] = 1`) into
+//!   the low lanes of the result; `expand` scatters the low lanes of `src` back to
+//!   the positions where `mask[i] = 1`.
+//! - **Gather / scatter** — `gather`, `gather_masked`, `scatter`, `scatter_masked`:
+//!   indirect indexed load and store through [`SimdKernel::IndexVector`].
+//! - **Mask construction** — `mask_from_bools`, `mask_from_bitmask`,
+//!   `leading_k_mask` (tail handling), and the `mask_to_vector` /
+//!   `vector_to_mask` / `mask_to_bitmask` conversions.
+//! - **Scan** — `scan_vector`, parameterized by a [`crate::ops::ScanOp`] and an
+//!   inclusive/exclusive [`crate::ops::ScanMode`].
+//! - **Cross-lane permutes** — `reverse`, `interleave`, `deinterleave`, all
+//!   specified on the flat lane sequence rather than per 128-bit sub-lane.
+//! - **Adjacent-pair shuffles** — `swap_adjacent`, `dup_even`, `dup_odd`,
+//!   `fmaddsub`, `fmsubadd`: the minimal set for register-resident interleaved
+//!   complex arithmetic.
 //!
 //! # Architecture Mapping
 //!

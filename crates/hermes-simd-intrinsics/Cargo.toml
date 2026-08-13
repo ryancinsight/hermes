@@ -20,5 +20,5 @@ default = ["std", "mnemosyne-memory"]
 std = ["hermes-simd-core/std", "eunomia/std"]
 mnemosyne-memory = ["hermes-simd-core/mnemosyne-memory"]
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ["cfg(hermes_benchmark_generic_default)"] }
+[lints]
+workspace = true

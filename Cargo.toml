@@ -29,6 +29,91 @@ repository = "https://github.com/ryancinsight/hermes"
 # every member at the root README instead of its own landing page.
 categories = ["hardware-support", "algorithms", "no-std"]
 
+# Single source of truth for the lint floor. Members inherit with
+# `[lints] workspace = true`; a member re-declaring a level forks this table.
+# Per-site suppressions use `#[expect(lint, reason = "...")]`, never a
+# crate-level `#![allow]` — a blanket allow silences the lint for code written
+# years later, which is how `missing_safety_doc` came to be off across the
+# whole intrinsics crate.
+[workspace.lints.rust]
+missing_docs = "deny"
+# Declared workspace-wide because `[lints] workspace = true` cannot coexist with
+# a member-local `[lints.rust]` table; the benchmark cfg is only *set* by
+# hermes-simd-intrinsics, and declaring it known elsewhere costs nothing.
+unexpected_cfgs = { level = "warn", check-cfg = [
+    "cfg(hermes_benchmark_generic_default)",
+] }
+
+[workspace.lints.clippy]
+# `priority = -1` lets the individual entries below override the group.
+pedantic = { level = "warn", priority = -1 }
+
+# Safety and hygiene floor.
+unwrap_used = "deny"
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+# Mechanizes the `#[allow]` -> `#[expect]` migration: `expect` self-expires when
+# the underlying finding is fixed, so stale suppressions cannot accumulate.
+allow_attributes = "warn"
+
+# Curated allows. Each entry is a pedantic lint whose signal is negative *for
+# this domain*; the set is reviewed like code, not grown on convenience.
+#
+# A SIMD kernel library is built from lane-index and mask arithmetic that
+# crosses width boundaries by construction (usize lane counts into i32 gather
+# indices, element counts into byte offsets). These four fire on essentially
+# every such expression, and the real defenses are the `checked_*` dimension
+# arithmetic and `overflow-checks` in dev/test, not a cast-site lint.
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+# `#[inline(always)]` is load-bearing here, not a habit: the whole zero-cost
+# claim rests on kernel bodies inlining into their dispatch sites.
+inline_always = "allow"
+# Vector code names operands in conventional pairs (`a`/`b`, `lo`/`hi`,
+# `re`/`im`) and math kernels index with `i`/`j`/`k`/`m`/`n`. Renaming these to
+# satisfy a lint would make the kernels harder to check against their formulae.
+similar_names = "allow"
+many_single_char_names = "allow"
+# `hermes_simd_core::simd::SimdView` and friends: the repetition is the domain
+# vocabulary and removing it would degrade the public API names.
+module_name_repetitions = "allow"
+
+# Consolidated from the three per-crate `#![allow(..)]` blocks that previously
+# stated overlapping policy in hermes-simd, -core, and -intrinsics. Kept because
+# each conflicts with how vector kernels are written, not because it was
+# inconvenient to fix.
+#
+# Lane loops index several parallel buffers at once (`buf_a[i]`, `buf_b[i]`,
+# `out[i]`), which is precisely the shape `needless_range_loop` rewrites into
+# an unreadable zip chain.
+needless_range_loop = "allow"
+# `a[i] = a[i] + b[i]` mirrors the fused-multiply-add formulae the kernels
+# implement; collapsing to `+=` obscures the correspondence.
+assign_op_pattern = "allow"
+# The scalar reference paths deliberately spell out element copies so they can
+# be read against the vector path they verify.
+manual_memcpy = "allow"
+# Kernel entry points genuinely take many operands (pointers, strides, lane
+# counts, masks); bundling them into structs would add an indirection the
+# zero-cost contract does not permit.
+too_many_arguments = "allow"
+# `const { LANE_BOUND_CHECK }` and `#[target_feature]` shims legitimately bind
+# and pass `()`.
+let_unit_value = "allow"
+unit_arg = "allow"
+# Written in the form the surrounding lane arithmetic uses.
+manual_div_ceil = "allow"
+manual_is_multiple_of = "allow"
+# ZST architecture markers are unit structs; a `Default` impl would imply they
+# carry state.
+new_without_default = "allow"
+# The dispatch cache's thread-local cannot be `const`-initialised on the pinned
+# toolchain.
+missing_const_for_thread_local = "allow"
+
 [workspace.dependencies]
 mnemosyne = { package = "mnemosyne-memory", git = "https://github.com/ryancinsight/Mnemosyne.git", version = "0.7.0", default-features = false }
 themis = { package = "themis-topology", git = "https://github.com/ryancinsight/themis", version = "0.10.1", default-features = false }

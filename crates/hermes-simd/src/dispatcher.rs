@@ -91,11 +91,26 @@ impl AdaptiveDispatcher {
                                 if !WARNED.load(core::sync::atomic::Ordering::Relaxed)
                                     && !WARNED.swap(true, core::sync::atomic::Ordering::Relaxed)
                                 {
-                                    std::eprintln!(
-                                        "WARNING [hermes-simd]: Cross-node NUMA memory access \
-                                         detected (thread node: {curr_node}). Re-routing AMX → \
-                                         AVX-512 to mitigate latency."
-                                    );
+                                    // A library should surface a downgrade through
+                                    // `tracing`, not stderr. Converting it means adding a
+                                    // `tracing` dependency to this `no_std`-capable facade,
+                                    // which is an ADR-level call and is not worth making for
+                                    // a branch that cannot currently execute: AMX is
+                                    // quarantined, so `has_amx()` is unconditionally false
+                                    // and this diagnostic is unreachable. Tracked as HS-433,
+                                    // to be done with the AMX un-quarantine.
+                                    #[expect(
+                                        clippy::print_stderr,
+                                        reason = "debug-only, once-latched AMX downgrade notice; \
+                                                  HS-433 converts it to tracing"
+                                    )]
+                                    {
+                                        std::eprintln!(
+                                            "WARNING [hermes-simd]: Cross-node NUMA memory \
+                                             access detected (thread node: {curr_node}). \
+                                             Re-routing AMX → AVX-512 to mitigate latency."
+                                        );
+                                    }
                                 }
                             }
                             if has_avx512 {

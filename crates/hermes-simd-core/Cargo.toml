@@ -27,3 +27,6 @@ std = ["eunomia/std", "themis/std"]
 mnemosyne-memory = ["dep:mnemosyne"]
 # Linux NUMA affinity and residency probes via libnuma (links -lnuma); off by default.
 libnuma = []
+
+[lints]
+workspace = true

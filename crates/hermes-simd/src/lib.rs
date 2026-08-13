@@ -35,14 +35,12 @@
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![deny(missing_docs)]
-#![allow(
-    unused_unsafe,
-    clippy::too_many_arguments,
-    clippy::needless_range_loop,
-    clippy::assign_op_pattern,
-    clippy::manual_memcpy
-)]
+// Lint policy is inherited from the workspace table (`[lints] workspace = true`).
+// `unused_unsafe` stays crate-local: it fires on `unsafe` blocks nested inside
+// `#[target_feature]` functions, which are written explicitly so each intrinsic
+// call site still carries its own SAFETY reasoning.
+#![allow(unused_unsafe)]
+#![cfg_attr(test, allow(clippy::unwrap_used))]
 
 extern crate alloc;
 
