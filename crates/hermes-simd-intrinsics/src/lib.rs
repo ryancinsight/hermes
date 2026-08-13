@@ -12,9 +12,10 @@
 //! | [`Neon`]        | AArch64 NEON | 4         | 2         |
 //! | [`SveArch`]    | AArch64 SVE shape, emulated | 16 | 8 |
 //!
-//! Optional crate-feature backends:
-//! - `wide` — wraps the [`wide`](https://docs.rs/wide) crate.
-//! - `portable-simd` — wraps nightly `std::simd`.
+//! Also here: the AVX-512 VNNI and 256-bit AVX-VNNI tile multipliers, packed
+//! 4-bit hardware unpacking, sliding-attack bitboard backends, and the
+//! quarantined Intel AMX engine (compiled, never dispatched — its runtime
+//! support probe reports `false` unconditionally; see the repository README).
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(missing_docs)]

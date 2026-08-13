@@ -24,6 +24,10 @@ description = "High-performance, zero-overhead SIMD abstraction library"
 license = "MIT OR Apache-2.0"
 rust-version = "1.95"
 repository = "https://github.com/ryancinsight/hermes"
+# Shared registry classification. `readme` is deliberately NOT inherited: an
+# inherited `readme` path resolves against the workspace root, which would point
+# every member at the root README instead of its own landing page.
+categories = ["hardware-support", "algorithms", "no-std"]
 
 [workspace.dependencies]
 mnemosyne = { package = "mnemosyne-memory", git = "https://github.com/ryancinsight/Mnemosyne.git", version = "0.7.0", default-features = false }

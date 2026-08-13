@@ -7,6 +7,9 @@ license.workspace = true
 authors.workspace = true
 description = "Monomorphized vector register types for the hermes-simd workspace"
 repository.workspace = true
+categories.workspace = true
+readme = "README.md"
+keywords = ["simd", "vectorization", "no-std", "registers", "types"]
 
 [dependencies]
 hermes-simd-core = { path = "../hermes-simd-core", version = "0.6.0", default-features = false }

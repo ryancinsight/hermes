@@ -5,8 +5,11 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-description.workspace = true
+description = "Architecture-specific SIMD kernels for hermes-simd: AVX2, AVX-512, AVX-VNNI, and NEON implementations of the SimdKernel trait"
 repository.workspace = true
+categories.workspace = true
+readme = "README.md"
+keywords = ["simd", "intrinsics", "avx512", "neon", "vnni"]
 
 [dependencies]
 hermes-simd-core = { path = "../hermes-simd-core", version = "0.6.0" }

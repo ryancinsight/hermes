@@ -1,6 +1,6 @@
 # hermes-simd
 
-A high-performance, zero-overhead Rust SIMD abstraction workspace covering dense, sparse, complex, and packed sub-byte data-parallel kernels — plus Intel AMX tiling, AVX-512 VNNI, and SWAR chess bitboards.
+A high-performance, zero-overhead Rust SIMD abstraction workspace covering dense, sparse, complex, and packed sub-byte data-parallel kernels — plus AVX-512 VNNI tile GEMM and SWAR chess bitboards.
 
 The workspace is designed for extreme runtime efficiency, using traits, ZST markers, const generics, and full compiler monomorphization to generate machine code identical to hand-optimized assembly. It compiles entirely on stable Rust with no unstable nightly compiler prerequisites.
 
@@ -10,7 +10,7 @@ The project is structured as a multi-crate workspace (dependencies flow strictly
 
 - **Numeric vocabulary (external)**: the precision ladder (`Bf4`/`F4`/`Bf8`/`F8`/`F16`/`Bf16`/`F32`/`F64`/`I8`/`I16`/`I32`), packed 4-bit storage, and cast traits live in the [`eunomia`](https://github.com/ryancinsight/eunomia) crate — the Atlas numeric SSOT — and are re-exported through `hermes-simd`. (The former `hermes-numeric` member crate was migrated upstream.)
 - **`crates/hermes-simd-core`**: Core abstractions — `SimdView<'a, T, Arch, Align, Mode, Ref>` typestate views, the `SimdKernel<T>` operation trait, `SimdCow` dense copy-on-write, generic `SparseCow<T, Format, Arch>`, `BitMask<N>`, reduction/element/scan op strategy ZSTs, const-generic tiling, and N-D tensor views.
-- **`crates/hermes-simd-intrinsics`**: Architecture-specific kernels (`Scalar`, `Avx2`, `Avx512`, `AvxVnni`, `Neon` ZST markers implementing `SimdKernel<T>` / tile traits), Intel AMX engine, AVX-512 VNNI and 256-bit AVX-VNNI tile multipliers, packed 4-bit hardware unpacking, and sliding-attack bitboard backends.
+- **`crates/hermes-simd-intrinsics`**: Architecture-specific kernels (`Scalar`, `Avx2`, `Avx512`, `AvxVnni`, `Neon` ZST markers implementing `SimdKernel<T>` / tile traits), AVX-512 VNNI and 256-bit AVX-VNNI tile multipliers, packed 4-bit hardware unpacking, sliding-attack bitboard backends, and the quarantined Intel AMX engine (see [Intel AMX status](#intel-amx-status)).
 - **`crates/hermes-simd-types`**: Monomorphized convenience aliases and the compile-time `PreferredArch` selection.
 - **`crates/hermes-simd-macros`**: Procedural macros — `#[runtime_dispatch]` generates compile-time-gated plus runtime-detected dispatchers from one generic kernel function.
 - **`crates/hermes-simd`**: Public facade — the sealed `SimdOps` extension trait, runtime-dispatched free functions (`sum`, `dot`, `spmv_*`, `interleaved_complex_*`, …), and `dispatch_view` CPUID routing.
@@ -23,7 +23,7 @@ The project is structured as a multi-crate workspace (dependencies flow strictly
 2. **Interleaved complex kernels**: `interleaved_complex_dot` / `interleaved_complex_mul_assign` over `[re, im, ...]` primitive slices, fully register-resident via adjacent-pair `SimdKernel` primitives (`swap_adjacent`, `dup_even`, `dup_odd`, `fmaddsub`, `fmsubadd`) with AVX2/AVX-512/NEON overrides and a `const CONJ_B` conjugation flag (see `docs/adr/004`).
 3. **Copy-on-write containers**: `SimdCow` (dense, with map/zip/reduce/scan/norm extensions) and one generic `SparseCow<T, F, Arch>` covering every sparse format through the `CowFormat` trait — zero-copy reads, single-allocation promotion.
 4. **Sparse SIMD (SpMV)**: format-parameterized views for CSR, Sliced ELLPACK (SELL-p), Blocked COO, and Dense-with-Mask layouts.
-5. **Intel AMX acceleration**: stable inline-assembly AMX (`tdpbf16ps`, `tdpbssd`), fallible RAII `AmxSession` tile-config caching guarded by runtime support, 2×2 register blocking; VNNI tile GEMM uses a single internal `vpdpbssd` asm macro plus bit-parallel INT4→INT8 unpacking.
+5. **VNNI tile GEMM**: AVX-512 VNNI and 256-bit AVX-VNNI tile multipliers behind a single internal `vpdpbssd` asm macro, plus bit-parallel INT4→INT8 unpacking. Intel AMX kernels exist in the tree but are quarantined and never dispatched — see [Intel AMX status](#intel-amx-status).
 6. **SWAR chess bitboards**: Kogge-Stone, Hyperbola Quintessence, Fancy Magic, and Hybrid SWAR-Magic sliding-attack backends behind one `BitBoardView`.
 7. **Typestate safety**: alignment (`Aligned<A>`/`Unaligned`), execution mode (`Masked`/`Unmasked`), and reference mutability are compile-time parameters with zero layout overhead.
 8. **Precision ladder**: 4-bit through 64-bit numeric types with packed storage and hardware-accelerated unpacking into `SimdCow`.
@@ -100,11 +100,32 @@ accumulating across depth in registers.
 | `std` (default) | Enables runtime CPU feature detection |
 | `mnemosyne-memory` (default) | Routes aligned vector allocation through Mnemosyne; topology queries belong to Themis |
 | `libnuma` | Enables Linux affinity and residency probes; Hermes does not expose topology query facades |
-| `sparse` | Enables `SparseView` SpMV layouts and computation |
-| `tiling` | Enables register-blocked tiling dot products and GEMV |
-| `bytemuck` | Enables safe type-casting via the `bytemuck` crate |
-| `wide` | Enables the `wide` crate backend fallback |
-| `portable-simd` | Enables nightly standard library `std::simd` |
+
+Sparse SpMV, register-blocked tiling, and the packed sub-byte kernels are
+unconditional parts of the library, not opt-in features.
+
+## Intel AMX status
+
+**AMX is quarantined: it is compiled, but never dispatched.** The tile kernels
+(`tdpbf16ps`, `tdpbssd`), the `AmxConfig` tile descriptors, and the fallible
+RAII `AmxSession`/`AmxBatchSession` guards are present in
+`hermes-simd-intrinsics`, but every runtime support probe reports `false`
+unconditionally (`crates/hermes-simd/src/cpu.rs`,
+`crates/hermes-simd-intrinsics/src/x86_64/amx/mod.rs`). `AmxSession::new`
+therefore always returns `AmxSessionError::UnsupportedTarget`, and the tile
+GEMM ladder never enters its AMX rung on any host.
+
+The quarantine is deliberate. Raw CPUID is insufficient to decide AMX
+availability — it misses XCR0 OS enablement and the Linux `XTILEDATA` process
+permission — and the stable Rust feature-detection macro does not accept AMX
+feature strings on the pinned toolchain. Reporting `false` preserves the
+safe-dispatch contract instead of risking a `#UD`/`#NM` fault.
+
+**Removal trigger** ([`backlog.md`](backlog.md) → Open): re-enable AMX
+auto-dispatch only after adding a stable, permission-aware probe that verifies
+hardware feature bits, XCR0 OS state, and Linux `XTILEDATA` process permission
+before reporting support. Acceptance: AMX GEMM dispatches and matches the
+scalar reference on a Sapphire-Rapids Linux runner.
 
 ---
 
@@ -144,7 +165,7 @@ let (re, im) = interleaved_complex_dot_runtime::<f64, true>(&a, &b).unwrap();
 assert_eq!((re, im), (70.0, 8.0));
 ```
 
-### High-level GEMM (AMX / VNNI Fallback)
+### High-level Tile GEMM (VNNI)
 ```rust
 use hermes_simd::gemm;
 
@@ -153,8 +174,8 @@ let a = vec![1i8; m * k];
 let b = vec![2i8; k * n];
 let mut c = vec![0i32; m * n];
 
-// Automatically dispatches down the ladder: Intel AMX → AVX-512 VNNI →
-// 256-bit AVX-VNNI (client CPUs without AVX-512) → scalar tiles.
+// Automatically dispatches down the ladder: AVX-512 VNNI → 256-bit AVX-VNNI
+// (client CPUs without AVX-512) → scalar tiles.
 unsafe {
     gemm::<i8, i8, i32>(m, n, k, &a, k, &b, n, &mut c, n).unwrap();
 }
@@ -185,7 +206,7 @@ cargo run -p hermes-simd-benches -- --parse-only --write-baseline --check-regres
 cargo run -p hermes-simd-benches -- --parse-only --check-regressions
 ```
 
-Differential testing policy: every optimized backend (AVX2, AVX-512, NEON, AMX) is verified against the always-available `Scalar` backend — bitwise on dyadic-exact inputs, within analytically derived rounding bounds on arbitrary inputs.
+Differential testing policy: the AVX2, AVX-512, and NEON backends are verified against the always-available `Scalar` backend — bitwise on dyadic-exact inputs, within analytically derived rounding bounds on arbitrary inputs. AVX-512 executes under Intel SDE emulating Sapphire Rapids (`test-avx512-sde`) and NEON on a native aarch64 runner (`test-aarch64`), so neither is carried by a capability-gated skip. The AMX kernels are compile-checked only; they are not runtime-validated, because the quarantine above prevents them from being dispatched at all.
 
 Benchmark regression policy: `benchmarks_baseline.json` is the structured
 Criterion baseline. `--check-regressions` fails when a committed baseline row is
@@ -201,4 +222,4 @@ depth-major row-panel accumulation against repeated public `axpy_rows` calls.
 - Active sprint tactics: [`checklist.md`](checklist.md)
 - Version history: [`CHANGELOG.md`](CHANGELOG.md)
 
-Current version: **0.2.0** (pre-release; canonical trait surfaces defined, breaking changes documented per minor release).
+Current version: **0.6.0** (pre-release; canonical trait surfaces defined, breaking changes documented per minor release).
