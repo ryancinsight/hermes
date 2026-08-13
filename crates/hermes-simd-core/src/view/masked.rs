@@ -328,8 +328,8 @@ where
                 let v = load(ptr);
                 let compressed = Arch::compress(v, native_mask);
 
-                Arch::store_unaligned(temp.as_mut_ptr() as *mut T, compressed);
-                core::ptr::copy_nonoverlapping(temp.as_ptr() as *const T, ptr_out, pop);
+                Arch::store_unaligned(temp.as_mut_ptr().cast::<T>(), compressed);
+                core::ptr::copy_nonoverlapping(temp.as_ptr().cast::<T>(), ptr_out, pop);
 
                 ptr = ptr.add(lane_count);
                 ptr_out = ptr_out.add(pop);

@@ -89,7 +89,7 @@ where
 
         #[cfg(feature = "mnemosyne-memory")]
         let ptr =
-            unsafe { core::alloc::GlobalAlloc::alloc(&mnemosyne::Mnemosyne, layout) as *mut T };
+            unsafe { core::alloc::GlobalAlloc::alloc(&mnemosyne::Mnemosyne, layout).cast::<T>() };
         #[cfg(not(feature = "mnemosyne-memory"))]
         let ptr = unsafe { alloc(layout) as *mut T };
 
@@ -144,7 +144,7 @@ where
         let layout = Self::layout_for_capacity(capacity, align);
 
         let allocator = crate::numa::MnemosyneNumaAllocator;
-        let ptr = unsafe { allocator.alloc_on_node(layout, node) as *mut T };
+        let ptr = unsafe { allocator.alloc_on_node(layout, node).cast::<T>() };
         if ptr.is_null() {
             alloc::alloc::handle_alloc_error(layout);
         }
@@ -275,7 +275,7 @@ where
         // elements are not yet initialized.
         unsafe {
             core::slice::from_raw_parts_mut(
-                self.ptr.add(self.len) as *mut core::mem::MaybeUninit<T>,
+                self.ptr.add(self.len).cast::<core::mem::MaybeUninit<T>>(),
                 self.cap - self.len,
             )
         }
@@ -474,11 +474,11 @@ where
         let new_ptr = if self.cap == 0 {
             if let Some(node) = self.node {
                 let allocator = crate::numa::MnemosyneNumaAllocator;
-                unsafe { allocator.alloc_on_node(new_layout, node) as *mut T }
+                unsafe { allocator.alloc_on_node(new_layout, node).cast::<T>() }
             } else {
                 #[cfg(feature = "mnemosyne-memory")]
                 unsafe {
-                    core::alloc::GlobalAlloc::alloc(&mnemosyne::Mnemosyne, new_layout) as *mut T
+                    core::alloc::GlobalAlloc::alloc(&mnemosyne::Mnemosyne, new_layout).cast::<T>()
                 }
                 #[cfg(not(feature = "mnemosyne-memory"))]
                 unsafe {
@@ -490,16 +490,18 @@ where
             unsafe {
                 if let Some(node) = self.node {
                     let allocator = crate::numa::MnemosyneNumaAllocator;
-                    allocator.realloc_on_node(self.ptr as *mut u8, old_layout, new_layout, node)
-                        as *mut T
+                    allocator
+                        .realloc_on_node(self.ptr.cast::<u8>(), old_layout, new_layout, node)
+                        .cast::<T>()
                 } else {
                     #[cfg(feature = "mnemosyne-memory")]
                     let ptr = core::alloc::GlobalAlloc::realloc(
                         &mnemosyne::Mnemosyne,
-                        self.ptr as *mut u8,
+                        self.ptr.cast::<u8>(),
                         old_layout,
                         new_layout.size(),
-                    ) as *mut T;
+                    )
+                    .cast::<T>();
                     #[cfg(not(feature = "mnemosyne-memory"))]
                     let ptr =
                         alloc::alloc::realloc(self.ptr as *mut u8, old_layout, new_layout.size())
@@ -557,12 +559,12 @@ impl<T, Align: Alignment> Drop for DeallocGuard<T, Align> {
                 );
                 if let Some(node) = self.node {
                     let allocator = crate::numa::MnemosyneNumaAllocator;
-                    allocator.dealloc_on_node(self.ptr as *mut u8, layout, node);
+                    allocator.dealloc_on_node(self.ptr.cast::<u8>(), layout, node);
                 } else {
                     #[cfg(feature = "mnemosyne-memory")]
                     core::alloc::GlobalAlloc::dealloc(
                         &mnemosyne::Mnemosyne,
-                        self.ptr as *mut u8,
+                        self.ptr.cast::<u8>(),
                         layout,
                     );
                     #[cfg(not(feature = "mnemosyne-memory"))]

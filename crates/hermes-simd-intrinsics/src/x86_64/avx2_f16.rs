@@ -68,7 +68,7 @@ mod f16c {
     #[inline]
     #[target_feature(enable = "avx,f16c")]
     unsafe fn to_f32_halves(v: &[F16; 16]) -> (__m256, __m256) {
-        let p = v.as_ptr() as *const __m128i;
+        let p = v.as_ptr().cast::<__m128i>();
         (
             _mm256_cvtph_ps(_mm_loadu_si128(p)),
             _mm256_cvtph_ps(_mm_loadu_si128(p.add(1))),
@@ -81,7 +81,7 @@ mod f16c {
     #[target_feature(enable = "avx,f16c")]
     unsafe fn from_f32_halves(lo: __m256, hi: __m256) -> [F16; 16] {
         let mut out = [F16::ZERO; 16];
-        let p = out.as_mut_ptr() as *mut __m128i;
+        let p = out.as_mut_ptr().cast::<__m128i>();
         _mm_storeu_si128(p, _mm256_cvtps_ph::<ROUND_NEAREST>(lo));
         _mm_storeu_si128(p.add(1), _mm256_cvtps_ph::<ROUND_NEAREST>(hi));
         out

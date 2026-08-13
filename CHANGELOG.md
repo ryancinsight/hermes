@@ -27,6 +27,15 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch] Raw pointer-to-pointer casts use `.cast::<T>()` instead of
+  `as *const T` / `as *mut T` across the workspace — 171 sites in 20 files, the
+  first class burnt down from the HS-435 pedantic ratchet. `.cast()` cannot
+  change constness, so a `*const` that should have stayed const can no longer
+  become `*mut` through a silent edit to a cast that still compiles. No
+  behavioural change: `.cast()` is definitionally the same operation for
+  same-constness pointer casts. Net -77 lines, as the shorter form let the
+  formatter collapse previously wrapped call sites.
+
 - [patch] Lint policy is now a single `[workspace.lints]` table inherited by
   every member, replacing three overlapping per-crate `#![allow(..)]` blocks
   and four copies of `#![deny(missing_docs)]`. `clippy::pedantic` is the floor;

@@ -73,12 +73,12 @@ impl AdaptiveDispatcher {
                 if is_multi_numa() {
                     if let Some(curr_node) = current_numa_node() {
                         let a_local = verify_numa_locality(
-                            a_ptr as *const u8,
+                            a_ptr.cast::<u8>(),
                             a_len * core::mem::size_of::<T>(),
                             curr_node,
                         );
                         let b_local = verify_numa_locality(
-                            b_ptr as *const u8,
+                            b_ptr.cast::<u8>(),
                             b_len * core::mem::size_of::<T>(),
                             curr_node,
                         );

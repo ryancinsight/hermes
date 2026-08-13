@@ -488,7 +488,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
         const { Self::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let lanes = Self::LANE_COUNT;
-        Self::store_unaligned(buf.as_mut_ptr() as *mut T, v);
+        Self::store_unaligned(buf.as_mut_ptr().cast::<T>(), v);
 
         let mut out_buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         if SMode::IS_INCLUSIVE {
@@ -505,7 +505,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
             }
         }
 
-        (Self::load_unaligned(out_buf.as_ptr() as *const T), carry)
+        (Self::load_unaligned(out_buf.as_ptr().cast::<T>()), carry)
     }
 
     /// Set all lanes to zero.
@@ -931,9 +931,9 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
         const { Self::LANE_BOUND_CHECK };
         let lanes = Self::LANE_COUNT;
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        Self::store_unaligned(buf.as_mut_ptr() as *mut T, v);
+        Self::store_unaligned(buf.as_mut_ptr().cast::<T>(), v);
         buf[..lanes].reverse();
-        Self::load_unaligned(buf.as_ptr() as *const T)
+        Self::load_unaligned(buf.as_ptr().cast::<T>())
     }
 
     /// Interleave two vectors lane-wise, returning the low and high halves of
@@ -953,8 +953,8 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
         let lanes = Self::LANE_COUNT;
         let mut buf_a = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let mut buf_b = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        Self::store_unaligned(buf_a.as_mut_ptr() as *mut T, a);
-        Self::store_unaligned(buf_b.as_mut_ptr() as *mut T, b);
+        Self::store_unaligned(buf_a.as_mut_ptr().cast::<T>(), a);
+        Self::store_unaligned(buf_b.as_mut_ptr().cast::<T>(), b);
 
         let mut lo = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let mut hi = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
@@ -975,8 +975,8 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
             hi[i].write(pick(src_hi));
         }
         (
-            Self::load_unaligned(lo.as_ptr() as *const T),
-            Self::load_unaligned(hi.as_ptr() as *const T),
+            Self::load_unaligned(lo.as_ptr().cast::<T>()),
+            Self::load_unaligned(hi.as_ptr().cast::<T>()),
         )
     }
 
@@ -996,8 +996,8 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
         let lanes = Self::LANE_COUNT;
         let mut buf_a = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let mut buf_b = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        Self::store_unaligned(buf_a.as_mut_ptr() as *mut T, a);
-        Self::store_unaligned(buf_b.as_mut_ptr() as *mut T, b);
+        Self::store_unaligned(buf_a.as_mut_ptr().cast::<T>(), a);
+        Self::store_unaligned(buf_b.as_mut_ptr().cast::<T>(), b);
 
         let mut even = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let mut odd = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
@@ -1013,8 +1013,8 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
             odd[i].write(pick(2 * i + 1));
         }
         (
-            Self::load_unaligned(even.as_ptr() as *const T),
-            Self::load_unaligned(odd.as_ptr() as *const T),
+            Self::load_unaligned(even.as_ptr().cast::<T>()),
+            Self::load_unaligned(odd.as_ptr().cast::<T>()),
         )
     }
 
@@ -1045,13 +1045,13 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
         const { Self::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let lanes = Self::LANE_COUNT;
-        Self::store_unaligned(buf.as_mut_ptr() as *mut T, v);
+        Self::store_unaligned(buf.as_mut_ptr().cast::<T>(), v);
         let mut i = 0usize;
         while i + 1 < lanes {
             buf.swap(i, i + 1);
             i += 2;
         }
-        Self::load_unaligned(buf.as_ptr() as *const T)
+        Self::load_unaligned(buf.as_ptr().cast::<T>())
     }
 
     /// Duplicate even lanes into odd lanes: `[a0, a1, a2, a3, ...] -> [a0, a0, a2, a2, ...]`.
@@ -1066,13 +1066,13 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
         const { Self::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let lanes = Self::LANE_COUNT;
-        Self::store_unaligned(buf.as_mut_ptr() as *mut T, v);
+        Self::store_unaligned(buf.as_mut_ptr().cast::<T>(), v);
         let mut out = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         for i in 0..lanes {
             let src_val = buf[i & !1].assume_init();
             out[i].write(src_val);
         }
-        Self::load_unaligned(out.as_ptr() as *const T)
+        Self::load_unaligned(out.as_ptr().cast::<T>())
     }
 
     /// Duplicate odd lanes into even lanes: `[a0, a1, a2, a3, ...] -> [a1, a1, a3, a3, ...]`.
@@ -1088,13 +1088,13 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
         const { Self::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let lanes = Self::LANE_COUNT;
-        Self::store_unaligned(buf.as_mut_ptr() as *mut T, v);
+        Self::store_unaligned(buf.as_mut_ptr().cast::<T>(), v);
         let mut out = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         for i in 0..lanes {
             let src_val = buf[(i | 1).min(lanes - 1)].assume_init();
             out[i].write(src_val);
         }
-        Self::load_unaligned(out.as_ptr() as *const T)
+        Self::load_unaligned(out.as_ptr().cast::<T>())
     }
 
     /// Alternating fused multiply: even lanes `a*b - c`, odd lanes `a*b + c`.

@@ -34,17 +34,44 @@
   by a test capturing the subscriber.
 
 - [ ] [minor] **HS-435 — pedantic ratchet.** The lint floor (HS-434) is set to
-  warn against 2152 library-src findings. Non-increasing baseline, burnt down
-  by class rather than by file. Measured distribution: 437 numeric casts (most
-  legitimate lane/index arithmetic — the four `cast_*` lints are already
-  allowed workspace-wide, so this residue is the genuinely suspect remainder),
-  168 `ptr_as_ptr` (mechanical, `.cast()` preserves constness and is the safer
-  form), 162 missing `#[must_use]`, 83 missing `# Errors` and 19 missing
-  `# Panics` sections (both required by the documentation standard), 51
-  `doc_markdown` backticks, 45 elidable lifetimes.
-  Sequence: `ptr_as_ptr` and the doc sections first — they are safety- and
-  contract-bearing; `#[must_use]` next; cosmetics last. Acceptance: each
-  increment lowers the recorded count and never raises it.
+  warn against the remaining library-src findings. Non-increasing baseline,
+  burnt down by class rather than by file. Acceptance: each increment lowers
+  the recorded count and never raises it.
+  Measured by lint (`--message-format=json`, deduped by lint+file+line+col, so
+  these are exact rather than the earlier message-text estimates):
+
+  | count | lint | note |
+  |------:|------|------|
+  | **0** | `ptr_as_ptr` | **done** — was 171, see below |
+  | 180 | `unreadable_literal` | bitboard/mask hex constants; check readability convention before sweeping |
+  | 162 | `must_use_candidate` | next up: real API-contract value |
+  | 131 | `elidable_lifetime_names` | mechanical |
+  | 92 | `semicolon_if_nothing_returned` | mechanical |
+  | 83 | `missing_errors_doc` | required by the documentation standard |
+  | 63 | `cast_lossless` | prefer `From` over `as` where infallible |
+  | 62 | `doc_markdown` | backticks |
+  | 49 | `uninlined_format_args` | mechanical |
+  | 26 | `allow_attributes` | the `#[allow]` -> `#[expect]` migration |
+  | 21 | `cast_ptr_alignment` | **not mechanical** — each is a real alignment claim to check against the load it feeds |
+  | 19 | `missing_panics_doc` | required by the documentation standard |
+  | 13 | `ref_as_ptr` | `core::ptr::from_ref`; same family as the finished item |
+  | 9 | `ptr_cast_constness` | `.cast_const()`/`.cast_mut()`; same family |
+  | 8 | `missing_safety_doc` | the sites HS-434 unhid; safety-bearing |
+
+  Sequence: the doc sections and `must_use` next (contract-bearing), then
+  `cast_ptr_alignment` reviewed individually rather than swept, cosmetics last.
+
+  **`ptr_as_ptr` burned down: 171 -> 0.** 167 sites converted mechanically by
+  `cargo clippy --fix` restricted to that one lint; the remaining 4 were
+  inference-typed (`as *const _`) so carried no machine-applicable suggestion
+  and were done by hand. `.cast::<T>()` cannot change constness, which is the
+  point: `as` silently can. Net -77 lines, since the shorter form let rustfmt
+  collapse call sites that had been wrapped.
+  Note for whoever takes the next class: `--fix` obeys the *workspace* lint
+  table, not just the lint you pass, so `-A clippy::all -A clippy::pedantic
+  -A clippy::restriction` is required to keep the diff to one transform. Without
+  it the run also rewrote 26 `#[allow]` -> `#[expect]` and left 19 unfulfilled
+  expectations behind.
 
 - [ ] [major] [arch] **HS-436 — `SimdKernel` is a god trait.** One sealed trait
   carries ~60 methods across load/store, streaming, dense arithmetic, masked

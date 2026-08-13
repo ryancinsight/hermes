@@ -118,7 +118,7 @@ impl TileMatrixMultiply<Bf16, Bf16, F32, Avx512, Avx512, 16, 16, 32> for Avx512 
         }
 
         for i in 0..16 {
-            _mm512_storeu_ps(c.add(i * c_stride) as *mut f32, c_regs[i]);
+            _mm512_storeu_ps(c.add(i * c_stride).cast::<f32>(), c_regs[i]);
         }
     }
 }
@@ -152,10 +152,10 @@ unsafe fn tile_matmul_i8(
     let byte_bias = _mm512_set1_epi8(i8::MIN);
     let mut bias_accumulator = _mm512_setzero_si512();
     for k in (0..64).step_by(4) {
-        let row0 = _mm_loadu_si128(b.add(k * b_stride) as *const __m128i);
-        let row1 = _mm_loadu_si128(b.add((k + 1) * b_stride) as *const __m128i);
-        let row2 = _mm_loadu_si128(b.add((k + 2) * b_stride) as *const __m128i);
-        let row3 = _mm_loadu_si128(b.add((k + 3) * b_stride) as *const __m128i);
+        let row0 = _mm_loadu_si128(b.add(k * b_stride).cast::<__m128i>());
+        let row1 = _mm_loadu_si128(b.add((k + 1) * b_stride).cast::<__m128i>());
+        let row2 = _mm_loadu_si128(b.add((k + 2) * b_stride).cast::<__m128i>());
+        let row3 = _mm_loadu_si128(b.add((k + 3) * b_stride).cast::<__m128i>());
 
         let unpack_lo_01 = _mm_unpacklo_epi8(row0, row1);
         let unpack_hi_01 = _mm_unpackhi_epi8(row0, row1);
@@ -177,7 +177,7 @@ unsafe fn tile_matmul_i8(
 
         bias_accumulator = _mm512_dpbusd_epi32(bias_accumulator, byte_bias, b_vec);
         for (row, accumulator) in c_regs.iter_mut().enumerate() {
-            let a_val = core::ptr::read_unaligned(a.add(row * a_stride + k) as *const i32);
+            let a_val = core::ptr::read_unaligned(a.add(row * a_stride + k).cast::<i32>());
             let a_unsigned = _mm512_xor_si512(_mm512_set1_epi32(a_val), byte_bias);
             *accumulator = _mm512_dpbusd_epi32(*accumulator, a_unsigned, b_vec);
         }
@@ -185,7 +185,7 @@ unsafe fn tile_matmul_i8(
 
     for (row, accumulator) in c_regs.iter().enumerate() {
         let corrected = _mm512_sub_epi32(*accumulator, bias_accumulator);
-        _mm512_storeu_si512(c.add(row * c_stride) as *mut _, corrected);
+        _mm512_storeu_si512(c.add(row * c_stride).cast(), corrected);
     }
 }
 
@@ -280,7 +280,7 @@ pub unsafe fn unpack_int4_avx2(packed: &[u8], unpacked: &mut [i8]) {
     );
 
     while i + 32 <= len {
-        let v = _mm256_loadu_si256(packed.as_ptr().add(i) as *const _);
+        let v = _mm256_loadu_si256(packed.as_ptr().add(i).cast());
 
         let low_nibbles = _mm256_and_si256(v, mask);
         let high_nibbles = _mm256_and_si256(_mm256_srli_epi16(v, 4), mask);
@@ -294,8 +294,8 @@ pub unsafe fn unpack_int4_avx2(packed: &[u8], unpacked: &mut [i8]) {
         let res0 = _mm256_permute2x128_si256(res_lo, res_hi, 0x20);
         let res1 = _mm256_permute2x128_si256(res_lo, res_hi, 0x31);
 
-        _mm256_storeu_si256(unpacked.as_mut_ptr().add(2 * i) as *mut _, res0);
-        _mm256_storeu_si256(unpacked.as_mut_ptr().add(2 * i + 32) as *mut _, res1);
+        _mm256_storeu_si256(unpacked.as_mut_ptr().add(2 * i).cast(), res0);
+        _mm256_storeu_si256(unpacked.as_mut_ptr().add(2 * i + 32).cast(), res1);
 
         i += 32;
     }

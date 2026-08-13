@@ -80,10 +80,10 @@ unsafe fn tile_matmul_i8(
                 // Pack B[k..k+4, col..col+8] so 32-bit lane j holds the four
                 // consecutive-k bytes of column `col + j` — the operand shape
                 // `vpdpbusd` contracts over.
-                let r0 = _mm_loadl_epi64(b.add(k * b_stride + col) as *const __m128i);
-                let r1 = _mm_loadl_epi64(b.add((k + 1) * b_stride + col) as *const __m128i);
-                let r2 = _mm_loadl_epi64(b.add((k + 2) * b_stride + col) as *const __m128i);
-                let r3 = _mm_loadl_epi64(b.add((k + 3) * b_stride + col) as *const __m128i);
+                let r0 = _mm_loadl_epi64(b.add(k * b_stride + col).cast::<__m128i>());
+                let r1 = _mm_loadl_epi64(b.add((k + 1) * b_stride + col).cast::<__m128i>());
+                let r2 = _mm_loadl_epi64(b.add((k + 2) * b_stride + col).cast::<__m128i>());
+                let r3 = _mm_loadl_epi64(b.add((k + 3) * b_stride + col).cast::<__m128i>());
 
                 let lo01 = _mm_unpacklo_epi8(r0, r1); // r0[j],r1[j] interleaved
                 let lo23 = _mm_unpacklo_epi8(r2, r3); // r2[j],r3[j] interleaved
@@ -97,7 +97,7 @@ unsafe fn tile_matmul_i8(
                 for (i, slot) in acc.iter_mut().enumerate() {
                     // A[row+i, k..k+4] as one 32-bit load, biased to unsigned.
                     let a_val =
-                        core::ptr::read_unaligned(a.add((row + i) * a_stride + k) as *const i32);
+                        core::ptr::read_unaligned(a.add((row + i) * a_stride + k).cast::<i32>());
                     let a_vec = _mm256_xor_si256(_mm256_set1_epi32(a_val), sign_flip);
                     *slot = _mm256_dpbusd_avx_epi32(*slot, a_vec, b_vec);
                 }
@@ -105,7 +105,10 @@ unsafe fn tile_matmul_i8(
 
             for (i, slot) in acc.iter().enumerate() {
                 let corrected = _mm256_sub_epi32(*slot, bias_acc);
-                _mm256_storeu_si256(c.add((row + i) * c_stride + col) as *mut __m256i, corrected);
+                _mm256_storeu_si256(
+                    c.add((row + i) * c_stride + col).cast::<__m256i>(),
+                    corrected,
+                );
             }
         }
     }
@@ -143,11 +146,11 @@ impl TileMatrixMultiply<I8, I8, I32, AvxVnni, AvxVnni, 16, 16, 64> for AvxVnni {
         b_stride: usize,
     ) {
         tile_matmul_i8(
-            c as *mut i32,
+            c.cast::<i32>(),
             c_stride,
-            a as *const i8,
+            a.cast::<i8>(),
             a_stride,
-            b as *const i8,
+            b.cast::<i8>(),
             b_stride,
         );
     }

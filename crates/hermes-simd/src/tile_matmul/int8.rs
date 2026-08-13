@@ -230,11 +230,11 @@ impl TiledGemm<I8, I8, I32> for (I8, I8, I32) {
         // SAFETY: `I8`/`I32` are `#[repr(transparent)]` over `i8`/`i32`, so the
         // pointer casts preserve layout and the `i8` dispatcher's tile contract.
         <(i8, i8, i32) as TiledGemm<i8, i8, i32>>::dispatch_tile_matmul(
-            c as *mut i32,
+            c.cast::<i32>(),
             c_stride,
-            a as *const i8,
+            a.cast::<i8>(),
             a_stride,
-            b as *const i8,
+            b.cast::<i8>(),
             b_stride,
         );
     }
@@ -265,9 +265,9 @@ impl TiledGemm<I8, I8, I32> for (I8, I8, I32) {
         // SAFETY: `I8`/`I32` are `#[repr(transparent)]` over `i8`/`i32`; the
         // reborrowed slices alias the same memory with identical layout and
         // length, and `c` is exclusively borrowed for the call's duration.
-        let a_raw = core::slice::from_raw_parts(a.as_ptr() as *const i8, a.len());
-        let b_raw = core::slice::from_raw_parts(b.as_ptr() as *const i8, b.len());
-        let c_raw = core::slice::from_raw_parts_mut(c.as_mut_ptr() as *mut i32, c.len());
+        let a_raw = core::slice::from_raw_parts(a.as_ptr().cast::<i8>(), a.len());
+        let b_raw = core::slice::from_raw_parts(b.as_ptr().cast::<i8>(), b.len());
+        let c_raw = core::slice::from_raw_parts_mut(c.as_mut_ptr().cast::<i32>(), c.len());
         gemm_i8_dispatched(m, n, k, a_raw, a_stride, b_raw, b_stride, c_raw, c_stride)
     }
 }

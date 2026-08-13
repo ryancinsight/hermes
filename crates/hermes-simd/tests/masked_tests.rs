@@ -145,7 +145,7 @@ macro_rules! test_masked_ops_for_type {
             }
 
             let indices: <$arch as SimdKernel<$t>>::IndexVector =
-                unsafe { core::ptr::read_unaligned(idx_arr.as_ptr() as *const _) };
+                unsafe { core::ptr::read_unaligned(idx_arr.as_ptr().cast()) };
 
             // Gather
             let vec_res = unsafe { <$arch as SimdKernel<$t>>::gather(base_data.as_ptr(), indices) };

@@ -1081,7 +1081,7 @@ fn test_numa_allocation_and_themis_owned_topology() {
     assert_eq!(vec[1], 2.0);
 
     // Verify locality check runs without crashing
-    let is_local = verify_numa_locality(vec.as_ptr() as *const u8, 8, 0);
+    let is_local = verify_numa_locality(vec.as_ptr().cast::<u8>(), 8, 0);
     println!("Is local to node 0: {}", is_local);
 }
 

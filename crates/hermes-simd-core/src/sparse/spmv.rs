@@ -54,7 +54,7 @@ pub(crate) unsafe fn build_index_vector<T: Scalar, Arch: SimdKernel<T>>(
         cols.len(),
         Arch::LANE_COUNT
     );
-    let ptr = cols.as_ptr() as *const Arch::IndexVector;
+    let ptr = cols.as_ptr().cast::<Arch::IndexVector>();
     core::ptr::read_unaligned(ptr)
 }
 

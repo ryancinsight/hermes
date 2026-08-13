@@ -19,15 +19,15 @@ impl TileMatrixMultiply<Bf16, Bf16, F32, AmxBf16, AmxBf16, 16, 16, 32> for AmxBf
         }
 
         // A is M=16 rows, K=32 cols. Row stride in bytes = a_stride * 2.
-        raw::tileloadd(0, a as *const _, (a_stride * 2) as isize);
+        raw::tileloadd(0, a.cast(), (a_stride * 2) as isize);
         // B is K=32 rows, N=16 cols. Row stride in bytes = b_stride * 2.
-        raw::tileloadd(1, b as *const _, (b_stride * 2) as isize);
+        raw::tileloadd(1, b.cast(), (b_stride * 2) as isize);
         // C is M=16 rows, N=16 cols. Row stride in bytes = c_stride * 4.
         raw::tileloadd(2, c as *const _, (c_stride * 4) as isize);
 
         raw::tdpbf16ps(2, 0, 1);
 
-        raw::tilestored(2, c as *mut _, (c_stride * 4) as isize);
+        raw::tilestored(2, c.cast(), (c_stride * 4) as isize);
 
         if !is_configured {
             raw::tilerelease();
@@ -79,25 +79,17 @@ impl super::AmxGemm<Bf16, Bf16, F32> for AmxBf16 {
 
                 let mut kk = 0;
                 while kk + 32 <= k {
-                    raw::tileloadd(
-                        0,
-                        a.add(i * a_stride + kk) as *const _,
-                        (a_stride * 2) as isize,
-                    );
+                    raw::tileloadd(0, a.add(i * a_stride + kk).cast(), (a_stride * 2) as isize);
                     raw::tileloadd(
                         1,
-                        a.add((i + 16) * a_stride + kk) as *const _,
+                        a.add((i + 16) * a_stride + kk).cast(),
                         (a_stride * 2) as isize,
                     );
 
-                    raw::tileloadd(
-                        6,
-                        b.add(kk * b_stride + j) as *const _,
-                        (b_stride * 2) as isize,
-                    );
+                    raw::tileloadd(6, b.add(kk * b_stride + j).cast(), (b_stride * 2) as isize);
                     raw::tileloadd(
                         7,
-                        b.add(kk * b_stride + j + 16) as *const _,
+                        b.add(kk * b_stride + j + 16).cast(),
                         (b_stride * 2) as isize,
                     );
 
@@ -109,24 +101,20 @@ impl super::AmxGemm<Bf16, Bf16, F32> for AmxBf16 {
                     kk += 32;
                 }
 
-                raw::tilestored(
-                    2,
-                    c.add(i * c_stride + j) as *mut _,
-                    (c_stride * 4) as isize,
-                );
+                raw::tilestored(2, c.add(i * c_stride + j).cast(), (c_stride * 4) as isize);
                 raw::tilestored(
                     3,
-                    c.add(i * c_stride + j + 16) as *mut _,
+                    c.add(i * c_stride + j + 16).cast(),
                     (c_stride * 4) as isize,
                 );
                 raw::tilestored(
                     4,
-                    c.add((i + 16) * c_stride + j) as *mut _,
+                    c.add((i + 16) * c_stride + j).cast(),
                     (c_stride * 4) as isize,
                 );
                 raw::tilestored(
                     5,
-                    c.add((i + 16) * c_stride + j + 16) as *mut _,
+                    c.add((i + 16) * c_stride + j + 16).cast(),
                     (c_stride * 4) as isize,
                 );
 
@@ -147,35 +135,23 @@ impl super::AmxGemm<Bf16, Bf16, F32> for AmxBf16 {
 
                 let mut kk = 0;
                 while kk + 32 <= k {
-                    raw::tileloadd(
-                        0,
-                        a.add(i * a_stride + kk) as *const _,
-                        (a_stride * 2) as isize,
-                    );
+                    raw::tileloadd(0, a.add(i * a_stride + kk).cast(), (a_stride * 2) as isize);
                     raw::tileloadd(
                         1,
-                        a.add((i + 16) * a_stride + kk) as *const _,
+                        a.add((i + 16) * a_stride + kk).cast(),
                         (a_stride * 2) as isize,
                     );
-                    raw::tileloadd(
-                        6,
-                        b.add(kk * b_stride + j) as *const _,
-                        (b_stride * 2) as isize,
-                    );
+                    raw::tileloadd(6, b.add(kk * b_stride + j).cast(), (b_stride * 2) as isize);
 
                     raw::tdpbf16ps(2, 0, 6);
                     raw::tdpbf16ps(4, 1, 6);
                     kk += 32;
                 }
 
-                raw::tilestored(
-                    2,
-                    c.add(i * c_stride + j) as *mut _,
-                    (c_stride * 4) as isize,
-                );
+                raw::tilestored(2, c.add(i * c_stride + j).cast(), (c_stride * 4) as isize);
                 raw::tilestored(
                     4,
-                    c.add((i + 16) * c_stride + j) as *mut _,
+                    c.add((i + 16) * c_stride + j).cast(),
                     (c_stride * 4) as isize,
                 );
                 j += 16;
@@ -195,26 +171,14 @@ impl super::AmxGemm<Bf16, Bf16, F32> for AmxBf16 {
 
                 let mut kk = 0;
                 while kk + 32 <= k {
-                    raw::tileloadd(
-                        0,
-                        a.add(i * a_stride + kk) as *const _,
-                        (a_stride * 2) as isize,
-                    );
-                    raw::tileloadd(
-                        6,
-                        b.add(kk * b_stride + j) as *const _,
-                        (b_stride * 2) as isize,
-                    );
+                    raw::tileloadd(0, a.add(i * a_stride + kk).cast(), (a_stride * 2) as isize);
+                    raw::tileloadd(6, b.add(kk * b_stride + j).cast(), (b_stride * 2) as isize);
 
                     raw::tdpbf16ps(2, 0, 6);
                     kk += 32;
                 }
 
-                raw::tilestored(
-                    2,
-                    c.add(i * c_stride + j) as *mut _,
-                    (c_stride * 4) as isize,
-                );
+                raw::tilestored(2, c.add(i * c_stride + j).cast(), (c_stride * 4) as isize);
                 j += 16;
             }
             i += 16;

@@ -22,7 +22,7 @@ where
         // only widens the permitted state, never narrows it — and `T: Scalar` is
         // `Copy`, so overwriting slots with `MaybeUninit::write` drops nothing.
         let out_uninit = unsafe {
-            core::slice::from_raw_parts_mut(out.as_mut_ptr() as *mut MaybeUninit<T>, out.len())
+            core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<MaybeUninit<T>>(), out.len())
         };
         self.gather_into_uninit(indices, out_uninit)?;
         Ok(())

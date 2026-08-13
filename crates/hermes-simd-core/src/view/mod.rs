@@ -395,7 +395,7 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
     pub fn simd_chunks_mut(self) -> iter::SimdChunksMut<'a, T, Arch, Align, Mode> {
         // SAFETY: self.ptr is valid for writes of total elements for lifetime 'a.
         unsafe {
-            iter::SimdChunksMut::from_raw_parts(self.ptr as *mut T, self.len(), Arch::LANE_COUNT)
+            iter::SimdChunksMut::from_raw_parts(self.ptr.cast::<T>(), self.len(), Arch::LANE_COUNT)
         }
     }
 
@@ -421,7 +421,7 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
         // Non-overlap is a caller invariant (enforced by the borrow checker: `self` is `&'a mut`).
         unsafe {
             iter::ZipChunksMut::from_raw_parts(
-                self.ptr as *mut T,
+                self.ptr.cast::<T>(),
                 self.len(),
                 other.as_slice().as_ptr(),
                 other.len(),

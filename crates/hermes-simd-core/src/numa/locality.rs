@@ -181,7 +181,7 @@ fn verify_numa_locality_os(ptr: *const u8, size: usize, expected_node: u32) -> b
             let cb = (chunk_len * core::mem::size_of::<PsapiWorkingSetExInformation>()) as u32;
             let res = K32QueryWorkingSetEx(
                 GetCurrentProcess(),
-                info_arr.as_mut_ptr() as *mut c_void,
+                info_arr.as_mut_ptr().cast::<c_void>(),
                 cb,
             );
             if res != 0 {

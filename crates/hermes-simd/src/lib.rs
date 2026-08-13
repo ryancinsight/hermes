@@ -424,9 +424,9 @@ where
                 for idx in tail_len..lane_count {
                     tail_buf[idx].write(T::ZERO);
                 }
-                let vec = Vector::load_unaligned(tail_buf.as_ptr() as *const T);
+                let vec = Vector::load_unaligned(tail_buf.as_ptr().cast::<T>());
                 let res = f(vec);
-                res.store_unaligned(tail_buf.as_mut_ptr() as *mut T);
+                res.store_unaligned(tail_buf.as_mut_ptr().cast::<T>());
                 for idx in 0..tail_len {
                     slice[simd_len + idx] = tail_buf[idx].assume_init();
                 }

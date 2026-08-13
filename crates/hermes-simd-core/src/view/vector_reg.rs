@@ -73,8 +73,8 @@ where
         // `LANE_BOUND_CHECK`), so the `lane_count`-length slice reads only
         // initialized elements.
         unsafe {
-            Arch::store_unaligned(buf.as_mut_ptr() as *mut T, self.raw);
-            let init_slice = core::slice::from_raw_parts(buf.as_ptr() as *const T, lane_count);
+            Arch::store_unaligned(buf.as_mut_ptr().cast::<T>(), self.raw);
+            let init_slice = core::slice::from_raw_parts(buf.as_ptr().cast::<T>(), lane_count);
             f.debug_list().entries(init_slice).finish()
         }
     }
@@ -96,11 +96,11 @@ where
         // elements into its buffer, so both `lane_count`-length slices read only
         // initialized elements.
         unsafe {
-            Arch::store_unaligned(buf_self.as_mut_ptr() as *mut T, self.raw);
-            Arch::store_unaligned(buf_other.as_mut_ptr() as *mut T, other.raw);
-            let slice_self = core::slice::from_raw_parts(buf_self.as_ptr() as *const T, lane_count);
+            Arch::store_unaligned(buf_self.as_mut_ptr().cast::<T>(), self.raw);
+            Arch::store_unaligned(buf_other.as_mut_ptr().cast::<T>(), other.raw);
+            let slice_self = core::slice::from_raw_parts(buf_self.as_ptr().cast::<T>(), lane_count);
             let slice_other =
-                core::slice::from_raw_parts(buf_other.as_ptr() as *const T, lane_count);
+                core::slice::from_raw_parts(buf_other.as_ptr().cast::<T>(), lane_count);
             slice_self == slice_other
         }
     }
@@ -331,7 +331,7 @@ where
 
             unsafe {
                 Ok(Self::masked_load_unaligned(
-                    buf.0.as_ptr() as *const T,
+                    buf.0.as_ptr().cast::<T>(),
                     mask,
                     src,
                 ))
@@ -383,11 +383,11 @@ where
             }
 
             unsafe {
-                self.masked_store_unaligned(buf.0.as_mut_ptr() as *mut T, mask);
+                self.masked_store_unaligned(buf.0.as_mut_ptr().cast::<T>(), mask);
             }
 
             unsafe {
-                let init_slice = core::slice::from_raw_parts(buf.0.as_ptr() as *const T, len);
+                let init_slice = core::slice::from_raw_parts(buf.0.as_ptr().cast::<T>(), len);
                 data.copy_from_slice(init_slice);
             }
         }
@@ -537,8 +537,8 @@ where
         // `N == LANE_COUNT`, so the store initializes all `N` slots before the
         // `[T; N]` is read out.
         unsafe {
-            self.store_unaligned(arr.as_mut_ptr() as *mut T);
-            core::ptr::read(arr.as_ptr() as *const [T; N])
+            self.store_unaligned(arr.as_mut_ptr().cast::<T>());
+            core::ptr::read(arr.as_ptr().cast::<[T; N]>())
         }
     }
 
@@ -553,7 +553,7 @@ where
         // into the `MAX_SIMD_LANES`-slot buffer (bounded by `LANE_BOUND_CHECK`),
         // so `assume_init` reads only those initialized lanes.
         unsafe {
-            self.store_unaligned(buf.as_mut_ptr() as *mut T);
+            self.store_unaligned(buf.as_mut_ptr().cast::<T>());
             let mut m = 0u64;
             for i in 0..lanes {
                 let val = buf[i].assume_init();
@@ -634,12 +634,12 @@ where
         // reads it, the loop initializes `buf_u[..lanes]`, and the `U` load reads
         // exactly those `lanes` lanes.
         unsafe {
-            self.store_unaligned(buf_t.as_mut_ptr() as *mut T);
+            self.store_unaligned(buf_t.as_mut_ptr().cast::<T>());
             for i in 0..lanes {
                 let val_t = buf_t[i].assume_init();
                 buf_u[i].write(U::cast_from(val_t));
             }
-            Vector::<U, Arch>::new(Arch::load_unaligned(buf_u.as_ptr() as *const U))
+            Vector::<U, Arch>::new(Arch::load_unaligned(buf_u.as_ptr().cast::<U>()))
         }
     }
 
@@ -654,7 +654,7 @@ where
         // `I < LANE_COUNT`, and the store initializes `buf[..LANE_COUNT]`, so
         // `buf[I]` is initialized.
         unsafe {
-            self.store_unaligned(buf.as_mut_ptr() as *mut T);
+            self.store_unaligned(buf.as_mut_ptr().cast::<T>());
             buf[I].assume_init()
         }
     }
@@ -671,9 +671,9 @@ where
         // then overwritten, and the reload reads all `LANE_COUNT` initialized
         // lanes.
         unsafe {
-            self.store_unaligned(buf.as_mut_ptr() as *mut T);
+            self.store_unaligned(buf.as_mut_ptr().cast::<T>());
             buf[I].write(val);
-            Self::load_unaligned(buf.as_ptr() as *const T)
+            Self::load_unaligned(buf.as_ptr().cast::<T>())
         }
     }
 

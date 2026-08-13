@@ -32,7 +32,7 @@ where
         // only widens the permitted state — and `T: Scalar` is `Copy`, so the
         // `MaybeUninit::write`s in the delegate drop nothing.
         let out_uninit = unsafe {
-            core::slice::from_raw_parts_mut(out.as_mut_ptr() as *mut MaybeUninit<T>, out.len())
+            core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<MaybeUninit<T>>(), out.len())
         };
         self.prefix_scan_into_uninit(out_uninit, op, mode)?;
         Ok(())

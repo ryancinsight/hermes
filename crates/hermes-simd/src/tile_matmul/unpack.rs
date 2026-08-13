@@ -72,10 +72,10 @@ pub fn widen_i8_to_i16(src: &[i8], dest: &mut [i16]) {
         if std::is_x86_feature_detected!("avx512bw") {
             while i + 32 <= len {
                 unsafe {
-                    let src_ptr = src.as_ptr().add(i) as *const __m256i;
+                    let src_ptr = src.as_ptr().add(i).cast::<__m256i>();
                     let a = _mm256_loadu_si256(src_ptr);
                     let res = _mm512_cvtepi8_epi16(a);
-                    let dest_ptr = dest.as_mut_ptr().add(i) as *mut __m512i;
+                    let dest_ptr = dest.as_mut_ptr().add(i).cast::<__m512i>();
                     _mm512_storeu_si512(dest_ptr, res);
                 }
                 i += 32;
@@ -85,9 +85,9 @@ pub fn widen_i8_to_i16(src: &[i8], dest: &mut [i16]) {
             while i + 16 <= len {
                 unsafe {
                     let src_ptr = src.as_ptr().add(i);
-                    let a = _mm_loadu_si128(src_ptr as *const __m128i);
+                    let a = _mm_loadu_si128(src_ptr.cast::<__m128i>());
                     let res = _mm256_cvtepi8_epi16(a);
-                    let dest_ptr = dest.as_mut_ptr().add(i) as *mut __m256i;
+                    let dest_ptr = dest.as_mut_ptr().add(i).cast::<__m256i>();
                     _mm256_storeu_si256(dest_ptr, res);
                 }
                 i += 16;
@@ -133,9 +133,9 @@ pub fn widen_i8_to_i32(src: &[i8], dest: &mut [i32]) {
             while i + 16 <= len {
                 unsafe {
                     let src_ptr = src.as_ptr().add(i);
-                    let a = _mm_loadu_si128(src_ptr as *const __m128i);
+                    let a = _mm_loadu_si128(src_ptr.cast::<__m128i>());
                     let res = _mm512_cvtepi8_epi32(a);
-                    let dest_ptr = dest.as_mut_ptr().add(i) as *mut __m512i;
+                    let dest_ptr = dest.as_mut_ptr().add(i).cast::<__m512i>();
                     _mm512_storeu_si512(dest_ptr, res);
                 }
                 i += 16;
@@ -145,9 +145,9 @@ pub fn widen_i8_to_i32(src: &[i8], dest: &mut [i32]) {
             while i + 8 <= len {
                 unsafe {
                     let src_ptr = src.as_ptr().add(i);
-                    let a = _mm_loadl_epi64(src_ptr as *const __m128i);
+                    let a = _mm_loadl_epi64(src_ptr.cast::<__m128i>());
                     let res = _mm256_cvtepi8_epi32(a);
-                    let dest_ptr = dest.as_mut_ptr().add(i) as *mut __m256i;
+                    let dest_ptr = dest.as_mut_ptr().add(i).cast::<__m256i>();
                     _mm256_storeu_si256(dest_ptr, res);
                 }
                 i += 8;
@@ -187,8 +187,9 @@ pub fn widen_i8_to_i32(src: &[i8], dest: &mut [i32]) {
 #[allow(non_snake_case)]
 pub fn widen_I8_to_I16(src: &[crate::I8], dest: &mut [crate::I16]) {
     unsafe {
-        let src_cast = core::slice::from_raw_parts(src.as_ptr() as *const i8, src.len());
-        let dest_cast = core::slice::from_raw_parts_mut(dest.as_mut_ptr() as *mut i16, dest.len());
+        let src_cast = core::slice::from_raw_parts(src.as_ptr().cast::<i8>(), src.len());
+        let dest_cast =
+            core::slice::from_raw_parts_mut(dest.as_mut_ptr().cast::<i16>(), dest.len());
         widen_i8_to_i16(src_cast, dest_cast);
     }
 }
@@ -198,8 +199,9 @@ pub fn widen_I8_to_I16(src: &[crate::I8], dest: &mut [crate::I16]) {
 #[allow(non_snake_case)]
 pub fn widen_I8_to_I32(src: &[crate::I8], dest: &mut [crate::I32]) {
     unsafe {
-        let src_cast = core::slice::from_raw_parts(src.as_ptr() as *const i8, src.len());
-        let dest_cast = core::slice::from_raw_parts_mut(dest.as_mut_ptr() as *mut i32, dest.len());
+        let src_cast = core::slice::from_raw_parts(src.as_ptr().cast::<i8>(), src.len());
+        let dest_cast =
+            core::slice::from_raw_parts_mut(dest.as_mut_ptr().cast::<i32>(), dest.len());
         widen_i8_to_i32(src_cast, dest_cast);
     }
 }
