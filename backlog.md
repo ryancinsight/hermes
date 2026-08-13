@@ -109,6 +109,7 @@
   rot is caught only when someone opens a pull request — filed as HS-432.
 
 - [ ] [patch] **HS-432 — benchmark budget job never runs on pushed work.**
+  Owner: Codex on `codex/hermes-benchmark-trigger`; claimed 2026-08-12.
   `benchmark-budgets` is gated to `pull_request` and `workflow_dispatch`, so
   every commit that reaches `main` by direct push — which is how this stream
   delivers — skips it entirely. HS-431's panic survived a month that way.
