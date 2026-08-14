@@ -285,13 +285,24 @@ fn generate_dispatcher(
             #(#specialized_bounds,)*
     };
 
+    let unreachable_code_expectation = if active_targets
+        .iter()
+        .any(|target| matches!(target, DispatchTarget::Neon))
+    {
+        quote! {
+            #[expect(
+                unreachable_code,
+                reason = "Generated architecture arms are cfg-selected before the scalar fallback"
+            )]
+        }
+    } else {
+        quote!()
+    };
+
     quote! {
         #[cfg(#arch_cfg)]
         #[inline(always)]
-        #[expect(
-            unreachable_code,
-            reason = "Generated architecture arms are cfg-selected before the scalar fallback"
-        )]
+        #unreachable_code_expectation
         #visibility fn #dispatch_name #dispatcher_generics(#inner_args) #inner_ret #dispatcher_where {
             #(#helper_fns)*
             #(#dispatch_arms)*
