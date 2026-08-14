@@ -10,6 +10,7 @@ pub struct NumaBinding {
 
 impl NumaBinding {
     /// Bind the current thread to the specified NUMA node.
+    #[must_use]
     pub fn bind(node: u32) -> Self {
         if current_numa_node() == Some(node) {
             #[cfg(all(target_os = "linux", feature = "libnuma"))]

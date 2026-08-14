@@ -449,6 +449,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     ///
     /// # Safety
     /// Processor must support the required target feature.
+    #[must_use]
     unsafe fn mask_from_bitmask(bm: u64) -> Self::Mask {
         crate::kernel_helpers::generic_mask_from_bitmask::<T, Self>(bm)
     }

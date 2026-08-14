@@ -65,6 +65,7 @@ where
     /// # Panics
     /// If `Arch` cannot execute on this host.
     #[inline]
+    #[must_use]
     pub fn from_csr(data: CsrData<'a, T>) -> Self {
         assert_arch_executable::<Arch>();
         Self {
@@ -76,6 +77,7 @@ where
 
     /// Access the underlying CSR data.
     #[inline(always)]
+    #[must_use]
     pub fn csr_data(&self) -> &CsrData<'a, T> {
         &self.data
     }
@@ -100,6 +102,7 @@ where
     /// # Panics
     /// If `Arch` cannot execute on this host.
     #[inline]
+    #[must_use]
     pub fn from_validated_csr(data: ValidatedData<CsrData<'a, T>>) -> Self {
         assert_arch_executable::<Arch>();
         Self {
@@ -119,6 +122,7 @@ where
     /// # Panics
     /// If `Arch` cannot execute on this host.
     #[inline]
+    #[must_use]
     pub fn from_sellp(data: SellPData<'a, T, C>) -> Self {
         assert_arch_executable::<Arch>();
         Self {
@@ -148,6 +152,7 @@ where
     /// # Panics
     /// If `Arch` cannot execute on this host.
     #[inline]
+    #[must_use]
     pub fn from_validated_sellp(data: ValidatedData<SellPData<'a, T, C>>) -> Self {
         assert_arch_executable::<Arch>();
         Self {
@@ -167,6 +172,7 @@ where
     /// # Panics
     /// If `Arch` cannot execute on this host.
     #[inline]
+    #[must_use]
     pub fn from_blocked_coo(data: BlockedCooData<'a, T, BM, BN>) -> Self {
         assert_arch_executable::<Arch>();
         Self {
@@ -199,6 +205,7 @@ where
     /// # Panics
     /// If `Arch` cannot execute on this host.
     #[inline]
+    #[must_use]
     pub fn from_validated_blocked_coo(data: ValidatedData<BlockedCooData<'a, T, BM, BN>>) -> Self {
         assert_arch_executable::<Arch>();
         Self {
@@ -218,6 +225,7 @@ where
     /// # Panics
     /// If `Arch` cannot execute on this host.
     #[inline]
+    #[must_use]
     pub fn from_dense_with_mask(data: DenseWithMaskData<'a, T>) -> Self {
         assert_arch_executable::<Arch>();
         Self {

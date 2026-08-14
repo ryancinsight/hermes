@@ -181,24 +181,28 @@ impl<
 {
     /// Access the underlying raw pointer.
     #[inline(always)]
+    #[must_use]
     pub fn as_ptr(&self) -> *const T {
         self.ptr
     }
 
     /// Returns the row stride of this tile view.
     #[inline(always)]
+    #[must_use]
     pub fn stride(&self) -> usize {
         self.stride
     }
 
     /// Returns the number of rows.
     #[inline(always)]
+    #[must_use]
     pub fn rows(&self) -> usize {
         ROWS
     }
 
     /// Returns the number of columns.
     #[inline(always)]
+    #[must_use]
     pub fn cols(&self) -> usize {
         COLS
     }

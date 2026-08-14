@@ -129,6 +129,7 @@ where
 
     /// Construct a Vector with all lanes set to zero.
     #[inline(always)]
+    #[must_use]
     pub fn zero() -> Self {
         Self::try_zero().expect("SIMD target is not supported or enabled on this host")
     }
@@ -403,6 +404,7 @@ where
 
     /// Elementwise population count (number of set bits).
     #[inline(always)]
+    #[must_use]
     pub fn popcount(self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::popcount(self.raw) })
@@ -431,6 +433,7 @@ where
 
     /// Elementwise absolute value.
     #[inline(always)]
+    #[must_use]
     pub fn abs(self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::abs(self.raw) })
@@ -438,6 +441,7 @@ where
 
     /// Elementwise minimum of `self` and `other`.
     #[inline(always)]
+    #[must_use]
     pub fn min(self, other: Self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::min(self.raw, other.raw) })
@@ -445,6 +449,7 @@ where
 
     /// Elementwise maximum of `self` and `other`.
     #[inline(always)]
+    #[must_use]
     pub fn max(self, other: Self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::max(self.raw, other.raw) })
@@ -452,6 +457,7 @@ where
 
     /// Elementwise square root.
     #[inline(always)]
+    #[must_use]
     pub fn sqrt(self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::sqrt(self.raw) })
@@ -459,6 +465,7 @@ where
 
     /// Elementwise equal comparison (`self == other`).
     #[inline(always)]
+    #[must_use]
     pub fn cmp_eq(self, other: Self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_eq(self.raw, other.raw) })
@@ -466,6 +473,7 @@ where
 
     /// Elementwise not-equal comparison (`self != other`).
     #[inline(always)]
+    #[must_use]
     pub fn cmp_ne(self, other: Self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_ne(self.raw, other.raw) })
@@ -473,6 +481,7 @@ where
 
     /// Elementwise less-than comparison (`self < other`).
     #[inline(always)]
+    #[must_use]
     pub fn cmp_lt(self, other: Self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_lt(self.raw, other.raw) })
@@ -480,6 +489,7 @@ where
 
     /// Elementwise less-than-or-equal comparison (`self <= other`).
     #[inline(always)]
+    #[must_use]
     pub fn cmp_le(self, other: Self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_le(self.raw, other.raw) })
@@ -487,6 +497,7 @@ where
 
     /// Elementwise greater-than comparison (`self > other`).
     #[inline(always)]
+    #[must_use]
     pub fn cmp_gt(self, other: Self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_gt(self.raw, other.raw) })
@@ -494,6 +505,7 @@ where
 
     /// Elementwise greater-than-or-equal comparison (`self >= other`).
     #[inline(always)]
+    #[must_use]
     pub fn cmp_ge(self, other: Self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_ge(self.raw, other.raw) })
@@ -501,6 +513,7 @@ where
 
     /// Conditional blend: select lanes from `true_val` where the mask lane in `self` is active (sign bit set), and from `false_val` otherwise.
     #[inline(always)]
+    #[must_use]
     pub fn blend(self, true_val: Self, false_val: Self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::blend(self.raw, true_val.raw, false_val.raw) })
@@ -661,6 +674,7 @@ where
 
     /// Insert a value into a single lane by index at compile-time.
     #[inline(always)]
+    #[must_use]
     pub fn insert<const I: usize>(self, val: T) -> Self {
         assert_runtime_supported::<T, Arch>();
         let _ = AssertLaneIndex::<T, Arch, I>::OK;
@@ -679,6 +693,7 @@ where
 
     /// Load a Vector from a chunk index of a `SimdView`.
     #[inline(always)]
+    #[must_use]
     pub fn from_view_chunk<Align, Mode, Ref>(
         view: &super::SimdView<'_, T, Arch, Align, Mode, Ref>,
         chunk_idx: usize,

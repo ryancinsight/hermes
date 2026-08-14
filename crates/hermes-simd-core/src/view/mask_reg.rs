@@ -87,6 +87,7 @@ where
     /// # Safety
     /// Processor must support the target feature of `Arch`.
     #[inline(always)]
+    #[must_use]
     pub unsafe fn from_bitmask(bm: BitMask<64>) -> Self {
         Self::new(Arch::mask_from_bitmask(bm.0))
     }

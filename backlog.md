@@ -46,7 +46,7 @@
   |------:|------|------|
   | **0** | `ptr_as_ptr` | **done** — was 171, see below |
   | 180 | `unreadable_literal` | bitboard/mask hex constants; check readability convention before sweeping |
-  | 162 | `must_use_candidate` | next up: real API-contract value |
+  | **0** | `must_use_candidate` | **done** — 162 exact findings closed below |
   | 131 | `elidable_lifetime_names` | mechanical |
   | 92 | `semicolon_if_nothing_returned` | mechanical |
   | 83 | `missing_errors_doc` | required by the documentation standard |
@@ -69,6 +69,15 @@
   contract checks; unrelated lint classes, intrinsics, and peer-owned
   `Cargo.lock` state are non-goals. Acceptance is a lower exact class count,
   `cargo fmt --check`, focused core nextest, and a clean targeted Clippy run.
+
+  **`must_use_candidate` burned down: 162 -> 0 (2026-08-14).** The public
+  value-returning APIs in `hermes-simd-core` now carry `#[must_use]`, including
+  SIMD reductions and lane operations, views, aligned storage, sparse/COW
+  conversions, and scalar rounding. Clippy's targeted `must_use_candidate`
+  gate is clean after the mechanical fixes and the remaining contract-bearing
+  methods were annotated by hand. `cargo fmt --all -- --check` and the focused
+  `hermes-simd-core` nextest suite pass 16/16. The remaining HS-435 classes are
+  unchanged and stay in the table above.
 
   **`ptr_as_ptr` burned down: 171 -> 0.** 167 sites converted mechanically by
   `cargo clippy --fix` restricted to that one lint; the remaining 4 were

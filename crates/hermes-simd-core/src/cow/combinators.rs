@@ -36,6 +36,7 @@ where
 {
     /// Sum all elements using `SimdView::sum`.
     #[inline(always)]
+    #[must_use]
     pub fn sum(&self) -> T {
         self.view().sum()
     }

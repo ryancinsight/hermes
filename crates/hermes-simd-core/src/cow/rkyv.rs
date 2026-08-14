@@ -88,18 +88,21 @@ where
 impl<T> ArchivedSimdCow<T> {
     /// Returns the length of the archived vector.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.elements.len()
     }
 
     /// Returns `true` if the archived vector is empty.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.elements.is_empty()
     }
 
     /// Access the archived elements as a slice.
     #[inline]
+    #[must_use]
     pub fn as_slice(&self) -> &[T] {
         self.elements.as_slice()
     }
@@ -109,6 +112,7 @@ impl<T> ArchivedSimdCow<T> {
     /// # Safety
     /// The alignment of the underlying archived memory must satisfy `Align`.
     #[inline]
+    #[must_use]
     pub unsafe fn as_borrowed<'a, Arch, Align>(&'a self) -> Option<SimdCow<'a, T, Arch, Align>>
     where
         Arch: SimdArch,

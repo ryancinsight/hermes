@@ -39,6 +39,7 @@ where
     /// Iterates in unrolled chunks of `Arch::LANE_COUNT * Arch::UNROLL_FACTOR` elements,
     /// accumulating into multiple registers in parallel to break loop dependencies.
     #[inline(always)]
+    #[must_use]
     pub fn sum(&self) -> T {
         // Keep the public sum facade on the generic reduction SSOT so its final
         // partial vector receives the same initialized-buffer masked-tail proof

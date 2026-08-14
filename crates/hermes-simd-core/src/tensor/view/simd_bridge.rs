@@ -34,6 +34,7 @@ where
     /// let view = t.into_simd_view::<Scalar, Unaligned>().unwrap();
     /// ```
     #[inline]
+    #[must_use]
     pub fn into_simd_view<Arch, Align>(
         &self,
     ) -> Option<SimdView<'a, T, Arch, Align, Unmasked, &'a [T]>>

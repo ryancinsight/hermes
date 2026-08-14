@@ -2,11 +2,13 @@
 ///
 /// Delegates to the themis topology SSOT. `None` means the platform did not
 /// report a node — never a fabricated node 0.
+#[must_use]
 pub fn current_numa_node() -> Option<u32> {
     themis::try_current_numa_node().map(|node| node.get())
 }
 
 /// Refreshes and returns the current NUMA node index for the executing thread.
+#[must_use]
 pub fn refresh_numa_node() -> Option<u32> {
     current_numa_node()
 }
@@ -89,6 +91,7 @@ pub fn get_alloc_generation() -> u64 {
 }
 
 /// Verify if the physical memory backing a pointer range is resident on a specific node.
+#[must_use]
 pub fn verify_numa_locality(ptr: *const u8, size: usize, expected_node: u32) -> bool {
     #[cfg(feature = "std")]
     {

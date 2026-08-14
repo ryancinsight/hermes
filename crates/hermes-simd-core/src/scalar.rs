@@ -21,6 +21,7 @@ pub use eunomia::{CastFrom, CastTo, FloatElement, NumericElement};
 /// round-trip is exact).
 pub trait RoundTiesEven: Sealed + FloatElement {
     /// Round to the nearest integer, ties to the even neighbor.
+    #[must_use]
     fn round_ties_even(self) -> Self;
 }
 

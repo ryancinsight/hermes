@@ -73,6 +73,7 @@ impl crate::private::Sealed for Unaligned {}
 
 /// Helper to check if the alignment `Align` is sufficient for architecture `Arch` vector register width.
 #[inline(always)]
+#[must_use]
 pub fn is_aligned_for_arch<Arch: crate::arch::SimdArch, Align: Alignment>() -> bool {
     if !Align::IS_ALIGNED {
         return false;

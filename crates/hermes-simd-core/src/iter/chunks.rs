@@ -107,6 +107,7 @@ where
     /// for &x in chunks.remainder() { /* scalar tail */ }
     /// ```
     #[inline(always)]
+    #[must_use]
     pub fn remainder(&self) -> &'a [T] {
         // SAFETY: base + simd_end is within the original slice of length `total`.
         // simd_end <= total by construction.
@@ -123,6 +124,7 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
     ///
     /// After `n` calls to `next`, this returns `original_chunks - n`.
     #[inline(always)]
+    #[must_use]
     pub fn chunks_remaining(&self) -> usize {
         if self.simd_end > self.pos {
             (self.simd_end - self.pos) / Arch::LANE_COUNT
@@ -264,6 +266,7 @@ where
     ///
     /// Consumes the iterator to return a mutable slice with lifetime `'a`.
     #[inline(always)]
+    #[must_use]
     pub fn into_remainder(self) -> &'a mut [T] {
         // SAFETY: base + simd_end is within the original slice of length `total`.
         // simd_end <= total by construction.
@@ -281,6 +284,7 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
 {
     /// Returns the number of complete SIMD chunks remaining.
     #[inline(always)]
+    #[must_use]
     pub fn chunks_remaining(&self) -> usize {
         if self.simd_end > self.pos {
             (self.simd_end - self.pos) / Arch::LANE_COUNT

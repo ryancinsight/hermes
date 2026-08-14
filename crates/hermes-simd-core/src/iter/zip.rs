@@ -89,6 +89,7 @@ impl<'a, 'b, T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: 
 
     /// Returns the scalar tails for both views.
     #[inline(always)]
+    #[must_use]
     pub fn remainder(&self) -> (&'a [T], &'b [T]) {
         // SAFETY: base + simd_end is within bounds by construction.
         unsafe {
@@ -107,6 +108,7 @@ impl<'a, 'b, T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: 
 
     /// Returns the number of complete paired SIMD chunks remaining.
     #[inline(always)]
+    #[must_use]
     pub fn chunks_remaining(&self) -> usize {
         if self.simd_end > self.pos {
             (self.simd_end - self.pos) / Arch::LANE_COUNT
@@ -250,6 +252,7 @@ where
     ///
     /// Elements `[simd_end..total]` for each operand. Call this **after** the loop.
     #[inline(always)]
+    #[must_use]
     pub fn into_remainder(self) -> (&'a mut [T], &'b [T]) {
         let len = self.total - self.simd_end;
         // SAFETY: ptr_a/ptr_b + simd_end is within bounds by construction; both
@@ -264,6 +267,7 @@ where
 
     /// Number of complete SIMD chunks remaining.
     #[inline(always)]
+    #[must_use]
     pub fn chunks_remaining(&self) -> usize {
         if self.simd_end > self.pos {
             (self.simd_end - self.pos) / Arch::LANE_COUNT

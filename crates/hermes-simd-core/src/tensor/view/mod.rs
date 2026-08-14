@@ -187,6 +187,7 @@ impl<'a, 'b, T, const N: usize, L: Layout> TensorView<'a, T, N, L, &'b mut [T]> 
 
     /// Downgrade the exclusive mutable view to a shared read-only view.
     #[inline(always)]
+    #[must_use]
     pub fn downgrade(self) -> TensorView<'a, T, N, L, &'b [T]> {
         TensorView {
             ptr: self.ptr,
@@ -232,30 +233,35 @@ impl<'a, 'b, T> TensorView<'a, T, 2, ColMajor, &'b [T]> {
 impl<'a, T, const N: usize, L, Ref> TensorView<'a, T, N, L, Ref> {
     /// The logical shape of this tensor: number of elements per dimension.
     #[inline(always)]
+    #[must_use]
     pub fn shape(&self) -> [usize; N] {
         self.shape
     }
 
     /// The strides of this tensor in element units.
     #[inline(always)]
+    #[must_use]
     pub fn strides(&self) -> [usize; N] {
         self.strides
     }
 
     /// Number of elements in this tensor: `∏ shape[i]`.
     #[inline]
+    #[must_use]
     pub fn num_elements(&self) -> usize {
         self.shape.iter().product()
     }
 
     /// Returns `true` if the tensor is empty (one of its dimensions is 0).
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.num_elements() == 0
     }
 
     /// Whether this view is contiguous in row-major order.
     #[inline]
+    #[must_use]
     pub fn is_contiguous(&self) -> bool {
         let expected = row_major_strides(self.shape);
         self.strides == expected
@@ -263,6 +269,7 @@ impl<'a, T, const N: usize, L, Ref> TensorView<'a, T, N, L, Ref> {
 
     /// View the underlying flat slice (in storage order).
     #[inline(always)]
+    #[must_use]
     pub fn as_slice(&self) -> &[T] {
         unsafe { &*self.ptr }
     }
@@ -287,6 +294,7 @@ impl<'a, T, const N: usize, L, Ref> TensorView<'a, T, N, L, Ref> {
     /// # Safety
     /// `idx[i] < shape[i]` for all `i`.
     #[inline(always)]
+    #[must_use]
     pub unsafe fn get_unchecked(&self, idx: [usize; N]) -> T
     where
         T: Copy,

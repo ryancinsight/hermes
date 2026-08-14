@@ -166,6 +166,7 @@ where
 
     /// Returns the first minimum, or `None` for empty or NaN-containing data.
     #[inline]
+    #[must_use]
     pub fn argmin(&self) -> Option<(usize, T)>
     where
         T: crate::scalar::NumericElement,
@@ -175,6 +176,7 @@ where
 
     /// Returns the first maximum, or `None` for empty or NaN-containing data.
     #[inline]
+    #[must_use]
     pub fn argmax(&self) -> Option<(usize, T)>
     where
         T: crate::scalar::NumericElement,

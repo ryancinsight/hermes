@@ -155,6 +155,7 @@ where
     ///
     /// Delegates to `norm_sq` then `T::sqrt_scalar`.
     #[inline]
+    #[must_use]
     pub fn norm(&self) -> T {
         self.norm_sq().sqrt()
     }
@@ -167,6 +168,7 @@ where
     ///
     /// One allocation for the output `AlignedVec`.
     #[inline]
+    #[must_use]
     pub fn normalize(&self) -> SimdCow<'static, T, Arch, Align> {
         let n = self.norm();
         if n == T::ZERO {

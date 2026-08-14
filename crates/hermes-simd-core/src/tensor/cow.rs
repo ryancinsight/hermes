@@ -33,12 +33,14 @@ where
 {
     /// Create a borrowed `TensorCow` wrapping a `TensorView`.
     #[inline]
+    #[must_use]
     pub fn borrowed(view: TensorView<'a, T, N, L, &'a [T]>) -> Self {
         Self::Borrowed(view)
     }
 
     /// Create an owned `TensorCow` from an `AlignedVec` and shape.
     #[inline]
+    #[must_use]
     pub fn owned(data: AlignedVec<T, Align>, shape: [usize; N]) -> Self {
         let strides = row_major_strides(shape);
         Self::Owned {
@@ -50,6 +52,7 @@ where
 
     /// Create an owned `TensorCow` with explicit strides.
     #[inline]
+    #[must_use]
     pub fn owned_with_strides(
         data: AlignedVec<T, Align>,
         shape: [usize; N],
@@ -64,6 +67,7 @@ where
 
     /// Obtain a read-only view of this tensor.
     #[inline]
+    #[must_use]
     pub fn as_view(&self) -> TensorView<'_, T, N, L, &'_ [T]> {
         match self {
             Self::Borrowed(view) => *view,
@@ -78,6 +82,7 @@ where
 
     /// Returns the total logical element count.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         match self {
             Self::Borrowed(view) => view.num_elements(),
@@ -87,12 +92,14 @@ where
 
     /// Returns true if empty.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// Returns logical shape.
     #[inline]
+    #[must_use]
     pub fn shape(&self) -> [usize; N] {
         match self {
             Self::Borrowed(view) => view.shape(),
@@ -102,6 +109,7 @@ where
 
     /// Returns tensor strides.
     #[inline]
+    #[must_use]
     pub fn strides(&self) -> [usize; N] {
         match self {
             Self::Borrowed(view) => view.strides(),
@@ -111,6 +119,7 @@ where
 
     /// Returns whether tensor is contiguous row-major.
     #[inline]
+    #[must_use]
     pub fn is_contiguous(&self) -> bool {
         match self {
             Self::Borrowed(view) => view.is_contiguous(),
@@ -140,6 +149,7 @@ where
 
     /// Converts into the owned `AlignedVec` storage.
     #[inline]
+    #[must_use]
     pub fn into_owned(self) -> AlignedVec<T, Align> {
         match self {
             Self::Borrowed(view) => AlignedVec::from_slice(view.as_slice()),
