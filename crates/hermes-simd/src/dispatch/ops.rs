@@ -58,6 +58,11 @@ pub fn argmax<T: SimdOps>(data: &[T]) -> Option<(usize, T)> {
 }
 
 /// Computes the dot product of two slices using runtime-dispatched SIMD.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when the slices have different
+/// lengths.
 #[inline(always)]
 pub fn dot<T: SimdOps>(a: &[T], b: &[T]) -> Result<T, SimdError> {
     T::dot(a, b)
@@ -65,6 +70,11 @@ pub fn dot<T: SimdOps>(a: &[T], b: &[T]) -> Result<T, SimdError> {
 
 /// Fused row update `out[i] += alpha * x[i]` (AXPY) via runtime-dispatched
 /// SIMD with no temporary allocation. Errors on length mismatch.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when `x` and `out` have different
+/// lengths.
 #[inline(always)]
 pub fn axpy<T: SimdOps>(alpha: T, x: &[T], out: &mut [T]) -> Result<(), SimdError> {
     T::axpy(alpha, x, out)
@@ -82,6 +92,12 @@ pub fn axpy_mul<T: SimdOps>(alpha: T, a: &[T], b: &[T], out: &mut [T]) -> Result
 
 /// Fused multi-row update `out[row, i] += alphas[row] * x[i]` via one
 /// runtime-dispatched SIMD kernel. `out` is a row-major strided window.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when `alphas` or `x` is shorter than
+/// the requested shape, `row_stride < cols`, or `out` does not cover the
+/// requested rows and columns.
 #[inline(always)]
 pub fn axpy_rows<T: SimdOps>(
     alphas: &[T],
@@ -99,6 +115,12 @@ pub fn axpy_rows<T: SimdOps>(
 /// runtime-dispatched SIMD kernel. `alphas` is depth-major with `rows`
 /// elements per depth, `x_panel` is depth-major with `cols` elements per
 /// depth, and `out` is a row-major strided window.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when either input panel is shorter
+/// than the requested shape, `row_stride < cols`, or `out` does not cover the
+/// requested rows and columns.
 #[inline(always)]
 pub fn axpy_rows_batch<T: SimdOps>(
     alphas: &[T],
@@ -113,30 +135,54 @@ pub fn axpy_rows_batch<T: SimdOps>(
 }
 
 /// Computes the elementwise multiplication of two slices and writes to `out`.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when the input and output lengths do
+/// not match.
 #[inline(always)]
 pub fn elementwise_mul<T: SimdOps>(a: &[T], b: &[T], out: &mut [T]) -> Result<(), SimdError> {
     T::elementwise_mul(a, b, out)
 }
 
 /// Computes the elementwise sum of two slices and writes to `out`.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when the input and output lengths do
+/// not match.
 #[inline(always)]
 pub fn elementwise_add<T: SimdOps>(a: &[T], b: &[T], out: &mut [T]) -> Result<(), SimdError> {
     T::elementwise_add(a, b, out)
 }
 
 /// Computes the elementwise difference of two slices and writes to `out`.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when the input and output lengths do
+/// not match.
 #[inline(always)]
 pub fn elementwise_sub<T: SimdOps>(a: &[T], b: &[T], out: &mut [T]) -> Result<(), SimdError> {
     T::elementwise_sub(a, b, out)
 }
 
 /// Computes the elementwise quotient of two slices and writes to `out`.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when the input and output lengths do
+/// not match.
 #[inline(always)]
 pub fn elementwise_div<T: SimdOps>(a: &[T], b: &[T], out: &mut [T]) -> Result<(), SimdError> {
     T::elementwise_div(a, b, out)
 }
 
 /// Executes one exact modular radix-2 NTT butterfly stage over `u64` residues.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when the stage shape is invalid.
 #[inline]
 pub fn ntt_butterfly_stage_u64(
     data: &mut [u64],
@@ -154,12 +200,22 @@ pub fn masked_sum<T: SimdOps>(data: &[T], mask: &[bool]) -> T {
 }
 
 /// Computes the dot product of elements matching a boolean mask.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when `a`, `b`, and `mask` do not have
+/// equal lengths.
 #[inline(always)]
 pub fn masked_dot<T: SimdOps>(a: &[T], b: &[T], mask: &[bool]) -> Result<T, SimdError> {
     T::masked_dot(a, b, mask)
 }
 
 /// Computes the elementwise sum of elements matching a boolean mask.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when `a`, `b`, `mask`, and `out` do
+/// not have equal lengths.
 #[inline(always)]
 pub fn masked_add<T: SimdOps>(
     a: &[T],
@@ -217,6 +273,11 @@ pub fn spmv_sellp<T: SimdOps, const C: usize>(
 }
 
 /// Computes register-blocked tiled GEMM: `c += A * B`.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when the operand buffers do not cover
+/// the requested matrix dimensions.
 #[inline(always)]
 pub fn tiled_gemm<T: SimdOps>(
     a: &[T],
@@ -314,6 +375,11 @@ pub fn gemv_transpose_strided<T: SimdOps>(
 /// Inputs are primitive lane slices in `[re0, im0, re1, im1, ...]` order. `a`
 /// is updated with `a[i] * b[i]`; when `CONJ_B` is true, the operation is
 /// `a[i] * conj(b[i])`.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when the slices have different
+/// lengths or their common length is odd.
 #[inline]
 pub fn interleaved_complex_mul_assign<T, A, const CONJ_B: bool>(
     a: &mut [T],
@@ -331,6 +397,11 @@ where
 /// Inputs are primitive lane slices in `[re0, im0, re1, im1, ...]` order. The
 /// result is `(re, im)` for `sum(a[i] * b[i])`; when `CONJ_B` is true, the
 /// operation is `sum(a[i] * conj(b[i]))`.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when the slices have different
+/// lengths or their common length is odd.
 #[inline]
 pub fn interleaved_complex_dot<T, A, const CONJ_B: bool>(
     a: &[T],
@@ -344,6 +415,11 @@ where
 }
 
 /// Multiplies interleaved complex values in-place using Hermes runtime provider selection.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when the slices have different
+/// lengths or their common length is odd.
 #[inline]
 pub fn interleaved_complex_mul_assign_runtime<T, const CONJ_B: bool>(
     a: &mut [T],
@@ -356,6 +432,11 @@ where
 }
 
 /// Computes an interleaved complex dot product using Hermes runtime provider selection.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when the slices have different
+/// lengths or their common length is odd.
 #[inline]
 pub fn interleaved_complex_dot_runtime<T, const CONJ_B: bool>(
     a: &[T],
@@ -374,18 +455,33 @@ pub fn reduce_popcount<T: SimdOps>(data: &[T]) -> usize {
 }
 
 /// Computes the horizontal sum of population counts of `a[i] & b[i]` using runtime-dispatched SIMD.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when the slices have different
+/// lengths.
 #[inline(always)]
 pub fn reduce_popcount_and<T: SimdOps>(a: &[T], b: &[T]) -> Result<usize, SimdError> {
     T::reduce_popcount_and(a, b)
 }
 
 /// Computes the horizontal sum of population counts of `a[i] | b[i]` using runtime-dispatched SIMD.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when the slices have different
+/// lengths.
 #[inline(always)]
 pub fn reduce_popcount_or<T: SimdOps>(a: &[T], b: &[T]) -> Result<usize, SimdError> {
     T::reduce_popcount_or(a, b)
 }
 
 /// Computes the horizontal sum of population counts of `a[i] ^ b[i]` (Hamming distance) using runtime-dispatched SIMD.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when the slices have different
+/// lengths.
 #[inline(always)]
 pub fn reduce_popcount_xor<T: SimdOps>(a: &[T], b: &[T]) -> Result<usize, SimdError> {
     T::reduce_popcount_xor(a, b)

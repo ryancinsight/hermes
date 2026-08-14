@@ -36,6 +36,11 @@ impl AmxSession {
     }
 
     /// Enter a new AMX compute phase with the given configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AmxSessionError::UnsupportedTarget`] when AMX is not supported
+    /// or enabled for the current process.
     #[inline]
     pub fn new(config: &AmxConfig) -> Result<Self, AmxSessionError> {
         if !super::amx_runtime_supported() {
@@ -109,6 +114,11 @@ pub struct AmxBatchSession;
 
 impl AmxBatchSession {
     /// Begin a new AMX batch computation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AmxSessionError::UnsupportedTarget`] when AMX is not supported
+    /// or enabled for the current process.
     #[inline]
     pub fn begin(config: &AmxConfig) -> Result<Self, AmxSessionError> {
         if !super::amx_runtime_supported() {

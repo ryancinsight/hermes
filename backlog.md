@@ -49,7 +49,7 @@
   | **0** | `must_use_candidate` | **done** — 162 exact findings closed below |
   | 131 | `elidable_lifetime_names` | mechanical |
   | 92 | `semicolon_if_nothing_returned` | mechanical |
-  | 47 | `missing_errors_doc` | required by the documentation standard |
+  | **0** | `missing_errors_doc` | **done** — all 47 public `Result` APIs document their error contracts |
   | 63 | `cast_lossless` | prefer `From` over `as` where infallible |
   | 62 | `doc_markdown` | backticks |
   | 49 | `uninlined_format_args` | mechanical |
@@ -106,12 +106,14 @@
   rather than `as` casts that changed only pointer constness. The workspace
   all-targets gate is clean, and the focused core nextest suite passes 16/16.
 
-  **`missing_errors_doc` core slice burned down 36 findings (2026-08-14).**
-  Sparse validation, tensor view, tiled-kernel, masked-operation, COW, and
-  vector-register `Result` APIs now state their concrete error variants. The
-  workspace all-targets audit is 47 findings, all in facade dispatch and AMX
-  session layers; the core targeted gate is clean and its nextest suite passes
-  16/16. The remaining 47 stay open for a separate increment.
+  **`missing_errors_doc` burned down: 83 -> 0 (2026-08-14).** Sparse
+  validation, tensor view, tiled-kernel, masked-operation, COW,
+  vector-register, facade-dispatch, complex, modular, and AMX-session `Result`
+  APIs now state their concrete error variants. The workspace all-targets audit
+  is clean for `clippy::missing_errors_doc`; the affected Hermes and intrinsics
+  suites pass 424/424 and the doctest gate passes. The same increment also
+  rejects zero NTT moduli with a typed error and canonicalizes input residues
+  before subtraction.
 
   **`ptr_as_ptr` burned down: 171 -> 0.** 167 sites converted mechanically by
   `cargo clippy --fix` restricted to that one lint; the remaining 4 were

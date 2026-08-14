@@ -77,6 +77,11 @@ pub(crate) unsafe fn tile_loop_generic<
 pub trait TiledGemm<TA, TB, TC> {
     /// Perform matrix multiplication `c += a * b` using register-blocked/tiled SIMD.
     ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when the operand slices do not
+    /// cover the requested dimensions and strides.
+    ///
     /// # Safety
     /// - Pointers must be valid and slices must have matching dimensions.
     unsafe fn gemm(
@@ -108,6 +113,11 @@ pub trait TiledGemm<TA, TB, TC> {
 /// Perform matrix multiplication `c += a * b` using register-blocked/tiled SIMD.
 ///
 /// Automatically dispatches to the most performant backend available (e.g. Intel AMX, AVX-512, or Scalar).
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when the operand slices do not cover
+/// the requested dimensions and strides.
 ///
 /// # Safety
 /// - Pointers must be valid and slices must have matching dimensions.

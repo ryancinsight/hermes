@@ -68,12 +68,32 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     /// Returns `Some((index, value))` of the maximum element, or `None` for empty.
     fn argmax(data: &[Self]) -> Option<(usize, Self)>;
     /// Computes the dot product of two slices.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when the slices have different
+    /// lengths.
     fn dot(a: &[Self], b: &[Self]) -> Result<Self, SimdError>;
     /// Fused row update `out[i] += alpha * x[i]` (AXPY) with no temporaries.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when `x` and `out` have different
+    /// lengths.
     fn axpy(alpha: Self, x: &[Self], out: &mut [Self]) -> Result<(), SimdError>;
     /// Fused ternary update `out[i] += alpha * a[i] * b[i]` with no temporary.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when the input and output lengths
+    /// do not match.
     fn axpy_mul(alpha: Self, a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError>;
     /// Fused multi-row update `out[row, i] += alphas[row] * x[i]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when an input is shorter than the
+    /// requested shape, `row_stride < cols`, or `out` does not cover the rows.
     fn axpy_rows(
         alphas: &[Self],
         x: &[Self],
@@ -84,6 +104,12 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     ) -> Result<(), SimdError>;
     /// Fused batched multi-row update:
     /// `out[row, i] += sum_k alphas[k, row] * x_panel[k, i]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when an input panel is shorter
+    /// than the requested shape, `row_stride < cols`, or `out` does not cover
+    /// the rows.
     fn axpy_rows_batch(
         alphas: &[Self],
         x_panel: &[Self],
@@ -94,18 +120,48 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
         cols: usize,
     ) -> Result<(), SimdError>;
     /// Computes the elementwise product and writes to `out`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when the input and output lengths
+    /// do not match.
     fn elementwise_mul(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError>;
     /// Computes the elementwise sum `a[i] + b[i]` and writes to `out`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when the input and output lengths
+    /// do not match.
     fn elementwise_add(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError>;
     /// Computes the elementwise difference `a[i] - b[i]` and writes to `out`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when the input and output lengths
+    /// do not match.
     fn elementwise_sub(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError>;
     /// Computes the elementwise quotient `a[i] / b[i]` and writes to `out`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when the input and output lengths
+    /// do not match.
     fn elementwise_div(a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError>;
     /// Computes the sum of elements matching a boolean mask.
     fn masked_sum(data: &[Self], mask: &[bool]) -> Self;
     /// Computes the dot product of elements matching a boolean mask.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when `a`, `b`, and `mask` do not
+    /// have equal lengths.
     fn masked_dot(a: &[Self], b: &[Self], mask: &[bool]) -> Result<Self, SimdError>;
     /// Computes the elementwise sum of elements matching a boolean mask.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when `a`, `b`, `mask`, and `out`
+    /// do not have equal lengths.
     fn masked_add(a: &[Self], b: &[Self], mask: &[bool], out: &mut [Self])
         -> Result<(), SimdError>;
     /// Computes sparse SpMV using CSR.
@@ -125,6 +181,11 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
         y: &mut [Self],
     );
     /// Computes register-blocked tiled GEMM: `c += A * B`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when the operand buffers do not
+    /// cover the requested matrix dimensions.
     fn tiled_gemm(
         a: &[Self],
         b: &[Self],
@@ -134,6 +195,11 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
         k: usize,
     ) -> Result<(), SimdError>;
     /// Computes register-blocked GEMV: `y += A * x` (`A` row-major `nrows × ncols`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when an operand is shorter than
+    /// the requested matrix or vector shape.
     fn gemv(
         a: &[Self],
         x: &[Self],
@@ -143,6 +209,11 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     ) -> Result<(), SimdError>;
     /// Computes register-blocked transposed GEMV: `y += Aᵀ * x`
     /// (`A` row-major `nrows × ncols`, `x` length `nrows`, `y` length `ncols`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when an operand is shorter than
+    /// the requested matrix or vector shape.
     fn gemv_transpose(
         a: &[Self],
         x: &[Self],
@@ -152,6 +223,11 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     ) -> Result<(), SimdError>;
     /// Computes register-blocked sub-matrix GEMV: `y += A * x` with row stride
     /// `lda ≥ ncols` (`lda = ncols` is the packed [`Self::gemv`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when `lda < ncols` or an operand
+    /// is shorter than the requested strided shape.
     fn gemv_strided(
         a: &[Self],
         x: &[Self],
@@ -162,6 +238,11 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     ) -> Result<(), SimdError>;
     /// Computes register-blocked transposed sub-matrix GEMV: `y += Aᵀ * x` with
     /// row stride `lda ≥ ncols` (`lda = ncols` is the packed [`Self::gemv_transpose`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when `lda < ncols` or an operand
+    /// is shorter than the requested strided shape.
     fn gemv_transpose_strided(
         a: &[Self],
         x: &[Self],
@@ -172,6 +253,11 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     ) -> Result<(), SimdError>;
     /// Multiplies interleaved complex lanes in-place: `a[k] *= b[k]`
     /// (`a[k] *= conj(b[k])` when `CONJ_B`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when the slices have different
+    /// lengths or their common length is odd.
     fn interleaved_complex_mul_assign<const CONJ_B: bool>(
         a: &mut [Self],
         b: &[Self],
@@ -180,6 +266,11 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
         Self: core::ops::Neg<Output = Self>;
     /// Computes the interleaved complex dot product `(re, im)` of `sum(a[k] * b[k])`
     /// (`sum(a[k] * conj(b[k]))` when `CONJ_B`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when the slices have different
+    /// lengths or their common length is odd.
     fn interleaved_complex_dot<const CONJ_B: bool>(
         a: &[Self],
         b: &[Self],
@@ -189,10 +280,25 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     /// Computes the horizontal sum of population counts of all elements.
     fn reduce_popcount(data: &[Self]) -> usize;
     /// Computes the horizontal sum of population counts of `a[i] & b[i]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when the slices have different
+    /// lengths.
     fn reduce_popcount_and(a: &[Self], b: &[Self]) -> Result<usize, SimdError>;
     /// Computes the horizontal sum of population counts of `a[i] | b[i]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when the slices have different
+    /// lengths.
     fn reduce_popcount_or(a: &[Self], b: &[Self]) -> Result<usize, SimdError>;
     /// Computes the horizontal sum of population counts of `a[i] ^ b[i]` (Hamming distance).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when the slices have different
+    /// lengths.
     fn reduce_popcount_xor(a: &[Self], b: &[Self]) -> Result<usize, SimdError>;
 }
 
