@@ -41,6 +41,11 @@ impl LocalityCache {
 
 #[cfg(feature = "std")]
 thread_local! {
+    #[expect(
+        clippy::missing_const_for_thread_local,
+        reason = "clippy 1.97 false positive: this initialiser is already a \
+                  `const` block, and the lint re-suggests the form it is in"
+    )]
     static LOCALITY_CACHE: core::cell::RefCell<LocalityCache> = const {
         core::cell::RefCell::new(LocalityCache::new())
     };
