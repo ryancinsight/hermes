@@ -60,6 +60,7 @@ impl<const N: usize> BitMask<N> {
     /// assert_eq!(BitMask::<8>::leading_k(8).0, 0xFF);
     /// ```
     #[inline(always)]
+    #[must_use]
     pub const fn leading_k(k: usize) -> Self {
         let k = if k > N { N } else { k };
         let bits = if k >= 64 {
@@ -77,6 +78,7 @@ impl<const N: usize> BitMask<N> {
     /// # Panics
     /// Panics in debug mode if `bits.len() != N`.
     #[inline(always)]
+    #[must_use]
     pub fn from_bools(bits: &[bool]) -> Self {
         debug_assert_eq!(
             bits.len(),
@@ -86,25 +88,28 @@ impl<const N: usize> BitMask<N> {
         let mut m = 0u64;
         // Single pass, no branching beyond the loop iterator.
         for (i, &b) in bits.iter().enumerate().take(N) {
-            m |= (b as u64) << i;
+            m |= u64::from(b) << i;
         }
         Self(m)
     }
 
     /// Number of active (set) lanes.
     #[inline(always)]
+    #[must_use]
     pub fn popcount(self) -> u32 {
         self.0.count_ones()
     }
 
     /// Returns `true` if all `N` lanes are active.
     #[inline(always)]
+    #[must_use]
     pub fn is_all_active(self) -> bool {
         self.0 == Self::ALL_ACTIVE.0
     }
 
     /// Returns `true` if no lanes are active.
     #[inline(always)]
+    #[must_use]
     pub fn is_none_active(self) -> bool {
         self.0 == 0
     }
@@ -114,6 +119,7 @@ impl<const N: usize> BitMask<N> {
     /// # Panics
     /// Panics in debug mode if `i >= N`.
     #[inline(always)]
+    #[must_use]
     pub fn is_lane_active(self, i: usize) -> bool {
         debug_assert!(i < N, "BitMask::is_lane_active: lane index out of range");
         (self.0 >> i) & 1 == 1
@@ -121,12 +127,14 @@ impl<const N: usize> BitMask<N> {
 
     /// Bitwise AND of two masks.
     #[inline(always)]
+    #[must_use]
     pub fn and(self, other: Self) -> Self {
         Self(self.0 & other.0)
     }
 
     /// Bitwise OR of two masks.
     #[inline(always)]
+    #[must_use]
     pub fn or(self, other: Self) -> Self {
         Self(self.0 | other.0)
     }
@@ -134,6 +142,7 @@ impl<const N: usize> BitMask<N> {
     /// Expand this mask to a `[bool; N]` array.
     ///
     /// Useful for scalar fallbacks and debugging. Not performance-critical.
+    #[must_use]
     pub fn to_bools(self) -> [bool; N]
     where
         [bool; N]: Sized,
@@ -168,6 +177,7 @@ impl<const N: usize> BitMask<N> {
     /// assert_eq!(native, [true, true, true, false]);
     /// ```
     #[inline(always)]
+    #[must_use]
     pub unsafe fn to_native_mask<T, Arch>(self) -> Arch::Mask
     where
         T: crate::scalar::Scalar,
@@ -201,6 +211,10 @@ pub struct BitMaskIter<const N: usize> {
     remaining: u64,
 }
 
+#[expect(
+    clippy::copy_iterator,
+    reason = "The iterator is an eight-byte value returned by the copyable BitMask API"
+)]
 impl<const N: usize> Iterator for BitMaskIter<N> {
     type Item = usize;
 
@@ -278,6 +292,7 @@ impl<const N: usize> BitMask<N> {
     ///
     /// Equivalent to `(*self).into_iter()` since `BitMask<N>: Copy`.
     #[inline(always)]
+    #[must_use]
     pub fn active_lanes(self) -> BitMaskIter<N> {
         self.into_iter()
     }

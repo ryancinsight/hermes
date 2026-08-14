@@ -9,8 +9,8 @@
 //! | [`Scalar`]      | scalar loop  | 4         | 2         |
 //! | [`Avx2`]        | x86 AVX2     | 8         | 4         |
 //! | [`Avx512`]      | x86 AVX-512F | 16        | 8         |
-//! | [`Neon`]        | AArch64 NEON | 4         | 2         |
-//! | [`SveArch`]    | AArch64 SVE shape, emulated | 16 | 8 |
+//! | [`Neon`]        | `AArch64` NEON | 4         | 2         |
+//! | [`SveArch`]    | `AArch64` SVE shape, emulated | 16 | 8 |
 //!
 //! Also here: the AVX-512 VNNI and 256-bit AVX-VNNI tile multipliers, packed
 //! 4-bit hardware unpacking, sliding-attack bitboard backends, and the Intel
@@ -296,15 +296,15 @@ pub use x86_64::amx::{has_amx_bf16, has_amx_int8, has_amx_tile};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Scalar;
 
-/// x86/x86_64 AVX2 instruction set architecture marker.
+/// `x86/x86_64` AVX2 instruction set architecture marker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Avx2;
 
-/// x86/x86_64 AVX-512F instruction set architecture marker.
+/// `x86/x86_64` AVX-512F instruction set architecture marker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Avx512;
 
-/// x86/x86_64 AVX-VNNI (256-bit VEX-encoded VNNI) instruction set marker.
+/// `x86/x86_64` AVX-VNNI (256-bit VEX-encoded VNNI) instruction set marker.
 ///
 /// Distinct from [`Avx512`]: AVX-VNNI provides `vpdpbusd`/`vpdpwssd` on 256-bit
 /// YMM registers without requiring AVX-512, so it accelerates integer dot/GEMM
@@ -315,7 +315,7 @@ pub struct Avx512;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AvxVnni;
 
-/// AArch64 NEON instruction set architecture marker.
+/// `AArch64` NEON instruction set architecture marker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Neon;
 

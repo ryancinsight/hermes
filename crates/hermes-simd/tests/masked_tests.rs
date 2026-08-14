@@ -1,4 +1,12 @@
 #![allow(clippy::unnecessary_cast)]
+#![expect(
+    clippy::float_cmp,
+    reason = "Masked operation tests compare exact manufactured lane values"
+)]
+#![expect(
+    clippy::cast_lossless,
+    reason = "The macro supplies integer lane indices to precision-specific test constructors"
+)]
 use hermes_simd::*;
 
 macro_rules! test_masked_ops_for_type {

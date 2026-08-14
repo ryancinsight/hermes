@@ -7,7 +7,18 @@
 
 use crate::Avx2;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use core::arch::x86_64::*;
+use core::arch::x86_64::{
+    __m128i, __m256d, _mm256_add_pd, _mm256_and_pd, _mm256_andnot_pd, _mm256_blendv_pd,
+    _mm256_castpd256_pd128, _mm256_castpd_si256, _mm256_ceil_pd, _mm256_cmp_pd, _mm256_div_pd,
+    _mm256_extractf128_pd, _mm256_floor_pd, _mm256_fmadd_pd, _mm256_fmaddsub_pd,
+    _mm256_fmsubadd_pd, _mm256_i32gather_pd, _mm256_load_pd, _mm256_loadu_pd,
+    _mm256_mask_i32gather_pd, _mm256_maskstore_pd, _mm256_max_pd, _mm256_min_pd, _mm256_movedup_pd,
+    _mm256_movemask_pd, _mm256_mul_pd, _mm256_or_pd, _mm256_permute4x64_pd, _mm256_permute_pd,
+    _mm256_round_pd, _mm256_set1_pd, _mm256_setzero_pd, _mm256_sqrt_pd, _mm256_store_pd,
+    _mm256_storeu_pd, _mm256_stream_pd, _mm256_sub_pd, _mm256_xor_pd, _mm_add_pd, _mm_cvtsd_f64,
+    _mm_unpackhi_pd, _CMP_EQ_OQ, _CMP_GE_OQ, _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ,
+    _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT, _MM_FROUND_TO_ZERO,
+};
 use hermes_simd_core::kernel::SimdKernel;
 
 /// Newtype over `__m256d` so `Send + Sync` can be implemented on the wrapper.
@@ -482,7 +493,12 @@ impl SimdKernel<f64> for Avx2 {
     #[target_feature(enable = "avx2")]
     #[inline]
     unsafe fn popcount(a: Self::Vector) -> Self::Vector {
-        use core::arch::x86_64::*;
+        use core::arch::x86_64::{
+            _mm256_add_epi8, _mm256_and_si256, _mm256_castpd_si256, _mm256_castsi256_si128,
+            _mm256_cvtepi32_pd, _mm256_extractf128_si256, _mm256_sad_epu8, _mm256_set1_epi8,
+            _mm256_setr_epi8, _mm256_setzero_si256, _mm256_shuffle_epi32, _mm256_shuffle_epi8,
+            _mm256_srli_epi16, _mm_unpacklo_epi64,
+        };
         let v = _mm256_castpd_si256(a.0);
         let low_mask = _mm256_set1_epi8(0x0F);
         let lookup = _mm256_setr_epi8(

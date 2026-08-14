@@ -30,6 +30,7 @@ pub trait BitBoardKernel: Send + Sync + 'static {
     /// # Panics
     /// If `square` is not a board index below 64.
     #[inline(always)]
+    #[must_use]
     fn queen_attacks(square: u8, occupancy: u64) -> u64 {
         Self::rook_attacks(square, occupancy) | Self::bishop_attacks(square, occupancy)
     }
@@ -62,9 +63,10 @@ impl<'a, Backend, Arch> Copy for BitBoardView<'a, Backend, Arch, &'a [u64]> {}
 impl<'a, Backend, Arch> BitBoardView<'a, Backend, Arch, &'a [u64]> {
     /// Create a shared `BitBoardView` over a slice of bitboards.
     #[inline(always)]
+    #[must_use]
     pub fn new(data: &'a [u64]) -> Self {
         Self {
-            ptr: data as *const [u64] as *mut [u64],
+            ptr: core::ptr::from_ref(data).cast_mut(),
             _marker: PhantomData,
         }
     }
@@ -75,7 +77,7 @@ impl<'a, Backend, Arch> BitBoardView<'a, Backend, Arch, &'a mut [u64]> {
     #[inline(always)]
     pub fn new_mut(data: &'a mut [u64]) -> Self {
         Self {
-            ptr: data as *mut [u64],
+            ptr: core::ptr::from_mut(data),
             _marker: PhantomData,
         }
     }
@@ -93,6 +95,7 @@ impl<'a, Backend, Arch> BitBoardView<'a, Backend, Arch, &'a mut [u64]> {
 
     /// Downgrade exclusive mutable view to a shared view.
     #[inline(always)]
+    #[must_use]
     pub fn downgrade(self) -> BitBoardView<'a, Backend, Arch, &'a [u64]> {
         BitBoardView {
             ptr: self.ptr,
@@ -104,6 +107,7 @@ impl<'a, Backend, Arch> BitBoardView<'a, Backend, Arch, &'a mut [u64]> {
 impl<'a, Backend, Arch, Ref: 'a> BitBoardView<'a, Backend, Arch, Ref> {
     /// Access the underlying raw slice of bitboards.
     #[inline(always)]
+    #[must_use]
     pub fn as_slice(&self) -> &[u64] {
         // SAFETY: the pointer was derived from a borrow of `'a` — shared in
         // `new`, exclusive in `new_mut` — and the view keeps that borrow alive
@@ -136,18 +140,21 @@ where
 {
     /// Generate Rook attacks for a square given occupancy.
     #[inline(always)]
+    #[must_use]
     pub fn rook_attacks(&self, square: u8, occupancy: u64) -> u64 {
         Backend::rook_attacks(square, occupancy)
     }
 
     /// Generate Bishop attacks for a square given occupancy.
     #[inline(always)]
+    #[must_use]
     pub fn bishop_attacks(&self, square: u8, occupancy: u64) -> u64 {
         Backend::bishop_attacks(square, occupancy)
     }
 
     /// Generate Queen attacks for a square given occupancy.
     #[inline(always)]
+    #[must_use]
     pub fn queen_attacks(&self, square: u8, occupancy: u64) -> u64 {
         Backend::queen_attacks(square, occupancy)
     }
@@ -156,6 +163,10 @@ where
     ///
     /// Amortizes loop overhead and permits compiler instruction scheduling / pipelining
     /// by unrolling the attack queries in blocks of 4.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `out` is shorter than `squares`.
     #[inline]
     pub fn batch_attacks_single_occupancy(
         &self,

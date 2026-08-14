@@ -45,23 +45,103 @@
   | count | lint | note |
   |------:|------|------|
   | **0** | `ptr_as_ptr` | **done** — was 171, see below |
-  | 180 | `unreadable_literal` | bitboard/mask hex constants; check readability convention before sweeping |
-  | 162 | `must_use_candidate` | next up: real API-contract value |
-  | 131 | `elidable_lifetime_names` | mechanical |
-  | 92 | `semicolon_if_nothing_returned` | mechanical |
-  | 83 | `missing_errors_doc` | required by the documentation standard |
+  | **0** | `unreadable_literal` | **done** — bitboard masks use grouped literals; the canonical generated magic table carries a local expectation because regrouping its published constants would obscure table review |
+  | **0** | `must_use_candidate` | **done** — 162 exact findings closed below |
+  | **0** | `elidable_lifetime_names` | **done** — 131 explicit lifetime names elided mechanically; relationships with independent input lifetimes remain explicit |
+  | **0** | `semicolon_if_nothing_returned` | **done** — 92 unit, example, benchmark, kernel, and AMX wrapper return statements now make their unit-value intent explicit |
+  | **0** | `missing_errors_doc` | **done** — all 47 public `Result` APIs document their error contracts |
   | 63 | `cast_lossless` | prefer `From` over `as` where infallible |
   | 62 | `doc_markdown` | backticks |
   | 49 | `uninlined_format_args` | mechanical |
-  | 26 | `allow_attributes` | the `#[allow]` -> `#[expect]` migration |
-  | 21 | `cast_ptr_alignment` | **not mechanical** — each is a real alignment claim to check against the load it feeds |
-  | 19 | `missing_panics_doc` | required by the documentation standard |
-  | 13 | `ref_as_ptr` | `core::ptr::from_ref`; same family as the finished item |
-  | 9 | `ptr_cast_constness` | `.cast_const()`/`.cast_mut()`; same family |
-  | 8 | `missing_safety_doc` | the sites HS-434 unhid; safety-bearing |
+  | **0** | `allow_attributes` | **done** — library source suppressions now use reasoned `#[expect]` or are deleted when unfulfilled; test/bench-only suppressions remain outside this library-source ratchet |
+  | **0** | `cast_ptr_alignment` | **done** — 21 deliberately unaligned intrinsic sites reviewed below |
+  | **0** | `missing_panics_doc` | **done** — 19 contract-bearing APIs documented below |
+  | **0** | `ref_as_ptr` | **done** — 13 reference-to-slice pointer sites use `from_ref`/`from_mut` |
+  | **0** | `ptr_cast_constness` | **done** — raw-pointer constness casts use typed pointer methods |
+  | **0** | `missing_safety_doc` | **done** — AMX raw preconditions documented below |
 
   Sequence: the doc sections and `must_use` next (contract-bearing), then
   `cast_ptr_alignment` reviewed individually rather than swept, cosmetics last.
+
+  **Claimed increment (2026-08-14, codex session):** burn down the
+  `must_use_candidate` class in `hermes-simd-core` only. The scope is public
+  value-returning core APIs, their co-located documentation, and focused
+  contract checks; unrelated lint classes, intrinsics, and peer-owned
+  `Cargo.lock` state are non-goals. Acceptance is a lower exact class count,
+  `cargo fmt --check`, focused core nextest, and a clean targeted Clippy run.
+
+  **`must_use_candidate` burned down: 162 -> 0 (2026-08-14).** The public
+  value-returning APIs in `hermes-simd-core` now carry `#[must_use]`, including
+  SIMD reductions and lane operations, views, aligned storage, sparse/COW
+  conversions, and scalar rounding. Clippy's targeted `must_use_candidate`
+  gate is clean after the mechanical fixes and the remaining contract-bearing
+  methods were annotated by hand. `cargo fmt --all -- --check` and the focused
+  `hermes-simd-core` nextest suite pass 16/16. The remaining HS-435 classes are
+  unchanged and stay in the table above.
+
+  **`missing_panics_doc` burned down: 19 -> 0 (2026-08-14).** The core API
+  docs now state the concrete panic conditions for alignment-preserving views,
+  mask lane-count checks, SIMD host support, chunk bounds, tensor invariants,
+  tile validation, and zero-sized-vector length overflow. The targeted
+  `clippy::missing_panics_doc` gate is clean; `cargo fmt --all -- --check` and
+  the focused `hermes-simd-core` nextest suite pass 16/16. The remaining
+  HS-435 classes are unchanged and stay in the table above.
+
+  **`cast_ptr_alignment` burned down: 21 -> 0 (2026-08-14).** The AVX2
+  F16C, AVX-VNNI, AVX-512 VNNI, and consumer unpack paths now carry precise
+  per-site expectations where the intrinsic is explicitly an unaligned
+  load/store. The workspace all-targets `clippy::cast_ptr_alignment` gate is
+  clean, and the focused intrinsics nextest suite passes 30/30. No alignment
+  promise was weakened; each expectation is attached to the matching
+  `_loadu`, `_loadl`, or `_storeu` intrinsic.
+
+  **`ref_as_ptr` burned down: 13 -> 0 (2026-08-14).** Slice-view and tensor
+  constructors now use `core::ptr::from_ref`/`from_mut` with explicit
+  const-to-mut pointer casts where their internal representation requires it.
+  The workspace all-targets `clippy::ref_as_ptr` gate is clean, and the
+  focused core nextest suite passes 16/16.
+
+  **`ptr_cast_constness` burned down: 9 -> 0 (2026-08-14).** The remaining
+  mutable-view and tile constructors now use `.cast_const()`/`.cast_mut()`
+  rather than `as` casts that changed only pointer constness. The workspace
+  all-targets gate is clean, and the focused core nextest suite passes 16/16.
+
+  **`missing_errors_doc` burned down: 83 -> 0 (2026-08-14).** Sparse
+  validation, tensor view, tiled-kernel, masked-operation, COW,
+  vector-register, facade-dispatch, complex, modular, and AMX-session `Result`
+  APIs now state their concrete error variants. The workspace all-targets audit
+  is clean for `clippy::missing_errors_doc`; the affected Hermes and intrinsics
+  suites pass 424/424 and the doctest gate passes. The same increment also
+  rejects zero NTT moduli with a typed error and canonicalizes input residues
+  before subtraction. The `SimdOps` trait facade is now 287 lines; its blanket
+  implementations and shared method macro live in the dedicated
+  `dispatch/simd_ops/blanket_impls.rs` leaf, with the package suite passing
+  408/408 after the structural split.
+
+  **`elidable_lifetime_names` burned down: 131 -> 0 (2026-08-14).** The
+  core view, sparse, COW, iterator, tensor, aligned-storage, and SIMD facade
+  implementations now use Rust's elided lifetime forms where the input
+  relationship is unambiguous. Independent input lifetimes remain named, so
+  the change removes syntax without changing the borrow contract. The
+  targeted Clippy audit is clean and the combined core/SIMD nextest suite
+  passes 424/424.
+
+  **`semicolon_if_nothing_returned` burned down: 92 -> 0 (2026-08-14).**
+  Unit-valued kernel, AMX wrapper, example, and benchmark statements now use
+  explicit semicolons. This is a syntax-only cleanup; the affected provider
+  and intrinsic suites pass 454/454, and the benchmark-target smoke gate
+  completes successfully.
+
+  **Strict all-target workspace gate restored (2026-08-14).** The provider
+  workspace now passes `cargo clippy --workspace --all-targets -- -D warnings`
+  after consolidating mechanical lint fixes and documenting the few domain
+  contracts that must remain explicit: exact manufactured floating-point
+  oracles, canonical magic tables, and structural kernel-size exceptions.
+  The bitboard public boundary also validates squares before shift arithmetic,
+  so the negative regression tests assert the domain error rather than an
+  incidental overflow panic. Verification: `cargo fmt --all -- --check`,
+  `cargo test --doc -p hermes-simd-core -p hermes-simd -p
+  hermes-simd-intrinsics`, nextest 454/454, and benchmark smoke pass.
 
   **`ptr_as_ptr` burned down: 171 -> 0.** 167 sites converted mechanically by
   `cargo clippy --fix` restricted to that one lint; the remaining 4 were
@@ -74,6 +154,13 @@
   -A clippy::restriction` is required to keep the diff to one transform. Without
   it the run also rewrote 26 `#[allow]` -> `#[expect]` and left 19 unfulfilled
   expectations behind.
+
+  **`allow_attributes` burned down 26 -> 0 (2026-08-14).** The source sweep
+  replaced target-specific and macro-contract suppressions with reasoned
+  `#[expect]` attributes, deleted unfulfilled `unused_mut` and `dead_code`
+  suppressions, and made the aarch64-only unreachable-code expectation
+  conditional. A focused `clippy::allow_attributes` run over the affected
+  core, intrinsics, facade, and macro packages is clean; core nextest is 16/16.
 
 - [ ] [major] [arch] **HS-436 — `SimdKernel` is a god trait.** One sealed trait
   carries ~60 methods across load/store, streaming, dense arithmetic, masked
@@ -650,14 +737,14 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   `unreachable!()` in `amx/mod.rs`, all call sites converted, and a measured
   before/after on AMX silicon.
 
-- [ ] [patch] **HS-435 — `# Safety` sections for the AMX raw wrappers.**
+- [x] [patch] **HS-435 — `# Safety` sections for the AMX raw wrappers.**
   The eight `pub unsafe fn`s in `amx/mod.rs`'s `raw` module carry `///`
-  summaries but no `# Safety` section, so `clippy::missing_safety_doc` fires on
-  each. Their real preconditions are now stated (an `AmxSession` must be
-  active, hence the tile configuration loaded, and `probe::has_amx_tile()` must
-  hold), plus the pointer/stride validity and 64-byte alignment obligations for
-  the load/store pair. Pre-existing, and unrelated to the probe; folding it in
-  would have collided with the in-flight lint-floor ratchet.
+  summaries but no `# Safety` section, so `clippy::missing_safety_doc` fired on
+  each. The wrappers now state their real preconditions: AMX permission and an
+  active tile configuration, valid tile indices and configured operand shapes,
+  valid pointer/stride ranges for tile loads and stores, and 64-byte-aligned
+  `TILECFG` storage. The targeted safety-doc lint is clean and intrinsics
+  nextest passes 30/30.
 
 ## Delivered (2026-06-11)
 

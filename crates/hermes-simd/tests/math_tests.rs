@@ -1,8 +1,17 @@
 //! Integration tests for `SimdCow` math extensions:
-//! norm_sq, norm, normalize, add/sub/mul/div scalar broadcast, div_cow.
+//! `norm_sq`, norm, normalize, add/sub/mul/div scalar broadcast, `div_cow`.
 //!
 //! All tests run against the `Scalar` arch (lane=1) for portability.
 //! The scalar fallback is the authoritative correctness reference.
+
+#![expect(
+    clippy::float_cmp,
+    reason = "These integration tests assert exact manufactured scalar reference values"
+)]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "The shared error helper consumes heterogeneous Result values to inspect their error variant"
+)]
 
 use hermes_simd::{Scalar, SimdCow, SimdError, Unaligned};
 

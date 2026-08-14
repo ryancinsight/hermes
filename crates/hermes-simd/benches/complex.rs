@@ -35,12 +35,12 @@ fn bench_complex_dot(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("runtime", pairs), &pairs, |bench, _| {
             bench.iter(|| {
                 interleaved_complex_dot_runtime::<f64, false>(black_box(&a), black_box(&b)).unwrap()
-            })
+            });
         });
         group.bench_with_input(BenchmarkId::new("scalar", pairs), &pairs, |bench, _| {
             bench.iter(|| {
                 interleaved_complex_dot::<f64, Scalar, false>(black_box(&a), black_box(&b)).unwrap()
-            })
+            });
         });
     }
     group.finish();
@@ -59,8 +59,8 @@ fn bench_complex_mul_assign(c: &mut Criterion) {
                     black_box(&mut buf),
                     black_box(&b),
                 )
-                .unwrap()
-            })
+                .unwrap();
+            });
         });
         group.bench_with_input(BenchmarkId::new("scalar", pairs), &pairs, |bench, _| {
             bench.iter(|| {
@@ -69,8 +69,8 @@ fn bench_complex_mul_assign(c: &mut Criterion) {
                     black_box(&mut buf),
                     black_box(&b),
                 )
-                .unwrap()
-            })
+                .unwrap();
+            });
         });
     }
     group.finish();

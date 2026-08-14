@@ -97,7 +97,7 @@ where
     impl<const TILE_N: usize> AssertN<TILE_N> {
         const OK: () = assert!(TILE_N >= 1, "TILE_N must be at least 1");
     }
-    let _ = AssertN::<TILE_N>::OK;
+    let () = AssertN::<TILE_N>::OK;
 
     check_gemv_t_dimensions(a.len(), x.len(), y.len(), nrows, ncols, lda)?;
 

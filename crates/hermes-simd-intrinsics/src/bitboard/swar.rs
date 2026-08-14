@@ -7,8 +7,8 @@ use hermes_simd_core::bitboard::BitBoardKernel;
 pub struct Swar;
 
 // Directions shift and masks
-const FILE_A: u64 = 0x0101010101010101;
-const FILE_H: u64 = 0x8080808080808080;
+const FILE_A: u64 = 0x0101_0101_0101_0101;
+const FILE_H: u64 = 0x8080_8080_8080_8080;
 
 #[inline(always)]
 fn shift_n(v: u64) -> u64 {
@@ -87,24 +87,27 @@ pub struct SwarUtils;
 impl SwarUtils {
     /// Count set bits in a 64-bit word using SWAR parallel popcount.
     #[inline(always)]
+    #[must_use]
     pub fn popcount(mut x: u64) -> u32 {
-        x -= (x >> 1) & 0x5555555555555555;
-        x = (x & 0x3333333333333333) + ((x >> 2) & 0x3333333333333333);
-        x = (x + (x >> 4)) & 0x0F0F0F0F0F0F0F0F;
-        x = x.wrapping_mul(0x0101010101010101);
+        x -= (x >> 1) & 0x5555_5555_5555_5555;
+        x = (x & 0x3333_3333_3333_3333) + ((x >> 2) & 0x3333_3333_3333_3333);
+        x = (x + (x >> 4)) & 0x0F0F_0F0F_0F0F_0F0F;
+        x = x.wrapping_mul(0x0101_0101_0101_0101);
         (x >> 56) as u32
     }
 
     /// Find the least significant set bit (bit index 0-63) using SWAR trailing zero count.
     #[inline(always)]
+    #[must_use]
     pub fn bit_scan_forward(x: u64) -> u32 {
         x.trailing_zeros()
     }
 
     /// Find the most significant set bit (bit index 0-63) using SWAR leading zero count.
     #[inline(always)]
+    #[must_use]
     pub fn bit_scan_reverse(x: u64) -> u32 {
-        63 - x.leading_zeros()
+        x.ilog2()
     }
 
     /// Computes parallel prefix shift (Kogge-Stone style prefix scan) on a 64-bit mask.
@@ -121,55 +124,62 @@ impl SwarUtils {
 
     /// Isolates the least significant set bit (all other bits set to zero).
     #[inline(always)]
+    #[must_use]
     pub fn isolate_lsb(x: u64) -> u64 {
         x & x.wrapping_neg()
     }
 
     /// Clears the least significant set bit.
     #[inline(always)]
+    #[must_use]
     pub fn clear_lsb(x: u64) -> u64 {
         x & (x.wrapping_sub(1))
     }
 
     /// Isolates the most significant set bit (all other bits set to zero).
     #[inline(always)]
+    #[must_use]
     pub fn isolate_msb(x: u64) -> u64 {
         if x == 0 {
             0
         } else {
-            1u64 << (63 - x.leading_zeros())
+            1u64 << x.ilog2()
         }
     }
 
     /// Computes parallel popcount for each of the 8-bit fields in a 64-bit word.
     #[inline(always)]
+    #[must_use]
     pub fn popcount_8(mut x: u64) -> u64 {
-        x = x - ((x >> 1) & 0x5555555555555555);
-        x = (x & 0x3333333333333333) + ((x >> 2) & 0x3333333333333333);
-        (x + (x >> 4)) & 0x0F0F0F0F0F0F0F0F
+        x = x - ((x >> 1) & 0x5555_5555_5555_5555);
+        x = (x & 0x3333_3333_3333_3333) + ((x >> 2) & 0x3333_3333_3333_3333);
+        (x + (x >> 4)) & 0x0F0F_0F0F_0F0F_0F0F
     }
 
     /// Computes parallel popcount for each of the 16-bit fields in a 64-bit word.
     #[inline(always)]
+    #[must_use]
     pub fn popcount_16(mut x: u64) -> u64 {
-        x = x - ((x >> 1) & 0x5555555555555555);
-        x = (x & 0x3333333333333333) + ((x >> 2) & 0x3333333333333333);
-        x = (x + (x >> 4)) & 0x0F0F0F0F0F0F0F0F;
-        (x + (x >> 8)) & 0x00FF00FF00FF00FF
+        x = x - ((x >> 1) & 0x5555_5555_5555_5555);
+        x = (x & 0x3333_3333_3333_3333) + ((x >> 2) & 0x3333_3333_3333_3333);
+        x = (x + (x >> 4)) & 0x0F0F_0F0F_0F0F_0F0F;
+        (x + (x >> 8)) & 0x00FF_00FF_00FF_00FF
     }
 
     /// Computes parallel popcount for each of the 32-bit fields in a 64-bit word.
     #[inline(always)]
+    #[must_use]
     pub fn popcount_32(mut x: u64) -> u64 {
-        x = x - ((x >> 1) & 0x5555555555555555);
-        x = (x & 0x3333333333333333) + ((x >> 2) & 0x3333333333333333);
-        x = (x + (x >> 4)) & 0x0F0F0F0F0F0F0F0F;
-        x = (x + (x >> 8)) & 0x00FF00FF00FF00FF;
-        (x + (x >> 16)) & 0x0000FFFF0000FFFF
+        x = x - ((x >> 1) & 0x5555_5555_5555_5555);
+        x = (x & 0x3333_3333_3333_3333) + ((x >> 2) & 0x3333_3333_3333_3333);
+        x = (x + (x >> 4)) & 0x0F0F_0F0F_0F0F_0F0F;
+        x = (x + (x >> 8)) & 0x00FF_00FF_00FF_00FF;
+        (x + (x >> 16)) & 0x0000_FFFF_0000_FFFF
     }
 
     /// Bit isolation mask: sets all bits from the lowest set bit to bit 0.
     #[inline(always)]
+    #[must_use]
     pub fn blsmsk(x: u64) -> u64 {
         x ^ (x.wrapping_sub(1))
     }
@@ -177,6 +187,7 @@ impl SwarUtils {
     /// SWAR implementation of parallel bit extract (pext).
     /// Extracts bits from `val` at positions specified by `mask` and packs them contiguously at the LSB.
     #[inline]
+    #[must_use]
     pub fn pext(val: u64, mut mask: u64) -> u64 {
         let mut res = 0;
         let mut shift = 0;
@@ -194,6 +205,7 @@ impl SwarUtils {
     /// SWAR implementation of parallel bit deposit (pdep).
     /// Deposits contiguous low bits from `val` to positions specified by `mask`.
     #[inline]
+    #[must_use]
     pub fn pdep(mut val: u64, mut mask: u64) -> u64 {
         let mut res = 0;
         while mask != 0 {

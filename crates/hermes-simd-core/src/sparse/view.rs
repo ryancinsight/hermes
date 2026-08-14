@@ -65,6 +65,7 @@ where
     /// # Panics
     /// If `Arch` cannot execute on this host.
     #[inline]
+    #[must_use]
     pub fn from_csr(data: CsrData<'a, T>) -> Self {
         assert_arch_executable::<Arch>();
         Self {
@@ -76,6 +77,7 @@ where
 
     /// Access the underlying CSR data.
     #[inline(always)]
+    #[must_use]
     pub fn csr_data(&self) -> &CsrData<'a, T> {
         &self.data
     }
@@ -86,6 +88,11 @@ where
     Arch: SimdArch,
 {
     /// Validate CSR storage and create a SpMV-ready view.
+    ///
+    /// # Errors
+    /// Returns [`crate::SimdError::LengthMismatch`] when CSR storage lengths
+    /// are inconsistent, or [`crate::SimdError::IndexOutOfBounds`] when a row
+    /// pointer or column index is invalid.
     #[inline]
     pub fn try_from_csr(data: CsrData<'a, T>) -> Result<Self, crate::SimdError> {
         Ok(Self {
@@ -100,6 +107,7 @@ where
     /// # Panics
     /// If `Arch` cannot execute on this host.
     #[inline]
+    #[must_use]
     pub fn from_validated_csr(data: ValidatedData<CsrData<'a, T>>) -> Self {
         assert_arch_executable::<Arch>();
         Self {
@@ -119,6 +127,7 @@ where
     /// # Panics
     /// If `Arch` cannot execute on this host.
     #[inline]
+    #[must_use]
     pub fn from_sellp(data: SellPData<'a, T, C>) -> Self {
         assert_arch_executable::<Arch>();
         Self {
@@ -134,6 +143,11 @@ where
     Arch: SimdArch,
 {
     /// Validate SELL-p storage and create a SpMV-ready view.
+    ///
+    /// # Errors
+    /// Returns [`crate::SimdError::LengthMismatch`] when SELL-p storage
+    /// lengths are inconsistent, or [`crate::SimdError::IndexOutOfBounds`]
+    /// when a row pointer or column index is invalid.
     #[inline]
     pub fn try_from_sellp(data: SellPData<'a, T, C>) -> Result<Self, crate::SimdError> {
         Ok(Self {
@@ -148,6 +162,7 @@ where
     /// # Panics
     /// If `Arch` cannot execute on this host.
     #[inline]
+    #[must_use]
     pub fn from_validated_sellp(data: ValidatedData<SellPData<'a, T, C>>) -> Self {
         assert_arch_executable::<Arch>();
         Self {
@@ -167,6 +182,7 @@ where
     /// # Panics
     /// If `Arch` cannot execute on this host.
     #[inline]
+    #[must_use]
     pub fn from_blocked_coo(data: BlockedCooData<'a, T, BM, BN>) -> Self {
         assert_arch_executable::<Arch>();
         Self {
@@ -183,6 +199,11 @@ where
     Arch: SimdArch,
 {
     /// Validate Blocked-COO storage and create a SpMV-ready view.
+    ///
+    /// # Errors
+    /// Returns [`crate::SimdError::LengthMismatch`] when Blocked-COO storage
+    /// lengths are inconsistent, or [`crate::SimdError::IndexOutOfBounds`]
+    /// when a row, column, or block index is invalid.
     #[inline]
     pub fn try_from_blocked_coo(
         data: BlockedCooData<'a, T, BM, BN>,
@@ -199,6 +220,7 @@ where
     /// # Panics
     /// If `Arch` cannot execute on this host.
     #[inline]
+    #[must_use]
     pub fn from_validated_blocked_coo(data: ValidatedData<BlockedCooData<'a, T, BM, BN>>) -> Self {
         assert_arch_executable::<Arch>();
         Self {
@@ -218,6 +240,7 @@ where
     /// # Panics
     /// If `Arch` cannot execute on this host.
     #[inline]
+    #[must_use]
     pub fn from_dense_with_mask(data: DenseWithMaskData<'a, T>) -> Self {
         assert_arch_executable::<Arch>();
         Self {

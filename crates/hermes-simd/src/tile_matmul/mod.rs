@@ -77,6 +77,11 @@ pub(crate) unsafe fn tile_loop_generic<
 pub trait TiledGemm<TA, TB, TC> {
     /// Perform matrix multiplication `c += a * b` using register-blocked/tiled SIMD.
     ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when the operand slices do not
+    /// cover the requested dimensions and strides.
+    ///
     /// # Safety
     /// - Pointers must be valid and slices must have matching dimensions.
     unsafe fn gemm(
@@ -91,7 +96,7 @@ pub trait TiledGemm<TA, TB, TC> {
         c_stride: usize,
     ) -> Result<(), SimdError>;
 
-    /// Dynamically dispatches tile matrix multiplication for a single tile of shape MxNxK.
+    /// Dynamically dispatches tile matrix multiplication for a single tile of shape `MxNxK`.
     ///
     /// # Safety
     /// - Pointers must be valid and aligned as per the chosen backend requirements.
@@ -108,6 +113,11 @@ pub trait TiledGemm<TA, TB, TC> {
 /// Perform matrix multiplication `c += a * b` using register-blocked/tiled SIMD.
 ///
 /// Automatically dispatches to the most performant backend available (e.g. Intel AMX, AVX-512, or Scalar).
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when the operand slices do not cover
+/// the requested dimensions and strides.
 ///
 /// # Safety
 /// - Pointers must be valid and slices must have matching dimensions.
@@ -129,7 +139,7 @@ where
     <(TA, TB, TC) as TiledGemm<TA, TB, TC>>::gemm(m, n, k, a, a_stride, b, b_stride, c, c_stride)
 }
 
-/// Dynamically dispatches tile matrix multiplication for a single tile of shape MxNxK.
+/// Dynamically dispatches tile matrix multiplication for a single tile of shape `MxNxK`.
 ///
 /// # Safety
 /// - Pointers must be valid and aligned as per the chosen backend requirements.
@@ -146,5 +156,5 @@ pub unsafe fn dispatch_tile_matmul<TA, TB, TC>(
 {
     <(TA, TB, TC) as TiledGemm<TA, TB, TC>>::dispatch_tile_matmul(
         c, c_stride, a, a_stride, b, b_stride,
-    )
+    );
 }

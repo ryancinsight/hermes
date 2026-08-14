@@ -120,7 +120,7 @@ impl<
             }
         }
         Some(Self {
-            ptr: data.as_ptr() as *mut T,
+            ptr: data.as_ptr().cast_mut(),
             stride,
             _marker: PhantomData,
         })
@@ -181,24 +181,28 @@ impl<
 {
     /// Access the underlying raw pointer.
     #[inline(always)]
+    #[must_use]
     pub fn as_ptr(&self) -> *const T {
         self.ptr
     }
 
     /// Returns the row stride of this tile view.
     #[inline(always)]
+    #[must_use]
     pub fn stride(&self) -> usize {
         self.stride
     }
 
     /// Returns the number of rows.
     #[inline(always)]
+    #[must_use]
     pub fn rows(&self) -> usize {
         ROWS
     }
 
     /// Returns the number of columns.
     #[inline(always)]
+    #[must_use]
     pub fn cols(&self) -> usize {
         COLS
     }
@@ -221,7 +225,7 @@ pub trait TileMatrixMultiply<
     /// Performs tile matrix multiplication: C += A * B
     ///
     /// # Safety
-    /// - Pointers `a`, `b`, and `c` must be valid for reads/writes of size M*a_stride, K*b_stride, M*c_stride.
+    /// - Pointers `a`, `b`, and `c` must be valid for reads/writes of size M*`a_stride`, K*`b_stride`, M*`c_stride`.
     unsafe fn tile_matmul(
         c: *mut TC,
         c_stride: usize,

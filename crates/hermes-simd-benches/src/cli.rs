@@ -63,6 +63,10 @@ mod tests {
     use super::BenchRunnerArgs;
 
     #[test]
+    #[expect(
+        clippy::float_cmp,
+        reason = "The CLI parser test compares an exact threshold literal"
+    )]
     fn parses_regression_threshold_and_baseline_path() {
         let args = BenchRunnerArgs::parse([
             "--parse-only".to_string(),

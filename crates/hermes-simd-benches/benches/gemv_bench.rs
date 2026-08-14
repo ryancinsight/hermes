@@ -50,8 +50,8 @@ fn bench_gemv_f32(c: &mut Criterion) {
             &(nrows, ncols),
             |bencher, &(nrows, ncols)| {
                 bencher.iter(|| {
-                    gemv::<f32>(black_box(&a), black_box(&x), &mut y, nrows, ncols).unwrap()
-                })
+                    gemv::<f32>(black_box(&a), black_box(&x), &mut y, nrows, ncols).unwrap();
+                });
             },
         );
     }

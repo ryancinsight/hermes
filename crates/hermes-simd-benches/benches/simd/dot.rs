@@ -32,7 +32,7 @@ pub fn bench<T, F>(
             |bencher, _| bencher.iter(|| scalar_dot(black_box(&a), black_box(&b), zero)),
         );
         group.bench_with_input(BenchmarkId::new("dispatch", size), &size, |bencher, _| {
-            bencher.iter(|| dispatch(black_box(&a), black_box(&b)))
+            bencher.iter(|| dispatch(black_box(&a), black_box(&b)));
         });
     }
     group.finish();

@@ -46,23 +46,21 @@ pub struct SimdChunks<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: Executi
 // SAFETY: SimdChunks borrows `'a` data immutably; forwarding Send/Sync is sound
 // when `T: Send` / `T: Sync`.
 unsafe impl<
-        'a,
         T: Send,
         Arch: SimdArch + crate::kernel::SimdKernel<T>,
         Align: Alignment,
         Mode: ExecutionMode,
-    > Send for SimdChunks<'a, T, Arch, Align, Mode>
+    > Send for SimdChunks<'_, T, Arch, Align, Mode>
 where
     T: crate::scalar::Scalar,
 {
 }
 unsafe impl<
-        'a,
         T: Sync,
         Arch: SimdArch + crate::kernel::SimdKernel<T>,
         Align: Alignment,
         Mode: ExecutionMode,
-    > Sync for SimdChunks<'a, T, Arch, Align, Mode>
+    > Sync for SimdChunks<'_, T, Arch, Align, Mode>
 where
     T: crate::scalar::Scalar,
 {
@@ -107,6 +105,7 @@ where
     /// for &x in chunks.remainder() { /* scalar tail */ }
     /// ```
     #[inline(always)]
+    #[must_use]
     pub fn remainder(&self) -> &'a [T] {
         // SAFETY: base + simd_end is within the original slice of length `total`.
         // simd_end <= total by construction.
@@ -123,6 +122,7 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
     ///
     /// After `n` calls to `next`, this returns `original_chunks - n`.
     #[inline(always)]
+    #[must_use]
     pub fn chunks_remaining(&self) -> usize {
         if self.simd_end > self.pos {
             (self.simd_end - self.pos) / Arch::LANE_COUNT
@@ -212,23 +212,21 @@ pub struct SimdChunksMut<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: Exec
 // SAFETY: SimdChunksMut borrows `'a` data mutably; forwarding Send/Sync is sound
 // when `T: Send` / `T: Sync`.
 unsafe impl<
-        'a,
         T: Send,
         Arch: SimdArch + crate::kernel::SimdKernel<T>,
         Align: Alignment,
         Mode: ExecutionMode,
-    > Send for SimdChunksMut<'a, T, Arch, Align, Mode>
+    > Send for SimdChunksMut<'_, T, Arch, Align, Mode>
 where
     T: crate::scalar::Scalar,
 {
 }
 unsafe impl<
-        'a,
         T: Sync,
         Arch: SimdArch + crate::kernel::SimdKernel<T>,
         Align: Alignment,
         Mode: ExecutionMode,
-    > Sync for SimdChunksMut<'a, T, Arch, Align, Mode>
+    > Sync for SimdChunksMut<'_, T, Arch, Align, Mode>
 where
     T: crate::scalar::Scalar,
 {
@@ -264,6 +262,7 @@ where
     ///
     /// Consumes the iterator to return a mutable slice with lifetime `'a`.
     #[inline(always)]
+    #[must_use]
     pub fn into_remainder(self) -> &'a mut [T] {
         // SAFETY: base + simd_end is within the original slice of length `total`.
         // simd_end <= total by construction.
@@ -281,6 +280,7 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
 {
     /// Returns the number of complete SIMD chunks remaining.
     #[inline(always)]
+    #[must_use]
     pub fn chunks_remaining(&self) -> usize {
         if self.simd_end > self.pos {
             (self.simd_end - self.pos) / Arch::LANE_COUNT

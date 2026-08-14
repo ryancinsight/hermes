@@ -15,7 +15,7 @@
 
 use hermes_simd_core::arch::{IsaFamily, SimdArch};
 
-/// AArch64 SVE architecture ZST marker.
+/// `AArch64` SVE architecture ZST marker.
 ///
 /// The current stable implementation uses the same real lane-emulated kernel
 /// family as other non-native `(architecture, scalar)` pairs. Native SVE
@@ -25,13 +25,14 @@ use hermes_simd_core::arch::{IsaFamily, SimdArch};
 pub struct SveArch;
 
 impl SveArch {
-    /// Returns whether the current process can execute native AArch64 SVE.
+    /// Returns whether the current process can execute native `AArch64` SVE.
     ///
     /// The stable Hermes backend remains lane-emulated, so this capability is
     /// intentionally separate from [`SimdArch::is_runtime_supported`]: the
     /// latter reports that the emulated backend is safe to construct on every
     /// host, while this probe reports hardware capability only.
     #[inline]
+    #[must_use]
     pub fn is_native_hardware_supported() -> bool {
         #[cfg(all(target_arch = "aarch64", feature = "std"))]
         {
@@ -71,6 +72,10 @@ mod tests {
     use hermes_simd_core::kernel::SimdKernel;
 
     #[test]
+    #[expect(
+        clippy::float_cmp,
+        reason = "The emulated SVE test compares exact manufactured lane values"
+    )]
     fn emulated_sve_f32_kernel_is_value_semantic() {
         // Runtime SVE detection is intentionally independent from compile-time
         // `target_feature`: a host may support SVE even when this stable,
@@ -107,6 +112,10 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        clippy::float_cmp,
+        reason = "The emulated SVE test compares exact manufactured lane values"
+    )]
     fn emulated_sve_f64_kernel_loads_gathers_and_stores() {
         let source = [1.0_f64, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
         let indices = [7, 6, 5, 4, 3, 2, 1, 0];

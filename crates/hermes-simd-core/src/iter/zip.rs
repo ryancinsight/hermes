@@ -45,14 +45,14 @@ pub struct ZipChunks<'a, 'b, T, Arch: SimdArch, Align: Alignment, Mode: Executio
 }
 
 // SAFETY: ZipChunks borrows two `'a`/`'b` immutable slices; forwarding Send/Sync is sound.
-unsafe impl<'a, 'b, T: Send, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
-    Send for ZipChunks<'a, 'b, T, Arch, Align, Mode>
+unsafe impl<T: Send, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode> Send
+    for ZipChunks<'_, '_, T, Arch, Align, Mode>
 where
     T: Scalar,
 {
 }
-unsafe impl<'a, 'b, T: Sync, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
-    Sync for ZipChunks<'a, 'b, T, Arch, Align, Mode>
+unsafe impl<T: Sync, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode> Sync
+    for ZipChunks<'_, '_, T, Arch, Align, Mode>
 where
     T: Scalar,
 {
@@ -89,6 +89,7 @@ impl<'a, 'b, T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: 
 
     /// Returns the scalar tails for both views.
     #[inline(always)]
+    #[must_use]
     pub fn remainder(&self) -> (&'a [T], &'b [T]) {
         // SAFETY: base + simd_end is within bounds by construction.
         unsafe {
@@ -107,6 +108,7 @@ impl<'a, 'b, T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: 
 
     /// Returns the number of complete paired SIMD chunks remaining.
     #[inline(always)]
+    #[must_use]
     pub fn chunks_remaining(&self) -> usize {
         if self.simd_end > self.pos {
             (self.simd_end - self.pos) / Arch::LANE_COUNT
@@ -150,13 +152,13 @@ impl<'a, 'b, T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: 
     }
 }
 
-impl<'a, 'b, T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
-    ExactSizeIterator for ZipChunks<'a, 'b, T, Arch, Align, Mode>
+impl<T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
+    ExactSizeIterator for ZipChunks<'_, '_, T, Arch, Align, Mode>
 {
 }
 
-impl<'a, 'b, T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
-    core::iter::FusedIterator for ZipChunks<'a, 'b, T, Arch, Align, Mode>
+impl<T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
+    core::iter::FusedIterator for ZipChunks<'_, '_, T, Arch, Align, Mode>
 {
 }
 
@@ -198,7 +200,7 @@ pub struct ZipChunksMut<'a, 'b, T: 'a + 'b, Arch: SimdArch, Align: Alignment, Mo
 
 // SAFETY: `ZipChunksMut` holds exclusive (`*mut T`) access to `'a` data and shared
 // (`*const T`) access to `'b` data. Forwarding Send/Sync is sound when `T: Send + Sync`.
-unsafe impl<'a, 'b, T, Arch, Align, Mode> Send for ZipChunksMut<'a, 'b, T, Arch, Align, Mode>
+unsafe impl<T, Arch, Align, Mode> Send for ZipChunksMut<'_, '_, T, Arch, Align, Mode>
 where
     T: Scalar + Send + Sync,
     Arch: SimdArch + SimdKernel<T>,
@@ -206,7 +208,7 @@ where
     Mode: ExecutionMode,
 {
 }
-unsafe impl<'a, 'b, T, Arch, Align, Mode> Sync for ZipChunksMut<'a, 'b, T, Arch, Align, Mode>
+unsafe impl<T, Arch, Align, Mode> Sync for ZipChunksMut<'_, '_, T, Arch, Align, Mode>
 where
     T: Scalar + Send + Sync,
     Arch: SimdArch + SimdKernel<T>,
@@ -250,6 +252,7 @@ where
     ///
     /// Elements `[simd_end..total]` for each operand. Call this **after** the loop.
     #[inline(always)]
+    #[must_use]
     pub fn into_remainder(self) -> (&'a mut [T], &'b [T]) {
         let len = self.total - self.simd_end;
         // SAFETY: ptr_a/ptr_b + simd_end is within bounds by construction; both
@@ -264,6 +267,7 @@ where
 
     /// Number of complete SIMD chunks remaining.
     #[inline(always)]
+    #[must_use]
     pub fn chunks_remaining(&self) -> usize {
         if self.simd_end > self.pos {
             (self.simd_end - self.pos) / Arch::LANE_COUNT
@@ -310,12 +314,12 @@ impl<'a, 'b, T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: 
     }
 }
 
-impl<'a, 'b, T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
-    ExactSizeIterator for ZipChunksMut<'a, 'b, T, Arch, Align, Mode>
+impl<T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
+    ExactSizeIterator for ZipChunksMut<'_, '_, T, Arch, Align, Mode>
 {
 }
 
-impl<'a, 'b, T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
-    core::iter::FusedIterator for ZipChunksMut<'a, 'b, T, Arch, Align, Mode>
+impl<T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
+    core::iter::FusedIterator for ZipChunksMut<'_, '_, T, Arch, Align, Mode>
 {
 }

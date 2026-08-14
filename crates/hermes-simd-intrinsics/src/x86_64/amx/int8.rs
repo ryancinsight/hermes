@@ -1,4 +1,4 @@
-use super::{raw, AmxConfig, AmxInt8, AmxSession};
+use super::{pack::pack_rhs_panel, raw, AmxConfig, AmxInt8, AmxSession};
 use eunomia::{I32, I8};
 use hermes_simd_core::view::TileMatrixMultiply;
 
@@ -22,8 +22,10 @@ macro_rules! impl_tile_matmul_int8 {
 
                 // A is M=16 rows, K=64 cols.
                 raw::tileloadd(0, a.cast(), a_stride as isize);
-                // B is K=64 rows, N=16 cols.
-                raw::tileloadd(1, b.cast(), b_stride as isize);
+                // B is packed as K/4=16 rows, 4N=64 byte columns for AMX dot products.
+                let mut b_tile = [<$t_in>::default(); 16 * 64];
+                pack_rhs_panel::<_, 4>(b, b_stride, 0, 0, 64, &mut b_tile);
+                raw::tileloadd(1, b_tile.as_ptr().cast(), 64);
                 // C is M=16 rows, N=16 cols.
                 raw::tileloadd(2, c as *const _, (c_stride * 4) as isize);
 
@@ -44,6 +46,10 @@ impl_tile_matmul_int8!(I8, I32);
 
 impl super::AmxGemm<i8, i8, i32> for AmxInt8 {
     #[inline]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "AMX int8 tiling keeps tile configuration, packing, dispatch, and tails in one unsafe boundary"
+    )]
     unsafe fn amx_gemm(
         m: usize,
         n: usize,
@@ -84,13 +90,17 @@ impl super::AmxGemm<i8, i8, i32> for AmxInt8 {
                     (c_stride * 4) as isize,
                 );
 
+                let mut b_tile_0 = [0i8; 16 * 64];
+                let mut b_tile_1 = [0i8; 16 * 64];
                 let mut kk = 0;
                 while kk + 64 <= k {
                     raw::tileloadd(0, a.add(i * a_stride + kk).cast(), a_stride as isize);
                     raw::tileloadd(1, a.add((i + 16) * a_stride + kk).cast(), a_stride as isize);
 
-                    raw::tileloadd(6, b.add(kk * b_stride + j).cast(), b_stride as isize);
-                    raw::tileloadd(7, b.add(kk * b_stride + j + 16).cast(), b_stride as isize);
+                    pack_rhs_panel::<_, 4>(b, b_stride, j, kk, 64, &mut b_tile_0);
+                    pack_rhs_panel::<_, 4>(b, b_stride, j + 16, kk, 64, &mut b_tile_1);
+                    raw::tileloadd(6, b_tile_0.as_ptr().cast(), 64);
+                    raw::tileloadd(7, b_tile_1.as_ptr().cast(), 64);
 
                     raw::tdpbssd(2, 0, 6);
                     raw::tdpbssd(3, 0, 7);
@@ -132,11 +142,13 @@ impl super::AmxGemm<i8, i8, i32> for AmxInt8 {
                     (c_stride * 4) as isize,
                 );
 
+                let mut b_tile = [0i8; 16 * 64];
                 let mut kk = 0;
                 while kk + 64 <= k {
                     raw::tileloadd(0, a.add(i * a_stride + kk).cast(), a_stride as isize);
                     raw::tileloadd(1, a.add((i + 16) * a_stride + kk).cast(), a_stride as isize);
-                    raw::tileloadd(6, b.add(kk * b_stride + j).cast(), b_stride as isize);
+                    pack_rhs_panel::<_, 4>(b, b_stride, j, kk, 64, &mut b_tile);
+                    raw::tileloadd(6, b_tile.as_ptr().cast(), 64);
 
                     raw::tdpbssd(2, 0, 6);
                     raw::tdpbssd(4, 1, 6);
@@ -164,10 +176,12 @@ impl super::AmxGemm<i8, i8, i32> for AmxInt8 {
                     (c_stride * 4) as isize,
                 );
 
+                let mut b_tile = [0i8; 16 * 64];
                 let mut kk = 0;
                 while kk + 64 <= k {
                     raw::tileloadd(0, a.add(i * a_stride + kk).cast(), a_stride as isize);
-                    raw::tileloadd(6, b.add(kk * b_stride + j).cast(), b_stride as isize);
+                    pack_rhs_panel::<_, 4>(b, b_stride, j, kk, 64, &mut b_tile);
+                    raw::tileloadd(6, b_tile.as_ptr().cast(), 64);
 
                     raw::tdpbssd(2, 0, 6);
                     kk += 64;
@@ -190,8 +204,8 @@ impl super::AmxGemm<i8, i8, i32> for AmxInt8 {
                         let mut sum = 0i32;
                         for kk in 0..k {
                             sum = sum.wrapping_add(
-                                (*a.add(r * a_stride + kk) as i32)
-                                    * (*b.add(kk * b_stride + col) as i32),
+                                i32::from(*a.add(r * a_stride + kk))
+                                    * i32::from(*b.add(kk * b_stride + col)),
                             );
                         }
                         *c.add(r * c_stride + col) += sum;
@@ -199,8 +213,8 @@ impl super::AmxGemm<i8, i8, i32> for AmxInt8 {
                         let mut sum = 0i32;
                         for kk in amx_k_bound..k {
                             sum = sum.wrapping_add(
-                                (*a.add(r * a_stride + kk) as i32)
-                                    * (*b.add(kk * b_stride + col) as i32),
+                                i32::from(*a.add(r * a_stride + kk))
+                                    * i32::from(*b.add(kk * b_stride + col)),
                             );
                         }
                         *c.add(r * c_stride + col) += sum;
@@ -213,6 +227,10 @@ impl super::AmxGemm<i8, i8, i32> for AmxInt8 {
 
 impl super::AmxGemm<I8, I8, I32> for AmxInt8 {
     #[inline]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "AMX int8 tiling keeps tile configuration, packing, dispatch, and tails in one unsafe boundary"
+    )]
     unsafe fn amx_gemm(
         m: usize,
         n: usize,
@@ -253,13 +271,17 @@ impl super::AmxGemm<I8, I8, I32> for AmxInt8 {
                     (c_stride * 4) as isize,
                 );
 
+                let mut b_tile_0 = [I8::default(); 16 * 64];
+                let mut b_tile_1 = [I8::default(); 16 * 64];
                 let mut kk = 0;
                 while kk + 64 <= k {
                     raw::tileloadd(0, a.add(i * a_stride + kk).cast(), a_stride as isize);
                     raw::tileloadd(1, a.add((i + 16) * a_stride + kk).cast(), a_stride as isize);
 
-                    raw::tileloadd(6, b.add(kk * b_stride + j).cast(), b_stride as isize);
-                    raw::tileloadd(7, b.add(kk * b_stride + j + 16).cast(), b_stride as isize);
+                    pack_rhs_panel::<_, 4>(b, b_stride, j, kk, 64, &mut b_tile_0);
+                    pack_rhs_panel::<_, 4>(b, b_stride, j + 16, kk, 64, &mut b_tile_1);
+                    raw::tileloadd(6, b_tile_0.as_ptr().cast(), 64);
+                    raw::tileloadd(7, b_tile_1.as_ptr().cast(), 64);
 
                     raw::tdpbssd(2, 0, 6);
                     raw::tdpbssd(3, 0, 7);
@@ -301,11 +323,13 @@ impl super::AmxGemm<I8, I8, I32> for AmxInt8 {
                     (c_stride * 4) as isize,
                 );
 
+                let mut b_tile = [I8::default(); 16 * 64];
                 let mut kk = 0;
                 while kk + 64 <= k {
                     raw::tileloadd(0, a.add(i * a_stride + kk).cast(), a_stride as isize);
                     raw::tileloadd(1, a.add((i + 16) * a_stride + kk).cast(), a_stride as isize);
-                    raw::tileloadd(6, b.add(kk * b_stride + j).cast(), b_stride as isize);
+                    pack_rhs_panel::<_, 4>(b, b_stride, j, kk, 64, &mut b_tile);
+                    raw::tileloadd(6, b_tile.as_ptr().cast(), 64);
 
                     raw::tdpbssd(2, 0, 6);
                     raw::tdpbssd(4, 1, 6);
@@ -333,10 +357,12 @@ impl super::AmxGemm<I8, I8, I32> for AmxInt8 {
                     (c_stride * 4) as isize,
                 );
 
+                let mut b_tile = [I8::default(); 16 * 64];
                 let mut kk = 0;
                 while kk + 64 <= k {
                     raw::tileloadd(0, a.add(i * a_stride + kk).cast(), a_stride as isize);
-                    raw::tileloadd(6, b.add(kk * b_stride + j).cast(), b_stride as isize);
+                    pack_rhs_panel::<_, 4>(b, b_stride, j, kk, 64, &mut b_tile);
+                    raw::tileloadd(6, b_tile.as_ptr().cast(), 64);
 
                     raw::tdpbssd(2, 0, 6);
                     kk += 64;
@@ -359,8 +385,8 @@ impl super::AmxGemm<I8, I8, I32> for AmxInt8 {
                         let mut sum = 0i32;
                         for kk in 0..k {
                             sum = sum.wrapping_add(
-                                (a.add(r * a_stride + kk).read().0 as i32)
-                                    * (b.add(kk * b_stride + col).read().0 as i32),
+                                i32::from(a.add(r * a_stride + kk).read().0)
+                                    * i32::from(b.add(kk * b_stride + col).read().0),
                             );
                         }
                         *c.add(r * c_stride + col) = I32(c.add(r * c_stride + col).read().0 + sum);
@@ -368,8 +394,8 @@ impl super::AmxGemm<I8, I8, I32> for AmxInt8 {
                         let mut sum = 0i32;
                         for kk in amx_k_bound..k {
                             sum = sum.wrapping_add(
-                                (a.add(r * a_stride + kk).read().0 as i32)
-                                    * (b.add(kk * b_stride + col).read().0 as i32),
+                                i32::from(a.add(r * a_stride + kk).read().0)
+                                    * i32::from(b.add(kk * b_stride + col).read().0),
                             );
                         }
                         *c.add(r * c_stride + col) = I32(c.add(r * c_stride + col).read().0 + sum);

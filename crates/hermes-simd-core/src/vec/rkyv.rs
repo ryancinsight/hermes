@@ -1,4 +1,4 @@
-//! rkyv zero-copy serialization support for AlignedVec.
+//! rkyv zero-copy serialization support for `AlignedVec`.
 
 //! Zero-copy serialization support for aligned vectors using `rkyv`.
 

@@ -39,7 +39,10 @@
 // `unused_unsafe` stays crate-local: it fires on `unsafe` blocks nested inside
 // `#[target_feature]` functions, which are written explicitly so each intrinsic
 // call site still carries its own SAFETY reasoning.
-#![allow(unused_unsafe)]
+#![expect(
+    unused_unsafe,
+    reason = "Architecture-specific unsafe calls disappear on unsupported targets"
+)]
 // Library-only denials; see the note in hermes-simd-core's crate root.
 #![deny(missing_docs)]
 #![deny(clippy::unwrap_used, clippy::print_stdout, clippy::print_stderr)]
@@ -277,7 +280,13 @@ where
 
 /// Dispatches a shared slice into the best matching `DispatchedView` based on runtime CPU feature detection.
 #[inline]
-#[allow(unreachable_code)]
+#[cfg_attr(
+    target_arch = "aarch64",
+    expect(
+        unreachable_code,
+        reason = "Architecture-specific dispatch returns are cfg-selected before scalar fallback"
+    )
+)]
 pub fn dispatch_view<'a, T, Align>(
     data: &'a [T],
 ) -> Option<DispatchedView<'a, T, Align, Unmasked, &'a [T]>>
@@ -319,7 +328,13 @@ where
 
 /// Dispatches a mutable slice into the best matching `DispatchedView` based on runtime CPU feature detection.
 #[inline]
-#[allow(unreachable_code)]
+#[cfg_attr(
+    target_arch = "aarch64",
+    expect(
+        unreachable_code,
+        reason = "Architecture-specific dispatch returns are cfg-selected before scalar fallback"
+    )
+)]
 pub fn dispatch_view_mut<'a, T, Align>(
     data: &'a mut [T],
 ) -> Option<DispatchedView<'a, T, Align, Unmasked, &'a mut [T]>>
@@ -371,7 +386,7 @@ pub trait SimdCowExt<T: SimdScalar, Arch: SimdArch + SimdKernel<T>, Align: Align
         F: FnMut(Vector<T, Arch>) -> Vector<T, Arch>;
 }
 
-impl<'a, T, Arch, Align> SimdCowExt<T, Arch, Align> for SimdCow<'a, T, Arch, Align>
+impl<T, Arch, Align> SimdCowExt<T, Arch, Align> for SimdCow<'_, T, Arch, Align>
 where
     T: SimdScalar,
     Arch: SimdArch + SimdKernel<T>,

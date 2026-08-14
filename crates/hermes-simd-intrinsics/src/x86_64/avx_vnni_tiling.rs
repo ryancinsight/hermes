@@ -1,4 +1,4 @@
-//! AVX-VNNI (256-bit VEX-encoded VNNI) `TileMatrixMultiply` for x86_64.
+//! AVX-VNNI (256-bit VEX-encoded VNNI) `TileMatrixMultiply` for `x86_64`.
 //!
 //! Serves client CPUs (Alder Lake and newer, Zen 5) that have `vpdpbusd` on
 //! YMM registers but no AVX-512. Sits between the AVX-512 VNNI tile kernel and
@@ -56,7 +56,12 @@ unsafe fn tile_matmul_i8(
     b: *const i8,
     b_stride: usize,
 ) {
-    use arch::*;
+    use arch::{
+        __m128i, __m256i, _mm256_dpbusd_avx_epi32, _mm256_loadu_si256, _mm256_set1_epi32,
+        _mm256_set1_epi8, _mm256_set_m128i, _mm256_setzero_si256, _mm256_storeu_si256,
+        _mm256_sub_epi32, _mm256_xor_si256, _mm_loadl_epi64, _mm_unpackhi_epi16,
+        _mm_unpacklo_epi16, _mm_unpacklo_epi8,
+    };
 
     // Per-byte +128 bias for the unsigned operand of `vpdpbusd` (XOR 0x80).
     let sign_flip = _mm256_set1_epi8(-128);
@@ -72,7 +77,12 @@ unsafe fn tile_matmul_i8(
             // Load the 8 output rows for this block (8 columns each).
             let mut acc = [_mm256_setzero_si256(); 8];
             for (i, slot) in acc.iter_mut().enumerate() {
-                *slot = _mm256_loadu_si256(c.add((row + i) * c_stride + col) as *const __m256i);
+                #[expect(
+                    clippy::cast_ptr_alignment,
+                    reason = "_mm256_loadu_si256 accepts the deliberately unaligned tile row"
+                )]
+                let c_row = c.add((row + i) * c_stride + col).cast::<__m256i>();
+                *slot = _mm256_loadu_si256(c_row);
             }
             let mut bias_acc = _mm256_setzero_si256();
 
@@ -80,9 +90,25 @@ unsafe fn tile_matmul_i8(
                 // Pack B[k..k+4, col..col+8] so 32-bit lane j holds the four
                 // consecutive-k bytes of column `col + j` — the operand shape
                 // `vpdpbusd` contracts over.
+                #[expect(
+                    clippy::cast_ptr_alignment,
+                    reason = "_mm_loadl_epi64 accepts the deliberately unaligned tile row"
+                )]
                 let r0 = _mm_loadl_epi64(b.add(k * b_stride + col).cast::<__m128i>());
+                #[expect(
+                    clippy::cast_ptr_alignment,
+                    reason = "_mm_loadl_epi64 accepts the deliberately unaligned tile row"
+                )]
                 let r1 = _mm_loadl_epi64(b.add((k + 1) * b_stride + col).cast::<__m128i>());
+                #[expect(
+                    clippy::cast_ptr_alignment,
+                    reason = "_mm_loadl_epi64 accepts the deliberately unaligned tile row"
+                )]
                 let r2 = _mm_loadl_epi64(b.add((k + 2) * b_stride + col).cast::<__m128i>());
+                #[expect(
+                    clippy::cast_ptr_alignment,
+                    reason = "_mm_loadl_epi64 accepts the deliberately unaligned tile row"
+                )]
                 let r3 = _mm_loadl_epi64(b.add((k + 3) * b_stride + col).cast::<__m128i>());
 
                 let lo01 = _mm_unpacklo_epi8(r0, r1); // r0[j],r1[j] interleaved
@@ -105,10 +131,12 @@ unsafe fn tile_matmul_i8(
 
             for (i, slot) in acc.iter().enumerate() {
                 let corrected = _mm256_sub_epi32(*slot, bias_acc);
-                _mm256_storeu_si256(
-                    c.add((row + i) * c_stride + col).cast::<__m256i>(),
-                    corrected,
-                );
+                #[expect(
+                    clippy::cast_ptr_alignment,
+                    reason = "_mm256_storeu_si256 accepts the deliberately unaligned tile row"
+                )]
+                let c_row = c.add((row + i) * c_stride + col).cast::<__m256i>();
+                _mm256_storeu_si256(c_row, corrected);
             }
         }
     }

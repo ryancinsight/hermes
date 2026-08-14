@@ -5,6 +5,11 @@
 //! `TILE_M` rows (`gemv`, which is memory-bound). This example runs both paths
 //! and cross-checks against the plain facade `dot`.
 
+#![expect(
+    clippy::float_cmp,
+    reason = "The runnable example asserts exact manufactured tile outputs"
+)]
+
 use hermes_simd::{dot, gemv, tiled_dot, Scalar, SimdError, SimdView, Unaligned};
 
 fn main() -> Result<(), SimdError> {

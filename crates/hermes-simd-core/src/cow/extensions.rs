@@ -166,6 +166,7 @@ where
 
     /// Returns the first minimum, or `None` for empty or NaN-containing data.
     #[inline]
+    #[must_use]
     pub fn argmin(&self) -> Option<(usize, T)>
     where
         T: crate::scalar::NumericElement,
@@ -175,6 +176,7 @@ where
 
     /// Returns the first maximum, or `None` for empty or NaN-containing data.
     #[inline]
+    #[must_use]
     pub fn argmax(&self) -> Option<(usize, T)>
     where
         T: crate::scalar::NumericElement,
@@ -203,6 +205,10 @@ where
 
     /// Perform a prefix scan (inclusive or exclusive) of the view using the specified operation,
     /// returning a new owned `SimdCow`.
+    ///
+    /// # Errors
+    /// Returns [`SimdError::InsufficientOutputLength`] if the scan destination
+    /// cannot hold the complete result.
     #[inline]
     pub fn prefix_scan<Op, SMode>(
         &self,
@@ -230,6 +236,11 @@ where
     ///
     /// Promotes `self` to owned if currently borrowed (one allocation).
     /// Subsequent calls on the same already-owned `SimdCow` are allocation-free.
+    ///
+    /// # Errors
+    /// This operation currently completes after promoting the view and running
+    /// the in-place scan; the `Result` is retained for the fallible scan API
+    /// family and returns `Ok(())` on completion.
     #[inline]
     pub fn prefix_scan_in_place<Op, SMode>(&mut self, op: Op, mode: SMode) -> Result<(), SimdError>
     where

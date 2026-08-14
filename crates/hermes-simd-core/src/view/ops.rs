@@ -39,6 +39,7 @@ where
     /// Iterates in unrolled chunks of `Arch::LANE_COUNT * Arch::UNROLL_FACTOR` elements,
     /// accumulating into multiple registers in parallel to break loop dependencies.
     #[inline(always)]
+    #[must_use]
     pub fn sum(&self) -> T {
         // Keep the public sum facade on the generic reduction SSOT so its final
         // partial vector receives the same initialized-buffer masked-tail proof
@@ -307,7 +308,10 @@ where
         {
             // SAFETY: lengths validated above; `zip_into_streaming` peels the
             // output to the NT-store alignment and issues the write barrier.
-            return unsafe { self.zip_into_streaming(other, out, op, len, simd_len) };
+            unsafe {
+                self.zip_into_streaming(other, out, op, len, simd_len);
+            }
+            return Ok(());
         }
 
         let ptr_self = self.as_slice().as_ptr();
@@ -386,8 +390,7 @@ where
         op: Op,
         len: usize,
         _simd_len: usize,
-    ) -> Result<(), SimdError>
-    where
+    ) where
         ORef: 'a,
         Op: ElementOp<T>,
     {
@@ -428,8 +431,6 @@ where
         for i in mid_end..len {
             out[i] = op.apply_scalar(s[i], o[i]);
         }
-
-        Ok(())
     }
 
     /// Pairwise elementwise operation on `self` and `other`, returning a new `AlignedVec<T, Align>`.

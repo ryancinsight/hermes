@@ -108,6 +108,7 @@ pub trait ReductionOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
     /// # Safety
     /// Processor must support the target feature of `Arch`.
     #[inline(always)]
+    #[must_use]
     unsafe fn identity_vector<Arch: SimdKernel<T>>() -> Arch::Vector {
         Arch::splat(Self::identity_scalar())
     }

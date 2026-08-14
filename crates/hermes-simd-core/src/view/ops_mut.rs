@@ -83,7 +83,7 @@ where
             };
 
             for i in (0..simd_len).step_by(lane_count) {
-                let va = load_self(ptr_self.add(i) as *const T);
+                let va = load_self(ptr_self.add(i).cast_const());
                 let vb = load_other(ptr_other.add(i));
                 let vr = op.apply::<Arch>(va, vb);
                 store(ptr_self.add(i), vr);

@@ -409,7 +409,7 @@ mod tests {
         assert_eq!(has_amx_int8(), has_amx_int8());
     }
 
-    /// AMX exists only on x86_64, and only Linux and Windows expose a
+    /// AMX exists only on `x86_64`, and only Linux and Windows expose a
     /// permission protocol for it. Everywhere else the probe must refuse.
     #[test]
     fn unsupported_platforms_refuse() {

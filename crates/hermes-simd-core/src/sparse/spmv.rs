@@ -1,4 +1,4 @@
-//! Sparse matrix-vector multiplication (SpMV) kernels.
+//! Sparse matrix-vector multiplication (`SpMV`) kernels.
 //!
 //! # Safety
 //!
@@ -46,7 +46,7 @@ pub(crate) unsafe fn build_index_vector<T: Scalar, Arch: SimdKernel<T>>(
             core::mem::size_of::<Arch::IndexVector>()
                 == Arch::LANE_COUNT * core::mem::size_of::<i32>(),
             "IndexVector size must equal LANE_COUNT * size_of::<i32>()"
-        )
+        );
     };
     assert!(
         cols.len() >= Arch::LANE_COUNT,
@@ -62,21 +62,15 @@ pub(crate) unsafe fn build_index_vector<T: Scalar, Arch: SimdKernel<T>>(
 fn validate_spmv_sizes(x_len: usize, y_len: usize, ncols: usize, nrows: usize, format_name: &str) {
     assert!(
         x_len >= ncols,
-        "x too short for {} ncols (got {}, expected >= {})",
-        format_name,
-        x_len,
-        ncols
+        "x too short for {format_name} ncols (got {x_len}, expected >= {ncols})"
     );
     assert!(
         y_len >= nrows,
-        "y too short for {} nrows (got {}, expected >= {})",
-        format_name,
-        y_len,
-        nrows
+        "y too short for {format_name} nrows (got {y_len}, expected >= {nrows})"
     );
 }
 
-impl<'a, T, Arch> SparseSpMv<T> for SparseView<'a, T, Validated<Csr>, Arch>
+impl<T, Arch> SparseSpMv<T> for SparseView<'_, T, Validated<Csr>, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
@@ -192,7 +186,7 @@ where
     }
 }
 
-impl<'a, T, Arch> SparseSpMv<T> for SparseView<'a, T, DenseWithMask, Arch>
+impl<T, Arch> SparseSpMv<T> for SparseView<'_, T, DenseWithMask, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
@@ -310,8 +304,8 @@ where
     }
 }
 
-impl<'a, T, const BM: usize, const BN: usize, Arch> SparseSpMv<T>
-    for SparseView<'a, T, Validated<BlockedCoo<BM, BN>>, Arch>
+impl<T, const BM: usize, const BN: usize, Arch> SparseSpMv<T>
+    for SparseView<'_, T, Validated<BlockedCoo<BM, BN>>, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
@@ -431,7 +425,7 @@ where
     }
 }
 
-/// Vectorized SELL-p SpMV for the case `Arch::LANE_COUNT == C`.
+/// Vectorized SELL-p `SpMV` for the case `Arch::LANE_COUNT == C`.
 ///
 /// # Safety
 /// - The host must implement `Arch` (its kernels are `#[target_feature]`-gated).
@@ -526,7 +520,7 @@ unsafe fn sellp_spmv_vectorized<T, const C: usize, Arch>(
     }
 }
 
-impl<'a, T, const C: usize, Arch> SparseSpMv<T> for SparseView<'a, T, Validated<SellP<C>>, Arch>
+impl<T, const C: usize, Arch> SparseSpMv<T> for SparseView<'_, T, Validated<SellP<C>>, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,

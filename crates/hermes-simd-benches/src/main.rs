@@ -35,7 +35,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .clone()
         .unwrap_or_else(|| workspace_root.join("benchmarks_baseline.json"));
 
-    if !args.parse_only {
+    if args.parse_only {
+        println!(
+            "Skipping benchmark run. Parsing existing results from: {}",
+            target_criterion.display()
+        );
+    } else {
         println!("Running workspace benchmarks via cargo bench...");
         let status = Command::new("cargo")
             .args(["bench", "--workspace"])
@@ -44,17 +49,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if !status.success() {
             return Err("cargo bench execution failed".into());
         }
-    } else {
-        println!(
-            "Skipping benchmark run. Parsing existing results from: {:?}",
-            target_criterion
-        );
     }
 
     if !target_criterion.exists() {
         return Err(format!(
-            "Criterion results directory not found at {:?}",
-            target_criterion
+            "Criterion results directory not found at {}",
+            target_criterion.display()
         )
         .into());
     }
@@ -81,8 +81,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &generated_at,
         )?;
         println!(
-            "Successfully wrote benchmark baseline to {:?}",
-            baseline_path
+            "Successfully wrote benchmark baseline to {}",
+            baseline_path.display()
         );
     }
 
@@ -98,7 +98,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let markdown = render_markdown(&results, &cpu, capabilities, &generated_at);
     let output_path = workspace_root.join("benchmarks_results.md");
     std::fs::write(&output_path, markdown)?;
-    println!("Successfully wrote benchmark results to {:?}", output_path);
+    println!(
+        "Successfully wrote benchmark results to {}",
+        output_path.display()
+    );
 
     Ok(())
 }

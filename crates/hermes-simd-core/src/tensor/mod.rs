@@ -44,6 +44,8 @@ pub use view::TensorView;
 
 #[cfg(test)]
 mod tests {
+    #![expect(clippy::float_cmp, reason = "exact integer-valued float oracle")]
+
     use super::*;
     use strides::row_major_strides;
 

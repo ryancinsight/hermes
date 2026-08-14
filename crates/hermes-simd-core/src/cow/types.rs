@@ -43,6 +43,7 @@ where
 {
     /// Creates a borrowed `SimdCow` wrapping a `SimdView`.
     #[inline]
+    #[must_use]
     pub fn borrowed(view: SimdView<'a, T, Arch, Align, Unmasked, &'a [T]>) -> Self {
         Self::Borrowed(view)
     }
@@ -52,6 +53,7 @@ where
     /// # Panics
     /// If `Arch` cannot execute on this host.
     #[inline]
+    #[must_use]
     pub fn owned(vec: AlignedVec<T, Align>) -> Self {
         assert_arch_executable::<Arch>();
         Self::Owned(vec)
@@ -59,18 +61,21 @@ where
 
     /// Returns true when this container is borrowing caller-owned storage.
     #[inline(always)]
+    #[must_use]
     pub fn is_borrowed(&self) -> bool {
         matches!(self, Self::Borrowed(_))
     }
 
     /// Returns true when this container owns aligned storage.
     #[inline(always)]
+    #[must_use]
     pub fn is_owned(&self) -> bool {
         matches!(self, Self::Owned(_))
     }
 
     /// Obtains a read-only `SimdView` over the data.
     #[inline(always)]
+    #[must_use]
     pub fn view(&self) -> SimdView<'_, T, Arch, Align, Unmasked, &'_ [T]> {
         match self {
             Self::Borrowed(view) => *view,
@@ -80,6 +85,7 @@ where
 
     /// Returns the number of elements in the contained slice.
     #[inline(always)]
+    #[must_use]
     pub fn len(&self) -> usize {
         match self {
             Self::Borrowed(view) => view.len(),
@@ -89,12 +95,14 @@ where
 
     /// Returns `true` if the contained slice is empty.
     #[inline(always)]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// Converts this `SimdCow` into an unaligned Cow, stripping the alignment guarantee zero-cost.
     #[inline]
+    #[must_use]
     pub fn into_unaligned(self) -> SimdCow<'a, T, Arch, crate::align::Unaligned> {
         match self {
             Self::Borrowed(view) => SimdCow::Borrowed(view.into_unaligned()),
@@ -123,6 +131,7 @@ where
 
     /// Zero-copy sub-slice over a range of indices, returning an unaligned borrowed `SimdCow`.
     #[inline]
+    #[must_use]
     pub fn slice_unaligned(
         &self,
         range: core::ops::Range<usize>,
@@ -153,7 +162,7 @@ where
     }
 }
 
-impl<'a, T, Arch, Align> Clone for SimdCow<'a, T, Arch, Align>
+impl<T, Arch, Align> Clone for SimdCow<'_, T, Arch, Align>
 where
     T: Clone,
     Arch: SimdArch,
@@ -168,7 +177,7 @@ where
     }
 }
 
-impl<'a, T, Arch, Align> Default for SimdCow<'a, T, Arch, Align>
+impl<T, Arch, Align> Default for SimdCow<'_, T, Arch, Align>
 where
     Arch: SimdArch,
     Align: Alignment,
@@ -179,7 +188,7 @@ where
     }
 }
 
-impl<'a, T, Arch, Align> core::fmt::Debug for SimdCow<'a, T, Arch, Align>
+impl<T, Arch, Align> core::fmt::Debug for SimdCow<'_, T, Arch, Align>
 where
     T: core::fmt::Debug,
     Arch: SimdArch,
@@ -193,8 +202,8 @@ where
     }
 }
 
-impl<'a, 'b, T, Arch1, Arch2, Align1, Align2> PartialEq<SimdCow<'b, T, Arch2, Align2>>
-    for SimdCow<'a, T, Arch1, Align1>
+impl<'b, T, Arch1, Arch2, Align1, Align2> PartialEq<SimdCow<'b, T, Arch2, Align2>>
+    for SimdCow<'_, T, Arch1, Align1>
 where
     T: PartialEq,
     Arch1: SimdArch,
@@ -210,7 +219,7 @@ where
     }
 }
 
-impl<'a, T, Arch, Align> Eq for SimdCow<'a, T, Arch, Align>
+impl<T, Arch, Align> Eq for SimdCow<'_, T, Arch, Align>
 where
     T: Eq,
     Arch: SimdArch,
@@ -218,8 +227,8 @@ where
 {
 }
 
-impl<'a, T: PartialEq, Arch: SimdArch, Align: Alignment> PartialEq<[T]>
-    for SimdCow<'a, T, Arch, Align>
+impl<T: PartialEq, Arch: SimdArch, Align: Alignment> PartialEq<[T]>
+    for SimdCow<'_, T, Arch, Align>
 {
     #[inline]
     fn eq(&self, other: &[T]) -> bool {
@@ -283,7 +292,7 @@ where
         }
         match self {
             Self::Owned(ref mut vec) => vec,
-            _ => unreachable!(),
+            Self::Borrowed(_) => unreachable!(),
         }
     }
 
@@ -353,6 +362,7 @@ where
     /// # Panics
     /// If `Arch` cannot execute on this host.
     #[inline]
+    #[must_use]
     pub fn from_std_cow(src: alloc::borrow::Cow<'a, [T]>) -> Self {
         assert_arch_executable::<Arch>();
         match src {

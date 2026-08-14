@@ -607,8 +607,8 @@ mod tests {
 
     #[test]
     fn axpy_zero_alpha_is_identity() {
-        let x: Vec<f64> = (0..50).map(|i| i as f64).collect();
-        let mut out: Vec<f64> = (0..50).map(|i| i as f64 * 2.0).collect();
+        let x: Vec<f64> = (0..50).map(f64::from).collect();
+        let mut out: Vec<f64> = (0..50).map(|i| f64::from(i) * 2.0).collect();
         let expected = out.clone();
         axpy(0.0, &x, &mut out).unwrap();
         assert_eq!(out, expected);

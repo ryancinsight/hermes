@@ -1,10 +1,10 @@
 use hermes_simd_core::arch::{IsaFamily, SimdArch};
 
-/// x86/x86_64 AMX BF16 matrix multiply backend.
+/// `x86/x86_64` AMX BF16 matrix multiply backend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AmxBf16;
 
-/// x86/x86_64 AMX INT8 matrix multiply backend.
+/// `x86/x86_64` AMX INT8 matrix multiply backend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AmxInt8;
 

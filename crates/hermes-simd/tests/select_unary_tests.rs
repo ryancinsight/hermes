@@ -2,6 +2,19 @@
 //! `SimdView::map_unary` / `map_unary_in_place`, and `SimdView::prefix_scan`
 //! ZST strategy correctness.
 
+#![expect(
+    clippy::float_cmp,
+    reason = "These integration tests assert exact manufactured lane values"
+)]
+#![expect(
+    clippy::items_after_statements,
+    reason = "The integration harness keeps compile-time lane constants beside the exercised operation"
+)]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "The shared error helper consumes heterogeneous Result values to inspect their error variant"
+)]
+
 use hermes_simd::{
     Abs, Clamp, Exclusive, Inclusive, Neg, RecipSqrt, Scalar, ScanAdd, ScanMax, ScanMin, SimdCow,
     SimdError, SimdView, Sqrt, Unaligned, Unmasked,
@@ -472,7 +485,7 @@ fn test_popcount_vectorized() {
             let data_f64 = [1.0f64, 2.0, 3.0, -7.5];
             let mut expected_f64 = [0.0f64; 4];
             for i in 0..4 {
-                expected_f64[i] = data_f64[i].to_bits().count_ones() as f64;
+                expected_f64[i] = f64::from(data_f64[i].to_bits().count_ones());
             }
             unsafe {
                 let vec = Vector::<f64, Avx2>::load_unaligned(data_f64.as_ptr());
@@ -508,7 +521,7 @@ fn test_popcount_vectorized() {
             let mut expected_f64_8 = [0.0f64; 8];
             for i in 0..8 {
                 data_f64_8[i] = (i as f64) * 9876.5432 - 19.0;
-                expected_f64_8[i] = data_f64_8[i].to_bits().count_ones() as f64;
+                expected_f64_8[i] = f64::from(data_f64_8[i].to_bits().count_ones());
             }
             unsafe {
                 let vec = Vector::<f64, Avx512>::load_unaligned(data_f64_8.as_ptr());

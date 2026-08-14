@@ -17,10 +17,10 @@ where
         let data = vec![one; size];
         group.throughput(Throughput::Elements(size as u64));
         group.bench_with_input(BenchmarkId::new("scalar_iter", size), &size, |b, _| {
-            b.iter(|| scalar_sum(black_box(&data), zero))
+            b.iter(|| scalar_sum(black_box(&data), zero));
         });
         group.bench_with_input(BenchmarkId::new("dispatch", size), &size, |b, _| {
-            b.iter(|| dispatch(black_box(&data)))
+            b.iter(|| dispatch(black_box(&data)));
         });
     }
     group.finish();

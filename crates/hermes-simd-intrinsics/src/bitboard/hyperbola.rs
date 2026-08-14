@@ -10,7 +10,7 @@ const FILE_RAYS: [u64; 64] = {
     let mut rays = [0u64; 64];
     let mut sq = 0;
     while sq < 64 {
-        rays[sq] = 0x0101010101010101u64 << (sq & 7);
+        rays[sq] = 0x0101_0101_0101_0101_u64 << (sq & 7);
         sq += 1;
     }
     rays
@@ -20,7 +20,7 @@ const RANK_RAYS: [u64; 64] = {
     let mut rays = [0u64; 64];
     let mut sq = 0;
     while sq < 64 {
-        rays[sq] = 0xFFu64 << (sq & 56);
+        rays[sq] = 0xFFu64 << (sq & 0x0038);
         sq += 1;
     }
     rays
@@ -90,6 +90,7 @@ fn antidiagonal_ray(square: u8) -> u64 {
 
 /// Generates sliding attacks along a ray mask using Hyperbola Quintessence.
 #[inline(always)]
+#[must_use]
 pub fn hyperbola_quintessence(square: u8, occupancy: u64, ray_mask: u64) -> u64 {
     let slider = 1u64 << square;
     let o = occupancy & ray_mask;

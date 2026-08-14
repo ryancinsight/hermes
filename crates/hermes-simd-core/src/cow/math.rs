@@ -155,6 +155,7 @@ where
     ///
     /// Delegates to `norm_sq` then `T::sqrt_scalar`.
     #[inline]
+    #[must_use]
     pub fn norm(&self) -> T {
         self.norm_sq().sqrt()
     }
@@ -167,6 +168,7 @@ where
     ///
     /// One allocation for the output `AlignedVec`.
     #[inline]
+    #[must_use]
     pub fn normalize(&self) -> SimdCow<'static, T, Arch, Align> {
         let n = self.norm();
         if n == T::ZERO {
@@ -201,7 +203,7 @@ where
         let bin_width = (hi.to_f64() - lo_w) / n_bins as f64;
         let mut counts = alloc::vec![0usize; n_bins];
 
-        for &x in self.as_ref().iter() {
+        for &x in self.as_ref() {
             if x < lo || x >= hi {
                 continue;
             }

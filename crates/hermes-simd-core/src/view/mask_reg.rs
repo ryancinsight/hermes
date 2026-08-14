@@ -19,6 +19,10 @@ where
     _marker: PhantomData<T>,
 }
 
+#[expect(
+    clippy::expl_impl_clone_on_copy,
+    reason = "The raw register capability is supplied by the architecture trait, so Clone stays explicit"
+)]
 impl<T, Arch> Clone for Mask<T, Arch>
 where
     Arch: SimdArch + SimdKernel<T>,
@@ -87,6 +91,7 @@ where
     /// # Safety
     /// Processor must support the target feature of `Arch`.
     #[inline(always)]
+    #[must_use]
     pub unsafe fn from_bitmask(bm: BitMask<64>) -> Self {
         Self::new(Arch::mask_from_bitmask(bm.0))
     }

@@ -31,11 +31,17 @@ impl std::error::Error for AmxSessionError {}
 impl AmxSession {
     /// Returns true if an AMX session is currently active on the executing thread.
     #[inline]
+    #[must_use]
     pub fn is_active() -> bool {
         ACTIVE_CONFIG.with(|c| c.get().is_some())
     }
 
     /// Enter a new AMX compute phase with the given configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AmxSessionError::UnsupportedTarget`] when AMX is not supported
+    /// or enabled for the current process.
     #[inline]
     pub fn new(config: &AmxConfig) -> Result<Self, AmxSessionError> {
         if !super::amx_runtime_supported() {
@@ -54,7 +60,7 @@ impl AmxSession {
             }
             ACTIVE_CONFIG.with(|c| c.set(Some(ActiveAmxConfig::from(config))));
         } else {
-            let active = ACTIVE_CONFIG.with(|c| c.get());
+            let active = ACTIVE_CONFIG.with(std::cell::Cell::get);
             if active != Some(ActiveAmxConfig::from(config)) {
                 unsafe {
                     raw::ldtilecfg(config);
@@ -109,6 +115,11 @@ pub struct AmxBatchSession;
 
 impl AmxBatchSession {
     /// Begin a new AMX batch computation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AmxSessionError::UnsupportedTarget`] when AMX is not supported
+    /// or enabled for the current process.
     #[inline]
     pub fn begin(config: &AmxConfig) -> Result<Self, AmxSessionError> {
         if !super::amx_runtime_supported() {

@@ -1,5 +1,8 @@
 //! Generic runtime-dispatch population count and bitwise reduction kernels.
-#![allow(missing_docs)]
+#![expect(
+    missing_docs,
+    reason = "Runtime-dispatch kernel documentation is attached to the public facade"
+)]
 
 use hermes_simd_core::{
     align::Unaligned,
@@ -12,7 +15,6 @@ use hermes_simd_core::{
 use hermes_simd_macros::runtime_dispatch;
 
 /// Dispatch population count reduction over a slice.
-#[allow(missing_docs)]
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
 pub fn dispatch_reduce_popcount_kernel<T, A>(data: &[T]) -> usize
 where
@@ -26,7 +28,6 @@ where
 }
 
 /// Dispatch bitwise AND population count reduction over two slices.
-#[allow(missing_docs)]
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
 pub fn dispatch_reduce_popcount_and_kernel<T, A>(a: &[T], b: &[T]) -> Result<usize, SimdError>
 where
@@ -43,7 +44,6 @@ where
 }
 
 /// Dispatch bitwise OR population count reduction over two slices.
-#[allow(missing_docs)]
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
 pub fn dispatch_reduce_popcount_or_kernel<T, A>(a: &[T], b: &[T]) -> Result<usize, SimdError>
 where
@@ -60,7 +60,6 @@ where
 }
 
 /// Dispatch bitwise XOR population count reduction over two slices.
-#[allow(missing_docs)]
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
 pub fn dispatch_reduce_popcount_xor_kernel<T, A>(a: &[T], b: &[T]) -> Result<usize, SimdError>
 where

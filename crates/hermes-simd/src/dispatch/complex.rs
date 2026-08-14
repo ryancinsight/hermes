@@ -64,6 +64,11 @@ where
 /// `a[k] = a[k] * b[k]` when `CONJ_B == false`, and
 /// `a[k] = a[k] * conj(b[k])` when `CONJ_B == true`.
 ///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when the slices have different
+/// lengths or their common length is odd.
+///
 /// # Examples
 ///
 /// ```
@@ -179,6 +184,16 @@ where
 /// primitive lane order. The returned tuple is `(re, im)` for
 /// `sum(a[k] * b[k])`; when `CONJ_B` is true, the operation is
 /// `sum(a[k] * conj(b[k]))`.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] when the slices have different
+/// lengths or their common length is odd.
+///
+/// # Panics
+///
+/// Panics if the selected SIMD architecture reports more lanes than the fixed
+/// stack scratch buffer supports; that is a violated architecture contract.
 ///
 /// # Examples
 ///

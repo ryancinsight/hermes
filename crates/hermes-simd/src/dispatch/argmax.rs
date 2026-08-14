@@ -8,7 +8,6 @@ use hermes_simd_core::{
 };
 use hermes_simd_macros::runtime_dispatch;
 
-#[allow(dead_code)]
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
 pub(super) fn dispatch_argmax_kernel<T, A>(data: &[T]) -> Option<(usize, T)>
 where

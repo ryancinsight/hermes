@@ -7,7 +7,21 @@
 
 use crate::Avx2;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use core::arch::x86_64::*;
+use core::arch::x86_64::{
+    __m256, __m256i, _mm256_add_epi8, _mm256_add_ps, _mm256_and_ps, _mm256_and_si256,
+    _mm256_andnot_ps, _mm256_blendv_ps, _mm256_castps256_ps128, _mm256_castps_si256,
+    _mm256_ceil_ps, _mm256_cmp_ps, _mm256_cvtepi32_ps, _mm256_div_ps, _mm256_extractf128_ps,
+    _mm256_floor_ps, _mm256_fmadd_ps, _mm256_fmaddsub_ps, _mm256_fmsubadd_ps, _mm256_fnmadd_ps,
+    _mm256_i32gather_ps, _mm256_load_ps, _mm256_loadu_ps, _mm256_madd_epi16, _mm256_maddubs_epi16,
+    _mm256_mask_i32gather_ps, _mm256_maskstore_ps, _mm256_max_ps, _mm256_min_ps,
+    _mm256_movehdup_ps, _mm256_moveldup_ps, _mm256_movemask_ps, _mm256_mul_ps, _mm256_or_ps,
+    _mm256_permute_ps, _mm256_permutevar8x32_ps, _mm256_round_ps, _mm256_rsqrt_ps,
+    _mm256_set1_epi16, _mm256_set1_epi8, _mm256_set1_ps, _mm256_setr_epi32, _mm256_setr_epi8,
+    _mm256_setzero_ps, _mm256_shuffle_epi8, _mm256_sqrt_ps, _mm256_srli_epi16, _mm256_store_ps,
+    _mm256_storeu_ps, _mm256_stream_ps, _mm256_sub_ps, _mm256_xor_ps, _mm_add_ps, _mm_cvtss_f32,
+    _mm_shuffle_ps, _CMP_EQ_OQ, _CMP_GE_OQ, _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ,
+    _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT, _MM_FROUND_TO_ZERO,
+};
 use hermes_simd_core::kernel::SimdKernel;
 
 /// Newtype over `__m256` so `Send + Sync` can be implemented on the wrapper.

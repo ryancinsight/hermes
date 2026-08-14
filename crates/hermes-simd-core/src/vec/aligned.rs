@@ -43,6 +43,7 @@ where
 
     /// Create a new empty `AlignedVec` with no allocation.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             ptr: core::ptr::NonNull::dangling().as_ptr(),
@@ -60,6 +61,7 @@ where
 
     /// Create a new `AlignedVec` with space allocated for `capacity` elements
     /// satisfying the alignment boundary constraints.
+    #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         let default_align = if Align::IS_ALIGNED {
             Align::ALIGN_BYTES as u32
@@ -109,6 +111,7 @@ where
 
     /// Create a new `AlignedVec` with space allocated for `capacity` elements
     /// on the specified NUMA node.
+    #[must_use]
     pub fn with_capacity_numa(capacity: usize, node: u32) -> Self {
         let default_align = if Align::IS_ALIGNED {
             Align::ALIGN_BYTES as u32
@@ -160,6 +163,11 @@ where
     }
 
     /// Appends an element to the back of the vector.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the length of a zero-sized element vector would overflow
+    /// `usize`.
     pub fn push(&mut self, value: T) {
         if core::mem::size_of::<T>() == 0 {
             // No allocation or writes needed for zero-sized types.
@@ -230,24 +238,28 @@ where
 
     /// Returns the number of elements in the vector.
     #[inline(always)]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.len
     }
 
     /// Returns true if the vector contains no elements.
     #[inline(always)]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
     /// Returns the capacity of the vector.
     #[inline(always)]
+    #[must_use]
     pub fn capacity(&self) -> usize {
         self.cap
     }
 
     /// Returns a raw pointer to the vector's buffer.
     #[inline(always)]
+    #[must_use]
     pub fn as_ptr(&self) -> *const T {
         self.ptr
     }
@@ -294,6 +306,7 @@ where
 
     /// Accesses the elements as an immutable slice.
     #[inline(always)]
+    #[must_use]
     pub fn as_slice(&self) -> &[T] {
         if self.len == 0 {
             &[]
@@ -374,10 +387,13 @@ where
     }
 
     /// Obtains a compile-time safe immutable `SimdView` over the vector's buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the vector's internal alignment invariant is violated.
     #[inline(always)]
-    pub fn view<'a, Arch>(
-        &'a self,
-    ) -> SimdView<'a, T, Arch, Align, crate::execution::Unmasked, &'a [T]>
+    #[must_use]
+    pub fn view<Arch>(&self) -> SimdView<'_, T, Arch, Align, crate::execution::Unmasked, &[T]>
     where
         Arch: crate::arch::SimdArch,
     {
@@ -386,10 +402,14 @@ where
     }
 
     /// Obtains a compile-time safe mutable `SimdView` over the vector's buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the vector's internal alignment invariant is violated.
     #[inline(always)]
-    pub fn view_mut<'a, Arch>(
-        &'a mut self,
-    ) -> SimdView<'a, T, Arch, Align, crate::execution::Unmasked, &'a mut [T]>
+    pub fn view_mut<Arch>(
+        &mut self,
+    ) -> SimdView<'_, T, Arch, Align, crate::execution::Unmasked, &mut [T]>
     where
         Arch: crate::arch::SimdArch,
     {
@@ -405,6 +425,7 @@ where
     /// The caller must guarantee that the underlying memory address satisfies the alignment
     /// boundary constraints of `NewAlign`.
     #[inline(always)]
+    #[must_use]
     pub unsafe fn into_alignment_unchecked<NewAlign: Alignment>(self) -> AlignedVec<T, NewAlign> {
         let md = core::mem::ManuallyDrop::new(self);
         AlignedVec {
@@ -419,6 +440,7 @@ where
 
     /// Converts this `AlignedVec` to an unaligned layout, stripping the alignment guarantee zero-cost.
     #[inline(always)]
+    #[must_use]
     pub fn into_unaligned(self) -> AlignedVec<T, crate::align::Unaligned> {
         unsafe { self.into_alignment_unchecked() }
     }
@@ -426,6 +448,7 @@ where
     /// Attempts to cast this `AlignedVec` to a stricter alignment constraint.
     /// Returns `Some` if the pointer satisfies the alignment requirement of `NewAlign`, otherwise `None`.
     #[inline]
+    #[must_use]
     pub fn try_into_alignment<NewAlign: Alignment>(self) -> Option<AlignedVec<T, NewAlign>> {
         if NewAlign::IS_ALIGNED {
             let addr = self.as_ptr() as usize;

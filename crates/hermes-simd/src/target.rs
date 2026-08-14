@@ -19,11 +19,11 @@ use hermes_simd_core::{
 pub enum TargetId {
     /// Portable scalar target; always supported.
     Scalar,
-    /// x86/x86_64 AVX2 target, requiring AVX2 and FMA.
+    /// `x86/x86_64` AVX2 target, requiring AVX2 and FMA.
     Avx2,
-    /// x86/x86_64 AVX-512F target.
+    /// `x86/x86_64` AVX-512F target.
     Avx512,
-    /// AArch64 NEON target.
+    /// `AArch64` NEON target.
     Neon,
 }
 
@@ -135,7 +135,6 @@ fn neon_supported() -> bool {
 /// Returns `None` when the target is not supported by the host or when the
 /// requested alignment typestate is not satisfied by `data`.
 #[inline]
-#[allow(unreachable_code)]
 pub fn dispatch_view_to<'a, T, Align>(
     target: TargetId,
     data: &'a [T],
@@ -149,9 +148,7 @@ where
             SimdView::<T, Scalar, Align, Unmasked, &'a [T]>::new(data).map(DispatchedView::Scalar)
         }
         TargetId::Avx2 => {
-            if !target.is_supported() {
-                None
-            } else {
+            if target.is_supported() {
                 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
                 {
                     SimdView::<T, Avx2, Align, Unmasked, &'a [T]>::new(data)
@@ -161,12 +158,12 @@ where
                 {
                     None
                 }
+            } else {
+                None
             }
         }
         TargetId::Avx512 => {
-            if !target.is_supported() {
-                None
-            } else {
+            if target.is_supported() {
                 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
                 {
                     SimdView::<T, Avx512, Align, Unmasked, &'a [T]>::new(data)
@@ -176,12 +173,12 @@ where
                 {
                     None
                 }
+            } else {
+                None
             }
         }
         TargetId::Neon => {
-            if !target.is_supported() {
-                None
-            } else {
+            if target.is_supported() {
                 #[cfg(target_arch = "aarch64")]
                 {
                     SimdView::<T, Neon, Align, Unmasked, &'a [T]>::new(data)
@@ -191,6 +188,8 @@ where
                 {
                     None
                 }
+            } else {
+                None
             }
         }
     }
@@ -201,7 +200,6 @@ where
 /// Returns `None` when the target is not supported by the host or when the
 /// requested alignment typestate is not satisfied by `data`.
 #[inline]
-#[allow(unreachable_code)]
 pub fn dispatch_view_mut_to<'a, T, Align>(
     target: TargetId,
     data: &'a mut [T],
@@ -214,9 +212,7 @@ where
         TargetId::Scalar => SimdView::<T, Scalar, Align, Unmasked, &'a mut [T]>::new_mut(data)
             .map(DispatchedView::Scalar),
         TargetId::Avx2 => {
-            if !target.is_supported() {
-                None
-            } else {
+            if target.is_supported() {
                 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
                 {
                     SimdView::<T, Avx2, Align, Unmasked, &'a mut [T]>::new_mut(data)
@@ -226,12 +222,12 @@ where
                 {
                     None
                 }
+            } else {
+                None
             }
         }
         TargetId::Avx512 => {
-            if !target.is_supported() {
-                None
-            } else {
+            if target.is_supported() {
                 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
                 {
                     SimdView::<T, Avx512, Align, Unmasked, &'a mut [T]>::new_mut(data)
@@ -241,12 +237,12 @@ where
                 {
                     None
                 }
+            } else {
+                None
             }
         }
         TargetId::Neon => {
-            if !target.is_supported() {
-                None
-            } else {
+            if target.is_supported() {
                 #[cfg(target_arch = "aarch64")]
                 {
                     SimdView::<T, Neon, Align, Unmasked, &'a mut [T]>::new_mut(data)
@@ -256,6 +252,8 @@ where
                 {
                     None
                 }
+            } else {
+                None
             }
         }
     }

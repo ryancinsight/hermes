@@ -12,7 +12,7 @@ use super::view::TensorView;
 // TensorCow: Clone-on-Write tensor container
 // ---------------------------------------------------------------------------
 
-/// A Clone-on-Write (CoW) container for strided tensors.
+/// A Clone-on-Write (`CoW`) container for strided tensors.
 pub enum TensorCow<'a, T: 'a, const N: usize, L = RowMajor, Align: Alignment = Unaligned> {
     /// Borrowed read-only tensor view.
     Borrowed(TensorView<'a, T, N, L, &'a [T]>),
@@ -33,12 +33,14 @@ where
 {
     /// Create a borrowed `TensorCow` wrapping a `TensorView`.
     #[inline]
+    #[must_use]
     pub fn borrowed(view: TensorView<'a, T, N, L, &'a [T]>) -> Self {
         Self::Borrowed(view)
     }
 
     /// Create an owned `TensorCow` from an `AlignedVec` and shape.
     #[inline]
+    #[must_use]
     pub fn owned(data: AlignedVec<T, Align>, shape: [usize; N]) -> Self {
         let strides = row_major_strides(shape);
         Self::Owned {
@@ -50,6 +52,7 @@ where
 
     /// Create an owned `TensorCow` with explicit strides.
     #[inline]
+    #[must_use]
     pub fn owned_with_strides(
         data: AlignedVec<T, Align>,
         shape: [usize; N],
@@ -63,7 +66,13 @@ where
     }
 
     /// Obtain a read-only view of this tensor.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an owned variant contains shape or stride metadata that is
+    /// inconsistent with its validated construction invariant.
     #[inline]
+    #[must_use]
     pub fn as_view(&self) -> TensorView<'_, T, N, L, &'_ [T]> {
         match self {
             Self::Borrowed(view) => *view,
@@ -78,6 +87,7 @@ where
 
     /// Returns the total logical element count.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         match self {
             Self::Borrowed(view) => view.num_elements(),
@@ -87,12 +97,14 @@ where
 
     /// Returns true if empty.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// Returns logical shape.
     #[inline]
+    #[must_use]
     pub fn shape(&self) -> [usize; N] {
         match self {
             Self::Borrowed(view) => view.shape(),
@@ -102,6 +114,7 @@ where
 
     /// Returns tensor strides.
     #[inline]
+    #[must_use]
     pub fn strides(&self) -> [usize; N] {
         match self {
             Self::Borrowed(view) => view.strides(),
@@ -111,6 +124,7 @@ where
 
     /// Returns whether tensor is contiguous row-major.
     #[inline]
+    #[must_use]
     pub fn is_contiguous(&self) -> bool {
         match self {
             Self::Borrowed(view) => view.is_contiguous(),
@@ -134,12 +148,13 @@ where
         }
         match self {
             Self::Owned { data, .. } => data,
-            _ => unreachable!(),
+            Self::Borrowed(_) => unreachable!(),
         }
     }
 
     /// Converts into the owned `AlignedVec` storage.
     #[inline]
+    #[must_use]
     pub fn into_owned(self) -> AlignedVec<T, Align> {
         match self {
             Self::Borrowed(view) => AlignedVec::from_slice(view.as_slice()),
@@ -148,6 +163,11 @@ where
     }
 
     /// Reshapes the tensor to a different rank `M` without allocation.
+    ///
+    /// # Errors
+    /// Returns [`TensorError::NotContiguous`] when the source is not
+    /// contiguous, or [`TensorError::ShapeMismatch`] when the element counts
+    /// of the old and new shapes differ.
     #[inline]
     pub fn reshape<const M: usize>(
         self,
@@ -226,8 +246,8 @@ where
 // PartialEq / Eq
 // ---------------------------------------------------------------------------
 
-impl<'a, 'b, T, const N: usize, L1, L2, A1, A2> PartialEq<TensorCow<'b, T, N, L2, A2>>
-    for TensorCow<'a, T, N, L1, A1>
+impl<'b, T, const N: usize, L1, L2, A1, A2> PartialEq<TensorCow<'b, T, N, L2, A2>>
+    for TensorCow<'_, T, N, L1, A1>
 where
     T: PartialEq,
     A1: Alignment,
@@ -241,7 +261,7 @@ where
     }
 }
 
-impl<'a, T, const N: usize, L, Align> Eq for TensorCow<'a, T, N, L, Align>
+impl<T, const N: usize, L, Align> Eq for TensorCow<'_, T, N, L, Align>
 where
     T: Eq,
     Align: Alignment,

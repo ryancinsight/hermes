@@ -30,7 +30,7 @@ fn bench_tiled_gemm(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("tiled_gemm", size), &size, |bencher, _| {
             bencher.iter(|| {
                 tiled_gemm(&a, &b, &mut out, size, size, size).unwrap();
-            })
+            });
         });
     }
     group.finish();
@@ -102,7 +102,7 @@ fn bench_bf16_gemm_batch_sensitivity(c: &mut Criterion) {
                             }
                         }
                     }
-                })
+                });
             },
         );
 
@@ -111,7 +111,7 @@ fn bench_bf16_gemm_batch_sensitivity(c: &mut Criterion) {
             bencher.iter(|| unsafe {
                 gemm::<Bf16, Bf16, F32>(size, size, size, &a, size, &b, size, &mut out, size)
                     .unwrap();
-            })
+            });
         });
     }
     group.finish();
@@ -157,13 +157,15 @@ where
             if r >= bound || col >= bound {
                 let mut sum = 0i32;
                 for kk in 0..size {
-                    sum = sum.wrapping_add((a[r * size + kk] as i32) * (b[kk * size + col] as i32));
+                    sum = sum
+                        .wrapping_add(i32::from(a[r * size + kk]) * i32::from(b[kk * size + col]));
                 }
                 out[r * size + col] += sum;
             } else if k_bound < size {
                 let mut sum = 0i32;
                 for kk in k_bound..size {
-                    sum = sum.wrapping_add((a[r * size + kk] as i32) * (b[kk * size + col] as i32));
+                    sum = sum
+                        .wrapping_add(i32::from(a[r * size + kk]) * i32::from(b[kk * size + col]));
                 }
                 out[r * size + col] += sum;
             }
@@ -187,7 +189,7 @@ fn bench_int8_gemm_batch_sensitivity(c: &mut Criterion) {
             &size,
             |bencher, _| {
                 bencher
-                    .iter(|| unsafe { forced_backend_int8_gemm::<Scalar>(size, &a, &b, &mut out) })
+                    .iter(|| unsafe { forced_backend_int8_gemm::<Scalar>(size, &a, &b, &mut out) });
             },
         );
 
@@ -199,8 +201,8 @@ fn bench_int8_gemm_batch_sensitivity(c: &mut Criterion) {
                 &size,
                 |bencher, _| {
                     bencher.iter(|| unsafe {
-                        forced_backend_int8_gemm::<hermes_simd::AvxVnni>(size, &a, &b, &mut out)
-                    })
+                        forced_backend_int8_gemm::<hermes_simd::AvxVnni>(size, &a, &b, &mut out);
+                    });
                 },
             );
         }
@@ -210,7 +212,7 @@ fn bench_int8_gemm_batch_sensitivity(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("dispatch", size), &size, |bencher, _| {
             bencher.iter(|| unsafe {
                 gemm::<i8, i8, i32>(size, size, size, &a, size, &b, size, &mut out, size).unwrap();
-            })
+            });
         });
     }
     group.finish();
@@ -245,14 +247,14 @@ fn bench_amx_context_switch_pressure(c: &mut Criterion) {
                 }
             }
             gemm::<Bf16, Bf16, F32>(size, size, size, &a, size, &b, size, &mut out, size).unwrap();
-        })
+        });
     });
 
     // Scenario 2: Configuring/releasing tile state on every iteration (no reuse / raw call)
     group.bench_function("raw_call_config_release", |bencher| {
         bencher.iter(|| unsafe {
             gemm::<Bf16, Bf16, F32>(size, size, size, &a, size, &b, size, &mut out, size).unwrap();
-        })
+        });
     });
 
     // Scenario 3: yielding thread to simulate heavy OS context switch pressure
@@ -260,7 +262,7 @@ fn bench_amx_context_switch_pressure(c: &mut Criterion) {
         bencher.iter(|| unsafe {
             gemm::<Bf16, Bf16, F32>(size, size, size, &a, size, &b, size, &mut out, size).unwrap();
             std::thread::yield_now();
-        })
+        });
     });
 
     group.finish();

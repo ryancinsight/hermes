@@ -25,20 +25,20 @@ pub struct KoggeStone;
 #[inline(always)]
 pub(crate) fn east_mask(s: usize) -> u64 {
     match s {
-        1 => 0xFEFEFEFEFEFEFEFE,
-        2 => 0xFCFCFCFCFCFCFCFC,
-        4 => 0xF0F0F0F0F0F0F0F0,
-        _ => 0xFFFFFFFFFFFFFFFF,
+        1 => 0xFEFE_FEFE_FEFE_FEFE,
+        2 => 0xFCFC_FCFC_FCFC_FCFC,
+        4 => 0xF0F0_F0F0_F0F0_F0F0,
+        _ => 0xFFFF_FFFF_FFFF_FFFF,
     }
 }
 
 #[inline(always)]
 pub(crate) fn west_mask(s: usize) -> u64 {
     match s {
-        1 => 0x7F7F7F7F7F7F7F7F,
-        2 => 0x3F3F3F3F3F3F3F3F,
-        4 => 0x0F0F0F0F0F0F0F0F,
-        _ => 0xFFFFFFFFFFFFFFFF,
+        1 => 0x7F7F_7F7F_7F7F_7F7F,
+        2 => 0x3F3F_3F3F_3F3F_3F3F,
+        4 => 0x0F0F_0F0F_0F0F_0F0F,
+        _ => 0xFFFF_FFFF_FFFF_FFFF,
     }
 }
 
@@ -114,7 +114,13 @@ pub(crate) fn step_sw(g: u64, p: u64, s: usize) -> (u64, u64) {
 
 impl BitBoardKernel for KoggeStone {
     #[inline(always)]
-    #[allow(unreachable_code)]
+    #[cfg_attr(
+        target_arch = "aarch64",
+        expect(
+            unreachable_code,
+            reason = "Architecture-specific returns are cfg-selected before scalar fallback"
+        )
+    )]
     fn rook_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
 
@@ -169,7 +175,13 @@ impl BitBoardKernel for KoggeStone {
     }
 
     #[inline(always)]
-    #[allow(unreachable_code)]
+    #[cfg_attr(
+        target_arch = "aarch64",
+        expect(
+            unreachable_code,
+            reason = "Architecture-specific returns are cfg-selected before scalar fallback"
+        )
+    )]
     fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
 
@@ -224,7 +236,13 @@ impl BitBoardKernel for KoggeStone {
     }
 
     #[inline(always)]
-    #[allow(unreachable_code)]
+    #[cfg_attr(
+        target_arch = "aarch64",
+        expect(
+            unreachable_code,
+            reason = "Architecture-specific returns are cfg-selected before scalar fallback"
+        )
+    )]
     fn queen_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
 

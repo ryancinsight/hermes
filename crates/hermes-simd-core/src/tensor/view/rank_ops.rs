@@ -58,6 +58,7 @@ impl<'a, 'b, T, L> TensorView<'a, T, 2, L, &'b [T]> {
     ///
     /// The result is `ColMajor`-tagged. No allocation.
     #[inline]
+    #[must_use]
     pub fn transpose_view(&self) -> TensorView<'a, T, 2, ColMajor, &'b [T]> {
         TensorView {
             ptr: self.ptr,
@@ -147,6 +148,11 @@ impl<'a, T, L> TensorView<'a, T, 2, L, &mut [T]> {
 
 impl<'a, T, L> TensorView<'a, T, 3, L, &'a [T]> {
     /// Return a 2-D view of the `b`-th matrix in a batched tensor.
+    ///
+    /// # Errors
+    /// Returns [`TensorError::NotContiguous`] when the source is not
+    /// contiguous, or [`TensorError::IndexOutOfBounds`] when `b` is outside
+    /// the batch dimension.
     #[inline]
     pub fn matrix_at(
         &self,
@@ -169,6 +175,11 @@ impl<'a, T, L> TensorView<'a, T, 3, L, &'a [T]> {
 
 impl<'a, T, L> TensorView<'a, T, 3, L, &'a mut [T]> {
     /// Return a mutable 2-D view of the `b`-th matrix in a batched tensor.
+    ///
+    /// # Errors
+    /// Returns [`TensorError::NotContiguous`] when the source is not
+    /// contiguous, or [`TensorError::IndexOutOfBounds`] when `b` is outside
+    /// the batch dimension.
     #[inline]
     pub fn matrix_at_mut(
         &mut self,
@@ -196,6 +207,7 @@ impl<'a, T, L> TensorView<'a, T, 3, L, &'a mut [T]> {
 impl<'a, T, Ref> TensorView<'a, T, 2, RowMajor, Ref> {
     /// Transpose a row-major 2-D tensor view to column-major.
     #[inline]
+    #[must_use]
     pub fn transpose(self) -> TensorView<'a, T, 2, ColMajor, Ref> {
         TensorView {
             ptr: self.ptr,
@@ -209,6 +221,7 @@ impl<'a, T, Ref> TensorView<'a, T, 2, RowMajor, Ref> {
 impl<'a, T, Ref> TensorView<'a, T, 2, ColMajor, Ref> {
     /// Transpose a column-major 2-D tensor view to row-major.
     #[inline]
+    #[must_use]
     pub fn transpose(self) -> TensorView<'a, T, 2, RowMajor, Ref> {
         TensorView {
             ptr: self.ptr,

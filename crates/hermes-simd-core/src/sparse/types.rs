@@ -388,6 +388,11 @@ impl<S> SparseValidate for ValidatedData<S> {
 /// Trait for validating the structural soundness of sparse matrices.
 pub trait SparseValidate {
     /// Validate structural correctness and bounds checks.
+    ///
+    /// # Errors
+    /// Returns [`crate::SimdError::LengthMismatch`] when storage lengths or
+    /// row-pointer endpoints are inconsistent, or
+    /// [`crate::SimdError::IndexOutOfBounds`] when an index is invalid.
     fn validate(&self) -> Result<(), crate::SimdError>;
 }
 

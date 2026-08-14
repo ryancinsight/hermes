@@ -6,9 +6,13 @@ use super::{east_mask, west_mask};
 /// Caller must ensure that the host CPU supports AVX-512 Foundation features.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[target_feature(enable = "avx512f")]
-#[allow(unused_assignments)]
+#[must_use]
 pub unsafe fn kogge_stone_rook_avx512(slider: u64, occupancy: u64) -> u64 {
-    use core::arch::x86_64::*;
+    use core::arch::x86_64::{
+        _mm256_extract_epi64, _mm256_or_si256, _mm512_and_si512, _mm512_castsi512_si256,
+        _mm512_extracti64x4_epi64, _mm512_or_si512, _mm512_set1_epi64, _mm512_set_epi64,
+        _mm512_slli_epi64, _mm512_sllv_epi64, _mm512_srlv_epi64,
+    };
 
     let p_scalar = !occupancy;
 
@@ -132,9 +136,17 @@ pub unsafe fn kogge_stone_rook_avx512(slider: u64, occupancy: u64) -> u64 {
 /// Caller must ensure that the host CPU supports AVX-512 Foundation features.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[target_feature(enable = "avx512f")]
-#[allow(unused_assignments)]
+#[must_use]
+#[expect(
+    clippy::too_many_lines,
+    reason = "The bishop fill keeps four direction lanes in one AVX-512 kernel boundary"
+)]
 pub unsafe fn kogge_stone_bishop_avx512(slider: u64, occupancy: u64) -> u64 {
-    use core::arch::x86_64::*;
+    use core::arch::x86_64::{
+        _mm256_extract_epi64, _mm256_or_si256, _mm512_and_si512, _mm512_castsi512_si256,
+        _mm512_extracti64x4_epi64, _mm512_or_si512, _mm512_set1_epi64, _mm512_set_epi64,
+        _mm512_slli_epi64, _mm512_sllv_epi64, _mm512_srlv_epi64,
+    };
 
     let p_scalar = !occupancy;
 
@@ -282,9 +294,18 @@ pub unsafe fn kogge_stone_bishop_avx512(slider: u64, occupancy: u64) -> u64 {
 /// Caller must ensure that the host CPU supports AVX-512 Foundation features.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[target_feature(enable = "avx512f")]
-#[allow(unused_assignments)]
+#[must_use]
+#[expect(
+    clippy::too_many_lines,
+    reason = "The queen fill keeps eight direction lanes in one AVX-512 kernel boundary"
+)]
 pub unsafe fn kogge_stone_queen_avx512(slider: u64, occupancy: u64) -> u64 {
-    use core::arch::x86_64::*;
+    use core::arch::x86_64::{
+        _mm256_castsi256_si128, _mm256_extracti128_si256, _mm256_or_si256, _mm512_and_si512,
+        _mm512_castsi512_si256, _mm512_extracti64x4_epi64, _mm512_or_si512, _mm512_set1_epi64,
+        _mm512_set_epi64, _mm512_slli_epi64, _mm512_sllv_epi64, _mm512_srlv_epi64,
+        _mm_cvtsi128_si64, _mm_or_si128, _mm_srli_si128,
+    };
 
     let p_scalar = !occupancy;
 

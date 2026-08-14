@@ -1,5 +1,10 @@
 //! Integration tests for `TensorView`/`TensorCow` layout primitives and histogram.
 
+#![expect(
+    clippy::float_cmp,
+    reason = "Tensor conformance tests compare exact manufactured lane values"
+)]
+
 use hermes_simd::*;
 
 // ---------------------------------------------------------------------------

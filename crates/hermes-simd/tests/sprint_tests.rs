@@ -1,9 +1,13 @@
 #![allow(clippy::while_let_on_iterator)]
+#![expect(
+    clippy::float_cmp,
+    reason = "Sprint acceptance tests compare exact manufactured scalar outputs"
+)]
 //! Unit tests for sprint A–D additions.
 //!
 //! Covers:
 //! - `NumericElement::min_scalar` / `max_scalar`
-//! - `ReductionOp<T>` identity and scalar_combine for `Min`, `Max`, `Sum`
+//! - `ReductionOp<T>` identity and `scalar_combine` for `Min`, `Max`, `Sum`
 //! - `SimdView::reduce(Min)` / `reduce(Max)` / `reduce(Sum)`
 //! - `ZipChunks` lockstep iteration
 //! - `Packed4Vec::from_iter` / `Extend`

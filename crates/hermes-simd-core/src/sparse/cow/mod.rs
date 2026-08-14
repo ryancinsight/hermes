@@ -258,7 +258,7 @@ where
     }
 }
 
-impl<'a, T, F, Arch> SparseSpMv<T> for SparseCow<'a, T, F, Arch>
+impl<T, F, Arch> SparseSpMv<T> for SparseCow<'_, T, F, Arch>
 where
     T: Scalar,
     F: CowFormat,
@@ -274,7 +274,7 @@ where
     }
 }
 
-impl<'a, T, F, Arch> SparseOps<T> for SparseCow<'a, T, F, Arch>
+impl<T, F, Arch> SparseOps<T> for SparseCow<'_, T, F, Arch>
 where
     T: Scalar,
     F: CowFormat,
@@ -299,7 +299,7 @@ where
     }
 }
 
-impl<'a, T: Send + Sync + Clone, Arch: SimdArch> SparseCow<'a, T, Csr, Arch> {
+impl<T: Send + Sync + Clone, Arch: SimdArch> SparseCow<'_, T, Csr, Arch> {
     /// Build an owned CSR Cow from slices.
     #[inline]
     pub fn from_slices(
@@ -319,7 +319,7 @@ impl<'a, T: Send + Sync + Clone, Arch: SimdArch> SparseCow<'a, T, Csr, Arch> {
     }
 }
 
-impl<'a, T: Send + Sync + Clone, Arch: SimdArch> SparseCow<'a, T, Validated<Csr>, Arch> {
+impl<T: Send + Sync + Clone, Arch: SimdArch> SparseCow<'_, T, Validated<Csr>, Arch> {
     /// Build an owned validated CSR Cow from slices.
     ///
     /// # Errors
@@ -342,7 +342,7 @@ impl<'a, T: Send + Sync + Clone, Arch: SimdArch> SparseCow<'a, T, Validated<Csr>
     }
 }
 
-impl<'a, T: Send + Sync + Clone, const C: usize, Arch: SimdArch> SparseCow<'a, T, SellP<C>, Arch> {
+impl<T: Send + Sync + Clone, const C: usize, Arch: SimdArch> SparseCow<'_, T, SellP<C>, Arch> {
     /// Build an owned SELL-p Cow from slices.
     #[inline]
     pub fn from_slices(
@@ -364,8 +364,8 @@ impl<'a, T: Send + Sync + Clone, const C: usize, Arch: SimdArch> SparseCow<'a, T
     }
 }
 
-impl<'a, T: Send + Sync + Clone, const C: usize, Arch: SimdArch>
-    SparseCow<'a, T, Validated<SellP<C>>, Arch>
+impl<T: Send + Sync + Clone, const C: usize, Arch: SimdArch>
+    SparseCow<'_, T, Validated<SellP<C>>, Arch>
 {
     /// Build an owned validated SELL-p Cow from slices.
     ///
@@ -391,8 +391,8 @@ impl<'a, T: Send + Sync + Clone, const C: usize, Arch: SimdArch>
     }
 }
 
-impl<'a, T: Send + Sync + Clone, const BM: usize, const BN: usize, Arch: SimdArch>
-    SparseCow<'a, T, BlockedCoo<BM, BN>, Arch>
+impl<T: Send + Sync + Clone, const BM: usize, const BN: usize, Arch: SimdArch>
+    SparseCow<'_, T, BlockedCoo<BM, BN>, Arch>
 {
     /// Build an owned Blocked-COO Cow from slices.
     #[inline]
@@ -415,8 +415,8 @@ impl<'a, T: Send + Sync + Clone, const BM: usize, const BN: usize, Arch: SimdArc
     }
 }
 
-impl<'a, T: Send + Sync + Clone, const BM: usize, const BN: usize, Arch: SimdArch>
-    SparseCow<'a, T, Validated<BlockedCoo<BM, BN>>, Arch>
+impl<T: Send + Sync + Clone, const BM: usize, const BN: usize, Arch: SimdArch>
+    SparseCow<'_, T, Validated<BlockedCoo<BM, BN>>, Arch>
 {
     /// Build an owned validated Blocked-COO Cow from slices.
     ///
@@ -442,8 +442,8 @@ impl<'a, T: Send + Sync + Clone, const BM: usize, const BN: usize, Arch: SimdArc
     }
 }
 
-impl<'a, T: Send + Sync + Clone, Arch: SimdArch> SparseCow<'a, T, DenseWithMask, Arch> {
-    /// Build an owned DenseWithMask Cow from slices.
+impl<T: Send + Sync + Clone, Arch: SimdArch> SparseCow<'_, T, DenseWithMask, Arch> {
+    /// Build an owned `DenseWithMask` Cow from slices.
     #[inline]
     pub fn from_slices(values: &[T], mask: &[bool], nrows: usize, ncols: usize) -> Self {
         Self::Owned(OwnedDenseWithMask::new(
@@ -455,8 +455,8 @@ impl<'a, T: Send + Sync + Clone, Arch: SimdArch> SparseCow<'a, T, DenseWithMask,
     }
 }
 
-impl<'a, T: Send + Sync, F: CowFormat, Arch: SimdArch> crate::sparse::types::SparseValidate
-    for SparseCow<'a, T, F, Arch>
+impl<T: Send + Sync, F: CowFormat, Arch: SimdArch> crate::sparse::types::SparseValidate
+    for SparseCow<'_, T, F, Arch>
 where
     for<'b> F::Storage<'b, T>: crate::sparse::types::SparseValidate,
     F::Owned<T>: crate::sparse::types::SparseValidate,

@@ -1,7 +1,7 @@
 //! Criterion benchmarks for sparse SIMD operations.
 //!
 //! Groups:
-//! - `spmv_csr_f32`: CSR SpMV at varying matrix densities.
+//! - `spmv_csr_f32`: CSR `SpMV` at varying matrix densities.
 //!
 //! A 512×512 sparse matrix is constructed in-memory at 1%, 5%, and 10% fill
 //! density. Throughput is reported in non-zero floating-point multiply-adds
@@ -61,9 +61,9 @@ fn bench_spmv_csr_f32(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("scalar", label), &label, |bench, _| {
             bench.iter(|| {
                 // Reset output each iteration to get consistent results.
-                y.iter_mut().for_each(|v| *v = 0.0);
-                spmv_csr::<f32>(black_box(data.clone()), black_box(&x), black_box(&mut y))
-            })
+                y.fill(0.0);
+                spmv_csr::<f32>(black_box(data.clone()), black_box(&x), black_box(&mut y));
+            });
         });
     }
 

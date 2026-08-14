@@ -55,7 +55,7 @@ pub struct Unaligned;
 impl<const A: usize> Alignment for Aligned<A> {
     const ALIGNMENT: Option<usize> = {
         // Evaluate the const assertion when the trait is implemented.
-        let _ = Self::_CHECK_POWER_OF_TWO;
+        let () = Self::_CHECK_POWER_OF_TWO;
         Some(A)
     };
     const IS_ALIGNED: bool = true;
@@ -73,6 +73,7 @@ impl crate::private::Sealed for Unaligned {}
 
 /// Helper to check if the alignment `Align` is sufficient for architecture `Arch` vector register width.
 #[inline(always)]
+#[must_use]
 pub fn is_aligned_for_arch<Arch: crate::arch::SimdArch, Align: Alignment>() -> bool {
     if !Align::IS_ALIGNED {
         return false;

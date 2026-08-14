@@ -19,8 +19,11 @@ pub struct AmxConfig {
 }
 
 impl AmxConfig {
+    const MATRIX_TILE_COLUMNS: usize = 16;
+
     /// Creates a palette 1 configuration where all tiles have the specified rows and byte columns.
     #[inline]
+    #[must_use]
     pub fn new_uniform(r: u8, c_bytes: u16) -> Self {
         Self {
             palette_id: 1,
@@ -35,6 +38,7 @@ impl AmxConfig {
 
     /// Creates a custom palette 1 configuration with row/col sizes for each of the 8 tiles.
     #[inline]
+    #[must_use]
     pub fn new_custom(rows: [u8; 8], cols_b: [u16; 8]) -> Self {
         Self {
             palette_id: 1,
@@ -47,15 +51,24 @@ impl AmxConfig {
         }
     }
 
-    /// Generate adaptive tile config based on dynamic matrix dimensions.
+    /// Generate a tile config for the AMX GEMM microkernel block.
+    ///
+    /// AMX stores the right-hand operand in the dot-product layout: TDPBSSD
+    /// uses `K / 4` rows with `4N` byte columns, while TDPBF16PS uses `K / 2`
+    /// rows with `4N` byte columns. This is not the logical row-major `K × N`
+    /// view of `B`; the packing occurs at the instruction boundary.
+    /// The palette limit and operand layout follow Intel's AMX configuration
+    /// example: <https://www.intel.com/content/www/us/en/developer/articles/code-sample/advanced-matrix-extensions-intrinsics-functions.html>.
     #[inline]
+    #[must_use]
     pub fn for_dimensions(m: usize, n: usize, k: usize, element_size: usize) -> Self {
+        let tile_n = n.min(Self::MATRIX_TILE_COLUMNS);
         let r_a = m.min(16) as u8;
         let c_a_bytes = (k * element_size).min(64) as u16;
-        let r_b = k.min(64 / element_size) as u8;
-        let c_b_bytes = (n * element_size).min(64) as u16;
+        let r_b = (k * element_size / 4).min(16) as u8;
+        let c_b_bytes = (tile_n * 4).min(64) as u16;
         let r_c = m.min(16) as u8;
-        let c_c_bytes = (n * 4).min(64) as u16; // Accumulation in 32-bit (F32/I32)
+        let c_c_bytes = (tile_n * 4).min(64) as u16; // Accumulation in 32-bit (F32/I32)
 
         let mut rows = [0; 8];
         let mut cols_b = [0; 8];
@@ -63,7 +76,7 @@ impl AmxConfig {
         // Tile 0 (A): M rows x K cols
         rows[0] = r_a;
         cols_b[0] = c_a_bytes;
-        // Tile 1 (B): K rows x N cols
+        // Tile 1 (B): K / dot-group rows x 4N byte columns after RHS packing
         rows[1] = r_b;
         cols_b[1] = c_b_bytes;
         // Tile 2 (C): M rows x N cols
@@ -83,6 +96,37 @@ impl AmxConfig {
         cols_b[7] = c_b_bytes;
 
         Self::new_custom(rows, cols_b)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AmxConfig;
+
+    #[test]
+    fn int8_configuration_respects_tile_byte_budget_for_irregular_width() {
+        let config = AmxConfig::for_dimensions(19, 17, 65, 1);
+
+        assert_eq!(config.rows[1], 16);
+        assert_eq!(config.cols_b[1], 64);
+        assert_eq!(
+            usize::from(config.rows[1]) * usize::from(config.cols_b[1]),
+            1024
+        );
+        assert_eq!(config.cols_b[2], 64);
+    }
+
+    #[test]
+    fn bf16_configuration_uses_the_fixed_microtile_width() {
+        let config = AmxConfig::for_dimensions(19, 17, 33, 2);
+
+        assert_eq!(config.rows[1], 16);
+        assert_eq!(config.cols_b[1], 64);
+        assert_eq!(
+            usize::from(config.rows[1]) * usize::from(config.cols_b[1]),
+            1024
+        );
+        assert_eq!(config.cols_b[2], 64);
     }
 }
 

@@ -13,6 +13,8 @@
 //! reads the same probes the dispatcher uses, reports the resulting matrix, and
 //! asserts against an expectation supplied as configuration.
 
+use std::fmt::Write as _;
+
 use hermes_simd::TargetId;
 
 /// Environment variable naming the targets a given runner must cover.
@@ -35,7 +37,7 @@ fn coverage_report() -> String {
             (true, true) => "executes",
             (true, false) => "NOT COVERED (architecture applies, this CPU lacks the feature)",
         };
-        report.push_str(&format!("  {:<8} {}\n", target.name(), mark));
+        let _ = writeln!(report, "  {:<8} {}", target.name(), mark);
     }
     report
 }

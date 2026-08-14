@@ -48,12 +48,12 @@ pub struct TensorView<'a, T: 'a, const N: usize, Layout = RowMajor, Ref = &'a [T
 // Send / Sync / Clone / Copy
 // ---------------------------------------------------------------------------
 
-unsafe impl<'a, T, const N: usize, Layout, Ref> Send for TensorView<'a, T, N, Layout, Ref> where
+unsafe impl<T, const N: usize, Layout, Ref> Send for TensorView<'_, T, N, Layout, Ref> where
     Ref: Send
 {
 }
 
-unsafe impl<'a, T, const N: usize, Layout, Ref> Sync for TensorView<'a, T, N, Layout, Ref> where
+unsafe impl<T, const N: usize, Layout, Ref> Sync for TensorView<'_, T, N, Layout, Ref> where
     Ref: Sync
 {
 }
@@ -71,7 +71,7 @@ impl<'a, T, const N: usize, Layout> Copy for TensorView<'a, T, N, Layout, &'a [T
 // Row-major immutable constructor
 // ---------------------------------------------------------------------------
 
-impl<'a, 'b, T, const N: usize> TensorView<'a, T, N, RowMajor, &'b [T]> {
+impl<'b, T, const N: usize> TensorView<'_, T, N, RowMajor, &'b [T]> {
     /// Create a row-major tensor view over `data` with the given `shape`.
     ///
     /// Strides are computed as `strides[i] = ∏_{j=i+1..N} shape[j]` (C-order).
@@ -99,7 +99,7 @@ impl<'a, 'b, T, const N: usize> TensorView<'a, T, N, RowMajor, &'b [T]> {
         }
         let strides = row_major_strides(shape);
         Ok(Self {
-            ptr: data as *const [T] as *mut [T],
+            ptr: core::ptr::from_ref(data).cast_mut(),
             shape,
             strides,
             _layout: PhantomData,
@@ -111,7 +111,7 @@ impl<'a, 'b, T, const N: usize> TensorView<'a, T, N, RowMajor, &'b [T]> {
 // Row-major mutable constructor
 // ---------------------------------------------------------------------------
 
-impl<'a, 'b, T, const N: usize> TensorView<'a, T, N, RowMajor, &'b mut [T]> {
+impl<'b, T, const N: usize> TensorView<'_, T, N, RowMajor, &'b mut [T]> {
     /// Create a mutable row-major tensor view over `data` with the given `shape`.
     ///
     /// # Errors
@@ -124,7 +124,7 @@ impl<'a, 'b, T, const N: usize> TensorView<'a, T, N, RowMajor, &'b mut [T]> {
         }
         let strides = row_major_strides(shape);
         Ok(Self {
-            ptr: data as *mut [T],
+            ptr: core::ptr::from_mut(data),
             shape,
             strides,
             _layout: PhantomData,
@@ -136,7 +136,7 @@ impl<'a, 'b, T, const N: usize> TensorView<'a, T, N, RowMajor, &'b mut [T]> {
 // Explicit-stride constructors (immutable + mutable)
 // ---------------------------------------------------------------------------
 
-impl<'a, 'b, T, const N: usize, L: Layout> TensorView<'a, T, N, L, &'b [T]> {
+impl<'b, T, const N: usize, L: Layout> TensorView<'_, T, N, L, &'b [T]> {
     /// Create a tensor view with explicit strides.
     ///
     /// Allows column-major, blocked, or any custom layout.
@@ -154,7 +154,7 @@ impl<'a, 'b, T, const N: usize, L: Layout> TensorView<'a, T, N, L, &'b [T]> {
             return Err(TensorError::ShapeMismatch);
         }
         Ok(Self {
-            ptr: data as *const [T] as *mut [T],
+            ptr: core::ptr::from_ref(data).cast_mut(),
             shape,
             strides,
             _layout: PhantomData,
@@ -178,7 +178,7 @@ impl<'a, 'b, T, const N: usize, L: Layout> TensorView<'a, T, N, L, &'b mut [T]> 
             return Err(TensorError::ShapeMismatch);
         }
         Ok(Self {
-            ptr: data as *mut [T],
+            ptr: core::ptr::from_mut(data),
             shape,
             strides,
             _layout: PhantomData,
@@ -187,6 +187,7 @@ impl<'a, 'b, T, const N: usize, L: Layout> TensorView<'a, T, N, L, &'b mut [T]> 
 
     /// Downgrade the exclusive mutable view to a shared read-only view.
     #[inline(always)]
+    #[must_use]
     pub fn downgrade(self) -> TensorView<'a, T, N, L, &'b [T]> {
         TensorView {
             ptr: self.ptr,
@@ -201,7 +202,7 @@ impl<'a, 'b, T, const N: usize, L: Layout> TensorView<'a, T, N, L, &'b mut [T]> 
 // ColMajor ergonomic constructor
 // ---------------------------------------------------------------------------
 
-impl<'a, 'b, T> TensorView<'a, T, 2, ColMajor, &'b [T]> {
+impl<'b, T> TensorView<'_, T, 2, ColMajor, &'b [T]> {
     /// Create a column-major (Fortran-order) 2-D tensor view.
     ///
     /// Fortran strides: `strides[0] = 1`, `strides[1] = shape[0]`.
@@ -217,7 +218,7 @@ impl<'a, 'b, T> TensorView<'a, T, 2, ColMajor, &'b [T]> {
         // Fortran strides: strides[0] = 1 (column-stride), strides[1] = nrows (row-stride).
         let strides = [1, shape[0]];
         Ok(Self {
-            ptr: data as *const [T] as *mut [T],
+            ptr: core::ptr::from_ref(data).cast_mut(),
             shape,
             strides,
             _layout: PhantomData,
@@ -232,30 +233,35 @@ impl<'a, 'b, T> TensorView<'a, T, 2, ColMajor, &'b [T]> {
 impl<'a, T, const N: usize, L, Ref> TensorView<'a, T, N, L, Ref> {
     /// The logical shape of this tensor: number of elements per dimension.
     #[inline(always)]
+    #[must_use]
     pub fn shape(&self) -> [usize; N] {
         self.shape
     }
 
     /// The strides of this tensor in element units.
     #[inline(always)]
+    #[must_use]
     pub fn strides(&self) -> [usize; N] {
         self.strides
     }
 
     /// Number of elements in this tensor: `∏ shape[i]`.
     #[inline]
+    #[must_use]
     pub fn num_elements(&self) -> usize {
         self.shape.iter().product()
     }
 
     /// Returns `true` if the tensor is empty (one of its dimensions is 0).
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.num_elements() == 0
     }
 
     /// Whether this view is contiguous in row-major order.
     #[inline]
+    #[must_use]
     pub fn is_contiguous(&self) -> bool {
         let expected = row_major_strides(self.shape);
         self.strides == expected
@@ -263,11 +269,16 @@ impl<'a, T, const N: usize, L, Ref> TensorView<'a, T, N, L, Ref> {
 
     /// View the underlying flat slice (in storage order).
     #[inline(always)]
+    #[must_use]
     pub fn as_slice(&self) -> &[T] {
         unsafe { &*self.ptr }
     }
 
     /// Bounds-checked element access.
+    ///
+    /// # Errors
+    /// Returns [`TensorError::IndexOutOfBounds`] when any index is outside
+    /// its corresponding shape dimension.
     #[inline]
     pub fn get(&self, idx: [usize; N]) -> Result<T, TensorError>
     where
@@ -287,6 +298,7 @@ impl<'a, T, const N: usize, L, Ref> TensorView<'a, T, N, L, Ref> {
     /// # Safety
     /// `idx[i] < shape[i]` for all `i`.
     #[inline(always)]
+    #[must_use]
     pub unsafe fn get_unchecked(&self, idx: [usize; N]) -> T
     where
         T: Copy,
@@ -296,6 +308,11 @@ impl<'a, T, const N: usize, L, Ref> TensorView<'a, T, N, L, Ref> {
     }
 
     /// Reshape this view to a different rank `M`, reusing the same flat slice.
+    ///
+    /// # Errors
+    /// Returns [`TensorError::NotContiguous`] when the source is not
+    /// contiguous, or [`TensorError::ShapeMismatch`] when the element counts
+    /// of the old and new shapes differ.
     #[inline]
     pub fn reshape<const M: usize>(
         self,
@@ -323,7 +340,7 @@ impl<'a, T, const N: usize, L, Ref> TensorView<'a, T, N, L, Ref> {
 // Mutable element access
 // ---------------------------------------------------------------------------
 
-impl<'a, 'b, T, const N: usize, L> TensorView<'a, T, N, L, &'b mut [T]> {
+impl<T, const N: usize, L> TensorView<'_, T, N, L, &mut [T]> {
     /// Access the underlying flat mutable slice.
     #[inline(always)]
     pub fn as_slice_mut(&mut self) -> &mut [T] {
@@ -331,6 +348,10 @@ impl<'a, 'b, T, const N: usize, L> TensorView<'a, T, N, L, &'b mut [T]> {
     }
 
     /// Bounds-checked element write access.
+    ///
+    /// # Errors
+    /// Returns [`TensorError::IndexOutOfBounds`] when any index is outside
+    /// its corresponding shape dimension.
     #[inline]
     pub fn set(&mut self, idx: [usize; N], val: T) -> Result<(), TensorError> {
         for i in 0..N {

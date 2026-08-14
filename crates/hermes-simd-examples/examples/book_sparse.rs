@@ -1,8 +1,13 @@
-//! Sparse SpMV through the validated-data typestate.
+//! Sparse `SpMV` through the validated-data typestate.
 //!
 //! A CSR matrix is built from raw parts, validated by `ValidatedData::new`
 //! (structural checks only — index bounds are checked before any SIMD
 //! gather can read out of bounds), and then consumed by `spmv_csr`.
+
+#![expect(
+    clippy::float_cmp,
+    reason = "The runnable example asserts exact manufactured sparse outputs"
+)]
 
 use hermes_simd::{
     spmv_csr, spmv_dense_masked, CsrData, DenseWithMaskData, SimdError, ValidatedData,
@@ -26,7 +31,7 @@ fn main() {
     let bad = CsrData::new(&[1.0f32][..], &[3i32][..], &[0i32, 1][..], 1, 3); // col 3 >= ncols
     match ValidatedData::new(bad) {
         Err(SimdError::IndexOutOfBounds) => {
-            println!("out-of-range column rejected: IndexOutOfBounds")
+            println!("out-of-range column rejected: IndexOutOfBounds");
         }
         Err(e) => panic!("unexpected error: {e:?}"),
         Ok(_) => panic!("malformed CSR validated"),

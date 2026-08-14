@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::kernel::{SimdKernel, MAX_SIMD_LANES};
 use crate::scalar::Scalar;
 
@@ -96,7 +94,7 @@ unsafe fn generic_scatter_bitmask<T, Arch>(
             core::mem::size_of::<Arch::IndexVector>()
                 == <Arch as SimdKernel<T>>::LANE_COUNT * core::mem::size_of::<i32>(),
             "IndexVector size must equal LANE_COUNT * size_of::<i32>()"
-        )
+        );
     };
 
     let mut idx = [0_i32; MAX_SIMD_LANES];

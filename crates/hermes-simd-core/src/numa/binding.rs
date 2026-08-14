@@ -10,6 +10,7 @@ pub struct NumaBinding {
 
 impl NumaBinding {
     /// Bind the current thread to the specified NUMA node.
+    #[must_use]
     pub fn bind(node: u32) -> Self {
         if current_numa_node() == Some(node) {
             #[cfg(all(target_os = "linux", feature = "libnuma"))]
@@ -62,7 +63,7 @@ impl NumaBinding {
             unsafe {
                 let thread = GetCurrentThread();
                 let mut mask = 0u64;
-                if GetNumaNodeProcessorMask(node as u8, &mut mask) != 0 && mask != 0 {
+                if GetNumaNodeProcessorMask(node as u8, &raw mut mask) != 0 && mask != 0 {
                     let old = SetThreadAffinityMask(thread, mask as usize);
                     Self { old_mask: old }
                 } else {

@@ -22,6 +22,7 @@ pub struct OwnedCsr<T> {
 impl<T> OwnedCsr<T> {
     /// Construct owned CSR storage.
     #[inline]
+    #[must_use]
     pub fn new(
         values: AlignedVec<T, Aligned<64>>,
         col_indices: AlignedVec<i32, Aligned<64>>,
@@ -40,6 +41,7 @@ impl<T> OwnedCsr<T> {
 
     /// Return a borrowed `CsrData` view over this owned storage.
     #[inline]
+    #[must_use]
     pub fn as_view(&self) -> CsrData<'_, T> {
         CsrMatrix::new(
             self.values.as_slice(),
@@ -82,6 +84,7 @@ pub struct OwnedSellP<T, const C: usize> {
 impl<T, const C: usize> OwnedSellP<T, C> {
     /// Construct owned SELL-p storage.
     #[inline]
+    #[must_use]
     pub fn new(
         values: AlignedVec<T, Aligned<64>>,
         col_indices: AlignedVec<i32, Aligned<64>>,
@@ -102,6 +105,7 @@ impl<T, const C: usize> OwnedSellP<T, C> {
 
     /// Return a borrowed `SellPData` view over this owned storage.
     #[inline]
+    #[must_use]
     pub fn as_view(&self) -> SellPData<'_, T, C> {
         SellPMatrix::new(
             self.values.as_slice(),
@@ -145,6 +149,7 @@ pub struct OwnedBlockedCoo<T, const BM: usize, const BN: usize> {
 impl<T, const BM: usize, const BN: usize> OwnedBlockedCoo<T, BM, BN> {
     /// Construct owned Blocked-COO storage.
     #[inline]
+    #[must_use]
     pub fn new(
         blocks: AlignedVec<T, Aligned<64>>,
         block_row: AlignedVec<i32, Aligned<64>>,
@@ -165,6 +170,7 @@ impl<T, const BM: usize, const BN: usize> OwnedBlockedCoo<T, BM, BN> {
 
     /// Return a borrowed `BlockedCooData` view over this owned storage.
     #[inline]
+    #[must_use]
     pub fn as_view(&self) -> BlockedCooData<'_, T, BM, BN> {
         BlockedCooMatrix::new(
             self.blocks.as_slice(),
@@ -195,7 +201,7 @@ impl<T, const BM: usize, const BN: usize> SparseValidate for OwnedBlockedCoo<T, 
     }
 }
 
-/// Owned heap-backed DenseWithMask storage.
+/// Owned heap-backed `DenseWithMask` storage.
 pub struct OwnedDenseWithMask<T> {
     pub(crate) values: AlignedVec<T, Aligned<64>>,
     pub(crate) mask: AlignedVec<bool, Aligned<64>>,
@@ -204,8 +210,9 @@ pub struct OwnedDenseWithMask<T> {
 }
 
 impl<T> OwnedDenseWithMask<T> {
-    /// Construct owned DenseWithMask storage.
+    /// Construct owned `DenseWithMask` storage.
     #[inline]
+    #[must_use]
     pub fn new(
         values: AlignedVec<T, Aligned<64>>,
         mask: AlignedVec<bool, Aligned<64>>,
@@ -222,6 +229,7 @@ impl<T> OwnedDenseWithMask<T> {
 
     /// Return a borrowed `DenseWithMaskData` view over this owned storage.
     #[inline]
+    #[must_use]
     pub fn as_view(&self) -> DenseWithMaskData<'_, T> {
         DenseWithMaskMatrix::new(
             self.values.as_slice(),

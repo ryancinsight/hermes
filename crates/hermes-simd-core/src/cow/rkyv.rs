@@ -28,7 +28,7 @@ pub struct SimdCowResolver {
     pub(crate) elements_resolver: rkyv::vec::VecResolver,
 }
 
-impl<'a, T, Arch, Align> rkyv::Archive for SimdCow<'a, T, Arch, Align>
+impl<T, Arch, Align> rkyv::Archive for SimdCow<'_, T, Arch, Align>
 where
     T: rkyv::Archive,
     Arch: SimdArch,
@@ -46,7 +46,7 @@ where
     }
 }
 
-impl<'a, T, Arch, Align, S> rkyv::Serialize<S> for SimdCow<'a, T, Arch, Align>
+impl<T, Arch, Align, S> rkyv::Serialize<S> for SimdCow<'_, T, Arch, Align>
 where
     T: rkyv::Serialize<S> + rkyv::Archive,
     Arch: SimdArch,
@@ -88,28 +88,32 @@ where
 impl<T> ArchivedSimdCow<T> {
     /// Returns the length of the archived vector.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.elements.len()
     }
 
     /// Returns `true` if the archived vector is empty.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.elements.is_empty()
     }
 
     /// Access the archived elements as a slice.
     #[inline]
+    #[must_use]
     pub fn as_slice(&self) -> &[T] {
         self.elements.as_slice()
     }
 
-    /// Zero-copy conversion of the archived SimdCow to a borrowed SimdCow.
+    /// Zero-copy conversion of the archived `SimdCow` to a borrowed `SimdCow`.
     ///
     /// # Safety
     /// The alignment of the underlying archived memory must satisfy `Align`.
     #[inline]
-    pub unsafe fn as_borrowed<'a, Arch, Align>(&'a self) -> Option<SimdCow<'a, T, Arch, Align>>
+    #[must_use]
+    pub unsafe fn as_borrowed<Arch, Align>(&self) -> Option<SimdCow<'_, T, Arch, Align>>
     where
         Arch: SimdArch,
         Align: Alignment,

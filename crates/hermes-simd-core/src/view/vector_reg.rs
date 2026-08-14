@@ -40,6 +40,13 @@ where
     _marker: PhantomData<T>,
 }
 
+#[repr(C, align(64))]
+struct AlignedBuf<T>([core::mem::MaybeUninit<T>; MAX_SIMD_LANES]);
+
+#[expect(
+    clippy::expl_impl_clone_on_copy,
+    reason = "The raw register capability is supplied by the architecture trait, so Clone stays explicit"
+)]
 impl<T, Arch> Clone for Vector<T, Arch>
 where
     Arch: SimdArch + SimdKernel<T>,
@@ -128,12 +135,21 @@ where
     }
 
     /// Construct a Vector with all lanes set to zero.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the architecture is not supported or enabled on this host.
     #[inline(always)]
+    #[must_use]
     pub fn zero() -> Self {
         Self::try_zero().expect("SIMD target is not supported or enabled on this host")
     }
 
     /// Try to construct a Vector with all lanes set to zero.
+    ///
+    /// # Errors
+    /// Returns [`SimdError::UnsupportedTarget`] when the architecture is not
+    /// supported or enabled on this host.
     #[inline(always)]
     pub fn try_zero() -> Result<Self, SimdError> {
         runtime_support_result::<T, Arch>()?;
@@ -141,12 +157,20 @@ where
     }
 
     /// Construct a Vector by broadcasting a scalar value to all lanes.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the architecture is not supported or enabled on this host.
     #[inline(always)]
     pub fn splat(val: T) -> Self {
         Self::try_splat(val).expect("SIMD target is not supported or enabled on this host")
     }
 
     /// Try to construct a Vector by broadcasting a scalar value to all lanes.
+    ///
+    /// # Errors
+    /// Returns [`SimdError::UnsupportedTarget`] when the architecture is not
+    /// supported or enabled on this host.
     #[inline(always)]
     pub fn try_splat(val: T) -> Result<Self, SimdError> {
         runtime_support_result::<T, Arch>()?;
@@ -215,6 +239,7 @@ where
 
     /// Load one vector from the start of a slice using the unaligned kernel load.
     ///
+    /// # Errors
     /// Returns [`SimdError::InsufficientInputLength`] when `data` has fewer
     /// elements than `Arch::LANE_COUNT`.
     #[inline(always)]
@@ -230,6 +255,7 @@ where
 
     /// Load one vector from the start of a slice using the aligned kernel load.
     ///
+    /// # Errors
     /// Returns [`SimdError::InsufficientInputLength`] when `data` has fewer
     /// elements than `Arch::LANE_COUNT`, and [`SimdError::UnalignedAddress`]
     /// when the slice start is not aligned to the vector byte width.
@@ -248,6 +274,7 @@ where
 
     /// Store this vector to the start of a slice using the unaligned kernel store.
     ///
+    /// # Errors
     /// Returns [`SimdError::InsufficientOutputLength`] when `out` has fewer
     /// elements than `Arch::LANE_COUNT`.
     #[inline(always)]
@@ -266,6 +293,7 @@ where
 
     /// Store this vector to the start of a slice using the aligned kernel store.
     ///
+    /// # Errors
     /// Returns [`SimdError::InsufficientOutputLength`] when `out` has fewer
     /// elements than `Arch::LANE_COUNT`, and [`SimdError::UnalignedAddress`]
     /// when the slice start is not aligned to the vector byte width.
@@ -289,6 +317,11 @@ where
     ///
     /// Active lanes (according to `mask`) must reside within the bounds of `data`.
     /// Inactive lanes are populated from the corresponding lanes of `src`.
+    ///
+    /// # Errors
+    /// Returns [`SimdError::IndexOutOfBounds`] when an active mask lane is
+    /// outside `data`, or [`SimdError::UnsupportedTarget`] when the
+    /// architecture is not supported or enabled on this host.
     #[inline]
     pub fn masked_load_from_slice(
         data: &[T],
@@ -318,9 +351,6 @@ where
             // The buffer holds `LANE_COUNT` lanes; `LANE_BOUND_CHECK` proves
             // `LANE_COUNT <= MAX_SIMD_LANES` at compile time per backend.
             const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
-            #[repr(C, align(64))]
-            struct AlignedBuf<T>([core::mem::MaybeUninit<T>; MAX_SIMD_LANES]);
-
             let mut buf = AlignedBuf([core::mem::MaybeUninit::uninit(); MAX_SIMD_LANES]);
             for i in 0..len {
                 buf.0[i].write(data[i]);
@@ -343,6 +373,11 @@ where
     ///
     /// Active lanes (according to `mask`) must reside within the bounds of `data`.
     /// Inactive lanes in the slice are left unchanged.
+    ///
+    /// # Errors
+    /// Returns [`SimdError::IndexOutOfBounds`] when an active mask lane is
+    /// outside `data`, or [`SimdError::UnsupportedTarget`] when the
+    /// architecture is not supported or enabled on this host.
     #[inline]
     pub fn masked_store_to_slice(
         self,
@@ -374,9 +409,6 @@ where
             // The buffer holds `LANE_COUNT` lanes; `LANE_BOUND_CHECK` proves
             // `LANE_COUNT <= MAX_SIMD_LANES` at compile time per backend.
             const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
-            #[repr(C, align(64))]
-            struct AlignedBuf<T>([core::mem::MaybeUninit<T>; MAX_SIMD_LANES]);
-
             let mut buf = AlignedBuf([core::mem::MaybeUninit::uninit(); MAX_SIMD_LANES]);
             for i in 0..len {
                 buf.0[i].write(data[i]);
@@ -403,6 +435,7 @@ where
 
     /// Elementwise population count (number of set bits).
     #[inline(always)]
+    #[must_use]
     pub fn popcount(self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::popcount(self.raw) })
@@ -431,6 +464,7 @@ where
 
     /// Elementwise absolute value.
     #[inline(always)]
+    #[must_use]
     pub fn abs(self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::abs(self.raw) })
@@ -438,6 +472,7 @@ where
 
     /// Elementwise minimum of `self` and `other`.
     #[inline(always)]
+    #[must_use]
     pub fn min(self, other: Self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::min(self.raw, other.raw) })
@@ -445,6 +480,7 @@ where
 
     /// Elementwise maximum of `self` and `other`.
     #[inline(always)]
+    #[must_use]
     pub fn max(self, other: Self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::max(self.raw, other.raw) })
@@ -452,6 +488,7 @@ where
 
     /// Elementwise square root.
     #[inline(always)]
+    #[must_use]
     pub fn sqrt(self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::sqrt(self.raw) })
@@ -459,6 +496,7 @@ where
 
     /// Elementwise equal comparison (`self == other`).
     #[inline(always)]
+    #[must_use]
     pub fn cmp_eq(self, other: Self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_eq(self.raw, other.raw) })
@@ -466,6 +504,7 @@ where
 
     /// Elementwise not-equal comparison (`self != other`).
     #[inline(always)]
+    #[must_use]
     pub fn cmp_ne(self, other: Self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_ne(self.raw, other.raw) })
@@ -473,6 +512,7 @@ where
 
     /// Elementwise less-than comparison (`self < other`).
     #[inline(always)]
+    #[must_use]
     pub fn cmp_lt(self, other: Self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_lt(self.raw, other.raw) })
@@ -480,6 +520,7 @@ where
 
     /// Elementwise less-than-or-equal comparison (`self <= other`).
     #[inline(always)]
+    #[must_use]
     pub fn cmp_le(self, other: Self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_le(self.raw, other.raw) })
@@ -487,6 +528,7 @@ where
 
     /// Elementwise greater-than comparison (`self > other`).
     #[inline(always)]
+    #[must_use]
     pub fn cmp_gt(self, other: Self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_gt(self.raw, other.raw) })
@@ -494,6 +536,7 @@ where
 
     /// Elementwise greater-than-or-equal comparison (`self >= other`).
     #[inline(always)]
+    #[must_use]
     pub fn cmp_ge(self, other: Self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_ge(self.raw, other.raw) })
@@ -501,6 +544,7 @@ where
 
     /// Conditional blend: select lanes from `true_val` where the mask lane in `self` is active (sign bit set), and from `false_val` otherwise.
     #[inline(always)]
+    #[must_use]
     pub fn blend(self, true_val: Self, false_val: Self) -> Self {
         assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::blend(self.raw, true_val.raw, false_val.raw) })
@@ -510,7 +554,7 @@ where
     #[inline(always)]
     pub fn from_array<const N: usize>(arr: [T; N]) -> Self {
         assert_runtime_supported::<T, Arch>();
-        let _ = AssertLaneCount::<T, Arch, N>::OK;
+        let () = AssertLaneCount::<T, Arch, N>::OK;
         // SAFETY: target feature checked above; `AssertLaneCount` proved
         // `N == LANE_COUNT`, so `arr` holds a full vector's worth of elements for
         // the unaligned load.
@@ -519,10 +563,14 @@ where
 
     /// Try to create a Vector from an array of size `N`, where `N` must equal
     /// `Arch::LANE_COUNT`.
+    ///
+    /// # Errors
+    /// Returns [`SimdError::UnsupportedTarget`] when the architecture is not
+    /// supported or enabled on this host.
     #[inline(always)]
     pub fn try_from_array<const N: usize>(arr: [T; N]) -> Result<Self, SimdError> {
         runtime_support_result::<T, Arch>()?;
-        let _ = AssertLaneCount::<T, Arch, N>::OK;
+        let () = AssertLaneCount::<T, Arch, N>::OK;
         // SAFETY: as `from_array` — `N == LANE_COUNT`, so `arr` covers the load.
         unsafe { Ok(Self::load_unaligned(arr.as_ptr())) }
     }
@@ -531,7 +579,7 @@ where
     #[inline(always)]
     pub fn to_array<const N: usize>(self) -> [T; N] {
         assert_runtime_supported::<T, Arch>();
-        let _ = AssertLaneCount::<T, Arch, N>::OK;
+        let () = AssertLaneCount::<T, Arch, N>::OK;
         let mut arr = [core::mem::MaybeUninit::<T>::uninit(); N];
         // SAFETY: target feature checked above; `AssertLaneCount` proved
         // `N == LANE_COUNT`, so the store initializes all `N` slots before the
@@ -623,7 +671,7 @@ where
     {
         assert_runtime_supported::<T, Arch>();
         assert_runtime_supported::<U, Arch>();
-        let _ = AssertLaneCountSame::<T, U, Arch>::OK;
+        let () = AssertLaneCountSame::<T, U, Arch>::OK;
         const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
         let mut buf_t = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let mut buf_u = [core::mem::MaybeUninit::<U>::uninit(); MAX_SIMD_LANES];
@@ -647,7 +695,7 @@ where
     #[inline(always)]
     pub fn extract<const I: usize>(self) -> T {
         assert_runtime_supported::<T, Arch>();
-        let _ = AssertLaneIndex::<T, Arch, I>::OK;
+        let () = AssertLaneIndex::<T, Arch, I>::OK;
         const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         // SAFETY: target feature checked above; `AssertLaneIndex` proved
@@ -661,9 +709,10 @@ where
 
     /// Insert a value into a single lane by index at compile-time.
     #[inline(always)]
+    #[must_use]
     pub fn insert<const I: usize>(self, val: T) -> Self {
         assert_runtime_supported::<T, Arch>();
-        let _ = AssertLaneIndex::<T, Arch, I>::OK;
+        let () = AssertLaneIndex::<T, Arch, I>::OK;
         const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         // SAFETY: target feature checked above; `AssertLaneIndex` proved
@@ -678,7 +727,13 @@ where
     }
 
     /// Load a Vector from a chunk index of a `SimdView`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the architecture is not supported or enabled on this host,
+    /// or if `chunk_idx` does not identify a complete SIMD lane group.
     #[inline(always)]
+    #[must_use]
     pub fn from_view_chunk<Align, Mode, Ref>(
         view: &super::SimdView<'_, T, Arch, Align, Mode, Ref>,
         chunk_idx: usize,
@@ -709,6 +764,11 @@ where
     }
 
     /// Store this Vector into a mutable chunk of a mutable `SimdView`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the architecture is not supported or enabled on this host,
+    /// or if `chunk_idx` does not identify a complete SIMD lane group.
     #[inline(always)]
     pub fn store_to_view_chunk<'a, Align, Mode>(
         self,

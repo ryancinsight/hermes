@@ -55,7 +55,10 @@ mod f16c {
     #[cfg(target_arch = "x86")]
     use core::arch::x86::*;
     #[cfg(target_arch = "x86_64")]
-    use core::arch::x86_64::*;
+    use core::arch::x86_64::{
+        __m128i, __m256, _mm256_add_ps, _mm256_cvtph_ps, _mm256_cvtps_ph, _mm256_fmadd_ps,
+        _mm256_mul_ps, _mm256_sub_ps, _mm_loadu_si128, _mm_storeu_si128, _MM_FROUND_TO_NEAREST_INT,
+    };
 
     // `vcvtps2ph` immediate: bits 1:0 = rounding (00 = nearest-even), bit 2 =
     // use-MXCSR (0 = use the immediate). `_MM_FROUND_NO_EXC` is not accepted —
@@ -68,6 +71,10 @@ mod f16c {
     #[inline]
     #[target_feature(enable = "avx,f16c")]
     unsafe fn to_f32_halves(v: &[F16; 16]) -> (__m256, __m256) {
+        #[expect(
+            clippy::cast_ptr_alignment,
+            reason = "_mm_loadu_si128 accepts the deliberately unaligned F16 buffer"
+        )]
         let p = v.as_ptr().cast::<__m128i>();
         (
             _mm256_cvtph_ps(_mm_loadu_si128(p)),
@@ -81,6 +88,10 @@ mod f16c {
     #[target_feature(enable = "avx,f16c")]
     unsafe fn from_f32_halves(lo: __m256, hi: __m256) -> [F16; 16] {
         let mut out = [F16::ZERO; 16];
+        #[expect(
+            clippy::cast_ptr_alignment,
+            reason = "_mm_storeu_si128 accepts the deliberately unaligned F16 buffer"
+        )]
         let p = out.as_mut_ptr().cast::<__m128i>();
         _mm_storeu_si128(p, _mm256_cvtps_ph::<ROUND_NEAREST>(lo));
         _mm_storeu_si128(p.add(1), _mm256_cvtps_ph::<ROUND_NEAREST>(hi));

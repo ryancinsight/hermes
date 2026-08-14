@@ -11,6 +11,7 @@
 //! only the obligations that go beyond it — pointer provenance, bounds, and
 //! alignment.
 
+use super::types::SparseValidate;
 use super::{BlockedCoo, Csr, DenseWithMask, SellP, SparseView};
 use crate::arch::SimdArch;
 use crate::kernel::SimdKernel;
@@ -27,7 +28,7 @@ pub trait SparseOps<T> {
     fn elementwise_mul_dense(&self, dense: &[T], out_values: &mut [T]);
 }
 
-impl<'a, T, Arch> SparseOps<T> for SparseView<'a, T, Csr, Arch>
+impl<T, Arch> SparseOps<T> for SparseView<'_, T, Csr, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
@@ -56,7 +57,6 @@ where
         // (`col_indices[k] < ncols`) via the SSOT checker and require
         // `dense.len() >= ncols`, so every gathered index is in bounds. O(nnz)
         // once per call, matching the SELL-p path in this file.
-        use super::types::SparseValidate;
         d.validate()
             .expect("CSR matrix failed structural validation before elementwise_mul_dense");
         assert!(
@@ -101,7 +101,7 @@ where
     }
 }
 
-impl<'a, T, const C: usize, Arch> SparseOps<T> for SparseView<'a, T, SellP<C>, Arch>
+impl<T, const C: usize, Arch> SparseOps<T> for SparseView<'_, T, SellP<C>, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
@@ -200,8 +200,8 @@ where
     }
 }
 
-impl<'a, T, const BM: usize, const BN: usize, Arch> SparseOps<T>
-    for SparseView<'a, T, BlockedCoo<BM, BN>, Arch>
+impl<T, const BM: usize, const BN: usize, Arch> SparseOps<T>
+    for SparseView<'_, T, BlockedCoo<BM, BN>, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
@@ -236,8 +236,7 @@ where
         );
         assert!(
             out_values.len() >= block_elems && d.blocks.len() >= block_elems,
-            "block/output buffers too small for {} block elements",
-            block_elems
+            "block/output buffers too small for {block_elems} block elements"
         );
         for b in 0..d.nblocks {
             let br = d.block_row[b] as usize;
@@ -315,7 +314,7 @@ where
     }
 }
 
-impl<'a, T, Arch> SparseOps<T> for SparseView<'a, T, DenseWithMask, Arch>
+impl<T, Arch> SparseOps<T> for SparseView<'_, T, DenseWithMask, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,

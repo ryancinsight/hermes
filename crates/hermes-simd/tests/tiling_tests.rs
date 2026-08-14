@@ -1,3 +1,12 @@
+#![expect(
+    clippy::float_cmp,
+    reason = "Tiling tests compare exact manufactured matrix values"
+)]
+#![expect(
+    clippy::items_after_statements,
+    reason = "The tiling harness keeps architecture-specific imports beside the gated case"
+)]
+
 use hermes_simd::*;
 
 #[test]
@@ -314,7 +323,7 @@ fn test_gemm_int8_signed_differential() {
         for col in 0..n {
             let mut sum = 0i32;
             for kk in 0..k {
-                sum = sum.wrapping_add((a[r * k + kk] as i32) * (b[kk * n + col] as i32));
+                sum = sum.wrapping_add(i32::from(a[r * k + kk]) * i32::from(b[kk * n + col]));
             }
             c_ref[r * n + col] += sum;
         }

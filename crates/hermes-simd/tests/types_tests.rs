@@ -1,4 +1,16 @@
 #![allow(clippy::manual_div_ceil, clippy::needless_range_loop)]
+#![expect(
+    clippy::float_cmp,
+    reason = "Type conformance tests compare exact manufactured lane values"
+)]
+#![expect(
+    clippy::cast_lossless,
+    reason = "Type conformance fixtures convert bounded integer indices into scalar values"
+)]
+#![expect(
+    clippy::items_after_statements,
+    reason = "The type conformance harness keeps compile-time dimensions beside the exercised case"
+)]
 use hermes_simd::*;
 use hermes_simd_core::scalar::NumericElement;
 
@@ -1082,7 +1094,7 @@ fn test_numa_allocation_and_themis_owned_topology() {
 
     // Verify locality check runs without crashing
     let is_local = verify_numa_locality(vec.as_ptr().cast::<u8>(), 8, 0);
-    println!("Is local to node 0: {}", is_local);
+    println!("Is local to node 0: {is_local}");
 }
 
 #[test]
@@ -1160,7 +1172,7 @@ fn test_adaptive_dispatcher_and_amx_session() {
     let b = [eunomia::Bf16::from_f32(2.0); 100];
     let decision =
         AdaptiveDispatcher::select_backend(10, 10, 10, a.as_ptr(), a.len(), b.as_ptr(), b.len());
-    println!("Selected backend for small matrix: {:?}", decision);
+    println!("Selected backend for small matrix: {decision:?}");
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
@@ -1314,8 +1326,7 @@ fn test_vectorized_packed_unpackers() {
             assert_eq!(
                 unpacked_bf16[i].to_f32(),
                 expected,
-                "Bf4 mismatch at index {}",
-                i
+                "Bf4 mismatch at index {i}"
             );
         }
     } else {
@@ -1337,7 +1348,7 @@ fn test_vectorized_packed_unpackers() {
                 (byte >> 4) & 0x0F
             };
             let expected = F4(val).to_f32();
-            assert_eq!(unpacked_f32[i].0, expected, "F4 mismatch at index {}", i);
+            assert_eq!(unpacked_f32[i].0, expected, "F4 mismatch at index {i}");
         }
     } else {
         println!("Skipping direct AVX-512 unpacked_f32 test (avx512f not detected)");

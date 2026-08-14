@@ -6,18 +6,18 @@ fn main() {
 
     println!("--- Dynamic Runtime Dispatch ---");
     let dynamic_sum = sum::<f32>(&a);
-    println!("Sum of a: {}", dynamic_sum);
+    println!("Sum of a: {dynamic_sum}");
 
     let dynamic_dot = dot::<f32>(&a, &b).unwrap();
-    println!("Dot product (a . b): {}", dynamic_dot);
+    println!("Dot product (a . b): {dynamic_dot}");
 
     println!("\n--- Static Compile-Time Dispatch (Scalar fallback) ---");
     let view_a = SimdView::<f32, Scalar, Unaligned>::new(&a).unwrap();
     let view_b = SimdView::<f32, Scalar, Unaligned>::new(&b).unwrap();
 
     let static_sum = view_a.sum();
-    println!("Static view sum of a: {}", static_sum);
+    println!("Static view sum of a: {static_sum}");
 
     let static_dot = view_a.dot(&view_b).unwrap();
-    println!("Static view dot (a . b): {}", static_dot);
+    println!("Static view dot (a . b): {static_dot}");
 }

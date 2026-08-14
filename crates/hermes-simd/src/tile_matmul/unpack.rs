@@ -1,5 +1,9 @@
 #[cfg(target_arch = "x86_64")]
-use core::arch::x86_64::*;
+use core::arch::x86_64::{
+    __m128i, __m256i, __m512i, _mm256_cvtepi8_epi16, _mm256_cvtepi8_epi32, _mm256_loadu_si256,
+    _mm256_storeu_si256, _mm512_cvtepi8_epi16, _mm512_cvtepi8_epi32, _mm512_storeu_si512,
+    _mm_loadl_epi64, _mm_loadu_si128,
+};
 
 #[cfg(target_arch = "aarch64")]
 use core::arch::aarch64::*;
@@ -72,9 +76,17 @@ pub fn widen_i8_to_i16(src: &[i8], dest: &mut [i16]) {
         if std::is_x86_feature_detected!("avx512bw") {
             while i + 32 <= len {
                 unsafe {
+                    #[expect(
+                        clippy::cast_ptr_alignment,
+                        reason = "_mm256_loadu_si256 accepts the deliberately unaligned source"
+                    )]
                     let src_ptr = src.as_ptr().add(i).cast::<__m256i>();
                     let a = _mm256_loadu_si256(src_ptr);
                     let res = _mm512_cvtepi8_epi16(a);
+                    #[expect(
+                        clippy::cast_ptr_alignment,
+                        reason = "_mm512_storeu_si512 accepts the deliberately unaligned output"
+                    )]
                     let dest_ptr = dest.as_mut_ptr().add(i).cast::<__m512i>();
                     _mm512_storeu_si512(dest_ptr, res);
                 }
@@ -85,8 +97,16 @@ pub fn widen_i8_to_i16(src: &[i8], dest: &mut [i16]) {
             while i + 16 <= len {
                 unsafe {
                     let src_ptr = src.as_ptr().add(i);
+                    #[expect(
+                        clippy::cast_ptr_alignment,
+                        reason = "_mm_loadu_si128 accepts the deliberately unaligned source"
+                    )]
                     let a = _mm_loadu_si128(src_ptr.cast::<__m128i>());
                     let res = _mm256_cvtepi8_epi16(a);
+                    #[expect(
+                        clippy::cast_ptr_alignment,
+                        reason = "_mm256_storeu_si256 accepts the deliberately unaligned output"
+                    )]
                     let dest_ptr = dest.as_mut_ptr().add(i).cast::<__m256i>();
                     _mm256_storeu_si256(dest_ptr, res);
                 }
@@ -116,7 +136,7 @@ pub fn widen_i8_to_i16(src: &[i8], dest: &mut [i16]) {
     }
 
     while i < len {
-        dest[i] = src[i] as i16;
+        dest[i] = i16::from(src[i]);
         i += 1;
     }
 }
@@ -133,8 +153,16 @@ pub fn widen_i8_to_i32(src: &[i8], dest: &mut [i32]) {
             while i + 16 <= len {
                 unsafe {
                     let src_ptr = src.as_ptr().add(i);
+                    #[expect(
+                        clippy::cast_ptr_alignment,
+                        reason = "_mm_loadu_si128 accepts the deliberately unaligned source"
+                    )]
                     let a = _mm_loadu_si128(src_ptr.cast::<__m128i>());
                     let res = _mm512_cvtepi8_epi32(a);
+                    #[expect(
+                        clippy::cast_ptr_alignment,
+                        reason = "_mm512_storeu_si512 accepts the deliberately unaligned output"
+                    )]
                     let dest_ptr = dest.as_mut_ptr().add(i).cast::<__m512i>();
                     _mm512_storeu_si512(dest_ptr, res);
                 }
@@ -145,8 +173,16 @@ pub fn widen_i8_to_i32(src: &[i8], dest: &mut [i32]) {
             while i + 8 <= len {
                 unsafe {
                     let src_ptr = src.as_ptr().add(i);
+                    #[expect(
+                        clippy::cast_ptr_alignment,
+                        reason = "_mm_loadl_epi64 accepts the deliberately unaligned source"
+                    )]
                     let a = _mm_loadl_epi64(src_ptr.cast::<__m128i>());
                     let res = _mm256_cvtepi8_epi32(a);
+                    #[expect(
+                        clippy::cast_ptr_alignment,
+                        reason = "_mm256_storeu_si256 accepts the deliberately unaligned output"
+                    )]
                     let dest_ptr = dest.as_mut_ptr().add(i).cast::<__m256i>();
                     _mm256_storeu_si256(dest_ptr, res);
                 }
@@ -177,14 +213,17 @@ pub fn widen_i8_to_i32(src: &[i8], dest: &mut [i32]) {
     }
 
     while i < len {
-        dest[i] = src[i] as i32;
+        dest[i] = i32::from(src[i]);
         i += 1;
     }
 }
 
 /// Widens a slice of `crate::I8` wrapper values to `crate::I16` using sign-extension.
 #[inline]
-#[allow(non_snake_case)]
+#[expect(
+    non_snake_case,
+    reason = "Public wrappers preserve the numeric domain type spelling"
+)]
 pub fn widen_I8_to_I16(src: &[crate::I8], dest: &mut [crate::I16]) {
     unsafe {
         let src_cast = core::slice::from_raw_parts(src.as_ptr().cast::<i8>(), src.len());
@@ -196,7 +235,10 @@ pub fn widen_I8_to_I16(src: &[crate::I8], dest: &mut [crate::I16]) {
 
 /// Widens a slice of `crate::I8` wrapper values to `crate::I32` using sign-extension.
 #[inline]
-#[allow(non_snake_case)]
+#[expect(
+    non_snake_case,
+    reason = "Public wrappers preserve the numeric domain type spelling"
+)]
 pub fn widen_I8_to_I32(src: &[crate::I8], dest: &mut [crate::I32]) {
     unsafe {
         let src_cast = core::slice::from_raw_parts(src.as_ptr().cast::<i8>(), src.len());

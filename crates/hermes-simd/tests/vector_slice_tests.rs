@@ -1,3 +1,8 @@
+#![expect(
+    clippy::float_cmp,
+    reason = "These integration tests assert exact manufactured vector values"
+)]
+
 use hermes_simd::{Scalar, SimdError, Vector};
 
 #[test]
@@ -347,11 +352,11 @@ fn test_widen_i8_simd_and_tails() {
         widen_i8_to_i16(&src, &mut dest_i16);
         widen_i8_to_i32(&src, &mut dest_i32);
 
-        let expected_i16: Vec<i16> = src.iter().map(|&x| x as i16).collect();
-        let expected_i32: Vec<i32> = src.iter().map(|&x| x as i32).collect();
+        let expected_i16: Vec<i16> = src.iter().map(|&x| i16::from(x)).collect();
+        let expected_i32: Vec<i32> = src.iter().map(|&x| i32::from(x)).collect();
 
-        assert_eq!(dest_i16, expected_i16, "Failed for length i16: {}", len);
-        assert_eq!(dest_i32, expected_i32, "Failed for length i32: {}", len);
+        assert_eq!(dest_i16, expected_i16, "Failed for length i16: {len}");
+        assert_eq!(dest_i32, expected_i32, "Failed for length i32: {len}");
 
         // Also test transparent wrapped types
         let src_wrapped: Vec<I8> = src.iter().map(|&x| I8(x)).collect();
@@ -361,18 +366,16 @@ fn test_widen_i8_simd_and_tails() {
         widen_I8_to_I16(&src_wrapped, &mut dest_i16_wrapped);
         widen_I8_to_I32(&src_wrapped, &mut dest_i32_wrapped);
 
-        let expected_i16_wrapped: Vec<I16> = src.iter().map(|&x| I16(x as i16)).collect();
-        let expected_i32_wrapped: Vec<I32> = src.iter().map(|&x| I32(x as i32)).collect();
+        let expected_i16_wrapped: Vec<I16> = src.iter().map(|&x| I16(i16::from(x))).collect();
+        let expected_i32_wrapped: Vec<I32> = src.iter().map(|&x| I32(i32::from(x))).collect();
 
         assert_eq!(
             dest_i16_wrapped, expected_i16_wrapped,
-            "Failed for wrapped i16: {}",
-            len
+            "Failed for wrapped i16: {len}"
         );
         assert_eq!(
             dest_i32_wrapped, expected_i32_wrapped,
-            "Failed for wrapped i32: {}",
-            len
+            "Failed for wrapped i32: {len}"
         );
     }
 }

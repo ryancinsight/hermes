@@ -3,7 +3,7 @@
 //! `SimdCow` provides zero-copy read access to borrowed slices via `SimdView`,
 //! deferring heap allocation until mutable or owned access is required.
 //!
-//! CoW combinators (`zip_cow`, `transform_in_place`) apply elementwise `ElementOp`
+//! `CoW` combinators (`zip_cow`, `transform_in_place`) apply elementwise `ElementOp`
 //! strategies without unnecessary intermediate allocations:
 //! - `zip_cow`: exactly one `AlignedVec` allocation for the output.
 //! - `transform_in_place`: promotes to owned (one allocation) if borrowed, then

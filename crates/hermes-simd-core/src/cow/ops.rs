@@ -89,7 +89,6 @@ macro_rules! impl_binary_op {
             type Output = SimdCow<'static, T, Arch, Align>;
 
             #[inline]
-            #[allow(unused_mut)]
             fn $op_method(self, rhs: SimdCow<'b, T, Arch, Align>) -> Self::Output {
                 match (self, rhs) {
                     (SimdCow::Owned(lhs_vec), rhs) => {
@@ -137,7 +136,6 @@ macro_rules! impl_binary_op {
             type Output = SimdCow<'static, T, Arch, Align>;
 
             #[inline]
-            #[allow(unused_mut)]
             fn $op_method(self, rhs: &'b SimdCow<'b, T, Arch, Align>) -> Self::Output {
                 match self {
                     SimdCow::Owned(lhs_vec) => {

@@ -293,6 +293,7 @@ where
 
     /// Computes the horizontal sum of population counts of all elements.
     #[inline]
+    #[must_use]
     pub fn reduce_popcount(&self) -> usize {
         let data = self.as_slice();
         let len = data.len();
@@ -606,6 +607,7 @@ where
     /// backend result never escapes. Equal extrema use the first slice element,
     /// including its signed-zero representation.
     #[inline]
+    #[must_use]
     pub fn argmin(&self) -> Option<(usize, T)> {
         let data = self.as_slice();
         if data.is_empty() {
@@ -625,6 +627,7 @@ where
     /// backend result never escapes. Equal extrema use the first slice element,
     /// including its signed-zero representation.
     #[inline]
+    #[must_use]
     pub fn argmax(&self) -> Option<(usize, T)> {
         let data = self.as_slice();
         if data.is_empty() {
