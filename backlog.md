@@ -732,7 +732,10 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   which the probe returns true, the GEMM dispatches, and its result is
   differentially checked against `scalar/tiling.rs`.
 
-- [ ] [major] **HS-434 — `const TILE: u8` for the AMX raw tile wrappers.**
+- [ ] [major] **HS-438 — `const TILE: u8` for the AMX raw tile wrappers.**
+  *(Renumbered from HS-434 on 2026-08-14: that ID was already held by the
+  workspace lint floor item at the top of this file. See the note under
+  HS-439.)*
   `raw::tilezero`/`tileloadd`/`tilestored` dispatch an 8-arm runtime `match`
   with an `unreachable!()` inside the tile loop, and `tdpbf16ps`/`tdpbssd`
   match an 11-entry whitelist of `(dst, src1, src2)` triples — a latent defect,
@@ -749,7 +752,7 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   `unreachable!()` in `amx/mod.rs`, all call sites converted, and a measured
   before/after on AMX silicon.
 
-- [x] [patch] **HS-435 — `# Safety` sections for the AMX raw wrappers.**
+- [x] [patch] **HS-439 — `# Safety` sections for the AMX raw wrappers.**
   The eight `pub unsafe fn`s in `amx/mod.rs`'s `raw` module carry `///`
   summaries but no `# Safety` section, so `clippy::missing_safety_doc` fired on
   each. The wrappers now state their real preconditions: AMX permission and an
@@ -757,6 +760,19 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   valid pointer/stride ranges for tile loads and stores, and 64-byte-aligned
   `TILECFG` storage. The targeted safety-doc lint is clean and intrinsics
   nextest passes 30/30.
+  *(Renumbered from HS-435 on 2026-08-14: that ID was already held by the
+  pedantic-ratchet item at the top of this file.)*
+
+  **ID allocation.** Both AMX items above were renumbered rather than the
+  lint-floor and ratchet items that shared their numbers, because those two are
+  cited by `Refs:` footers in already-pushed commits (`aa61f33`, `03871b4`,
+  `81502c5`) and commit messages cannot be corrected without rewriting shared
+  history. Renumbering the later items keeps every existing citation resolving
+  to exactly one entry.
+  Before claiming a new ID, check the whole file rather than the top section —
+  this file holds delivered items in dated sections further down, so the highest
+  number in use is not necessarily near the top. `grep -o 'HS-[0-9]\+' backlog.md
+  | sort -u | sort -t- -k2 -n | tail -1` gives it.
 
 ## Delivered (2026-06-11)
 
