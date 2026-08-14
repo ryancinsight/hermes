@@ -30,7 +30,9 @@
   reject safely because portable no-std Rust has no thread-local storage
   primitive. ADR 012 records the boundary and alternatives. Evidence:
   subscriber-backed value assertions, default-feature compilation, and the
-  no-default-features check; hosted CI remains the merge gate for all targets.
+  no-default-features check. Merged head `f4d444b5` passes the exact hosted
+  package matrix in run `31819198076`, including ARM NEON, Intel SDE, Miri,
+  cross-compilation, and supply-chain checks.
 
 - [x] [minor] **HS-435 — pedantic ratchet.** The lint floor (HS-434) is set to
   warn against the remaining library-src findings. Non-increasing baseline,
@@ -335,7 +337,8 @@
   300-second canonical measurements remain on pull requests and manual runs.
   A bench that panics or breaches its smoke budget therefore fails CI on the
   same event that introduced it. The push path does not claim full benchmark
-  performance evidence.
+  performance evidence. Exact hosted run `31819198076` passes the compile,
+  60-second smoke, and bounded canonical benchmark steps.
 
 - [ ] [patch] **HS-430 — measure the AVX-512 and NEON permute overrides.**
   HS-427 shipped them on correctness alone. The AVX2 result — a hand-written
