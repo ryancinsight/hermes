@@ -35,7 +35,7 @@
   Acceptance: the re-route emits a `tracing` event in release builds, asserted
   by a test capturing the subscriber.
 
-- [ ] [minor] **HS-435 — pedantic ratchet.** The lint floor (HS-434) is set to
+- [x] [minor] **HS-435 — pedantic ratchet.** The lint floor (HS-434) is set to
   warn against the remaining library-src findings. Non-increasing baseline,
   burnt down by class rather than by file. Acceptance: each increment lowers
   the recorded count and never raises it.
@@ -50,9 +50,9 @@
   | **0** | `elidable_lifetime_names` | **done** — 131 explicit lifetime names elided mechanically; relationships with independent input lifetimes remain explicit |
   | **0** | `semicolon_if_nothing_returned` | **done** — 92 unit, example, benchmark, kernel, and AMX wrapper return statements now make their unit-value intent explicit |
   | **0** | `missing_errors_doc` | **done** — all 47 public `Result` APIs document their error contracts |
-  | 63 | `cast_lossless` | prefer `From` over `as` where infallible |
-  | 62 | `doc_markdown` | backticks |
-  | 49 | `uninlined_format_args` | mechanical |
+  | **0** | `cast_lossless` | **done** — swept with the consolidated mechanical fixes; prefer `From` over `as` where infallible |
+  | **0** | `doc_markdown` | **done** — backticks |
+  | **0** | `uninlined_format_args` | **done** — mechanical |
   | **0** | `allow_attributes` | **done** — library source suppressions now use reasoned `#[expect]` or are deleted when unfulfilled; test/bench-only suppressions remain outside this library-source ratchet |
   | **0** | `cast_ptr_alignment` | **done** — 21 deliberately unaligned intrinsic sites reviewed below |
   | **0** | `missing_panics_doc` | **done** — 19 contract-bearing APIs documented below |
@@ -142,6 +142,18 @@
   incidental overflow panic. Verification: `cargo fmt --all -- --check`,
   `cargo test --doc -p hermes-simd-core -p hermes-simd -p
   hermes-simd-intrinsics`, nextest 454/454, and benchmark smoke pass.
+
+  **`cast_lossless` / `doc_markdown` / `uninlined_format_args` verified at 0
+  (2026-08-14).** The consolidated mechanical sweep in the strict-gate
+  increment had already cleared these three classes; the table lagged behind
+  the tree. Verified with a clean full-workspace measurement: `cargo clippy
+  --workspace --all-targets` after `cargo clean` emits zero diagnostics under
+  the workspace lint table, and a forced `-W clippy::pedantic` re-lint of all
+  seven crates yields only the curated-allow classes (inline_always,
+  cast_* precision/wrap/truncation/sign-loss, similar_names,
+  many_single_char_names — 1387 unique, matching the allowed set exactly), with
+  not one occurrence of the three formerly-pending classes. The strict gate
+  therefore holds; HS-435 is complete.
 
   **`ptr_as_ptr` burned down: 171 -> 0.** 167 sites converted mechanically by
   `cargo clippy --fix` restricted to that one lint; the remaining 4 were
