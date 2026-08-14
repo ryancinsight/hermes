@@ -14,6 +14,7 @@ mod casts;
 pub mod gather;
 /// Lane-masked math and compaction/expansion operations on SIMD views.
 pub mod masked;
+mod masked_compaction;
 /// Standard elementwise and accumulation operations on SIMD views.
 pub mod ops;
 /// Standard exclusive mutable elementwise operations on SIMD views.

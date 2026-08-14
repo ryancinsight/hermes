@@ -163,6 +163,11 @@ where
     }
 
     /// Reshapes the tensor to a different rank `M` without allocation.
+    ///
+    /// # Errors
+    /// Returns [`TensorError::NotContiguous`] when the source is not
+    /// contiguous, or [`TensorError::ShapeMismatch`] when the element counts
+    /// of the old and new shapes differ.
     #[inline]
     pub fn reshape<const M: usize>(
         self,

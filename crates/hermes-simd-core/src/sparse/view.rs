@@ -88,6 +88,11 @@ where
     Arch: SimdArch,
 {
     /// Validate CSR storage and create a SpMV-ready view.
+    ///
+    /// # Errors
+    /// Returns [`crate::SimdError::LengthMismatch`] when CSR storage lengths
+    /// are inconsistent, or [`crate::SimdError::IndexOutOfBounds`] when a row
+    /// pointer or column index is invalid.
     #[inline]
     pub fn try_from_csr(data: CsrData<'a, T>) -> Result<Self, crate::SimdError> {
         Ok(Self {
@@ -138,6 +143,11 @@ where
     Arch: SimdArch,
 {
     /// Validate SELL-p storage and create a SpMV-ready view.
+    ///
+    /// # Errors
+    /// Returns [`crate::SimdError::LengthMismatch`] when SELL-p storage
+    /// lengths are inconsistent, or [`crate::SimdError::IndexOutOfBounds`]
+    /// when a row pointer or column index is invalid.
     #[inline]
     pub fn try_from_sellp(data: SellPData<'a, T, C>) -> Result<Self, crate::SimdError> {
         Ok(Self {
@@ -189,6 +199,11 @@ where
     Arch: SimdArch,
 {
     /// Validate Blocked-COO storage and create a SpMV-ready view.
+    ///
+    /// # Errors
+    /// Returns [`crate::SimdError::LengthMismatch`] when Blocked-COO storage
+    /// lengths are inconsistent, or [`crate::SimdError::IndexOutOfBounds`]
+    /// when a row, column, or block index is invalid.
     #[inline]
     pub fn try_from_blocked_coo(
         data: BlockedCooData<'a, T, BM, BN>,

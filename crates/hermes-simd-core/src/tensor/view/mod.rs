@@ -275,6 +275,10 @@ impl<'a, T, const N: usize, L, Ref> TensorView<'a, T, N, L, Ref> {
     }
 
     /// Bounds-checked element access.
+    ///
+    /// # Errors
+    /// Returns [`TensorError::IndexOutOfBounds`] when any index is outside
+    /// its corresponding shape dimension.
     #[inline]
     pub fn get(&self, idx: [usize; N]) -> Result<T, TensorError>
     where
@@ -304,6 +308,11 @@ impl<'a, T, const N: usize, L, Ref> TensorView<'a, T, N, L, Ref> {
     }
 
     /// Reshape this view to a different rank `M`, reusing the same flat slice.
+    ///
+    /// # Errors
+    /// Returns [`TensorError::NotContiguous`] when the source is not
+    /// contiguous, or [`TensorError::ShapeMismatch`] when the element counts
+    /// of the old and new shapes differ.
     #[inline]
     pub fn reshape<const M: usize>(
         self,
@@ -339,6 +348,10 @@ impl<'a, 'b, T, const N: usize, L> TensorView<'a, T, N, L, &'b mut [T]> {
     }
 
     /// Bounds-checked element write access.
+    ///
+    /// # Errors
+    /// Returns [`TensorError::IndexOutOfBounds`] when any index is outside
+    /// its corresponding shape dimension.
     #[inline]
     pub fn set(&mut self, idx: [usize; N], val: T) -> Result<(), TensorError> {
         for i in 0..N {

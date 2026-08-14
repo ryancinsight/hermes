@@ -72,6 +72,10 @@ pub trait TilingStrategy<T, Arch: SimdArch, Align: Alignment> {
     const TILE_N: usize;
 
     /// Perform tiled matrix multiplication `c += a * b` using this strategy.
+    ///
+    /// # Errors
+    /// Returns [`SimdError::LengthMismatch`] when the operand spans or output
+    /// length do not satisfy the supplied matrix dimensions.
     fn gemm(
         a: &SimdView<'_, T, Arch, Align>,
         b: &SimdView<'_, T, Arch, Align>,
@@ -82,6 +86,10 @@ pub trait TilingStrategy<T, Arch: SimdArch, Align: Alignment> {
     ) -> Result<(), SimdError>;
 
     /// Perform tiled matrix-vector multiplication `y += A * x` using this strategy.
+    ///
+    /// # Errors
+    /// Returns [`SimdError::LengthMismatch`] when the operand spans or output
+    /// length do not satisfy the supplied matrix dimensions.
     fn gemv(
         a: &SimdView<'_, T, Arch, Align>,
         x: &SimdView<'_, T, Arch, Align>,
@@ -92,6 +100,10 @@ pub trait TilingStrategy<T, Arch: SimdArch, Align: Alignment> {
 
     /// Perform tiled transposed matrix-vector multiplication `y += Aᵀ * x`
     /// (`A` row-major `nrows × ncols`, `x` length `nrows`, `y` length `ncols`).
+    ///
+    /// # Errors
+    /// Returns [`SimdError::LengthMismatch`] when the operand spans or output
+    /// length do not satisfy the supplied matrix dimensions.
     fn gemv_transpose(
         a: &SimdView<'_, T, Arch, Align>,
         x: &SimdView<'_, T, Arch, Align>,
@@ -103,6 +115,10 @@ pub trait TilingStrategy<T, Arch: SimdArch, Align: Alignment> {
     /// Perform tiled matrix-vector multiplication `y += A * x` over a row-major
     /// **sub-matrix**: `nrows × ncols` with row stride `lda ≥ ncols`
     /// (`lda = ncols` is the packed [`Self::gemv`]).
+    ///
+    /// # Errors
+    /// Returns [`SimdError::LengthMismatch`] when `lda` is too small or the
+    /// operand spans or output length do not satisfy the supplied dimensions.
     fn gemv_strided(
         a: &SimdView<'_, T, Arch, Align>,
         x: &SimdView<'_, T, Arch, Align>,
@@ -115,6 +131,10 @@ pub trait TilingStrategy<T, Arch: SimdArch, Align: Alignment> {
     /// Perform tiled transposed matrix-vector multiplication `y += Aᵀ * x` over a
     /// row-major **sub-matrix**: `nrows × ncols` with row stride `lda ≥ ncols`
     /// (`lda = ncols` is the packed [`Self::gemv_transpose`]).
+    ///
+    /// # Errors
+    /// Returns [`SimdError::LengthMismatch`] when `lda` is too small or the
+    /// operand spans or output length do not satisfy the supplied dimensions.
     fn gemv_transpose_strided(
         a: &SimdView<'_, T, Arch, Align>,
         x: &SimdView<'_, T, Arch, Align>,
@@ -125,6 +145,9 @@ pub trait TilingStrategy<T, Arch: SimdArch, Align: Alignment> {
     ) -> Result<(), SimdError>;
 
     /// Perform tiled dot product computation using this strategy.
+    ///
+    /// # Errors
+    /// Returns [`SimdError::LengthMismatch`] when the operand lengths differ.
     fn dot(
         a: &SimdView<'_, T, Arch, Align>,
         b: &SimdView<'_, T, Arch, Align>,
@@ -135,6 +158,9 @@ pub trait TilingStrategy<T, Arch: SimdArch, Align: Alignment> {
 ///
 /// The inner loop processes `TILE_M * LANE_COUNT` elements per iteration, holding
 /// `TILE_M` accumulator registers simultaneously to saturate FMA throughput.
+///
+/// # Errors
+/// Returns [`SimdError::LengthMismatch`] when the operand lengths differ.
 #[inline(always)]
 pub fn tiled_dot<T, Arch, Align, const TILE_M: usize>(
     a: &SimdView<'_, T, Arch, Align>,
@@ -202,6 +228,10 @@ pub struct _TileMarker<const M: usize, const N: usize>(PhantomData<TilingPolicy<
 ///
 /// Processes `TILE_M` rows of `A` simultaneously to reuse loaded elements of `x` across those rows.
 /// Accepts `SimdView`-typed operands to enforce alignment typestates at the call boundary.
+///
+/// # Errors
+/// Returns [`SimdError::LengthMismatch`] when the operand spans or output
+/// length do not satisfy the supplied matrix dimensions.
 #[inline(always)]
 pub fn tiled_gemv<T, Arch, Align, const TILE_M: usize>(
     a: &SimdView<'_, T, Arch, Align>,
@@ -222,6 +252,10 @@ where
 ///
 /// Multiplies matrix `a` (dimensions `m * k`) and matrix `b` (dimensions `k * n`),
 /// accumulating the result into `c` (dimensions `m * n`).
+///
+/// # Errors
+/// Returns [`SimdError::LengthMismatch`] when the operand spans or output
+/// length do not satisfy the supplied matrix dimensions.
 #[inline(always)]
 pub fn tiled_gemm<T, Arch, Align, const TILE_M: usize, const TILE_N: usize>(
     a: &SimdView<'_, T, Arch, Align>,

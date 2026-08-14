@@ -139,6 +139,10 @@ where
     }
 
     /// Try to construct a Vector with all lanes set to zero.
+    ///
+    /// # Errors
+    /// Returns [`SimdError::UnsupportedTarget`] when the architecture is not
+    /// supported or enabled on this host.
     #[inline(always)]
     pub fn try_zero() -> Result<Self, SimdError> {
         runtime_support_result::<T, Arch>()?;
@@ -156,6 +160,10 @@ where
     }
 
     /// Try to construct a Vector by broadcasting a scalar value to all lanes.
+    ///
+    /// # Errors
+    /// Returns [`SimdError::UnsupportedTarget`] when the architecture is not
+    /// supported or enabled on this host.
     #[inline(always)]
     pub fn try_splat(val: T) -> Result<Self, SimdError> {
         runtime_support_result::<T, Arch>()?;
@@ -224,6 +232,7 @@ where
 
     /// Load one vector from the start of a slice using the unaligned kernel load.
     ///
+    /// # Errors
     /// Returns [`SimdError::InsufficientInputLength`] when `data` has fewer
     /// elements than `Arch::LANE_COUNT`.
     #[inline(always)]
@@ -239,6 +248,7 @@ where
 
     /// Load one vector from the start of a slice using the aligned kernel load.
     ///
+    /// # Errors
     /// Returns [`SimdError::InsufficientInputLength`] when `data` has fewer
     /// elements than `Arch::LANE_COUNT`, and [`SimdError::UnalignedAddress`]
     /// when the slice start is not aligned to the vector byte width.
@@ -257,6 +267,7 @@ where
 
     /// Store this vector to the start of a slice using the unaligned kernel store.
     ///
+    /// # Errors
     /// Returns [`SimdError::InsufficientOutputLength`] when `out` has fewer
     /// elements than `Arch::LANE_COUNT`.
     #[inline(always)]
@@ -275,6 +286,7 @@ where
 
     /// Store this vector to the start of a slice using the aligned kernel store.
     ///
+    /// # Errors
     /// Returns [`SimdError::InsufficientOutputLength`] when `out` has fewer
     /// elements than `Arch::LANE_COUNT`, and [`SimdError::UnalignedAddress`]
     /// when the slice start is not aligned to the vector byte width.
@@ -298,6 +310,11 @@ where
     ///
     /// Active lanes (according to `mask`) must reside within the bounds of `data`.
     /// Inactive lanes are populated from the corresponding lanes of `src`.
+    ///
+    /// # Errors
+    /// Returns [`SimdError::IndexOutOfBounds`] when an active mask lane is
+    /// outside `data`, or [`SimdError::UnsupportedTarget`] when the
+    /// architecture is not supported or enabled on this host.
     #[inline]
     pub fn masked_load_from_slice(
         data: &[T],
@@ -352,6 +369,11 @@ where
     ///
     /// Active lanes (according to `mask`) must reside within the bounds of `data`.
     /// Inactive lanes in the slice are left unchanged.
+    ///
+    /// # Errors
+    /// Returns [`SimdError::IndexOutOfBounds`] when an active mask lane is
+    /// outside `data`, or [`SimdError::UnsupportedTarget`] when the
+    /// architecture is not supported or enabled on this host.
     #[inline]
     pub fn masked_store_to_slice(
         self,
@@ -540,6 +562,10 @@ where
 
     /// Try to create a Vector from an array of size `N`, where `N` must equal
     /// `Arch::LANE_COUNT`.
+    ///
+    /// # Errors
+    /// Returns [`SimdError::UnsupportedTarget`] when the architecture is not
+    /// supported or enabled on this host.
     #[inline(always)]
     pub fn try_from_array<const N: usize>(arr: [T; N]) -> Result<Self, SimdError> {
         runtime_support_result::<T, Arch>()?;

@@ -148,6 +148,11 @@ impl<'a, T, L> TensorView<'a, T, 2, L, &mut [T]> {
 
 impl<'a, T, L> TensorView<'a, T, 3, L, &'a [T]> {
     /// Return a 2-D view of the `b`-th matrix in a batched tensor.
+    ///
+    /// # Errors
+    /// Returns [`TensorError::NotContiguous`] when the source is not
+    /// contiguous, or [`TensorError::IndexOutOfBounds`] when `b` is outside
+    /// the batch dimension.
     #[inline]
     pub fn matrix_at(
         &self,
@@ -170,6 +175,11 @@ impl<'a, T, L> TensorView<'a, T, 3, L, &'a [T]> {
 
 impl<'a, T, L> TensorView<'a, T, 3, L, &'a mut [T]> {
     /// Return a mutable 2-D view of the `b`-th matrix in a batched tensor.
+    ///
+    /// # Errors
+    /// Returns [`TensorError::NotContiguous`] when the source is not
+    /// contiguous, or [`TensorError::IndexOutOfBounds`] when `b` is outside
+    /// the batch dimension.
     #[inline]
     pub fn matrix_at_mut(
         &mut self,

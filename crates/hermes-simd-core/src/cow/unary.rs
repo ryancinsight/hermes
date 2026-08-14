@@ -109,6 +109,10 @@ where
     ///
     /// Uses `Arch::fmadd` in the SIMD region and `T::scalar_fmadd` in the tail.
     /// One allocation. Returns `Err(SimdError::LengthMismatch)` if lengths differ.
+    ///
+    /// # Errors
+    /// Returns [`SimdError::LengthMismatch`] if the three operand lengths
+    /// differ.
     #[inline]
     pub fn fma_cow(
         &self,
