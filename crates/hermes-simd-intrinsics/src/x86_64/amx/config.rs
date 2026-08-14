@@ -50,13 +50,19 @@ impl AmxConfig {
     }
 
     /// Generate a tile config for the AMX GEMM microkernel block.
+    ///
+    /// AMX stores the right-hand operand as an `N`-row tile whose byte columns
+    /// cover the `K` depth. This is the shape consumed by the dot-product
+    /// instructions, not the logical row-major `K × N` view of `B`.
+    /// The palette limit and operand layout follow Intel's AMX configuration
+    /// example: <https://www.intel.com/content/www/us/en/developer/articles/code-sample/advanced-matrix-extensions-intrinsics-functions.html>.
     #[inline]
     pub fn for_dimensions(m: usize, n: usize, k: usize, element_size: usize) -> Self {
         let tile_n = n.min(Self::MATRIX_TILE_COLUMNS);
         let r_a = m.min(16) as u8;
         let c_a_bytes = (k * element_size).min(64) as u16;
-        let r_b = k.min(64 / element_size) as u8;
-        let c_b_bytes = (tile_n * element_size).min(64) as u16;
+        let r_b = tile_n as u8;
+        let c_b_bytes = (k * element_size).min(64) as u16;
         let r_c = m.min(16) as u8;
         let c_c_bytes = (tile_n * 4).min(64) as u16; // Accumulation in 32-bit (F32/I32)
 
@@ -97,8 +103,8 @@ mod tests {
     fn int8_configuration_respects_tile_byte_budget_for_irregular_width() {
         let config = AmxConfig::for_dimensions(19, 17, 65, 1);
 
-        assert_eq!(config.rows[1], 64);
-        assert_eq!(config.cols_b[1], 16);
+        assert_eq!(config.rows[1], 16);
+        assert_eq!(config.cols_b[1], 64);
         assert_eq!(
             usize::from(config.rows[1]) * usize::from(config.cols_b[1]),
             1024
@@ -110,8 +116,8 @@ mod tests {
     fn bf16_configuration_uses_the_fixed_microtile_width() {
         let config = AmxConfig::for_dimensions(19, 17, 33, 2);
 
-        assert_eq!(config.rows[1], 32);
-        assert_eq!(config.cols_b[1], 32);
+        assert_eq!(config.rows[1], 16);
+        assert_eq!(config.cols_b[1], 64);
         assert_eq!(
             usize::from(config.rows[1]) * usize::from(config.cols_b[1]),
             1024
