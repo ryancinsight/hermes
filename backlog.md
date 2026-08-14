@@ -20,7 +20,7 @@
   Measured floor: 2152 library-src pedantic findings remain at warn; they are
   the HS-435 ratchet, not a silent allow.
 
-- [ ] [patch] **HS-433 — AMX downgrade notice writes to stderr.**
+- [ ] [patch] **HS-433 — AMX downgrade notice writes to stderr.** *(in progress — Codex, 2026-08-14)*
   `dispatcher.rs` surfaces the cross-NUMA-node AMX -> AVX-512 re-route with a
   debug-only `eprintln!`, so in release builds the downgrade is silent — the
   fallback-must-surface-its-trigger rule wants a `tracing` event. Not done now:
