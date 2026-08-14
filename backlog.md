@@ -54,7 +54,7 @@
   | 62 | `doc_markdown` | backticks |
   | 49 | `uninlined_format_args` | mechanical |
   | **0** | `allow_attributes` | **done** — library source suppressions now use reasoned `#[expect]` or are deleted when unfulfilled; test/bench-only suppressions remain outside this library-source ratchet |
-  | 21 | `cast_ptr_alignment` | **not mechanical** — each is a real alignment claim to check against the load it feeds |
+  | **0** | `cast_ptr_alignment` | **done** — 21 deliberately unaligned intrinsic sites reviewed below |
   | **0** | `missing_panics_doc` | **done** — 19 contract-bearing APIs documented below |
   | 13 | `ref_as_ptr` | `core::ptr::from_ref`; same family as the finished item |
   | 9 | `ptr_cast_constness` | `.cast_const()`/`.cast_mut()`; same family |
@@ -86,6 +86,14 @@
   `clippy::missing_panics_doc` gate is clean; `cargo fmt --all -- --check` and
   the focused `hermes-simd-core` nextest suite pass 16/16. The remaining
   HS-435 classes are unchanged and stay in the table above.
+
+  **`cast_ptr_alignment` burned down: 21 -> 0 (2026-08-14).** The AVX2
+  F16C, AVX-VNNI, AVX-512 VNNI, and consumer unpack paths now carry precise
+  per-site expectations where the intrinsic is explicitly an unaligned
+  load/store. The workspace all-targets `clippy::cast_ptr_alignment` gate is
+  clean, and the focused intrinsics nextest suite passes 30/30. No alignment
+  promise was weakened; each expectation is attached to the matching
+  `_loadu`, `_loadl`, or `_storeu` intrinsic.
 
   **`ptr_as_ptr` burned down: 171 -> 0.** 167 sites converted mechanically by
   `cargo clippy --fix` restricted to that one lint; the remaining 4 were

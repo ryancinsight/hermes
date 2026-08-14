@@ -146,15 +146,36 @@ unsafe fn tile_matmul_i8(
 
     let mut c_regs = [_mm512_setzero_si512(); 16];
     for (row, accumulator) in c_regs.iter_mut().enumerate() {
-        *accumulator = _mm512_loadu_si512(c.add(row * c_stride) as *const _);
+        #[expect(
+            clippy::cast_ptr_alignment,
+            reason = "_mm512_loadu_si512 accepts the deliberately unaligned tile row"
+        )]
+        let c_row = c.add(row * c_stride).cast::<__m512i>();
+        *accumulator = _mm512_loadu_si512(c_row);
     }
 
     let byte_bias = _mm512_set1_epi8(i8::MIN);
     let mut bias_accumulator = _mm512_setzero_si512();
     for k in (0..64).step_by(4) {
+        #[expect(
+            clippy::cast_ptr_alignment,
+            reason = "_mm_loadu_si128 accepts the deliberately unaligned tile row"
+        )]
         let row0 = _mm_loadu_si128(b.add(k * b_stride).cast::<__m128i>());
+        #[expect(
+            clippy::cast_ptr_alignment,
+            reason = "_mm_loadu_si128 accepts the deliberately unaligned tile row"
+        )]
         let row1 = _mm_loadu_si128(b.add((k + 1) * b_stride).cast::<__m128i>());
+        #[expect(
+            clippy::cast_ptr_alignment,
+            reason = "_mm_loadu_si128 accepts the deliberately unaligned tile row"
+        )]
         let row2 = _mm_loadu_si128(b.add((k + 2) * b_stride).cast::<__m128i>());
+        #[expect(
+            clippy::cast_ptr_alignment,
+            reason = "_mm_loadu_si128 accepts the deliberately unaligned tile row"
+        )]
         let row3 = _mm_loadu_si128(b.add((k + 3) * b_stride).cast::<__m128i>());
 
         let unpack_lo_01 = _mm_unpacklo_epi8(row0, row1);

@@ -72,9 +72,17 @@ pub fn widen_i8_to_i16(src: &[i8], dest: &mut [i16]) {
         if std::is_x86_feature_detected!("avx512bw") {
             while i + 32 <= len {
                 unsafe {
+                    #[expect(
+                        clippy::cast_ptr_alignment,
+                        reason = "_mm256_loadu_si256 accepts the deliberately unaligned source"
+                    )]
                     let src_ptr = src.as_ptr().add(i).cast::<__m256i>();
                     let a = _mm256_loadu_si256(src_ptr);
                     let res = _mm512_cvtepi8_epi16(a);
+                    #[expect(
+                        clippy::cast_ptr_alignment,
+                        reason = "_mm512_storeu_si512 accepts the deliberately unaligned output"
+                    )]
                     let dest_ptr = dest.as_mut_ptr().add(i).cast::<__m512i>();
                     _mm512_storeu_si512(dest_ptr, res);
                 }
@@ -85,8 +93,16 @@ pub fn widen_i8_to_i16(src: &[i8], dest: &mut [i16]) {
             while i + 16 <= len {
                 unsafe {
                     let src_ptr = src.as_ptr().add(i);
+                    #[expect(
+                        clippy::cast_ptr_alignment,
+                        reason = "_mm_loadu_si128 accepts the deliberately unaligned source"
+                    )]
                     let a = _mm_loadu_si128(src_ptr.cast::<__m128i>());
                     let res = _mm256_cvtepi8_epi16(a);
+                    #[expect(
+                        clippy::cast_ptr_alignment,
+                        reason = "_mm256_storeu_si256 accepts the deliberately unaligned output"
+                    )]
                     let dest_ptr = dest.as_mut_ptr().add(i).cast::<__m256i>();
                     _mm256_storeu_si256(dest_ptr, res);
                 }
@@ -133,8 +149,16 @@ pub fn widen_i8_to_i32(src: &[i8], dest: &mut [i32]) {
             while i + 16 <= len {
                 unsafe {
                     let src_ptr = src.as_ptr().add(i);
+                    #[expect(
+                        clippy::cast_ptr_alignment,
+                        reason = "_mm_loadu_si128 accepts the deliberately unaligned source"
+                    )]
                     let a = _mm_loadu_si128(src_ptr.cast::<__m128i>());
                     let res = _mm512_cvtepi8_epi32(a);
+                    #[expect(
+                        clippy::cast_ptr_alignment,
+                        reason = "_mm512_storeu_si512 accepts the deliberately unaligned output"
+                    )]
                     let dest_ptr = dest.as_mut_ptr().add(i).cast::<__m512i>();
                     _mm512_storeu_si512(dest_ptr, res);
                 }
@@ -145,8 +169,16 @@ pub fn widen_i8_to_i32(src: &[i8], dest: &mut [i32]) {
             while i + 8 <= len {
                 unsafe {
                     let src_ptr = src.as_ptr().add(i);
+                    #[expect(
+                        clippy::cast_ptr_alignment,
+                        reason = "_mm_loadl_epi64 accepts the deliberately unaligned source"
+                    )]
                     let a = _mm_loadl_epi64(src_ptr.cast::<__m128i>());
                     let res = _mm256_cvtepi8_epi32(a);
+                    #[expect(
+                        clippy::cast_ptr_alignment,
+                        reason = "_mm256_storeu_si256 accepts the deliberately unaligned output"
+                    )]
                     let dest_ptr = dest.as_mut_ptr().add(i).cast::<__m256i>();
                     _mm256_storeu_si256(dest_ptr, res);
                 }
