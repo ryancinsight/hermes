@@ -72,7 +72,7 @@ impl AmxConfig {
         // Tile 0 (A): M rows x K cols
         rows[0] = r_a;
         cols_b[0] = c_a_bytes;
-        // Tile 1 (B): K rows x N cols
+        // Tile 1 (B): N rows x K byte columns after RHS packing
         rows[1] = r_b;
         cols_b[1] = c_b_bytes;
         // Tile 2 (C): M rows x N cols

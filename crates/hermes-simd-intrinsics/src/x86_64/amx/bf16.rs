@@ -1,4 +1,4 @@
-use super::{raw, AmxBf16, AmxConfig, AmxSession};
+use super::{pack::pack_rhs_panel, raw, AmxBf16, AmxConfig, AmxSession};
 use eunomia::{Bf16, F32};
 use hermes_simd_core::view::TileMatrixMultiply;
 
@@ -20,8 +20,10 @@ impl TileMatrixMultiply<Bf16, Bf16, F32, AmxBf16, AmxBf16, 16, 16, 32> for AmxBf
 
         // A is M=16 rows, K=32 cols. Row stride in bytes = a_stride * 2.
         raw::tileloadd(0, a.cast(), (a_stride * 2) as isize);
-        // B is K=32 rows, N=16 cols. Row stride in bytes = b_stride * 2.
-        raw::tileloadd(1, b.cast(), (b_stride * 2) as isize);
+        // B is packed as N=16 rows, K=32 columns for AMX dot products.
+        let mut b_tile = [Bf16::default(); 16 * 32];
+        pack_rhs_panel(b, b_stride, 0, 0, 32, &mut b_tile);
+        raw::tileloadd(1, b_tile.as_ptr().cast(), 64);
         // C is M=16 rows, N=16 cols. Row stride in bytes = c_stride * 4.
         raw::tileloadd(2, c as *const _, (c_stride * 4) as isize);
 
@@ -77,6 +79,8 @@ impl super::AmxGemm<Bf16, Bf16, F32> for AmxBf16 {
                     (c_stride * 4) as isize,
                 );
 
+                let mut b_tile_0 = [Bf16::default(); 16 * 32];
+                let mut b_tile_1 = [Bf16::default(); 16 * 32];
                 let mut kk = 0;
                 while kk + 32 <= k {
                     raw::tileloadd(0, a.add(i * a_stride + kk).cast(), (a_stride * 2) as isize);
@@ -86,12 +90,10 @@ impl super::AmxGemm<Bf16, Bf16, F32> for AmxBf16 {
                         (a_stride * 2) as isize,
                     );
 
-                    raw::tileloadd(6, b.add(kk * b_stride + j).cast(), (b_stride * 2) as isize);
-                    raw::tileloadd(
-                        7,
-                        b.add(kk * b_stride + j + 16).cast(),
-                        (b_stride * 2) as isize,
-                    );
+                    pack_rhs_panel(b, b_stride, j, kk, 32, &mut b_tile_0);
+                    pack_rhs_panel(b, b_stride, j + 16, kk, 32, &mut b_tile_1);
+                    raw::tileloadd(6, b_tile_0.as_ptr().cast(), 64);
+                    raw::tileloadd(7, b_tile_1.as_ptr().cast(), 64);
 
                     raw::tdpbf16ps(2, 0, 6);
                     raw::tdpbf16ps(3, 0, 7);
@@ -133,6 +135,7 @@ impl super::AmxGemm<Bf16, Bf16, F32> for AmxBf16 {
                     (c_stride * 4) as isize,
                 );
 
+                let mut b_tile = [Bf16::default(); 16 * 32];
                 let mut kk = 0;
                 while kk + 32 <= k {
                     raw::tileloadd(0, a.add(i * a_stride + kk).cast(), (a_stride * 2) as isize);
@@ -141,7 +144,8 @@ impl super::AmxGemm<Bf16, Bf16, F32> for AmxBf16 {
                         a.add((i + 16) * a_stride + kk).cast(),
                         (a_stride * 2) as isize,
                     );
-                    raw::tileloadd(6, b.add(kk * b_stride + j).cast(), (b_stride * 2) as isize);
+                    pack_rhs_panel(b, b_stride, j, kk, 32, &mut b_tile);
+                    raw::tileloadd(6, b_tile.as_ptr().cast(), 64);
 
                     raw::tdpbf16ps(2, 0, 6);
                     raw::tdpbf16ps(4, 1, 6);
@@ -169,10 +173,12 @@ impl super::AmxGemm<Bf16, Bf16, F32> for AmxBf16 {
                     (c_stride * 4) as isize,
                 );
 
+                let mut b_tile = [Bf16::default(); 16 * 32];
                 let mut kk = 0;
                 while kk + 32 <= k {
                     raw::tileloadd(0, a.add(i * a_stride + kk).cast(), (a_stride * 2) as isize);
-                    raw::tileloadd(6, b.add(kk * b_stride + j).cast(), (b_stride * 2) as isize);
+                    pack_rhs_panel(b, b_stride, j, kk, 32, &mut b_tile);
+                    raw::tileloadd(6, b_tile.as_ptr().cast(), 64);
 
                     raw::tdpbf16ps(2, 0, 6);
                     kk += 32;

@@ -1,6 +1,7 @@
 //! Intel AMX (Advanced Matrix Extensions) backend for BF16 and INT8 matrix multiplication.
 
 mod config;
+mod pack;
 pub mod probe;
 mod session;
 mod types;
