@@ -25,12 +25,19 @@ pub trait FmaSupport {
 /// Separate from the per-type traits above because FMA availability is
 /// processor-wide; scalar type implementations only expose whether their
 /// operation family can use that host capability.
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", feature = "std"))]
 #[inline]
 pub fn has_fma3() -> bool {
     use std::sync::OnceLock;
     static CACHED: OnceLock<bool> = OnceLock::new();
     *CACHED.get_or_init(|| std::is_x86_feature_detected!("fma"))
+}
+
+#[cfg(all(target_arch = "x86_64", not(feature = "std")))]
+#[inline]
+/// Returns `false` because no-std builds cannot perform runtime CPU detection.
+pub fn has_fma3() -> bool {
+    false
 }
 
 /// FMA3 is an x86_64-specific extension; every other architecture reports
@@ -146,7 +153,7 @@ fn has_amx_int8() -> bool {
 /// `avx512f,avx512bw,avx512vl` — it widens BF16 to f32 and performs f32 FMA.
 /// This is intentionally separate from [`has_avx512_bf16`], which reports the
 /// native `DPBF16PS` instruction capability.
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", feature = "std"))]
 #[inline]
 fn has_avx512_bf16_tile() -> bool {
     use std::sync::OnceLock;
@@ -156,6 +163,12 @@ fn has_avx512_bf16_tile() -> bool {
             && std::is_x86_feature_detected!("avx512bw")
             && std::is_x86_feature_detected!("avx512vl")
     })
+}
+
+#[cfg(all(target_arch = "x86_64", not(feature = "std")))]
+#[inline]
+fn has_avx512_bf16_tile() -> bool {
+    false
 }
 
 /// Returns whether native AVX-512 BF16 dot-product instructions are usable.
@@ -176,7 +189,7 @@ pub fn has_avx512_bf16() -> bool {
 /// `avxvnni` feature (the signed-signed `vpdpbssd` from `avxvnniint8` is NOT
 /// assumed; the kernel bias-corrects `vpdpbusd` instead). The macro handles
 /// XCR0/OSXSAVE and the CPUID max-leaf internally.
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", feature = "std"))]
 #[inline]
 pub fn has_avx_vnni() -> bool {
     use std::sync::OnceLock;
@@ -184,9 +197,16 @@ pub fn has_avx_vnni() -> bool {
     *CACHED.get_or_init(|| std::is_x86_feature_detected!("avxvnni"))
 }
 
+#[cfg(all(target_arch = "x86_64", not(feature = "std")))]
+#[inline]
+/// Returns `false` because no-std builds cannot perform runtime CPU detection.
+pub fn has_avx_vnni() -> bool {
+    false
+}
+
 /// The AVX-512 int8 tile kernel enables `avx512f,avx512vnni` and implements
 /// signed-byte products through `VPDPBUSD` bias correction.
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", feature = "std"))]
 #[inline]
 fn has_avx512_vnni_tile() -> bool {
     use std::sync::OnceLock;
@@ -194,5 +214,11 @@ fn has_avx512_vnni_tile() -> bool {
     *CACHED.get_or_init(|| {
         std::is_x86_feature_detected!("avx512f") && std::is_x86_feature_detected!("avx512vnni")
     })
+}
+
+#[cfg(all(target_arch = "x86_64", not(feature = "std")))]
+#[inline]
+fn has_avx512_vnni_tile() -> bool {
+    false
 }
 use eunomia::Bf16;

@@ -11,7 +11,16 @@ impl TileMatrixMultiply<Bf16, Bf16, F32, AmxBf16, AmxBf16, 16, 16, 32> for AmxBf
         b: *const Bf16,
         b_stride: usize,
     ) {
-        let is_configured = super::ACTIVE_CONFIG.with(|f| f.get().is_some());
+        let is_configured = {
+            #[cfg(feature = "std")]
+            {
+                super::ACTIVE_CONFIG.with(|f| f.get().is_some())
+            }
+            #[cfg(not(feature = "std"))]
+            {
+                false
+            }
+        };
 
         if !is_configured {
             let config = AmxConfig::new_uniform(16, 64);

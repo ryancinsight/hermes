@@ -20,20 +20,17 @@
   Measured floor: 2152 library-src pedantic findings remain at warn; they are
   the HS-435 ratchet, not a silent allow.
 
-- [ ] [patch] **HS-433 — AMX downgrade notice writes to stderr.** *(in progress — Codex, 2026-08-14)*
-  `dispatcher.rs` surfaces the cross-NUMA-node AMX -> AVX-512 re-route with a
-  debug-only `eprintln!`, so in release builds the downgrade is silent — the
-  fallback-must-surface-its-trigger rule wants a `tracing` event. Not done now:
-  `hermes-simd` has no `tracing` dependency and adding one to a
-  `no_std`-capable facade is an ADR-level call. Carries a per-site
-  `#[expect(clippy::print_stderr)]` naming this item.
-  Re-open trigger fired (partially): `has_amx()` is a real probe now, so the
-  notice is no longer unreachable in principle — it fires on AMX silicon whose
-  process holds tile permission. No such machine is in CI, so the ADR call is
-  still not forced, but the "cannot execute" justification no longer holds and
-  this item is now blocked only on the `tracing` decision, not on AMX.
-  Acceptance: the re-route emits a `tracing` event in release builds, asserted
-  by a test capturing the subscriber.
+- [x] [patch] **HS-433 — AMX downgrade notice writes to stderr.** The
+  cross-NUMA-node AMX -> AVX-512 re-route now emits one release-visible
+  `tracing::warn!` event with the NUMA node, source backend, destination
+  backend, and trigger reason. The event is subscriber-owned and the
+  `no_std` facade keeps `tracing` default features disabled; the old stderr
+  path and its suppression are deleted. The same change removes the unsound
+  no-std global `Cell` substitute for AMX session state: no-std sessions now
+  reject safely because portable no-std Rust has no thread-local storage
+  primitive. ADR 012 records the boundary and alternatives. Evidence:
+  subscriber-backed value assertions, default-feature compilation, and the
+  no-default-features check; hosted CI remains the merge gate for all targets.
 
 - [x] [minor] **HS-435 — pedantic ratchet.** The lint floor (HS-434) is set to
   warn against the remaining library-src findings. Non-increasing baseline,

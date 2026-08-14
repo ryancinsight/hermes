@@ -1,4 +1,6 @@
+#[cfg(feature = "std")]
 use super::config::{ActiveAmxConfig, ACTIVE_CONFIG, SESSION_DEPTH};
+#[cfg(feature = "std")]
 use super::raw;
 use super::AmxConfig;
 
@@ -33,7 +35,14 @@ impl AmxSession {
     #[inline]
     #[must_use]
     pub fn is_active() -> bool {
-        ACTIVE_CONFIG.with(|c| c.get().is_some())
+        #[cfg(feature = "std")]
+        {
+            ACTIVE_CONFIG.with(|c| c.get().is_some())
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            false
+        }
     }
 
     /// Enter a new AMX compute phase with the given configuration.
@@ -48,61 +57,76 @@ impl AmxSession {
             return Err(AmxSessionError::UnsupportedTarget);
         }
 
-        let depth = SESSION_DEPTH.with(|d| {
-            let val = d.get();
-            d.set(val + 1);
-            val
-        });
+        #[cfg(not(feature = "std"))]
+        {
+            let _ = config;
+            return Err(AmxSessionError::UnsupportedTarget);
+        }
 
-        if depth == 0 {
-            unsafe {
-                raw::ldtilecfg(config);
-            }
-            ACTIVE_CONFIG.with(|c| c.set(Some(ActiveAmxConfig::from(config))));
-        } else {
-            let active = ACTIVE_CONFIG.with(std::cell::Cell::get);
-            if active != Some(ActiveAmxConfig::from(config)) {
+        #[cfg(feature = "std")]
+        {
+            let depth = SESSION_DEPTH.with(|d| {
+                let val = d.get();
+                d.set(val + 1);
+                val
+            });
+
+            if depth == 0 {
                 unsafe {
                     raw::ldtilecfg(config);
                 }
                 ACTIVE_CONFIG.with(|c| c.set(Some(ActiveAmxConfig::from(config))));
+            } else {
+                let active = ACTIVE_CONFIG.with(std::cell::Cell::get);
+                if active != Some(ActiveAmxConfig::from(config)) {
+                    unsafe {
+                        raw::ldtilecfg(config);
+                    }
+                    ACTIVE_CONFIG.with(|c| c.set(Some(ActiveAmxConfig::from(config))));
+                }
             }
+            Ok(Self { _private: () })
         }
-        Ok(Self { _private: () })
     }
 
     /// Context switch mitigation: release tile registers explicitly.
     #[inline]
     pub fn release() {
-        let active = Self::is_active();
-        if active && super::amx_runtime_supported() {
-            unsafe {
-                raw::tilerelease();
+        #[cfg(feature = "std")]
+        {
+            let active = Self::is_active();
+            if active && super::amx_runtime_supported() {
+                unsafe {
+                    raw::tilerelease();
+                }
             }
+            ACTIVE_CONFIG.with(|c| c.set(None));
+            SESSION_DEPTH.with(|d| d.set(0));
         }
-        ACTIVE_CONFIG.with(|c| c.set(None));
-        SESSION_DEPTH.with(|d| d.set(0));
     }
 }
 
 impl Drop for AmxSession {
     #[inline]
     fn drop(&mut self) {
-        let depth = SESSION_DEPTH.with(|d| {
-            let val = d.get();
-            if val > 0 {
-                d.set(val - 1);
-                val - 1
-            } else {
-                0
-            }
-        });
+        #[cfg(feature = "std")]
+        {
+            let depth = SESSION_DEPTH.with(|d| {
+                let val = d.get();
+                if val > 0 {
+                    d.set(val - 1);
+                    val - 1
+                } else {
+                    0
+                }
+            });
 
-        if depth == 0 {
-            unsafe {
-                raw::tilerelease();
+            if depth == 0 {
+                unsafe {
+                    raw::tilerelease();
+                }
+                ACTIVE_CONFIG.with(|c| c.set(None));
             }
-            ACTIVE_CONFIG.with(|c| c.set(None));
         }
     }
 }
@@ -126,21 +150,33 @@ impl AmxBatchSession {
             return Err(AmxSessionError::UnsupportedTarget);
         }
 
-        unsafe {
-            raw::ldtilecfg(config);
+        #[cfg(not(feature = "std"))]
+        {
+            let _ = config;
+            return Err(AmxSessionError::UnsupportedTarget);
         }
-        ACTIVE_CONFIG.with(|c| c.set(Some(ActiveAmxConfig::from(config))));
-        Ok(Self)
+
+        #[cfg(feature = "std")]
+        {
+            unsafe {
+                raw::ldtilecfg(config);
+            }
+            ACTIVE_CONFIG.with(|c| c.set(Some(ActiveAmxConfig::from(config))));
+            Ok(Self)
+        }
     }
 }
 
 impl Drop for AmxBatchSession {
     #[inline]
     fn drop(&mut self) {
-        unsafe {
-            raw::tilerelease();
+        #[cfg(feature = "std")]
+        {
+            unsafe {
+                raw::tilerelease();
+            }
+            ACTIVE_CONFIG.with(|c| c.set(None));
+            SESSION_DEPTH.with(|d| d.set(0));
         }
-        ACTIVE_CONFIG.with(|c| c.set(None));
-        SESSION_DEPTH.with(|d| d.set(0));
     }
 }

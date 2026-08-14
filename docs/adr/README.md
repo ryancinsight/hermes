@@ -17,3 +17,4 @@
 | [009](009-target-feature-inlining.md) | Monomorphized Target-Feature Gate Helpers for Zero-Overhead Inlining | Accepted |
 | [010](010-numa-memory-layout.md) | NUMA Memory Layout and Topology Integration | Accepted |
 | [011](011-bitboard-kernel-safe-surface.md) | Make `BitBoardKernel` a Safe Trait | Accepted |
+| [012](012-structured-amx-downgrade-events.md) | Structured AMX downgrade events | Accepted |

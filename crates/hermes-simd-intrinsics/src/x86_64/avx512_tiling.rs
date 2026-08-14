@@ -18,6 +18,7 @@ use hermes_simd_core::view::TileMatrixMultiply;
 /// The two BF16 operands are loaded as 512-bit integer vectors and reinterpreted
 /// as `__m512bh`; `DPBF16PS` consumes one BF16 pair per f32 accumulator lane.
 /// The `K = 32` tile therefore emits 16 dot-product instructions per output row.
+#[cfg(any(feature = "std", target_feature = "avx512bf16"))]
 #[target_feature(enable = "avx512f,avx512bf16")]
 unsafe fn tile_matmul_bf16_native(
     c: *mut F32,

@@ -7,6 +7,7 @@ mod session;
 mod types;
 
 pub use config::AmxConfig;
+#[cfg(feature = "std")]
 pub(crate) use config::ACTIVE_CONFIG;
 pub use probe::{has_amx_bf16, has_amx_int8, has_amx_tile};
 pub use session::{AmxBatchSession, AmxSession, AmxSessionError};
@@ -27,7 +28,14 @@ fn amx_runtime_supported() -> bool {
     }
     #[cfg(not(miri))]
     {
-        probe::has_amx_tile()
+        #[cfg(feature = "std")]
+        {
+            probe::has_amx_tile()
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            false
+        }
     }
 }
 

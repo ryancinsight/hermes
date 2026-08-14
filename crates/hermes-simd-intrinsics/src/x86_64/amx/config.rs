@@ -170,32 +170,3 @@ thread_local! {
     pub(crate) static ACTIVE_CONFIG: core::cell::Cell<Option<ActiveAmxConfig>> = const { core::cell::Cell::new(None) };
     pub(crate) static SESSION_DEPTH: core::cell::Cell<usize> = core::cell::Cell::new(0);
 }
-
-#[cfg(not(feature = "std"))]
-pub(crate) struct DummyThreadLocal<T> {
-    cell: core::cell::Cell<T>,
-}
-
-#[cfg(not(feature = "std"))]
-impl<T> DummyThreadLocal<T> {
-    const fn new(val: T) -> Self {
-        Self {
-            cell: core::cell::Cell::new(val),
-        }
-    }
-
-    #[inline(always)]
-    fn with<R, F: FnOnce(&core::cell::Cell<T>) -> R>(&self, f: F) -> R {
-        f(&self.cell)
-    }
-}
-
-#[cfg(not(feature = "std"))]
-unsafe impl<T> Sync for DummyThreadLocal<T> {}
-
-#[cfg(not(feature = "std"))]
-pub(crate) static ACTIVE_CONFIG: DummyThreadLocal<Option<ActiveAmxConfig>> =
-    DummyThreadLocal::new(None);
-
-#[cfg(not(feature = "std"))]
-pub(crate) static SESSION_DEPTH: DummyThreadLocal<usize> = DummyThreadLocal::new(0);

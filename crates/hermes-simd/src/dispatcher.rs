@@ -27,7 +27,7 @@ pub enum DispatchDecision {
 // CPU feature detection (AMX/AVX-512) is cached per-type via `OnceLock` in
 // `cpu.rs`. NUMA topology is stable after process start.
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", feature = "std"))]
 #[inline]
 fn is_multi_numa() -> bool {
     use std::sync::OnceLock;
@@ -35,6 +35,12 @@ fn is_multi_numa() -> bool {
     *MULTI_NUMA.get_or_init(|| {
         themis::CpuTopology::detect().is_some_and(|topology| topology.numa_nodes().len() > 1)
     })
+}
+
+#[cfg(all(target_arch = "x86_64", not(feature = "std")))]
+#[inline]
+fn is_multi_numa() -> bool {
+    false
 }
 
 impl AdaptiveDispatcher {
@@ -84,34 +90,14 @@ impl AdaptiveDispatcher {
                         );
 
                         if !a_local || !b_local {
-                            #[cfg(all(debug_assertions, feature = "std"))]
+                            #[cfg(feature = "std")]
                             {
                                 static WARNED: core::sync::atomic::AtomicBool =
                                     core::sync::atomic::AtomicBool::new(false);
                                 if !WARNED.load(core::sync::atomic::Ordering::Relaxed)
                                     && !WARNED.swap(true, core::sync::atomic::Ordering::Relaxed)
                                 {
-                                    // A library should surface a downgrade through
-                                    // `tracing`, not stderr. Converting it means adding a
-                                    // `tracing` dependency to this `no_std`-capable facade,
-                                    // which is an ADR-level call still pending as HS-433.
-                                    // The branch is no longer unreachable: `has_amx()` is a
-                                    // real probe now, so this fires on AMX silicon whose
-                                    // process holds tile permission. No such machine is in
-                                    // CI yet, which is why the conversion has not been
-                                    // forced.
-                                    #[expect(
-                                        clippy::print_stderr,
-                                        reason = "debug-only, once-latched AMX downgrade notice; \
-                                                  HS-433 converts it to tracing"
-                                    )]
-                                    {
-                                        std::eprintln!(
-                                            "WARNING [hermes-simd]: Cross-node NUMA memory \
-                                             access detected (thread node: {curr_node}). \
-                                             Re-routing AMX → AVX-512 to mitigate latency."
-                                        );
-                                    }
+                                    emit_numa_downgrade(curr_node);
                                 }
                             }
                             if has_avx512 {
@@ -138,5 +124,77 @@ impl AdaptiveDispatcher {
 
         let _ = (m, n, k, a_ptr, a_len, b_ptr, b_len);
         DispatchDecision::Scalar
+    }
+}
+
+#[cfg(feature = "std")]
+fn emit_numa_downgrade(numa_node: u32) {
+    tracing::warn!(
+        target: "hermes_simd::dispatcher",
+        numa_node,
+        from_backend = "amx",
+        to_backend = "avx512",
+        reason = "remote_input_memory",
+        "AMX dispatch downgraded because input memory is remote to the current NUMA node"
+    );
+}
+
+#[cfg(all(test, feature = "std"))]
+mod tests {
+    use std::io::{self, Write};
+    use std::sync::{Arc, Mutex};
+
+    use tracing_subscriber::fmt::MakeWriter;
+
+    use super::emit_numa_downgrade;
+
+    #[derive(Clone, Default)]
+    struct Buffer(Arc<Mutex<Vec<u8>>>);
+
+    struct BufferWriter(Arc<Mutex<Vec<u8>>>);
+
+    impl Write for BufferWriter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            let mut output = self
+                .0
+                .lock()
+                .map_err(|_| io::Error::other("event buffer lock poisoned"))?;
+            output.extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl<'writer> MakeWriter<'writer> for Buffer {
+        type Writer = BufferWriter;
+
+        fn make_writer(&'writer self) -> Self::Writer {
+            BufferWriter(Arc::clone(&self.0))
+        }
+    }
+
+    #[test]
+    fn numa_downgrade_emits_structured_warning() {
+        let buffer = Buffer::default();
+        let subscriber = tracing_subscriber::fmt()
+            .with_ansi(false)
+            .with_writer(buffer.clone())
+            .finish();
+
+        tracing::subscriber::with_default(subscriber, || emit_numa_downgrade(7));
+
+        let output = buffer
+            .0
+            .lock()
+            .expect("event buffer remains available")
+            .clone();
+        let output = String::from_utf8(output).expect("subscriber output is UTF-8");
+        assert!(output.contains("AMX dispatch downgraded"));
+        assert!(output.contains("numa_node=7"));
+        assert!(output.contains("from_backend=amx"));
+        assert!(output.contains("to_backend=avx512"));
     }
 }

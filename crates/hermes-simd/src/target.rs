@@ -1,5 +1,7 @@
 //! Explicit SIMD target tokens and forced view dispatch helpers.
 
+use alloc::vec::Vec;
+
 #[cfg(target_arch = "aarch64")]
 use crate::Neon;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]

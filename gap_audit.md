@@ -4,6 +4,18 @@ Persistent gap register. Evidence tiers follow the repository instruction
 hierarchy: machine-checked proof > type-level invariant > property/fuzz >
 differential/empirical > source audit.
 
+## HS-433 closure — structured AMX downgrade event
+
+The release-only observability gap is closed. `AdaptiveDispatcher` emits one
+subscriber-owned warning event when remote NUMA placement forces AMX down to
+AVX-512; the event carries the node and both backend names plus the trigger
+reason. The diagnostic no longer writes to stderr or disappears in release
+builds. The same slice removes the no-std AMX global `Cell`/`Sync` substitute,
+so a no-std session rejects safely instead of claiming thread-local state it
+cannot provide. Evidence is the subscriber-backed value-semantic test,
+default-feature compilation, and the no-default-features source check. The
+full hosted package matrix remains the merge gate.
+
 ## SIMD/SIMT Capability and Completeness Audit - 2026-08-11 <a id="simd-simt-2026-08-11"></a>
 
 Scope: the `SimdKernel` operation catalog, the backend/`TargetId` matrix, and
