@@ -44,6 +44,8 @@ pub use view::TensorView;
 
 #[cfg(test)]
 mod tests {
+    #![expect(clippy::float_cmp, reason = "exact integer-valued float oracle")]
+
     use super::*;
     use strides::row_major_strides;
 
@@ -70,10 +72,6 @@ mod tests {
     }
 
     #[test]
-    #[expect(
-        clippy::float_cmp,
-        reason = "The tensor view test compares exact integer-valued floating-point data"
-    )]
     fn test_row_view() {
         let data: Vec<f32> = (0..9).map(|x| x as f32).collect();
         let t = TensorView::<f32, 2>::new(&data, [3, 3]).unwrap();

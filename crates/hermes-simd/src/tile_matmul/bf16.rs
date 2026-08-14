@@ -7,7 +7,7 @@ use hermes_simd_intrinsics::Scalar;
 #[cfg(target_arch = "x86_64")]
 use hermes_simd_intrinsics::{AmxBf16, Avx512};
 
-fn gemm_bf16_remainder(
+fn gemm_remainder(
     m: usize,
     n: usize,
     k: usize,
@@ -149,7 +149,7 @@ impl TiledGemm<Bf16, Bf16, F32> for (Bf16, Bf16, F32) {
                         c_stride,
                     );
 
-                    gemm_bf16_remainder(m, n, k, a, a_stride, b, b_stride, c, c_stride);
+                    gemm_remainder(m, n, k, a, a_stride, b, b_stride, c, c_stride);
                     return Ok(());
                 }
                 crate::dispatcher::DispatchDecision::AvxVnni
@@ -169,7 +169,7 @@ impl TiledGemm<Bf16, Bf16, F32> for (Bf16, Bf16, F32) {
             c_stride,
         );
 
-        gemm_bf16_remainder(m, n, k, a, a_stride, b, b_stride, c, c_stride);
+        gemm_remainder(m, n, k, a, a_stride, b, b_stride, c, c_stride);
         Ok(())
     }
 }

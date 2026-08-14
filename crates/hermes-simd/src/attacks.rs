@@ -5,7 +5,7 @@ use hermes_simd_intrinsics::Magic;
 // perform only computed bit math and validated table indexing — they carry no
 // ISA/target-feature precondition and cannot cause undefined behavior for any
 // input. The safe wrappers below therefore uphold the `unsafe` trait contract
-// for the `Magic` impl without an unverified precondition.
+// inside the `Magic` implementation without an unverified precondition.
 
 /// Generate Rook attacks for a square given occupancy using the Magic bitboard backend.
 ///
