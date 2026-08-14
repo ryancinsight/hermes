@@ -19,6 +19,8 @@ pub struct AmxConfig {
 }
 
 impl AmxConfig {
+    const MATRIX_TILE_COLUMNS: usize = 16;
+
     /// Creates a palette 1 configuration where all tiles have the specified rows and byte columns.
     #[inline]
     pub fn new_uniform(r: u8, c_bytes: u16) -> Self {
@@ -47,15 +49,16 @@ impl AmxConfig {
         }
     }
 
-    /// Generate adaptive tile config based on dynamic matrix dimensions.
+    /// Generate a tile config for the AMX GEMM microkernel block.
     #[inline]
     pub fn for_dimensions(m: usize, n: usize, k: usize, element_size: usize) -> Self {
+        let tile_n = n.min(Self::MATRIX_TILE_COLUMNS);
         let r_a = m.min(16) as u8;
         let c_a_bytes = (k * element_size).min(64) as u16;
         let r_b = k.min(64 / element_size) as u8;
-        let c_b_bytes = (n * element_size).min(64) as u16;
+        let c_b_bytes = (tile_n * element_size).min(64) as u16;
         let r_c = m.min(16) as u8;
-        let c_c_bytes = (n * 4).min(64) as u16; // Accumulation in 32-bit (F32/I32)
+        let c_c_bytes = (tile_n * 4).min(64) as u16; // Accumulation in 32-bit (F32/I32)
 
         let mut rows = [0; 8];
         let mut cols_b = [0; 8];
@@ -83,6 +86,37 @@ impl AmxConfig {
         cols_b[7] = c_b_bytes;
 
         Self::new_custom(rows, cols_b)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AmxConfig;
+
+    #[test]
+    fn int8_configuration_respects_tile_byte_budget_for_irregular_width() {
+        let config = AmxConfig::for_dimensions(19, 17, 65, 1);
+
+        assert_eq!(config.rows[1], 64);
+        assert_eq!(config.cols_b[1], 16);
+        assert_eq!(
+            usize::from(config.rows[1]) * usize::from(config.cols_b[1]),
+            1024
+        );
+        assert_eq!(config.cols_b[2], 64);
+    }
+
+    #[test]
+    fn bf16_configuration_uses_the_fixed_microtile_width() {
+        let config = AmxConfig::for_dimensions(19, 17, 33, 2);
+
+        assert_eq!(config.rows[1], 32);
+        assert_eq!(config.cols_b[1], 32);
+        assert_eq!(
+            usize::from(config.rows[1]) * usize::from(config.cols_b[1]),
+            1024
+        );
+        assert_eq!(config.cols_b[2], 64);
     }
 }
 
