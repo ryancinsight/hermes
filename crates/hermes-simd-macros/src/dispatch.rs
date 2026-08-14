@@ -492,3 +492,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
         #fallback_dispatcher
     })
 }
+
+#[cfg(test)]
+#[path = "dispatch_tests.rs"]
+mod tests;

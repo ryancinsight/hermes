@@ -134,6 +134,11 @@ where
     ///
     /// # Errors
     /// Returns `SimdError::LengthMismatch` if `self.len() != other.len()`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the owned buffer cannot be represented as the declared
+    /// alignment. This indicates a violated `SimdCow` alignment invariant.
     pub fn transform_in_place<Op: ElementOp<T>>(
         &mut self,
         other: &SimdCow<'_, T, Arch, Align>,

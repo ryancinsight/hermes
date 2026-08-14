@@ -66,6 +66,11 @@ where
     }
 
     /// Obtain a read-only view of this tensor.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an owned variant contains shape or stride metadata that is
+    /// inconsistent with its validated construction invariant.
     #[inline]
     #[must_use]
     pub fn as_view(&self) -> TensorView<'_, T, N, L, &'_ [T]> {

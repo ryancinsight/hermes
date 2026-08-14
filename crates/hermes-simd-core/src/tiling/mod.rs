@@ -185,6 +185,10 @@ impl<const TILE_M: usize, const TILE_N: usize> TilingPolicy<TILE_M, TILE_N> {
     pub const SCALAR_DEGENERATE: TilingPolicy<1, 1> = TilingPolicy;
 
     /// Verify that the tile shape is valid at compile time.
+    ///
+    /// # Panics
+    ///
+    /// Panics when either tile dimension is zero.
     pub const fn validate(&self) {
         assert!(TILE_M >= 1, "TILE_M must be >= 1");
         assert!(TILE_N >= 1, "TILE_N must be >= 1");

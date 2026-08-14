@@ -163,6 +163,11 @@ where
     }
 
     /// Appends an element to the back of the vector.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the length of a zero-sized element vector would overflow
+    /// `usize`.
     pub fn push(&mut self, value: T) {
         if core::mem::size_of::<T>() == 0 {
             // No allocation or writes needed for zero-sized types.
@@ -382,6 +387,10 @@ where
     }
 
     /// Obtains a compile-time safe immutable `SimdView` over the vector's buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the vector's internal alignment invariant is violated.
     #[inline(always)]
     #[must_use]
     pub fn view<'a, Arch>(
@@ -395,6 +404,10 @@ where
     }
 
     /// Obtains a compile-time safe mutable `SimdView` over the vector's buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the vector's internal alignment invariant is violated.
     #[inline(always)]
     pub fn view_mut<'a, Arch>(
         &'a mut self,

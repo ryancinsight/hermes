@@ -55,7 +55,7 @@
   | 49 | `uninlined_format_args` | mechanical |
   | **0** | `allow_attributes` | **done** — library source suppressions now use reasoned `#[expect]` or are deleted when unfulfilled; test/bench-only suppressions remain outside this library-source ratchet |
   | 21 | `cast_ptr_alignment` | **not mechanical** — each is a real alignment claim to check against the load it feeds |
-  | 19 | `missing_panics_doc` | required by the documentation standard |
+  | **0** | `missing_panics_doc` | **done** — 19 contract-bearing APIs documented below |
   | 13 | `ref_as_ptr` | `core::ptr::from_ref`; same family as the finished item |
   | 9 | `ptr_cast_constness` | `.cast_const()`/`.cast_mut()`; same family |
   | **0** | `missing_safety_doc` | **done** — AMX raw preconditions documented below |
@@ -78,6 +78,14 @@
   methods were annotated by hand. `cargo fmt --all -- --check` and the focused
   `hermes-simd-core` nextest suite pass 16/16. The remaining HS-435 classes are
   unchanged and stay in the table above.
+
+  **`missing_panics_doc` burned down: 19 -> 0 (2026-08-14).** The core API
+  docs now state the concrete panic conditions for alignment-preserving views,
+  mask lane-count checks, SIMD host support, chunk bounds, tensor invariants,
+  tile validation, and zero-sized-vector length overflow. The targeted
+  `clippy::missing_panics_doc` gate is clean; `cargo fmt --all -- --check` and
+  the focused `hermes-simd-core` nextest suite pass 16/16. The remaining
+  HS-435 classes are unchanged and stay in the table above.
 
   **`ptr_as_ptr` burned down: 171 -> 0.** 167 sites converted mechanically by
   `cargo clippy --fix` restricted to that one lint; the remaining 4 were

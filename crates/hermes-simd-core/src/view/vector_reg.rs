@@ -128,6 +128,10 @@ where
     }
 
     /// Construct a Vector with all lanes set to zero.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the architecture is not supported or enabled on this host.
     #[inline(always)]
     #[must_use]
     pub fn zero() -> Self {
@@ -142,6 +146,10 @@ where
     }
 
     /// Construct a Vector by broadcasting a scalar value to all lanes.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the architecture is not supported or enabled on this host.
     #[inline(always)]
     pub fn splat(val: T) -> Self {
         Self::try_splat(val).expect("SIMD target is not supported or enabled on this host")
@@ -692,6 +700,11 @@ where
     }
 
     /// Load a Vector from a chunk index of a `SimdView`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the architecture is not supported or enabled on this host,
+    /// or if `chunk_idx` does not identify a complete SIMD lane group.
     #[inline(always)]
     #[must_use]
     pub fn from_view_chunk<Align, Mode, Ref>(
@@ -724,6 +737,11 @@ where
     }
 
     /// Store this Vector into a mutable chunk of a mutable `SimdView`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the architecture is not supported or enabled on this host,
+    /// or if `chunk_idx` does not identify a complete SIMD lane group.
     #[inline(always)]
     pub fn store_to_view_chunk<'a, Align, Mode>(
         self,

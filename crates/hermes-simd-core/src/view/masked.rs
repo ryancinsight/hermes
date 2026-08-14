@@ -12,6 +12,11 @@ where
     T: Scalar,
 {
     /// Add elementwise where mask is active, writing to `out`. Inactive lanes copy from `self`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the mask lane count `N` does not equal the architecture lane
+    /// count.
     #[inline(always)]
     pub fn masked_add<ORef, const N: usize>(
         &self,
@@ -102,6 +107,11 @@ where
     }
 
     /// Multiply elementwise where mask is active, writing to `out`. Inactive lanes copy from `self`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the mask lane count `N` does not equal the architecture lane
+    /// count.
     #[inline(always)]
     pub fn masked_mul<ORef, const N: usize>(
         &self,
@@ -187,6 +197,11 @@ where
     }
 
     /// Fused multiply-add where mask is active: `(self * b) + c`, writing to `out`. Inactive lanes copy from `c`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the mask lane count `N` does not equal the architecture lane
+    /// count.
     #[inline(always)]
     pub fn masked_fmadd<ORef1, ORef2, const N: usize>(
         &self,
@@ -280,6 +295,11 @@ where
     }
 
     /// Compress: pack elements where `mask` is active contiguously into `out`. Returns the number of elements written.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the mask lane count `N` does not equal the architecture lane
+    /// count.
     #[inline(always)]
     pub fn compress<const N: usize>(
         &self,
@@ -350,6 +370,11 @@ where
     }
 
     /// Expand: scatter the active elements of `self` into `out` at mask positions, filling inactive positions with `fill`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the mask lane count `N` does not equal the architecture lane
+    /// count.
     #[inline(always)]
     pub fn expand<ORef, const N: usize>(
         &self,

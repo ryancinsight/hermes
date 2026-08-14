@@ -163,6 +163,10 @@ where
     ///
     /// Amortizes loop overhead and permits compiler instruction scheduling / pipelining
     /// by unrolling the attack queries in blocks of 4.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `out` is shorter than `squares`.
     #[inline]
     pub fn batch_attacks_single_occupancy(
         &self,
