@@ -14,7 +14,9 @@ builds. The same slice removes the no-std AMX global `Cell`/`Sync` substitute,
 so a no-std session rejects safely instead of claiming thread-local state it
 cannot provide. Evidence is the subscriber-backed value-semantic test,
 default-feature compilation, and the no-default-features source check. The
-full hosted package matrix remains the merge gate.
+merged provider head `f4d444b5` passes the exact hosted package matrix in run
+`31819198076`, including the bounded benchmark job, ARM NEON, Intel SDE, Miri,
+cross-compilation, and supply-chain checks.
 
 ## SIMD/SIMT Capability and Completeness Audit - 2026-08-11 <a id="simd-simt-2026-08-11"></a>
 

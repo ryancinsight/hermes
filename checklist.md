@@ -10,9 +10,10 @@
       no-std AMX sessions reject safely.
 - [x] Add ADR 012, changelog coverage, and a subscriber-backed value-semantic
       event test.
-- [ ] Run the merged provider hosted gate and full Hermes package verification;
-      local all-target Clippy was attempted but exceeded the shared build
-      contention window before collection.
+- [x] Run the merged provider hosted gate and full Hermes package verification.
+      Exact merged-head run `31819198076` passes format, Clippy, host coverage,
+      464-test nextest, doctests, examples, docs, no-std, benchmark budgets,
+      Miri, cross-compile, ARM NEON, Intel SDE, and supply-chain checks.
 
 ## HS-432 [patch] — push benchmark-budget coverage
 
@@ -21,9 +22,9 @@
       canonical measurements on pull requests and manual runs.
 - [x] Preserve the existing timeout, locked commands, target inventory, and
       benchmark workloads.
-- [ ] Validate workflow syntax and the PM acceptance record through the exact
-      hosted workflow before delivery. Local `actionlint` and YAML parsers are
-      unavailable in this environment.
+- [x] Validate the workflow and PM acceptance record through exact hosted run
+      `31819198076`; the benchmark-budget job passes its compile, 60-second
+      smoke, and bounded canonical benchmark steps.
 
 ## HS-427 [minor] — native permute overrides
 
