@@ -245,7 +245,7 @@ where
 // ---------------------------------------------------------------------------
 
 /// Adopt an `AlignedVec` as an owned `SimdCow` — zero-cost, no allocation.
-impl<'a, T, Arch, Align> From<AlignedVec<T, Align>> for SimdCow<'a, T, Arch, Align>
+impl<T, Arch, Align> From<AlignedVec<T, Align>> for SimdCow<'_, T, Arch, Align>
 where
     Arch: SimdArch,
     Align: Alignment,
@@ -257,7 +257,7 @@ where
 }
 
 /// Copy a standard `Vec<T>` into a new owned `SimdCow`, allocating one aligned buffer.
-impl<'a, T: Copy, Arch, Align> From<alloc::vec::Vec<T>> for SimdCow<'a, T, Arch, Align>
+impl<T: Copy, Arch, Align> From<alloc::vec::Vec<T>> for SimdCow<'_, T, Arch, Align>
 where
     Arch: SimdArch,
     Align: Alignment,

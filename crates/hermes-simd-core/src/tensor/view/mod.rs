@@ -48,12 +48,12 @@ pub struct TensorView<'a, T: 'a, const N: usize, Layout = RowMajor, Ref = &'a [T
 // Send / Sync / Clone / Copy
 // ---------------------------------------------------------------------------
 
-unsafe impl<'a, T, const N: usize, Layout, Ref> Send for TensorView<'a, T, N, Layout, Ref> where
+unsafe impl<T, const N: usize, Layout, Ref> Send for TensorView<'_, T, N, Layout, Ref> where
     Ref: Send
 {
 }
 
-unsafe impl<'a, T, const N: usize, Layout, Ref> Sync for TensorView<'a, T, N, Layout, Ref> where
+unsafe impl<T, const N: usize, Layout, Ref> Sync for TensorView<'_, T, N, Layout, Ref> where
     Ref: Sync
 {
 }
@@ -71,7 +71,7 @@ impl<'a, T, const N: usize, Layout> Copy for TensorView<'a, T, N, Layout, &'a [T
 // Row-major immutable constructor
 // ---------------------------------------------------------------------------
 
-impl<'a, 'b, T, const N: usize> TensorView<'a, T, N, RowMajor, &'b [T]> {
+impl<'b, T, const N: usize> TensorView<'_, T, N, RowMajor, &'b [T]> {
     /// Create a row-major tensor view over `data` with the given `shape`.
     ///
     /// Strides are computed as `strides[i] = ∏_{j=i+1..N} shape[j]` (C-order).
@@ -111,7 +111,7 @@ impl<'a, 'b, T, const N: usize> TensorView<'a, T, N, RowMajor, &'b [T]> {
 // Row-major mutable constructor
 // ---------------------------------------------------------------------------
 
-impl<'a, 'b, T, const N: usize> TensorView<'a, T, N, RowMajor, &'b mut [T]> {
+impl<'b, T, const N: usize> TensorView<'_, T, N, RowMajor, &'b mut [T]> {
     /// Create a mutable row-major tensor view over `data` with the given `shape`.
     ///
     /// # Errors
@@ -136,7 +136,7 @@ impl<'a, 'b, T, const N: usize> TensorView<'a, T, N, RowMajor, &'b mut [T]> {
 // Explicit-stride constructors (immutable + mutable)
 // ---------------------------------------------------------------------------
 
-impl<'a, 'b, T, const N: usize, L: Layout> TensorView<'a, T, N, L, &'b [T]> {
+impl<'b, T, const N: usize, L: Layout> TensorView<'_, T, N, L, &'b [T]> {
     /// Create a tensor view with explicit strides.
     ///
     /// Allows column-major, blocked, or any custom layout.
@@ -202,7 +202,7 @@ impl<'a, 'b, T, const N: usize, L: Layout> TensorView<'a, T, N, L, &'b mut [T]> 
 // ColMajor ergonomic constructor
 // ---------------------------------------------------------------------------
 
-impl<'a, 'b, T> TensorView<'a, T, 2, ColMajor, &'b [T]> {
+impl<'b, T> TensorView<'_, T, 2, ColMajor, &'b [T]> {
     /// Create a column-major (Fortran-order) 2-D tensor view.
     ///
     /// Fortran strides: `strides[0] = 1`, `strides[1] = shape[0]`.
@@ -340,7 +340,7 @@ impl<'a, T, const N: usize, L, Ref> TensorView<'a, T, N, L, Ref> {
 // Mutable element access
 // ---------------------------------------------------------------------------
 
-impl<'a, 'b, T, const N: usize, L> TensorView<'a, T, N, L, &'b mut [T]> {
+impl<T, const N: usize, L> TensorView<'_, T, N, L, &mut [T]> {
     /// Access the underlying flat mutable slice.
     #[inline(always)]
     pub fn as_slice_mut(&mut self) -> &mut [T] {

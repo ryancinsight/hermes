@@ -78,7 +78,7 @@ where
     }
 }
 
-impl<'a, T, Format, Arch> ComputeView for SparseView<'a, T, Format, Arch>
+impl<T, Format, Arch> ComputeView for SparseView<'_, T, Format, Arch>
 where
     Format: SparseFormat,
     Arch: SimdArch,

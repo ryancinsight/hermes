@@ -386,7 +386,7 @@ pub trait SimdCowExt<T: SimdScalar, Arch: SimdArch + SimdKernel<T>, Align: Align
         F: FnMut(Vector<T, Arch>) -> Vector<T, Arch>;
 }
 
-impl<'a, T, Arch, Align> SimdCowExt<T, Arch, Align> for SimdCow<'a, T, Arch, Align>
+impl<T, Arch, Align> SimdCowExt<T, Arch, Align> for SimdCow<'_, T, Arch, Align>
 where
     T: SimdScalar,
     Arch: SimdArch + SimdKernel<T>,

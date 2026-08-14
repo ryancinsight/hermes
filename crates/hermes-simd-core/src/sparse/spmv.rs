@@ -76,7 +76,7 @@ fn validate_spmv_sizes(x_len: usize, y_len: usize, ncols: usize, nrows: usize, f
     );
 }
 
-impl<'a, T, Arch> SparseSpMv<T> for SparseView<'a, T, Validated<Csr>, Arch>
+impl<T, Arch> SparseSpMv<T> for SparseView<'_, T, Validated<Csr>, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
@@ -192,7 +192,7 @@ where
     }
 }
 
-impl<'a, T, Arch> SparseSpMv<T> for SparseView<'a, T, DenseWithMask, Arch>
+impl<T, Arch> SparseSpMv<T> for SparseView<'_, T, DenseWithMask, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
@@ -310,8 +310,8 @@ where
     }
 }
 
-impl<'a, T, const BM: usize, const BN: usize, Arch> SparseSpMv<T>
-    for SparseView<'a, T, Validated<BlockedCoo<BM, BN>>, Arch>
+impl<T, const BM: usize, const BN: usize, Arch> SparseSpMv<T>
+    for SparseView<'_, T, Validated<BlockedCoo<BM, BN>>, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
@@ -526,7 +526,7 @@ unsafe fn sellp_spmv_vectorized<T, const C: usize, Arch>(
     }
 }
 
-impl<'a, T, const C: usize, Arch> SparseSpMv<T> for SparseView<'a, T, Validated<SellP<C>>, Arch>
+impl<T, const C: usize, Arch> SparseSpMv<T> for SparseView<'_, T, Validated<SellP<C>>, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,

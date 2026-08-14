@@ -28,7 +28,7 @@ pub struct SimdCowResolver {
     pub(crate) elements_resolver: rkyv::vec::VecResolver,
 }
 
-impl<'a, T, Arch, Align> rkyv::Archive for SimdCow<'a, T, Arch, Align>
+impl<T, Arch, Align> rkyv::Archive for SimdCow<'_, T, Arch, Align>
 where
     T: rkyv::Archive,
     Arch: SimdArch,
@@ -46,7 +46,7 @@ where
     }
 }
 
-impl<'a, T, Arch, Align, S> rkyv::Serialize<S> for SimdCow<'a, T, Arch, Align>
+impl<T, Arch, Align, S> rkyv::Serialize<S> for SimdCow<'_, T, Arch, Align>
 where
     T: rkyv::Serialize<S> + rkyv::Archive,
     Arch: SimdArch,
@@ -113,7 +113,7 @@ impl<T> ArchivedSimdCow<T> {
     /// The alignment of the underlying archived memory must satisfy `Align`.
     #[inline]
     #[must_use]
-    pub unsafe fn as_borrowed<'a, Arch, Align>(&'a self) -> Option<SimdCow<'a, T, Arch, Align>>
+    pub unsafe fn as_borrowed<Arch, Align>(&self) -> Option<SimdCow<'_, T, Arch, Align>>
     where
         Arch: SimdArch,
         Align: Alignment,

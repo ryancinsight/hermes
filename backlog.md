@@ -47,7 +47,7 @@
   | **0** | `ptr_as_ptr` | **done** — was 171, see below |
   | 180 | `unreadable_literal` | bitboard/mask hex constants; check readability convention before sweeping |
   | **0** | `must_use_candidate` | **done** — 162 exact findings closed below |
-  | 131 | `elidable_lifetime_names` | mechanical |
+  | **0** | `elidable_lifetime_names` | **done** — 131 explicit lifetime names elided mechanically; relationships with independent input lifetimes remain explicit |
   | 92 | `semicolon_if_nothing_returned` | mechanical |
   | **0** | `missing_errors_doc` | **done** — all 47 public `Result` APIs document their error contracts |
   | 63 | `cast_lossless` | prefer `From` over `as` where infallible |
@@ -117,6 +117,14 @@
   implementations and shared method macro live in the dedicated
   `dispatch/simd_ops/blanket_impls.rs` leaf, with the package suite passing
   408/408 after the structural split.
+
+  **`elidable_lifetime_names` burned down: 131 -> 0 (2026-08-14).** The
+  core view, sparse, COW, iterator, tensor, aligned-storage, and SIMD facade
+  implementations now use Rust's elided lifetime forms where the input
+  relationship is unambiguous. Independent input lifetimes remain named, so
+  the change removes syntax without changing the borrow contract. The
+  targeted Clippy audit is clean and the combined core/SIMD nextest suite
+  passes 424/424.
 
   **`ptr_as_ptr` burned down: 171 -> 0.** 167 sites converted mechanically by
   `cargo clippy --fix` restricted to that one lint; the remaining 4 were

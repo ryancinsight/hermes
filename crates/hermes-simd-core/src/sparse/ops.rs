@@ -27,7 +27,7 @@ pub trait SparseOps<T> {
     fn elementwise_mul_dense(&self, dense: &[T], out_values: &mut [T]);
 }
 
-impl<'a, T, Arch> SparseOps<T> for SparseView<'a, T, Csr, Arch>
+impl<T, Arch> SparseOps<T> for SparseView<'_, T, Csr, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
@@ -101,7 +101,7 @@ where
     }
 }
 
-impl<'a, T, const C: usize, Arch> SparseOps<T> for SparseView<'a, T, SellP<C>, Arch>
+impl<T, const C: usize, Arch> SparseOps<T> for SparseView<'_, T, SellP<C>, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
@@ -200,8 +200,8 @@ where
     }
 }
 
-impl<'a, T, const BM: usize, const BN: usize, Arch> SparseOps<T>
-    for SparseView<'a, T, BlockedCoo<BM, BN>, Arch>
+impl<T, const BM: usize, const BN: usize, Arch> SparseOps<T>
+    for SparseView<'_, T, BlockedCoo<BM, BN>, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,
@@ -315,7 +315,7 @@ where
     }
 }
 
-impl<'a, T, Arch> SparseOps<T> for SparseView<'a, T, DenseWithMask, Arch>
+impl<T, Arch> SparseOps<T> for SparseView<'_, T, DenseWithMask, Arch>
 where
     T: Scalar,
     Arch: SimdArch + SimdKernel<T>,

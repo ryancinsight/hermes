@@ -46,23 +46,21 @@ pub struct SimdChunks<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: Executi
 // SAFETY: SimdChunks borrows `'a` data immutably; forwarding Send/Sync is sound
 // when `T: Send` / `T: Sync`.
 unsafe impl<
-        'a,
         T: Send,
         Arch: SimdArch + crate::kernel::SimdKernel<T>,
         Align: Alignment,
         Mode: ExecutionMode,
-    > Send for SimdChunks<'a, T, Arch, Align, Mode>
+    > Send for SimdChunks<'_, T, Arch, Align, Mode>
 where
     T: crate::scalar::Scalar,
 {
 }
 unsafe impl<
-        'a,
         T: Sync,
         Arch: SimdArch + crate::kernel::SimdKernel<T>,
         Align: Alignment,
         Mode: ExecutionMode,
-    > Sync for SimdChunks<'a, T, Arch, Align, Mode>
+    > Sync for SimdChunks<'_, T, Arch, Align, Mode>
 where
     T: crate::scalar::Scalar,
 {
@@ -214,23 +212,21 @@ pub struct SimdChunksMut<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: Exec
 // SAFETY: SimdChunksMut borrows `'a` data mutably; forwarding Send/Sync is sound
 // when `T: Send` / `T: Sync`.
 unsafe impl<
-        'a,
         T: Send,
         Arch: SimdArch + crate::kernel::SimdKernel<T>,
         Align: Alignment,
         Mode: ExecutionMode,
-    > Send for SimdChunksMut<'a, T, Arch, Align, Mode>
+    > Send for SimdChunksMut<'_, T, Arch, Align, Mode>
 where
     T: crate::scalar::Scalar,
 {
 }
 unsafe impl<
-        'a,
         T: Sync,
         Arch: SimdArch + crate::kernel::SimdKernel<T>,
         Align: Alignment,
         Mode: ExecutionMode,
-    > Sync for SimdChunksMut<'a, T, Arch, Align, Mode>
+    > Sync for SimdChunksMut<'_, T, Arch, Align, Mode>
 where
     T: crate::scalar::Scalar,
 {

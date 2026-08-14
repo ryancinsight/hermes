@@ -393,9 +393,7 @@ where
     /// Panics if the vector's internal alignment invariant is violated.
     #[inline(always)]
     #[must_use]
-    pub fn view<'a, Arch>(
-        &'a self,
-    ) -> SimdView<'a, T, Arch, Align, crate::execution::Unmasked, &'a [T]>
+    pub fn view<Arch>(&self) -> SimdView<'_, T, Arch, Align, crate::execution::Unmasked, &[T]>
     where
         Arch: crate::arch::SimdArch,
     {
@@ -409,9 +407,9 @@ where
     ///
     /// Panics if the vector's internal alignment invariant is violated.
     #[inline(always)]
-    pub fn view_mut<'a, Arch>(
-        &'a mut self,
-    ) -> SimdView<'a, T, Arch, Align, crate::execution::Unmasked, &'a mut [T]>
+    pub fn view_mut<Arch>(
+        &mut self,
+    ) -> SimdView<'_, T, Arch, Align, crate::execution::Unmasked, &mut [T]>
     where
         Arch: crate::arch::SimdArch,
     {

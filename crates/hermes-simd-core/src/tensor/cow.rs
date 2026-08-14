@@ -246,8 +246,8 @@ where
 // PartialEq / Eq
 // ---------------------------------------------------------------------------
 
-impl<'a, 'b, T, const N: usize, L1, L2, A1, A2> PartialEq<TensorCow<'b, T, N, L2, A2>>
-    for TensorCow<'a, T, N, L1, A1>
+impl<'b, T, const N: usize, L1, L2, A1, A2> PartialEq<TensorCow<'b, T, N, L2, A2>>
+    for TensorCow<'_, T, N, L1, A1>
 where
     T: PartialEq,
     A1: Alignment,
@@ -261,7 +261,7 @@ where
     }
 }
 
-impl<'a, T, const N: usize, L, Align> Eq for TensorCow<'a, T, N, L, Align>
+impl<T, const N: usize, L, Align> Eq for TensorCow<'_, T, N, L, Align>
 where
     T: Eq,
     Align: Alignment,

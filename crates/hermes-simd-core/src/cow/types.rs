@@ -162,7 +162,7 @@ where
     }
 }
 
-impl<'a, T, Arch, Align> Clone for SimdCow<'a, T, Arch, Align>
+impl<T, Arch, Align> Clone for SimdCow<'_, T, Arch, Align>
 where
     T: Clone,
     Arch: SimdArch,
@@ -177,7 +177,7 @@ where
     }
 }
 
-impl<'a, T, Arch, Align> Default for SimdCow<'a, T, Arch, Align>
+impl<T, Arch, Align> Default for SimdCow<'_, T, Arch, Align>
 where
     Arch: SimdArch,
     Align: Alignment,
@@ -188,7 +188,7 @@ where
     }
 }
 
-impl<'a, T, Arch, Align> core::fmt::Debug for SimdCow<'a, T, Arch, Align>
+impl<T, Arch, Align> core::fmt::Debug for SimdCow<'_, T, Arch, Align>
 where
     T: core::fmt::Debug,
     Arch: SimdArch,
@@ -202,8 +202,8 @@ where
     }
 }
 
-impl<'a, 'b, T, Arch1, Arch2, Align1, Align2> PartialEq<SimdCow<'b, T, Arch2, Align2>>
-    for SimdCow<'a, T, Arch1, Align1>
+impl<'b, T, Arch1, Arch2, Align1, Align2> PartialEq<SimdCow<'b, T, Arch2, Align2>>
+    for SimdCow<'_, T, Arch1, Align1>
 where
     T: PartialEq,
     Arch1: SimdArch,
@@ -219,7 +219,7 @@ where
     }
 }
 
-impl<'a, T, Arch, Align> Eq for SimdCow<'a, T, Arch, Align>
+impl<T, Arch, Align> Eq for SimdCow<'_, T, Arch, Align>
 where
     T: Eq,
     Arch: SimdArch,
@@ -227,8 +227,8 @@ where
 {
 }
 
-impl<'a, T: PartialEq, Arch: SimdArch, Align: Alignment> PartialEq<[T]>
-    for SimdCow<'a, T, Arch, Align>
+impl<T: PartialEq, Arch: SimdArch, Align: Alignment> PartialEq<[T]>
+    for SimdCow<'_, T, Arch, Align>
 {
     #[inline]
     fn eq(&self, other: &[T]) -> bool {
