@@ -7,6 +7,38 @@ use hermes_simd_intrinsics::Scalar;
 #[cfg(target_arch = "x86_64")]
 use hermes_simd_intrinsics::{AmxBf16, Avx512};
 
+fn gemm_bf16_remainder(
+    m: usize,
+    n: usize,
+    k: usize,
+    a: &[Bf16],
+    a_stride: usize,
+    b: &[Bf16],
+    b_stride: usize,
+    c: &mut [F32],
+    c_stride: usize,
+) {
+    let tile_m_bound = (m / 16) * 16;
+    let tile_n_bound = (n / 16) * 16;
+    let tile_k_bound = (k / 32) * 32;
+    for r in 0..m {
+        for col in 0..n {
+            let depth_start = if r >= tile_m_bound || col >= tile_n_bound {
+                0
+            } else {
+                tile_k_bound
+            };
+            if depth_start < k {
+                let mut sum = 0.0f32;
+                for kk in depth_start..k {
+                    sum += a[r * a_stride + kk].to_f32() * b[kk * b_stride + col].to_f32();
+                }
+                c[r * c_stride + col] = F32(c[r * c_stride + col].0 + sum);
+            }
+        }
+    }
+}
+
 impl TiledGemm<Bf16, Bf16, F32> for (Bf16, Bf16, F32) {
     #[inline]
     unsafe fn dispatch_tile_matmul(
@@ -117,28 +149,7 @@ impl TiledGemm<Bf16, Bf16, F32> for (Bf16, Bf16, F32) {
                         c_stride,
                     );
 
-                    let amx_m_bound = (m / 16) * 16;
-                    let amx_n_bound = (n / 16) * 16;
-                    let amx_k_bound = (k / 32) * 32;
-                    for r in 0..m {
-                        for col in 0..n {
-                            if r >= amx_m_bound || col >= amx_n_bound {
-                                let mut sum = 0.0f32;
-                                for kk in 0..k {
-                                    sum += a[r * a_stride + kk].to_f32()
-                                        * b[kk * b_stride + col].to_f32();
-                                }
-                                c[r * c_stride + col] = F32(c[r * c_stride + col].0 + sum);
-                            } else if amx_k_bound < k {
-                                let mut sum = 0.0f32;
-                                for kk in amx_k_bound..k {
-                                    sum += a[r * a_stride + kk].to_f32()
-                                        * b[kk * b_stride + col].to_f32();
-                                }
-                                c[r * c_stride + col] = F32(c[r * c_stride + col].0 + sum);
-                            }
-                        }
-                    }
+                    gemm_bf16_remainder(m, n, k, a, a_stride, b, b_stride, c, c_stride);
                     return Ok(());
                 }
                 crate::dispatcher::DispatchDecision::AvxVnni
@@ -158,26 +169,7 @@ impl TiledGemm<Bf16, Bf16, F32> for (Bf16, Bf16, F32) {
             c_stride,
         );
 
-        let amx_m_bound = (m / 16) * 16;
-        let amx_n_bound = (n / 16) * 16;
-        let amx_k_bound = (k / 32) * 32;
-        for r in 0..m {
-            for col in 0..n {
-                if r >= amx_m_bound || col >= amx_n_bound {
-                    let mut sum = 0.0f32;
-                    for kk in 0..k {
-                        sum += a[r * a_stride + kk].to_f32() * b[kk * b_stride + col].to_f32();
-                    }
-                    c[r * c_stride + col] = F32(c[r * c_stride + col].0 + sum);
-                } else if amx_k_bound < k {
-                    let mut sum = 0.0f32;
-                    for kk in amx_k_bound..k {
-                        sum += a[r * a_stride + kk].to_f32() * b[kk * b_stride + col].to_f32();
-                    }
-                    c[r * c_stride + col] = F32(c[r * c_stride + col].0 + sum);
-                }
-            }
-        }
+        gemm_bf16_remainder(m, n, k, a, a_stride, b, b_stride, c, c_stride);
         Ok(())
     }
 }

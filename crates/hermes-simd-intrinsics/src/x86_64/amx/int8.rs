@@ -46,6 +46,10 @@ impl_tile_matmul_int8!(I8, I32);
 
 impl super::AmxGemm<i8, i8, i32> for AmxInt8 {
     #[inline]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "AMX int8 tiling keeps tile configuration, packing, dispatch, and tails in one unsafe boundary"
+    )]
     unsafe fn amx_gemm(
         m: usize,
         n: usize,
@@ -200,8 +204,8 @@ impl super::AmxGemm<i8, i8, i32> for AmxInt8 {
                         let mut sum = 0i32;
                         for kk in 0..k {
                             sum = sum.wrapping_add(
-                                (*a.add(r * a_stride + kk) as i32)
-                                    * (*b.add(kk * b_stride + col) as i32),
+                                i32::from(*a.add(r * a_stride + kk))
+                                    * i32::from(*b.add(kk * b_stride + col)),
                             );
                         }
                         *c.add(r * c_stride + col) += sum;
@@ -209,8 +213,8 @@ impl super::AmxGemm<i8, i8, i32> for AmxInt8 {
                         let mut sum = 0i32;
                         for kk in amx_k_bound..k {
                             sum = sum.wrapping_add(
-                                (*a.add(r * a_stride + kk) as i32)
-                                    * (*b.add(kk * b_stride + col) as i32),
+                                i32::from(*a.add(r * a_stride + kk))
+                                    * i32::from(*b.add(kk * b_stride + col)),
                             );
                         }
                         *c.add(r * c_stride + col) += sum;
@@ -223,6 +227,10 @@ impl super::AmxGemm<i8, i8, i32> for AmxInt8 {
 
 impl super::AmxGemm<I8, I8, I32> for AmxInt8 {
     #[inline]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "AMX int8 tiling keeps tile configuration, packing, dispatch, and tails in one unsafe boundary"
+    )]
     unsafe fn amx_gemm(
         m: usize,
         n: usize,
@@ -377,8 +385,8 @@ impl super::AmxGemm<I8, I8, I32> for AmxInt8 {
                         let mut sum = 0i32;
                         for kk in 0..k {
                             sum = sum.wrapping_add(
-                                (a.add(r * a_stride + kk).read().0 as i32)
-                                    * (b.add(kk * b_stride + col).read().0 as i32),
+                                i32::from(a.add(r * a_stride + kk).read().0)
+                                    * i32::from(b.add(kk * b_stride + col).read().0),
                             );
                         }
                         *c.add(r * c_stride + col) = I32(c.add(r * c_stride + col).read().0 + sum);
@@ -386,8 +394,8 @@ impl super::AmxGemm<I8, I8, I32> for AmxInt8 {
                         let mut sum = 0i32;
                         for kk in amx_k_bound..k {
                             sum = sum.wrapping_add(
-                                (a.add(r * a_stride + kk).read().0 as i32)
-                                    * (b.add(kk * b_stride + col).read().0 as i32),
+                                i32::from(a.add(r * a_stride + kk).read().0)
+                                    * i32::from(b.add(kk * b_stride + col).read().0),
                             );
                         }
                         *c.add(r * c_stride + col) = I32(c.add(r * c_stride + col).read().0 + sum);

@@ -1,4 +1,4 @@
-//! AVX-VNNI (256-bit VEX-encoded VNNI) `TileMatrixMultiply` for x86_64.
+//! AVX-VNNI (256-bit VEX-encoded VNNI) `TileMatrixMultiply` for `x86_64`.
 //!
 //! Serves client CPUs (Alder Lake and newer, Zen 5) that have `vpdpbusd` on
 //! YMM registers but no AVX-512. Sits between the AVX-512 VNNI tile kernel and
@@ -56,7 +56,12 @@ unsafe fn tile_matmul_i8(
     b: *const i8,
     b_stride: usize,
 ) {
-    use arch::*;
+    use arch::{
+        __m128i, __m256i, _mm256_dpbusd_avx_epi32, _mm256_loadu_si256, _mm256_set1_epi32,
+        _mm256_set1_epi8, _mm256_set_m128i, _mm256_setzero_si256, _mm256_storeu_si256,
+        _mm256_sub_epi32, _mm256_xor_si256, _mm_loadl_epi64, _mm_unpackhi_epi16,
+        _mm_unpacklo_epi16, _mm_unpacklo_epi8,
+    };
 
     // Per-byte +128 bias for the unsigned operand of `vpdpbusd` (XOR 0x80).
     let sign_flip = _mm256_set1_epi8(-128);

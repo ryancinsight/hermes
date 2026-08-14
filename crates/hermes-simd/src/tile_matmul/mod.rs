@@ -96,7 +96,7 @@ pub trait TiledGemm<TA, TB, TC> {
         c_stride: usize,
     ) -> Result<(), SimdError>;
 
-    /// Dynamically dispatches tile matrix multiplication for a single tile of shape MxNxK.
+    /// Dynamically dispatches tile matrix multiplication for a single tile of shape `MxNxK`.
     ///
     /// # Safety
     /// - Pointers must be valid and aligned as per the chosen backend requirements.
@@ -139,7 +139,7 @@ where
     <(TA, TB, TC) as TiledGemm<TA, TB, TC>>::gemm(m, n, k, a, a_stride, b, b_stride, c, c_stride)
 }
 
-/// Dynamically dispatches tile matrix multiplication for a single tile of shape MxNxK.
+/// Dynamically dispatches tile matrix multiplication for a single tile of shape `MxNxK`.
 ///
 /// # Safety
 /// - Pointers must be valid and aligned as per the chosen backend requirements.

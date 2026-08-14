@@ -1,3 +1,8 @@
+#![expect(
+    clippy::float_cmp,
+    reason = "Sparse integration tests compare exact manufactured reference vectors"
+)]
+
 use hermes_simd::*;
 
 fn validated<S>(data: S) -> ValidatedData<S>

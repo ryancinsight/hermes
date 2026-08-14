@@ -2,9 +2,18 @@
 //! tail-mask primitives, exercised per architecture backend.
 //!
 //! The `Scalar` and SVE-shaped emulated backends always run; AVX2 / AVX-512 run
-//! when the host CPU supports them (CI provides at least AVX2 on x86_64 runners
+//! when the host CPU supports them (CI provides at least AVX2 on `x86_64` runners
 //! and NEON on aarch64 runners via `PreferredArch`-independent explicit
 //! markers).
+
+#![expect(
+    clippy::items_after_statements,
+    reason = "The property harness keeps compile-time lane constants beside the exercised kernel"
+)]
+#![expect(
+    clippy::float_cmp,
+    reason = "These property checks compare exact lane values from manufactured inputs"
+)]
 
 use hermes_simd::{Scalar, SveArch};
 use hermes_simd_core::align::Unaligned;
@@ -257,7 +266,7 @@ fn permutes_match_reference_all_backends() {
 }
 
 /// `masked_sum_reduce` with `leading_k_mask(k)` must sum exactly the first
-/// `min(k, LANE_COUNT)` lanes, including the k = 0 and k > LANE_COUNT bounds.
+/// `min(k, LANE_COUNT)` lanes, including the k = 0 and k > `LANE_COUNT` bounds.
 fn check_leading_k_masked_sum<A: SimdKernel<f32>>() {
     let lanes = A::LANE_COUNT;
     let vals: Vec<f32> = (0..lanes).map(|i| (i + 1) as f32).collect();

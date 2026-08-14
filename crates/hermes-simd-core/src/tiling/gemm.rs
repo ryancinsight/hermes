@@ -209,7 +209,7 @@ where
             assert!(M * N <= 64, "TILE_M * TILE_N must be <= 64");
         };
     }
-    let _ = AssertGEMM::<TILE_M, TILE_N>::OK;
+    let () = AssertGEMM::<TILE_M, TILE_N>::OK;
 
     check_tiled_gemm_dimensions(a.len(), b.len(), c.len(), m, n, k)?;
 
@@ -296,17 +296,25 @@ where
         }
     }
 
-    // Masked-vector cleanup for the `n % block_n` trailing columns: process them
-    // in `lane_count`-wide groups with a `leading_k_mask` on the final partial
-    // group, `TILE_M`-row blocked so each masked B row-load is reused across the
-    // row block — the same fmadd contraction (and therefore the same
-    // fused-multiply rounding) as the register tiles. Previously these columns
-    // ran a strided scalar triple loop, costing up to `block_n − 1` scalar
-    // columns (≈ half the FLOPs for `n` just under a block multiple). Inactive
-    // mask lanes load as zero and are never stored: `a·0` accumulates into a
-    // zero-initialized lane that the masked store discards, so they cannot
-    // contaminate active lanes. Each (row, col) is written exactly once,
-    // independent of the tiling above.
+    gemm_masked_tail::<T, Arch, TILE_M>(a_slice, b_slice, c, m, n, k, simd_n_len);
+
+    Ok(())
+}
+
+/// Computes the masked trailing columns left after full register tiles.
+fn gemm_masked_tail<T, Arch, const TILE_M: usize>(
+    a_slice: &[T],
+    b_slice: &[T],
+    c: &mut [T],
+    m: usize,
+    n: usize,
+    k: usize,
+    simd_n_len: usize,
+) where
+    Arch: SimdArch + SimdKernel<T>,
+    T: Scalar,
+{
+    let lane_count = Arch::LANE_COUNT;
     let mut col = simd_n_len;
     while col < n {
         let w = core::cmp::min(lane_count, n - col);
@@ -362,6 +370,4 @@ where
         }
         col += lane_count;
     }
-
-    Ok(())
 }

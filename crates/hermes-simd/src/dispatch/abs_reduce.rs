@@ -45,6 +45,10 @@ mod tests {
     use super::super::{abs_max, abs_sum};
 
     #[test]
+    #[expect(
+        clippy::float_cmp,
+        reason = "The reduction test compares exact scalar reference values"
+    )]
     fn abs_sum_matches_scalar_reference_across_tail_sizes() {
         for &len in &[0usize, 1, 3, 7, 8, 9, 15, 16, 17, 63, 64, 65, 1027] {
             let data: Vec<f64> = (0..len)
@@ -56,6 +60,10 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        clippy::float_cmp,
+        reason = "The reduction test compares exact scalar reference values"
+    )]
     fn abs_max_matches_scalar_reference_across_tail_sizes() {
         for &len in &[0usize, 1, 3, 7, 8, 9, 15, 16, 17, 63, 64, 65, 1027] {
             let data: Vec<f64> = (0..len)
@@ -67,6 +75,10 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        clippy::float_cmp,
+        reason = "The reduction test compares exact manufactured single-precision values"
+    )]
     fn abs_reductions_single_precision_match_reference() {
         let data: Vec<f32> = (0..133)
             .map(|i| (i as f32) * if i % 2 == 0 { 1.0 } else { -1.0 })
@@ -78,6 +90,10 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        clippy::float_cmp,
+        reason = "The reduction test compares exact manufactured single-precision values"
+    )]
     fn abs_reductions_masked_tails_cover_multiple_widths_and_f32() {
         for &len in &[1usize, 2, 3, 5, 9, 17, 65, 133] {
             let data: Vec<f32> = (0..len)
@@ -94,6 +110,10 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        clippy::float_cmp,
+        reason = "The reduction test compares exact manufactured double-precision values"
+    )]
     fn abs_reductions_masked_tails_cover_multiple_widths_and_f64() {
         for &len in &[1usize, 2, 3, 5, 9, 17, 65, 133] {
             let data: Vec<f64> = (0..len)
@@ -110,6 +130,10 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        clippy::float_cmp,
+        reason = "The empty reduction contract is an exact zero-value assertion"
+    )]
     fn abs_reductions_empty_are_zero() {
         let empty: [f64; 0] = [];
         assert_eq!(abs_sum(&empty), 0.0);
@@ -117,6 +141,10 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        clippy::float_cmp,
+        reason = "The reduction test compares an exact manufactured maximum"
+    )]
     fn abs_max_all_negative_returns_largest_magnitude() {
         let data = [-3.0f64, -7.5, -0.25, -7.25];
         assert_eq!(abs_max(&data), 7.5);

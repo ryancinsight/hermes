@@ -203,7 +203,7 @@ where
         let bin_width = (hi.to_f64() - lo_w) / n_bins as f64;
         let mut counts = alloc::vec![0usize; n_bins];
 
-        for &x in self.as_ref().iter() {
+        for &x in self.as_ref() {
             if x < lo || x >= hi {
                 continue;
             }

@@ -1,3 +1,16 @@
+#![expect(
+    clippy::float_cmp,
+    reason = "These integration tests assert exact manufactured lane values"
+)]
+#![expect(
+    clippy::match_wildcard_for_single_variants,
+    reason = "The tests intentionally accept the borrowed branch while rejecting owned results"
+)]
+#![expect(
+    clippy::unreadable_literal,
+    reason = "The tests use canonical SWAR masks as fixed-width reference values"
+)]
+
 use hermes_simd::*;
 
 #[test]
@@ -313,10 +326,10 @@ fn test_cow_enhancements() {
     assert!(matches!(cloned_owned, SimdCow::Owned(_)));
     assert_eq!(cloned_owned, cow_owned);
 
-    let debug_str = format!("{:?}", cow_borrowed);
+    let debug_str = format!("{cow_borrowed:?}");
     assert!(debug_str.contains("Borrowed"));
 
-    let debug_str_owned = format!("{:?}", cow_owned);
+    let debug_str_owned = format!("{cow_owned:?}");
     assert!(debug_str_owned.contains("Owned"));
 
     // 4. Verification of the refactored transform_in_place and zip_cow

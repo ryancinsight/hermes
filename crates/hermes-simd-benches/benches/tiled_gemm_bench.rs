@@ -157,13 +157,15 @@ where
             if r >= bound || col >= bound {
                 let mut sum = 0i32;
                 for kk in 0..size {
-                    sum = sum.wrapping_add((a[r * size + kk] as i32) * (b[kk * size + col] as i32));
+                    sum = sum
+                        .wrapping_add(i32::from(a[r * size + kk]) * i32::from(b[kk * size + col]));
                 }
                 out[r * size + col] += sum;
             } else if k_bound < size {
                 let mut sum = 0i32;
                 for kk in k_bound..size {
-                    sum = sum.wrapping_add((a[r * size + kk] as i32) * (b[kk * size + col] as i32));
+                    sum = sum
+                        .wrapping_add(i32::from(a[r * size + kk]) * i32::from(b[kk * size + col]));
                 }
                 out[r * size + col] += sum;
             }

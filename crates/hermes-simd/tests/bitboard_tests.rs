@@ -8,29 +8,25 @@ fn test_bitboard_backends_match() {
         let r_ks = <KoggeStone as BitBoardKernel>::rook_attacks(sq, occ);
         let r_hyp = <Hyperbola as BitBoardKernel>::rook_attacks(sq, occ);
         let r_magic = <Magic as BitBoardKernel>::rook_attacks(sq, occ);
-        assert_eq!(r_swar, r_ks, "Rook swar vs ks mismatch at sq {}", sq);
-        assert_eq!(r_swar, r_hyp, "Rook swar vs hyp mismatch at sq {}", sq);
-        assert_eq!(r_swar, r_magic, "Rook swar vs magic mismatch at sq {}", sq);
+        assert_eq!(r_swar, r_ks, "Rook swar vs ks mismatch at sq {sq}");
+        assert_eq!(r_swar, r_hyp, "Rook swar vs hyp mismatch at sq {sq}");
+        assert_eq!(r_swar, r_magic, "Rook swar vs magic mismatch at sq {sq}");
 
         let b_swar = <Swar as BitBoardKernel>::bishop_attacks(sq, occ);
         let b_ks = <KoggeStone as BitBoardKernel>::bishop_attacks(sq, occ);
         let b_hyp = <Hyperbola as BitBoardKernel>::bishop_attacks(sq, occ);
         let b_magic = <Magic as BitBoardKernel>::bishop_attacks(sq, occ);
-        assert_eq!(b_swar, b_ks, "Bishop swar vs ks mismatch at sq {}", sq);
-        assert_eq!(b_swar, b_hyp, "Bishop swar vs hyp mismatch at sq {}", sq);
-        assert_eq!(
-            b_swar, b_magic,
-            "Bishop swar vs magic mismatch at sq {}",
-            sq
-        );
+        assert_eq!(b_swar, b_ks, "Bishop swar vs ks mismatch at sq {sq}");
+        assert_eq!(b_swar, b_hyp, "Bishop swar vs hyp mismatch at sq {sq}");
+        assert_eq!(b_swar, b_magic, "Bishop swar vs magic mismatch at sq {sq}");
 
         let q_swar = <Swar as BitBoardKernel>::queen_attacks(sq, occ);
         let q_ks = <KoggeStone as BitBoardKernel>::queen_attacks(sq, occ);
         let q_hyp = <Hyperbola as BitBoardKernel>::queen_attacks(sq, occ);
         let q_magic = <Magic as BitBoardKernel>::queen_attacks(sq, occ);
-        assert_eq!(q_swar, q_ks, "Queen swar vs ks mismatch at sq {}", sq);
-        assert_eq!(q_swar, q_hyp, "Queen swar vs hyp mismatch at sq {}", sq);
-        assert_eq!(q_swar, q_magic, "Queen swar vs magic mismatch at sq {}", sq);
+        assert_eq!(q_swar, q_ks, "Queen swar vs ks mismatch at sq {sq}");
+        assert_eq!(q_swar, q_hyp, "Queen swar vs hyp mismatch at sq {sq}");
+        assert_eq!(q_swar, q_magic, "Queen swar vs magic mismatch at sq {sq}");
     }
 }
 
@@ -49,13 +45,11 @@ fn test_hybrid_swar_magic_matching() {
             let r_hybrid = <HybridSwarMagic as BitBoardKernel>::rook_attacks(sq, occ);
             assert_eq!(
                 r_hybrid, r_swar,
-                "Rook hybrid vs swar mismatch at sq {}, occ {}",
-                sq, occ
+                "Rook hybrid vs swar mismatch at sq {sq}, occ {occ}"
             );
             assert_eq!(
                 r_hybrid, r_magic,
-                "Rook hybrid vs magic mismatch at sq {}, occ {}",
-                sq, occ
+                "Rook hybrid vs magic mismatch at sq {sq}, occ {occ}"
             );
 
             let b_swar = <Swar as BitBoardKernel>::bishop_attacks(sq, occ);
@@ -63,13 +57,11 @@ fn test_hybrid_swar_magic_matching() {
             let b_hybrid = <HybridSwarMagic as BitBoardKernel>::bishop_attacks(sq, occ);
             assert_eq!(
                 b_hybrid, b_swar,
-                "Bishop hybrid vs swar mismatch at sq {}, occ {}",
-                sq, occ
+                "Bishop hybrid vs swar mismatch at sq {sq}, occ {occ}"
             );
             assert_eq!(
                 b_hybrid, b_magic,
-                "Bishop hybrid vs magic mismatch at sq {}, occ {}",
-                sq, occ
+                "Bishop hybrid vs magic mismatch at sq {sq}, occ {occ}"
             );
 
             let q_swar = <Swar as BitBoardKernel>::queen_attacks(sq, occ);
@@ -77,13 +69,11 @@ fn test_hybrid_swar_magic_matching() {
             let q_hybrid = <HybridSwarMagic as BitBoardKernel>::queen_attacks(sq, occ);
             assert_eq!(
                 q_hybrid, q_swar,
-                "Queen hybrid vs swar mismatch at sq {}, occ {}",
-                sq, occ
+                "Queen hybrid vs swar mismatch at sq {sq}, occ {occ}"
             );
             assert_eq!(
                 q_hybrid, q_magic,
-                "Queen hybrid vs magic mismatch at sq {}, occ {}",
-                sq, occ
+                "Queen hybrid vs magic mismatch at sq {sq}, occ {occ}"
             );
         }
     }
@@ -101,14 +91,14 @@ fn test_swar_utils_primitives() {
 
     let multi_byte = 0x01_03_07_0f_00_ff_55_aa_u64;
     let p8 = SwarUtils::popcount_8(multi_byte);
-    assert_eq!(p8 & 0xff, 0xaa_u64.count_ones() as u64);
-    assert_eq!((p8 >> 8) & 0xff, 0x55_u64.count_ones() as u64);
-    assert_eq!((p8 >> 16) & 0xff, 0xff_u64.count_ones() as u64);
-    assert_eq!((p8 >> 24) & 0xff, 0x00_u64.count_ones() as u64);
+    assert_eq!(p8 & 0xff, u64::from(0xaa_u64.count_ones()));
+    assert_eq!((p8 >> 8) & 0xff, u64::from(0x55_u64.count_ones()));
+    assert_eq!((p8 >> 16) & 0xff, u64::from(0xff_u64.count_ones()));
+    assert_eq!((p8 >> 24) & 0xff, u64::from(0x00_u64.count_ones()));
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "square must be in 0..64")]
 fn rook_attacks_panics_on_out_of_range_square() {
     // `square >= 64` is out of range; the magic tables are indexed by square, so
     // the public wrapper panics (bounds check) rather than reading OOB — backs the

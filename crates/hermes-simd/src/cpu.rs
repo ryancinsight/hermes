@@ -164,6 +164,7 @@ fn has_avx512_bf16_tile() -> bool {
 /// admits the conversion/FMA fallback on AVX-512F/BW/VL hosts. Native callers
 /// must use this exact capability before entering `DPBF16PS` code.
 #[inline]
+#[must_use]
 pub fn has_avx512_bf16() -> bool {
     hermes_simd_intrinsics::has_avx512_bf16()
 }

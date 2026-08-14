@@ -1,6 +1,10 @@
 use std::process::Command;
 
 #[derive(Debug, Clone, Copy)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "The capability report is a fixed-width feature matrix, not mutable state"
+)]
 pub(crate) struct HostCapabilities {
     avx2: bool,
     fma: bool,

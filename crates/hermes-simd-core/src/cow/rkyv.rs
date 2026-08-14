@@ -107,7 +107,7 @@ impl<T> ArchivedSimdCow<T> {
         self.elements.as_slice()
     }
 
-    /// Zero-copy conversion of the archived SimdCow to a borrowed SimdCow.
+    /// Zero-copy conversion of the archived `SimdCow` to a borrowed `SimdCow`.
     ///
     /// # Safety
     /// The alignment of the underlying archived memory must satisfy `Align`.

@@ -1,8 +1,13 @@
-//! Sparse SpMV through the validated-data typestate.
+//! Sparse `SpMV` through the validated-data typestate.
 //!
 //! A CSR matrix is built from raw parts, validated by `ValidatedData::new`
 //! (structural checks only — index bounds are checked before any SIMD
 //! gather can read out of bounds), and then consumed by `spmv_csr`.
+
+#![expect(
+    clippy::float_cmp,
+    reason = "The runnable example asserts exact manufactured sparse outputs"
+)]
 
 use hermes_simd::{
     spmv_csr, spmv_dense_masked, CsrData, DenseWithMaskData, SimdError, ValidatedData,

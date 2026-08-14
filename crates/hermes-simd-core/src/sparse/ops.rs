@@ -11,6 +11,7 @@
 //! only the obligations that go beyond it — pointer provenance, bounds, and
 //! alignment.
 
+use super::types::SparseValidate;
 use super::{BlockedCoo, Csr, DenseWithMask, SellP, SparseView};
 use crate::arch::SimdArch;
 use crate::kernel::SimdKernel;
@@ -56,7 +57,6 @@ where
         // (`col_indices[k] < ncols`) via the SSOT checker and require
         // `dense.len() >= ncols`, so every gathered index is in bounds. O(nnz)
         // once per call, matching the SELL-p path in this file.
-        use super::types::SparseValidate;
         d.validate()
             .expect("CSR matrix failed structural validation before elementwise_mul_dense");
         assert!(
@@ -236,8 +236,7 @@ where
         );
         assert!(
             out_values.len() >= block_elems && d.blocks.len() >= block_elems,
-            "block/output buffers too small for {} block elements",
-            block_elems
+            "block/output buffers too small for {block_elems} block elements"
         );
         for b in 0..d.nblocks {
             let br = d.block_row[b] as usize;

@@ -4,6 +4,11 @@
 //! runtime-dispatched over the same ISA selection path.  This example
 //! builds a small dataset with known extremes and verifies each reduction.
 
+#![expect(
+    clippy::float_cmp,
+    reason = "The runnable example asserts the exact empty reduction identity"
+)]
+
 use hermes_simd::{abs_sum, argmax, argmin, max, min, sum};
 
 fn main() {

@@ -24,6 +24,11 @@ impl<T> OnceLock<T> {
 
     /// Return the stored value, running `f` exactly once to initialize it;
     /// concurrent callers spin until initialization completes.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if the internal state claims initialization completed while
+    /// the value slot is empty, which violates this type's synchronization invariant.
     pub fn get_or_init<F>(&self, f: F) -> &T
     where
         F: FnOnce() -> T,
@@ -86,35 +91,41 @@ fn shift_s(v: u64) -> u64 {
 }
 #[inline(always)]
 fn shift_e(v: u64) -> u64 {
-    (v << 1) & 0xFEFEFEFEFEFEFEFE
+    (v << 1) & 0xFEFE_FEFE_FEFE_FEFE
 }
 #[inline(always)]
 fn shift_w(v: u64) -> u64 {
-    (v >> 1) & 0x7F7F7F7F7F7F7F7F
+    (v >> 1) & 0x7F7F_7F7F_7F7F_7F7F
 }
 #[inline(always)]
 fn shift_ne(v: u64) -> u64 {
-    (v << 9) & 0xFEFEFEFEFEFEFEFE
+    (v << 9) & 0xFEFE_FEFE_FEFE_FEFE
 }
 #[inline(always)]
 fn shift_nw(v: u64) -> u64 {
-    (v << 7) & 0x7F7F7F7F7F7F7F7F
+    (v << 7) & 0x7F7F_7F7F_7F7F_7F7F
 }
 #[inline(always)]
 fn shift_se(v: u64) -> u64 {
-    (v >> 7) & 0xFEFEFEFEFEFEFEFE
+    (v >> 7) & 0xFEFE_FEFE_FEFE_FEFE
 }
 #[inline(always)]
 fn shift_sw(v: u64) -> u64 {
-    (v >> 9) & 0x7F7F7F7F7F7F7F7F
+    (v >> 9) & 0x7F7F_7F7F_7F7F_7F7F
 }
 
 /// Construct Rook occupancy mask (excluding edges).
+///
+/// # Panics
+///
+/// Panics if `sq` is not a valid bitboard square (`0..64`).
 #[inline]
+#[must_use]
 pub fn rook_mask(sq: u8) -> u64 {
+    assert!(sq < 64, "square must be in 0..64");
     let mut mask = 0u64;
-    let r = (sq / 8) as i32;
-    let f = (sq % 8) as i32;
+    let r = i32::from(sq / 8);
+    let f = i32::from(sq % 8);
     for i in 1..7 {
         if i != r {
             mask |= 1u64 << (i * 8 + f);
@@ -127,11 +138,17 @@ pub fn rook_mask(sq: u8) -> u64 {
 }
 
 /// Construct Bishop occupancy mask (excluding edges).
+///
+/// # Panics
+///
+/// Panics if `sq` is not a valid bitboard square (`0..64`).
 #[inline]
+#[must_use]
 pub fn bishop_mask(sq: u8) -> u64 {
+    assert!(sq < 64, "square must be in 0..64");
     let mut mask = 0u64;
-    let r = (sq / 8) as i32;
-    let f = (sq % 8) as i32;
+    let r = i32::from(sq / 8);
+    let f = i32::from(sq % 8);
     for i in 1..7 {
         let nr = r + i;
         let nf = f + i;
@@ -173,6 +190,10 @@ fn get_occupancy(index: usize, mask: u64) -> u64 {
     occupancy
 }
 
+#[expect(
+    clippy::unreadable_literal,
+    reason = "The generated magic table is a canonical fixed-width constant table"
+)]
 const ROOK_MAGICS: [u64; 64] = [
     612507691268440096,
     612507278951579776,
@@ -240,6 +261,10 @@ const ROOK_MAGICS: [u64; 64] = [
     2815026809283586,
 ];
 
+#[expect(
+    clippy::unreadable_literal,
+    reason = "The generated magic table is a canonical fixed-width constant table"
+)]
 const BISHOP_MAGICS: [u64; 64] = [
     2900320361214181632,
     4521240153325862,
@@ -395,6 +420,7 @@ fn get_magic_data() -> &'static MagicTable {
 impl BitBoardKernel for Magic {
     #[inline]
     fn rook_attacks(square: u8, occupancy: u64) -> u64 {
+        assert!(square < 64, "square must be in 0..64");
         let table = get_magic_data();
         let mask = rook_mask(square);
         let pop = mask.count_ones() as usize;
@@ -407,6 +433,7 @@ impl BitBoardKernel for Magic {
 
     #[inline]
     fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
+        assert!(square < 64, "square must be in 0..64");
         let table = get_magic_data();
         let mask = bishop_mask(square);
         let pop = mask.count_ones() as usize;

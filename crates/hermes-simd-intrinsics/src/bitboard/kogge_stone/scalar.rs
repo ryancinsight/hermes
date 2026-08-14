@@ -2,6 +2,7 @@ use super::{step_e, step_n, step_ne, step_nw, step_s, step_se, step_sw, step_w};
 
 /// Computes Rook attacks using Kogge-Stone.
 #[inline]
+#[must_use]
 pub fn kogge_stone_rook(slider: u64, occupancy: u64) -> u64 {
     let p = !occupancy;
 
@@ -30,7 +31,7 @@ pub fn kogge_stone_rook(slider: u64, occupancy: u64) -> u64 {
         ge = g;
         pe = pr;
     }
-    let attacks_e = (ge << 1) & 0xFEFEFEFEFEFEFEFE;
+    let attacks_e = (ge << 1) & 0xFEFE_FEFE_FEFE_FEFE;
 
     // West
     let (mut gw, mut pw) = (slider, p);
@@ -39,13 +40,14 @@ pub fn kogge_stone_rook(slider: u64, occupancy: u64) -> u64 {
         gw = g;
         pw = pr;
     }
-    let attacks_w = (gw >> 1) & 0x7F7F7F7F7F7F7F7F;
+    let attacks_w = (gw >> 1) & 0x7F7F_7F7F_7F7F_7F7F;
 
     attacks_n | attacks_s | attacks_e | attacks_w
 }
 
 /// Computes Bishop attacks using Kogge-Stone.
 #[inline]
+#[must_use]
 pub fn kogge_stone_bishop(slider: u64, occupancy: u64) -> u64 {
     let p = !occupancy;
 
@@ -56,7 +58,7 @@ pub fn kogge_stone_bishop(slider: u64, occupancy: u64) -> u64 {
         gne = g;
         pne = pr;
     }
-    let attacks_ne = (gne << 9) & 0xFEFEFEFEFEFEFEFE;
+    let attacks_ne = (gne << 9) & 0xFEFE_FEFE_FEFE_FEFE;
 
     // North-West
     let (mut gnw, mut pnw) = (slider, p);
@@ -65,7 +67,7 @@ pub fn kogge_stone_bishop(slider: u64, occupancy: u64) -> u64 {
         gnw = g;
         pnw = pr;
     }
-    let attacks_nw = (gnw << 7) & 0x7F7F7F7F7F7F7F7F;
+    let attacks_nw = (gnw << 7) & 0x7F7F_7F7F_7F7F_7F7F;
 
     // South-East
     let (mut gse, mut pse) = (slider, p);
@@ -74,7 +76,7 @@ pub fn kogge_stone_bishop(slider: u64, occupancy: u64) -> u64 {
         gse = g;
         pse = pr;
     }
-    let attacks_se = (gse >> 7) & 0xFEFEFEFEFEFEFEFE;
+    let attacks_se = (gse >> 7) & 0xFEFE_FEFE_FEFE_FEFE;
 
     // South-West
     let (mut gsw, mut psw) = (slider, p);
@@ -83,13 +85,14 @@ pub fn kogge_stone_bishop(slider: u64, occupancy: u64) -> u64 {
         gsw = g;
         psw = pr;
     }
-    let attacks_sw = (gsw >> 9) & 0x7F7F7F7F7F7F7F7F;
+    let attacks_sw = (gsw >> 9) & 0x7F7F_7F7F_7F7F_7F7F;
 
     attacks_ne | attacks_nw | attacks_se | attacks_sw
 }
 
 /// Computes Queen attacks using Kogge-Stone.
 #[inline]
+#[must_use]
 pub fn kogge_stone_queen(slider: u64, occupancy: u64) -> u64 {
     kogge_stone_rook(slider, occupancy) | kogge_stone_bishop(slider, occupancy)
 }

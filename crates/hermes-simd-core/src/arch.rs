@@ -9,9 +9,9 @@
 /// Used for compile-time routing and documentation. Does not affect code generation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum IsaFamily {
-    /// x86 and x86_64 (SSE, AVX, AVX-512 families).
+    /// x86 and `x86_64` (SSE, AVX, AVX-512 families).
     X86,
-    /// AArch64 (NEON, SVE, SME families).
+    /// `AArch64` (NEON, SVE, SME families).
     AArch64,
     /// RISC-V (V extension).
     RiscV,
@@ -47,8 +47,8 @@ pub trait SimdArch: crate::private::Sealed + Send + Sync + 'static + Copy + Clon
     /// This is a hint, not a constraint. Optimal values:
     /// - `Scalar`: 1 (no tiling benefit)
     /// - `Neon`: 4 (4 NEON regs × 4-cycle FMA latency)
-    /// - `Avx2`: 4 (16 YMM / TILE_M=4 leaves headroom for loop overhead)
-    /// - `Avx512`: 8 (32 ZMM / TILE_M=8 saturates two FMA ports)
+    /// - `Avx2`: 4 (16 YMM / `TILE_M=4` leaves headroom for loop overhead)
+    /// - `Avx512`: 8 (32 ZMM / `TILE_M=8` saturates two FMA ports)
     const FMA_THROUGHPUT_HINT: u32;
 
     /// Returns true when the current host may execute this architecture's

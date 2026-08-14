@@ -32,7 +32,7 @@ fn gemm_i8_remainder(
                 let mut sum = 0i32;
                 for kk in 0..k {
                     sum = sum.wrapping_add(
-                        (a[r * a_stride + kk] as i32) * (b[kk * b_stride + col] as i32),
+                        i32::from(a[r * a_stride + kk]) * i32::from(b[kk * b_stride + col]),
                     );
                 }
                 c[r * c_stride + col] += sum;
@@ -40,7 +40,7 @@ fn gemm_i8_remainder(
                 let mut sum = 0i32;
                 for kk in tile_k_bound..k {
                     sum = sum.wrapping_add(
-                        (a[r * a_stride + kk] as i32) * (b[kk * b_stride + col] as i32),
+                        i32::from(a[r * a_stride + kk]) * i32::from(b[kk * b_stride + col]),
                     );
                 }
                 c[r * c_stride + col] += sum;
@@ -68,7 +68,7 @@ unsafe fn gemm_i8_dispatched(
     b_stride: usize,
     c: &mut [i32],
     c_stride: usize,
-) -> Result<(), SimdError> {
+) {
     #[cfg(target_arch = "x86_64")]
     {
         let decision = crate::dispatcher::AdaptiveDispatcher::select_backend(
@@ -94,7 +94,7 @@ unsafe fn gemm_i8_dispatched(
                     c.as_mut_ptr(),
                     c_stride,
                 );
-                return Ok(());
+                return;
             }
             crate::dispatcher::DispatchDecision::Avx512 => {
                 tile_loop_generic::<i8, i8, i32, Avx512, 16, 16, 64>(
@@ -109,7 +109,7 @@ unsafe fn gemm_i8_dispatched(
                     c_stride,
                 );
                 gemm_i8_remainder(m, n, k, a, a_stride, b, b_stride, c, c_stride);
-                return Ok(());
+                return;
             }
             crate::dispatcher::DispatchDecision::AvxVnni => {
                 tile_loop_generic::<i8, i8, i32, AvxVnni, 16, 16, 64>(
@@ -124,7 +124,7 @@ unsafe fn gemm_i8_dispatched(
                     c_stride,
                 );
                 gemm_i8_remainder(m, n, k, a, a_stride, b, b_stride, c, c_stride);
-                return Ok(());
+                return;
             }
             crate::dispatcher::DispatchDecision::Scalar => {}
         }
@@ -142,7 +142,6 @@ unsafe fn gemm_i8_dispatched(
         c_stride,
     );
     gemm_i8_remainder(m, n, k, a, a_stride, b, b_stride, c, c_stride);
-    Ok(())
 }
 
 impl TiledGemm<i8, i8, i32> for (i8, i8, i32) {
@@ -213,7 +212,8 @@ impl TiledGemm<i8, i8, i32> for (i8, i8, i32) {
             b_stride,
             c_stride,
         )?;
-        gemm_i8_dispatched(m, n, k, a, a_stride, b, b_stride, c, c_stride)
+        gemm_i8_dispatched(m, n, k, a, a_stride, b, b_stride, c, c_stride);
+        Ok(())
     }
 }
 
@@ -268,6 +268,7 @@ impl TiledGemm<I8, I8, I32> for (I8, I8, I32) {
         let a_raw = core::slice::from_raw_parts(a.as_ptr().cast::<i8>(), a.len());
         let b_raw = core::slice::from_raw_parts(b.as_ptr().cast::<i8>(), b.len());
         let c_raw = core::slice::from_raw_parts_mut(c.as_mut_ptr().cast::<i32>(), c.len());
-        gemm_i8_dispatched(m, n, k, a_raw, a_stride, b_raw, b_stride, c_raw, c_stride)
+        gemm_i8_dispatched(m, n, k, a_raw, a_stride, b_raw, b_stride, c_raw, c_stride);
+        Ok(())
     }
 }

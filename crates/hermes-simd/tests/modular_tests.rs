@@ -3,11 +3,11 @@ use hermes_simd::{ntt_butterfly_stage_u64, SimdError};
 const MODULUS: u64 = 998_244_353;
 
 fn mod_mul(lhs: u64, rhs: u64, modulus: u64) -> u64 {
-    ((lhs as u128 * rhs as u128) % modulus as u128) as u64
+    ((u128::from(lhs) * u128::from(rhs)) % u128::from(modulus)) as u64
 }
 
 fn mod_add(lhs: u64, rhs: u64, modulus: u64) -> u64 {
-    ((lhs as u128 + rhs as u128) % modulus as u128) as u64
+    ((u128::from(lhs) + u128::from(rhs)) % u128::from(modulus)) as u64
 }
 
 fn mod_sub(lhs: u64, rhs: u64, modulus: u64) -> u64 {

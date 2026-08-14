@@ -1,4 +1,4 @@
-//! Sparse matrix-vector multiplication (SpMV) kernels.
+//! Sparse matrix-vector multiplication (`SpMV`) kernels.
 //!
 //! # Safety
 //!
@@ -62,17 +62,11 @@ pub(crate) unsafe fn build_index_vector<T: Scalar, Arch: SimdKernel<T>>(
 fn validate_spmv_sizes(x_len: usize, y_len: usize, ncols: usize, nrows: usize, format_name: &str) {
     assert!(
         x_len >= ncols,
-        "x too short for {} ncols (got {}, expected >= {})",
-        format_name,
-        x_len,
-        ncols
+        "x too short for {format_name} ncols (got {x_len}, expected >= {ncols})"
     );
     assert!(
         y_len >= nrows,
-        "y too short for {} nrows (got {}, expected >= {})",
-        format_name,
-        y_len,
-        nrows
+        "y too short for {format_name} nrows (got {y_len}, expected >= {nrows})"
     );
 }
 
@@ -431,7 +425,7 @@ where
     }
 }
 
-/// Vectorized SELL-p SpMV for the case `Arch::LANE_COUNT == C`.
+/// Vectorized SELL-p `SpMV` for the case `Arch::LANE_COUNT == C`.
 ///
 /// # Safety
 /// - The host must implement `Arch` (its kernels are `#[target_feature]`-gated).

@@ -39,6 +39,10 @@ impl TileMatrixMultiply<Bf16, Bf16, F32, AmxBf16, AmxBf16, 16, 16, 32> for AmxBf
 
 impl super::AmxGemm<Bf16, Bf16, F32> for AmxBf16 {
     #[inline]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "AMX BF16 tiling keeps tile configuration, packing, dispatch, and tails in one unsafe boundary"
+    )]
     unsafe fn amx_gemm(
         m: usize,
         n: usize,

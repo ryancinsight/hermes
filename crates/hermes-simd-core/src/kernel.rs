@@ -552,7 +552,11 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn bitand(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| x.bitand(y))
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(
+            a,
+            b,
+            eunomia::NumericElement::bitand,
+        )
     }
 
     /// Elementwise bitwise OR: `a | b`.
@@ -560,7 +564,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn bitor(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| x.bitor(y))
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, eunomia::NumericElement::bitor)
     }
 
     /// Elementwise bitwise XOR: `a ^ b`.
@@ -568,7 +572,11 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn bitxor(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| x.bitxor(y))
+        crate::kernel_helpers::generic_binary_op::<T, Self, _>(
+            a,
+            b,
+            eunomia::NumericElement::bitxor,
+        )
     }
 
     /// Elementwise absolute value.
@@ -576,7 +584,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn abs(a: Self::Vector) -> Self::Vector {
-        crate::kernel_helpers::generic_unary_op::<T, Self, _>(a, |x| x.abs())
+        crate::kernel_helpers::generic_unary_op::<T, Self, _>(a, eunomia::NumericElement::abs)
     }
 
     /// Elementwise minimum of `a` and `b`.
@@ -608,7 +616,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn sqrt(a: Self::Vector) -> Self::Vector {
-        crate::kernel_helpers::generic_unary_op::<T, Self, _>(a, |x| x.sqrt())
+        crate::kernel_helpers::generic_unary_op::<T, Self, _>(a, eunomia::NumericElement::sqrt)
     }
 
     /// Elementwise reciprocal square root, `1/√x`, to full `T` precision (~1 ulp).
@@ -723,10 +731,10 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     /// Processor must support the required target feature.
     unsafe fn cmp_ne(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         crate::kernel_helpers::generic_binary_op::<T, Self, _>(a, b, |x, y| {
-            if x != y {
-                T::ALL_ONES
-            } else {
+            if x == y {
                 T::ZERO
+            } else {
+                T::ALL_ONES
             }
         })
     }
@@ -888,7 +896,11 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn horizontal_bitwise_or(v: Self::Vector) -> T {
-        crate::kernel_helpers::generic_horizontal_reduce::<T, Self>(v, T::ZERO, |a, b| a.bitor(b))
+        crate::kernel_helpers::generic_horizontal_reduce::<T, Self>(
+            v,
+            T::ZERO,
+            eunomia::NumericElement::bitor,
+        )
     }
 
     /// Horizontal bitwise XOR across all lanes.
@@ -899,7 +911,11 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn horizontal_bitwise_xor(v: Self::Vector) -> T {
-        crate::kernel_helpers::generic_horizontal_reduce::<T, Self>(v, T::ZERO, |a, b| a.bitxor(b))
+        crate::kernel_helpers::generic_horizontal_reduce::<T, Self>(
+            v,
+            T::ZERO,
+            eunomia::NumericElement::bitxor,
+        )
     }
 
     // -------------------------------------------------------------------------

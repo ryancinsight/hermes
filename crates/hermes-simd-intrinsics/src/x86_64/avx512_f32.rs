@@ -11,7 +11,22 @@
 
 use crate::Avx512;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use core::arch::x86_64::*;
+use core::arch::x86_64::{
+    __m512, __m512i, __mmask16, _mm512_add_ps, _mm512_and_ps, _mm512_andnot_ps,
+    _mm512_castps_si512, _mm512_cmp_ps_mask, _mm512_cmplt_epi32_mask, _mm512_div_ps,
+    _mm512_fmadd_ps, _mm512_fmaddsub_ps, _mm512_fmsubadd_ps, _mm512_fnmadd_ps, _mm512_i32gather_ps,
+    _mm512_i32scatter_ps, _mm512_load_ps, _mm512_loadu_ps, _mm512_mask3_fmadd_ps,
+    _mm512_mask_add_ps, _mm512_mask_blend_ps, _mm512_mask_expand_ps, _mm512_mask_i32gather_ps,
+    _mm512_mask_i32scatter_ps, _mm512_mask_loadu_ps, _mm512_mask_mov_ps, _mm512_mask_mul_ps,
+    _mm512_mask_storeu_ps, _mm512_maskz_compress_ps, _mm512_max_ps, _mm512_min_ps,
+    _mm512_movehdup_ps, _mm512_moveldup_ps, _mm512_mul_ps, _mm512_or_ps, _mm512_permute_ps,
+    _mm512_permutex2var_ps, _mm512_permutexvar_ps, _mm512_reduce_add_ps, _mm512_roundscale_ps,
+    _mm512_rsqrt14_ps, _mm512_set1_ps, _mm512_setr_epi32, _mm512_setzero_ps, _mm512_setzero_si512,
+    _mm512_sqrt_ps, _mm512_store_ps, _mm512_storeu_ps, _mm512_stream_ps, _mm512_sub_ps,
+    _mm512_xor_ps, _CMP_EQ_OQ, _CMP_GE_OQ, _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ,
+    _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT, _MM_FROUND_TO_NEG_INF, _MM_FROUND_TO_POS_INF,
+    _MM_FROUND_TO_ZERO,
+};
 use hermes_simd_core::kernel::SimdKernel;
 
 /// Newtype over `__m512` providing `Send + Sync`.
@@ -509,7 +524,12 @@ impl SimdKernel<f32> for Avx512 {
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn popcount(a: Self::Vector) -> Self::Vector {
-        use core::arch::x86_64::*;
+        use core::arch::x86_64::{
+            __m256, __m256i, _mm256_add_epi8, _mm256_and_si256, _mm256_cvtepi32_ps,
+            _mm256_madd_epi16, _mm256_maddubs_epi16, _mm256_set1_epi16, _mm256_set1_epi8,
+            _mm256_setr_epi8, _mm256_shuffle_epi8, _mm256_srli_epi16, _mm512_castps256_ps512,
+            _mm512_castps_si512, _mm512_extracti64x4_epi64, _mm512_insertf32x8,
+        };
         let v_si512 = _mm512_castps_si512(a.0);
         let lo = _mm512_extracti64x4_epi64(v_si512, 0);
         let hi = _mm512_extracti64x4_epi64(v_si512, 1);
@@ -633,7 +653,7 @@ impl SimdKernel<f32> for Avx512 {
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn mask_to_bitmask(mask: Self::Mask) -> u64 {
-        mask as u64
+        u64::from(mask)
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.

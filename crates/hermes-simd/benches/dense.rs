@@ -185,8 +185,8 @@ fn bench_gemv_transpose_f32(c: &mut Criterion) {
 /// over an `n × n` block of an `n × (n+padding)` buffer — measures the strided
 /// (gapped-row) access path that the packed `gemv_f32` bench does not.
 fn bench_gemv_strided_f32(c: &mut Criterion) {
-    let mut group = benchmark_group(c, "gemv_strided_f32");
     const PAD: usize = 8;
+    let mut group = benchmark_group(c, "gemv_strided_f32");
     for &n in SIZES {
         let lda = n + PAD;
         group.throughput(Throughput::Elements((n as u64) * (n as u64)));

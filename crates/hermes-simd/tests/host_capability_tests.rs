@@ -1,3 +1,8 @@
+#![expect(
+    clippy::float_cmp,
+    reason = "The host capability contract compares exact manufactured lane values"
+)]
+
 use hermes_simd::*;
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -284,9 +289,9 @@ fn runtime_dispatch_view_matches_host_features() {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     match (expected_x86_dispatch(), view) {
-        (HostDispatch::Avx512, DispatchedView::Avx512(_)) => {}
-        (HostDispatch::Avx2, DispatchedView::Avx2(_)) => {}
-        (HostDispatch::Scalar, DispatchedView::Scalar(_)) => {}
+        (HostDispatch::Avx512, DispatchedView::Avx512(_))
+        | (HostDispatch::Avx2, DispatchedView::Avx2(_))
+        | (HostDispatch::Scalar, DispatchedView::Scalar(_)) => {}
         (expected, actual) => panic!("expected {expected:?}, got {}", dispatch_name(&actual)),
     }
 
@@ -350,7 +355,7 @@ fn local_gemm_dispatch_matches_scalar_reference_for_irregular_shapes() {
         for col in 0..n {
             let mut sum = 0i32;
             for kk in 0..k {
-                sum += (a[r * k + kk] as i32) * (b[kk * n + col] as i32);
+                sum += i32::from(a[r * k + kk]) * i32::from(b[kk * n + col]);
             }
             expected[r * n + col] += sum;
         }

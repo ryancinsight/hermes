@@ -447,7 +447,7 @@ mod tests {
         }
     }
 
-    /// SpMV kernels index `x`, `values`, and `col_indices` through raw pointers
+    /// `SpMV` kernels index `x`, `values`, and `col_indices` through raw pointers
     /// with the length bookkeeping stated in their `SAFETY` notes. The
     /// integration tests exercise them on the host SIMD backend, but miri runs
     /// only this crate and `hermes-simd-core`; driving each format through the
@@ -673,6 +673,10 @@ mod tests {
         }
 
         #[test]
+        #[expect(
+            clippy::float_cmp,
+            reason = "The sparse reduction test compares an exact manufactured sum"
+        )]
         fn csr_sum_values_matches_reference() {
             let values = [1.5f32, -2.0, 3.25, 4.0, 5.5];
             let col_indices = [0i32, 1, 2, 0, 1];

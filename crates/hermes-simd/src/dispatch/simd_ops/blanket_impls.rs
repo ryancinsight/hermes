@@ -257,7 +257,7 @@ macro_rules! impl_simd_ops_methods {
     };
 }
 
-/// x86/x86_64 specialized generic implementation of SimdOps.
+/// `x86/x86_64` specialized generic implementation of `SimdOps`.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 impl<T> SimdOps for T
 where

@@ -40,6 +40,13 @@ where
     _marker: PhantomData<T>,
 }
 
+#[repr(C, align(64))]
+struct AlignedBuf<T>([core::mem::MaybeUninit<T>; MAX_SIMD_LANES]);
+
+#[expect(
+    clippy::expl_impl_clone_on_copy,
+    reason = "The raw register capability is supplied by the architecture trait, so Clone stays explicit"
+)]
 impl<T, Arch> Clone for Vector<T, Arch>
 where
     Arch: SimdArch + SimdKernel<T>,
@@ -344,9 +351,6 @@ where
             // The buffer holds `LANE_COUNT` lanes; `LANE_BOUND_CHECK` proves
             // `LANE_COUNT <= MAX_SIMD_LANES` at compile time per backend.
             const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
-            #[repr(C, align(64))]
-            struct AlignedBuf<T>([core::mem::MaybeUninit<T>; MAX_SIMD_LANES]);
-
             let mut buf = AlignedBuf([core::mem::MaybeUninit::uninit(); MAX_SIMD_LANES]);
             for i in 0..len {
                 buf.0[i].write(data[i]);
@@ -405,9 +409,6 @@ where
             // The buffer holds `LANE_COUNT` lanes; `LANE_BOUND_CHECK` proves
             // `LANE_COUNT <= MAX_SIMD_LANES` at compile time per backend.
             const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
-            #[repr(C, align(64))]
-            struct AlignedBuf<T>([core::mem::MaybeUninit<T>; MAX_SIMD_LANES]);
-
             let mut buf = AlignedBuf([core::mem::MaybeUninit::uninit(); MAX_SIMD_LANES]);
             for i in 0..len {
                 buf.0[i].write(data[i]);
@@ -553,7 +554,7 @@ where
     #[inline(always)]
     pub fn from_array<const N: usize>(arr: [T; N]) -> Self {
         assert_runtime_supported::<T, Arch>();
-        let _ = AssertLaneCount::<T, Arch, N>::OK;
+        let () = AssertLaneCount::<T, Arch, N>::OK;
         // SAFETY: target feature checked above; `AssertLaneCount` proved
         // `N == LANE_COUNT`, so `arr` holds a full vector's worth of elements for
         // the unaligned load.
@@ -569,7 +570,7 @@ where
     #[inline(always)]
     pub fn try_from_array<const N: usize>(arr: [T; N]) -> Result<Self, SimdError> {
         runtime_support_result::<T, Arch>()?;
-        let _ = AssertLaneCount::<T, Arch, N>::OK;
+        let () = AssertLaneCount::<T, Arch, N>::OK;
         // SAFETY: as `from_array` — `N == LANE_COUNT`, so `arr` covers the load.
         unsafe { Ok(Self::load_unaligned(arr.as_ptr())) }
     }
@@ -578,7 +579,7 @@ where
     #[inline(always)]
     pub fn to_array<const N: usize>(self) -> [T; N] {
         assert_runtime_supported::<T, Arch>();
-        let _ = AssertLaneCount::<T, Arch, N>::OK;
+        let () = AssertLaneCount::<T, Arch, N>::OK;
         let mut arr = [core::mem::MaybeUninit::<T>::uninit(); N];
         // SAFETY: target feature checked above; `AssertLaneCount` proved
         // `N == LANE_COUNT`, so the store initializes all `N` slots before the
@@ -670,7 +671,7 @@ where
     {
         assert_runtime_supported::<T, Arch>();
         assert_runtime_supported::<U, Arch>();
-        let _ = AssertLaneCountSame::<T, U, Arch>::OK;
+        let () = AssertLaneCountSame::<T, U, Arch>::OK;
         const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
         let mut buf_t = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let mut buf_u = [core::mem::MaybeUninit::<U>::uninit(); MAX_SIMD_LANES];
@@ -694,7 +695,7 @@ where
     #[inline(always)]
     pub fn extract<const I: usize>(self) -> T {
         assert_runtime_supported::<T, Arch>();
-        let _ = AssertLaneIndex::<T, Arch, I>::OK;
+        let () = AssertLaneIndex::<T, Arch, I>::OK;
         const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         // SAFETY: target feature checked above; `AssertLaneIndex` proved
@@ -711,7 +712,7 @@ where
     #[must_use]
     pub fn insert<const I: usize>(self, val: T) -> Self {
         assert_runtime_supported::<T, Arch>();
-        let _ = AssertLaneIndex::<T, Arch, I>::OK;
+        let () = AssertLaneIndex::<T, Arch, I>::OK;
         const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         // SAFETY: target feature checked above; `AssertLaneIndex` proved

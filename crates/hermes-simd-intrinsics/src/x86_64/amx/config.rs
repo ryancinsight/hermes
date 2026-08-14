@@ -23,6 +23,7 @@ impl AmxConfig {
 
     /// Creates a palette 1 configuration where all tiles have the specified rows and byte columns.
     #[inline]
+    #[must_use]
     pub fn new_uniform(r: u8, c_bytes: u16) -> Self {
         Self {
             palette_id: 1,
@@ -37,6 +38,7 @@ impl AmxConfig {
 
     /// Creates a custom palette 1 configuration with row/col sizes for each of the 8 tiles.
     #[inline]
+    #[must_use]
     pub fn new_custom(rows: [u8; 8], cols_b: [u16; 8]) -> Self {
         Self {
             palette_id: 1,
@@ -58,6 +60,7 @@ impl AmxConfig {
     /// The palette limit and operand layout follow Intel's AMX configuration
     /// example: <https://www.intel.com/content/www/us/en/developer/articles/code-sample/advanced-matrix-extensions-intrinsics-functions.html>.
     #[inline]
+    #[must_use]
     pub fn for_dimensions(m: usize, n: usize, k: usize, element_size: usize) -> Self {
         let tile_n = n.min(Self::MATRIX_TILE_COLUMNS);
         let r_a = m.min(16) as u8;

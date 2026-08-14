@@ -189,7 +189,7 @@ pub use x86_aliases::*;
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 mod x86_aliases {
-    use super::*;
+    use super::{Avx2, Avx512, Bf16, Bf4, Bf8, Mask, Vector, F16, F32, F4, F64, F8, I16, I32, I8};
 
     // AVX2 Vector types
     /// Concrete AVX2 f32 vector register (8 lanes).

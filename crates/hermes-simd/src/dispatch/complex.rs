@@ -190,6 +190,11 @@ where
 /// Returns [`SimdError::LengthMismatch`] when the slices have different
 /// lengths or their common length is odd.
 ///
+/// # Panics
+///
+/// Panics if the selected SIMD architecture reports more lanes than the fixed
+/// stack scratch buffer supports; that is a violated architecture contract.
+///
 /// # Examples
 ///
 /// ```

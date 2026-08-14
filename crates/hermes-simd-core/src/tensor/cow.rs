@@ -12,7 +12,7 @@ use super::view::TensorView;
 // TensorCow: Clone-on-Write tensor container
 // ---------------------------------------------------------------------------
 
-/// A Clone-on-Write (CoW) container for strided tensors.
+/// A Clone-on-Write (`CoW`) container for strided tensors.
 pub enum TensorCow<'a, T: 'a, const N: usize, L = RowMajor, Align: Alignment = Unaligned> {
     /// Borrowed read-only tensor view.
     Borrowed(TensorView<'a, T, N, L, &'a [T]>),
@@ -148,7 +148,7 @@ where
         }
         match self {
             Self::Owned { data, .. } => data,
-            _ => unreachable!(),
+            Self::Borrowed(_) => unreachable!(),
         }
     }
 

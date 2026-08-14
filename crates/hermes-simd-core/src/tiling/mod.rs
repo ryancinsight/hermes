@@ -207,7 +207,7 @@ impl<const TILE_M: usize, const TILE_N: usize> TilingPolicy<TILE_M, TILE_N> {
     pub const AVX512_OPTIMAL: TilingPolicy<8, 4> = TilingPolicy;
     /// Scalar degenerate tile: `TILE_M = 1`, `TILE_N = 1` — no tiling overhead.
     ///
-    /// Named `SCALAR_DEGENERATE` (SCREAMING_SNAKE_CASE) to satisfy Rust naming lints.
+    /// Named `SCALAR_DEGENERATE` (`SCREAMING_SNAKE_CASE`) to satisfy Rust naming lints.
     pub const SCALAR_DEGENERATE: TilingPolicy<1, 1> = TilingPolicy;
 
     /// Verify that the tile shape is valid at compile time.

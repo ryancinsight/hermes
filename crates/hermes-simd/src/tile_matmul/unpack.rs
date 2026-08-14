@@ -1,5 +1,9 @@
 #[cfg(target_arch = "x86_64")]
-use core::arch::x86_64::*;
+use core::arch::x86_64::{
+    __m128i, __m256i, __m512i, _mm256_cvtepi8_epi16, _mm256_cvtepi8_epi32, _mm256_loadu_si256,
+    _mm256_storeu_si256, _mm512_cvtepi8_epi16, _mm512_cvtepi8_epi32, _mm512_storeu_si512,
+    _mm_loadl_epi64, _mm_loadu_si128,
+};
 
 #[cfg(target_arch = "aarch64")]
 use core::arch::aarch64::*;
@@ -132,7 +136,7 @@ pub fn widen_i8_to_i16(src: &[i8], dest: &mut [i16]) {
     }
 
     while i < len {
-        dest[i] = src[i] as i16;
+        dest[i] = i16::from(src[i]);
         i += 1;
     }
 }
@@ -209,7 +213,7 @@ pub fn widen_i8_to_i32(src: &[i8], dest: &mut [i32]) {
     }
 
     while i < len {
-        dest[i] = src[i] as i32;
+        dest[i] = i32::from(src[i]);
         i += 1;
     }
 }

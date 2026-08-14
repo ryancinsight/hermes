@@ -443,7 +443,7 @@ impl<T: Send + Sync + Clone, const BM: usize, const BN: usize, Arch: SimdArch>
 }
 
 impl<T: Send + Sync + Clone, Arch: SimdArch> SparseCow<'_, T, DenseWithMask, Arch> {
-    /// Build an owned DenseWithMask Cow from slices.
+    /// Build an owned `DenseWithMask` Cow from slices.
     #[inline]
     pub fn from_slices(values: &[T], mask: &[bool], nrows: usize, ncols: usize) -> Self {
         Self::Owned(OwnedDenseWithMask::new(

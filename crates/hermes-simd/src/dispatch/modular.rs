@@ -57,12 +57,12 @@ pub fn ntt_butterfly_stage_u64(
 
 #[inline]
 fn mod_mul_u64(lhs: u64, rhs: u64, modulus: u64) -> u64 {
-    ((lhs as u128 * rhs as u128) % modulus as u128) as u64
+    ((u128::from(lhs) * u128::from(rhs)) % u128::from(modulus)) as u64
 }
 
 #[inline]
 fn mod_add_u64(lhs: u64, rhs: u64, modulus: u64) -> u64 {
-    ((lhs as u128 + rhs as u128) % modulus as u128) as u64
+    ((u128::from(lhs) + u128::from(rhs)) % u128::from(modulus)) as u64
 }
 
 #[inline]

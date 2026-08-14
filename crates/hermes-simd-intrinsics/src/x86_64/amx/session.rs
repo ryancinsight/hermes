@@ -31,6 +31,7 @@ impl std::error::Error for AmxSessionError {}
 impl AmxSession {
     /// Returns true if an AMX session is currently active on the executing thread.
     #[inline]
+    #[must_use]
     pub fn is_active() -> bool {
         ACTIVE_CONFIG.with(|c| c.get().is_some())
     }
@@ -59,7 +60,7 @@ impl AmxSession {
             }
             ACTIVE_CONFIG.with(|c| c.set(Some(ActiveAmxConfig::from(config))));
         } else {
-            let active = ACTIVE_CONFIG.with(|c| c.get());
+            let active = ACTIVE_CONFIG.with(std::cell::Cell::get);
             if active != Some(ActiveAmxConfig::from(config)) {
                 unsafe {
                     raw::ldtilecfg(config);

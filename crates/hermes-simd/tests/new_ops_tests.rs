@@ -1,6 +1,15 @@
-//! Integration tests for the new SimdView operations surface:
-//! min/max/argmin/argmax (dispatch), scale, unary map, prefix_scan,
-//! select/masked_negate, gather, zip_transform, and ZipChunks.
+//! Integration tests for the new `SimdView` operations surface:
+//! min/max/argmin/argmax (dispatch), scale, unary map, `prefix_scan`,
+//! `select/masked_negate`, gather, `zip_transform`, and `ZipChunks`.
+
+#![expect(
+    clippy::float_cmp,
+    reason = "These integration tests assert exact manufactured lane values"
+)]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "The shared error helper consumes heterogeneous Result values to inspect their error variant"
+)]
 
 use hermes_simd::{
     argmax, argmin, max, min, scale, Abs, Ceil, Clamp, Exclusive, Floor, Inclusive, Neg, Round,

@@ -44,6 +44,10 @@ struct Param {
     three_val: &'static str,
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "The generator main is one ordered emission pipeline whose output paths and parameters must stay synchronized"
+)]
 fn main() -> std::io::Result<()> {
     let avx2_params = vec![
         Param {
@@ -71,7 +75,7 @@ fn main() -> std::io::Result<()> {
             cmp_ge_val: "_CMP_GE_OQ",
             one_half_val: "0.5f32",
             three_val: "3.0f32",
-            sum_reduce_code: r#"
+            sum_reduce_code: r"
         let hi_quad = _mm256_extractf128_ps(v.0, 1);
         let lo_quad = _mm256_castps256_ps128(v.0);
         let sum_quad = _mm_add_ps(lo_quad, hi_quad);
@@ -79,15 +83,15 @@ fn main() -> std::io::Result<()> {
         let sum_dual = _mm_add_ps(sum_quad, hi_dual);
         let hi_single = _mm_shuffle_ps(sum_dual, sum_dual, 0xB1);
         _mm_cvtss_f32(_mm_add_ps(sum_dual, hi_single))
-"#,
-            recip_sqrt_code: r#"
+",
+            recip_sqrt_code: r"
         let y0 = _mm256_rsqrt_ps(a.0);
         let y0_sq = _mm256_mul_ps(y0, y0);
         let half_y0 = _mm256_mul_ps(y0, _mm256_set1_ps(0.5));
         let term = _mm256_fnmadd_ps(a.0, y0_sq, _mm256_set1_ps(3.0));
         Avx2F32Vec(_mm256_mul_ps(half_y0, term))
-"#,
-            popcount_code: r#"
+",
+            popcount_code: r"
         let v = _mm256_castps_si256(a.0);
         let low_mask = _mm256_set1_epi8(0x0F);
         let lookup = _mm256_setr_epi8(
@@ -103,7 +107,7 @@ fn main() -> std::io::Result<()> {
         let pop_u32 = _mm256_madd_epi16(pop_u16, _mm256_set1_epi16(1));
         let pop_f32 = _mm256_cvtepi32_ps(pop_u32);
         Avx2F32Vec(pop_f32)
-"#,
+",
         },
         Param {
             scalar_type: "f64",
@@ -130,21 +134,21 @@ fn main() -> std::io::Result<()> {
             cmp_ge_val: "_CMP_GE_OQ",
             one_half_val: "0.5f64",
             three_val: "3.0f64",
-            sum_reduce_code: r#"
+            sum_reduce_code: r"
         let hi = _mm256_extractf128_pd(v.0, 1);
         let lo = _mm256_castpd256_pd128(v.0);
         let sum_128 = _mm_add_pd(lo, hi);
         let hi_lane = _mm_unpackhi_pd(sum_128, sum_128);
         _mm_cvtsd_f64(_mm_add_pd(sum_128, hi_lane))
-"#,
-            recip_sqrt_code: r#"
+",
+            recip_sqrt_code: r"
         // f64 has no hardware reciprocal-sqrt approximation accurate enough for its
         // 52-bit mantissa: an rsqrt seed (~12 bits from the f32 `_mm_rsqrt_ps`) plus
         // one Newton step reaches only ~24 bits. Use the correctly-rounded hardware
         // sqrt + divide for full f64 precision (~1 ulp), matching the scalar path.
         Avx2F64Vec(_mm256_div_pd(_mm256_set1_pd(1.0), _mm256_sqrt_pd(a.0)))
-"#,
-            popcount_code: r#"
+",
+            popcount_code: r"
         use core::arch::x86_64::*;
         let v = _mm256_castpd_si256(a.0);
         let low_mask = _mm256_set1_epi8(0x0F);
@@ -164,7 +168,7 @@ fn main() -> std::io::Result<()> {
         let packed = _mm_unpacklo_epi64(low, high);
         let pop_f64 = _mm256_cvtepi32_pd(packed);
         Avx2F64Vec(pop_f64)
-"#,
+",
         },
     ];
 
@@ -195,14 +199,14 @@ fn main() -> std::io::Result<()> {
             one_half_val: "0.5f32",
             three_val: "3.0f32",
             sum_reduce_code: "        _mm512_reduce_add_ps(v.0)",
-            recip_sqrt_code: r#"
+            recip_sqrt_code: r"
         let y0 = _mm512_rsqrt14_ps(a.0);
         let y0_sq = _mm512_mul_ps(y0, y0);
         let half_y0 = _mm512_mul_ps(y0, _mm512_set1_ps(0.5));
         let term = _mm512_fnmadd_ps(a.0, y0_sq, _mm512_set1_ps(3.0));
         Avx512F32Vec(_mm512_mul_ps(half_y0, term))
-"#,
-            popcount_code: r#"
+",
+            popcount_code: r"
         use core::arch::x86_64::*;
         let v_si512 = _mm512_castps_si512(a.0);
         let lo = _mm512_extracti64x4_epi64(v_si512, 0);
@@ -230,7 +234,7 @@ fn main() -> std::io::Result<()> {
 
         let merged = _mm512_insertf32x8(_mm512_castps256_ps512(res_lo), res_hi, 1);
         Avx512F32Vec(merged)
-"#,
+",
         },
         Param {
             scalar_type: "f64",
@@ -258,13 +262,13 @@ fn main() -> std::io::Result<()> {
             one_half_val: "0.5f64",
             three_val: "3.0f64",
             sum_reduce_code: "        _mm512_reduce_add_pd(v.0)",
-            recip_sqrt_code: r#"
+            recip_sqrt_code: r"
         // Full f64 precision via correctly-rounded sqrt + divide. The `rsqrt14` seed
         // (~14 bits) plus one Newton step reaches only ~28 bits, far below f64's 52;
         // see the avx2 f64 note.
         Avx512F64Vec(_mm512_div_pd(_mm512_set1_pd(1.0), _mm512_sqrt_pd(a.0)))
-"#,
-            popcount_code: r#"
+",
+            popcount_code: r"
         use core::arch::x86_64::*;
         let v_si512 = _mm512_castpd_si512(a.0);
         let lo = _mm512_extracti64x4_epi64(v_si512, 0);
@@ -295,7 +299,7 @@ fn main() -> std::io::Result<()> {
 
         let merged = _mm512_insertf64x4(_mm512_castpd256_pd512(res_lo), res_hi, 1);
         Avx512F64Vec(merged)
-"#,
+",
         },
     ];
 
@@ -320,6 +324,10 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "The AVX2 renderer is a single template with one substitution order"
+)]
 fn render_avx2(p: &Param) -> String {
     let t = r#"//! AVX2 __SCALAR_TYPE__ hardware kernel.
 //!
@@ -871,6 +879,10 @@ impl SimdKernel<__SCALAR_TYPE__> for Avx2 {
         .replace("__THREE_VAL__", p.three_val)
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "The AVX-512 renderer is a single template with one substitution order"
+)]
 fn render_avx512(p: &Param) -> String {
     let t = r#"//! AVX-512F __SCALAR_TYPE__ hardware kernel.
 //!

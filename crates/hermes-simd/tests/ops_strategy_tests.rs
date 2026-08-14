@@ -2,6 +2,11 @@
 //! `transform_in_place`, `zip_into`, and invariant checks that
 //! `add_assign`/`mul_assign`/`elementwise_mul` produce identical results.
 
+#![expect(
+    clippy::float_cmp,
+    reason = "Strategy conformance tests compare exact manufactured lane values"
+)]
+
 use hermes_simd::{
     Add, BitAnd, BitOr, BitXor, Div, Mul, Scalar, SimdError, SimdView, Sub, SveArch, Unaligned,
     Unmasked,

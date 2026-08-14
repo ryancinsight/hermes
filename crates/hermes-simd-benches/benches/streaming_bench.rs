@@ -36,7 +36,7 @@ fn aligned_filled(len: usize, f: impl Fn(usize) -> f32) -> AlignedVec<f32, Align
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[target_feature(enable = "avx2")]
 unsafe fn add_regular(a: *const f32, b: *const f32, out: *mut f32, len: usize) {
-    use core::arch::x86_64::*;
+    use core::arch::x86_64::{_mm256_add_ps, _mm256_loadu_ps, _mm256_store_ps};
     let mut i = 0;
     while i < len {
         let va = _mm256_loadu_ps(a.add(i));
@@ -54,7 +54,7 @@ unsafe fn add_regular(a: *const f32, b: *const f32, out: *mut f32, len: usize) {
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[target_feature(enable = "avx2")]
 unsafe fn add_streaming(a: *const f32, b: *const f32, out: *mut f32, len: usize) {
-    use core::arch::x86_64::*;
+    use core::arch::x86_64::{_mm256_add_ps, _mm256_loadu_ps, _mm256_stream_ps, _mm_sfence};
     let mut i = 0;
     while i < len {
         let va = _mm256_loadu_ps(a.add(i));

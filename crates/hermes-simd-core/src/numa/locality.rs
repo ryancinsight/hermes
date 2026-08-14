@@ -4,7 +4,7 @@
 /// report a node — never a fabricated node 0.
 #[must_use]
 pub fn current_numa_node() -> Option<u32> {
-    themis::try_current_numa_node().map(|node| node.get())
+    themis::try_current_numa_node().map(themis::NumaNodeId::get)
 }
 
 /// Refreshes and returns the current NUMA node index for the executing thread.
@@ -41,11 +41,6 @@ impl LocalityCache {
 
 #[cfg(feature = "std")]
 thread_local! {
-    // clippy 1.97.0 FP: already const. ATLAS-MNEMOSYNE-CI-1.
-    #[expect(
-        clippy::missing_const_for_thread_local,
-        reason = "The initializer is already const; this expectation records the toolchain diagnostic"
-    )]
     static LOCALITY_CACHE: core::cell::RefCell<LocalityCache> = const {
         core::cell::RefCell::new(LocalityCache::new())
     };
@@ -148,6 +143,10 @@ pub fn verify_numa_locality(ptr: *const u8, size: usize, expected_node: u32) -> 
     }
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "The cfg-exclusive Windows and Linux FFI paths share one page-query contract boundary"
+)]
 fn verify_numa_locality_os(ptr: *const u8, size: usize, expected_node: u32) -> bool {
     #[cfg(target_os = "windows")]
     unsafe {
@@ -162,6 +161,7 @@ fn verify_numa_locality_os(ptr: *const u8, size: usize, expected_node: u32) -> b
             fn GetCurrentProcess() -> *mut c_void;
             fn K32QueryWorkingSetEx(hProcess: *mut c_void, pv: *mut c_void, cb: u32) -> i32;
         }
+        const CHUNK_SIZE: usize = 64;
         let page_size = 4096;
         let start_page = (ptr as usize) & !(page_size - 1);
         let end_page = ((ptr as usize) + size + page_size - 1) & !(page_size - 1);
@@ -170,7 +170,6 @@ fn verify_numa_locality_os(ptr: *const u8, size: usize, expected_node: u32) -> b
             return true;
         }
 
-        const CHUNK_SIZE: usize = 64;
         let mut info_arr = [PsapiWorkingSetExInformation {
             virtual_address: core::ptr::null_mut(),
             virtual_attributes: 0,
@@ -222,6 +221,7 @@ fn verify_numa_locality_os(ptr: *const u8, size: usize, expected_node: u32) -> b
                 flags: i32,
             ) -> i32;
         }
+        const CHUNK_SIZE: usize = 64;
         let page_size = 4096;
         let start_page = (ptr as usize) & !(page_size - 1);
         let end_page = ((ptr as usize) + size + page_size - 1) & !(page_size - 1);
@@ -230,7 +230,6 @@ fn verify_numa_locality_os(ptr: *const u8, size: usize, expected_node: u32) -> b
             return true;
         }
 
-        const CHUNK_SIZE: usize = 64;
         let mut pages_arr = [core::ptr::null_mut(); CHUNK_SIZE];
         let mut status_arr = [0i32; CHUNK_SIZE];
 

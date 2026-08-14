@@ -7,8 +7,12 @@ use super::{east_mask, west_mask};
 /// Caller must ensure AVX2 is available.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[target_feature(enable = "avx2")]
+#[must_use]
 pub unsafe fn kogge_stone_rook_avx2(slider: u64, occupancy: u64) -> u64 {
-    use core::arch::x86_64::*;
+    use core::arch::x86_64::{
+        _mm256_and_si256, _mm256_extract_epi64, _mm256_or_si256, _mm256_set1_epi64x,
+        _mm256_set_epi64x, _mm256_slli_epi64, _mm256_sllv_epi64, _mm256_srlv_epi64,
+    };
 
     let p_scalar = !occupancy;
 
@@ -98,8 +102,12 @@ pub unsafe fn kogge_stone_rook_avx2(slider: u64, occupancy: u64) -> u64 {
 /// # Safety
 /// Caller must ensure AVX2 is available.
 #[target_feature(enable = "avx2")]
+#[must_use]
 pub unsafe fn kogge_stone_bishop_avx2(slider: u64, occupancy: u64) -> u64 {
-    use core::arch::x86_64::*;
+    use core::arch::x86_64::{
+        _mm256_and_si256, _mm256_extract_epi64, _mm256_or_si256, _mm256_set1_epi64x,
+        _mm256_set_epi64x, _mm256_slli_epi64, _mm256_sllv_epi64, _mm256_srlv_epi64,
+    };
 
     let p_scalar = !occupancy;
 
@@ -188,8 +196,16 @@ pub unsafe fn kogge_stone_bishop_avx2(slider: u64, occupancy: u64) -> u64 {
 /// # Safety
 /// Caller must ensure AVX2 is available.
 #[target_feature(enable = "avx2")]
+#[must_use]
+#[expect(
+    clippy::too_many_lines,
+    reason = "The queen fill keeps four direction lanes in one AVX2 kernel boundary"
+)]
 pub unsafe fn kogge_stone_queen_avx2(slider: u64, occupancy: u64) -> u64 {
-    use core::arch::x86_64::*;
+    use core::arch::x86_64::{
+        _mm256_and_si256, _mm256_extract_epi64, _mm256_or_si256, _mm256_set1_epi64x,
+        _mm256_set_epi64x, _mm256_slli_epi64, _mm256_sllv_epi64, _mm256_srlv_epi64,
+    };
 
     let p_scalar = !occupancy;
 

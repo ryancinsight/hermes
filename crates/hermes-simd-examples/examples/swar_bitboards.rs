@@ -91,47 +91,41 @@ fn main() {
 
     // 4. Pure SWAR primitives
     println!("\nDemonstrating Pure SWAR Primitives (SwarUtils):");
-    let val = 0b101100u64; // bits at index 2, 3, 5 (decimal 44)
-    println!("  Input value: {:#b} (decimal {})", val, val);
+    let val = 0b10_1100_u64; // bits at index 2, 3, 5 (decimal 44)
+    println!("  Input value: {val:#b} (decimal {val})");
 
     let lsb = SwarUtils::isolate_lsb(val);
-    println!("  Isolate LSB: {:#b} (decimal {})", lsb, lsb);
+    println!("  Isolate LSB: {lsb:#b} (decimal {lsb})");
     assert_eq!(lsb, 4);
 
     let cleared_lsb = SwarUtils::clear_lsb(val);
-    println!(
-        "  Clear LSB:   {:#b} (decimal {})",
-        cleared_lsb, cleared_lsb
-    );
+    println!("  Clear LSB:   {cleared_lsb:#b} (decimal {cleared_lsb})");
     assert_eq!(cleared_lsb, 40);
 
     let msb = SwarUtils::isolate_msb(val);
-    println!("  Isolate MSB: {:#b} (decimal {})", msb, msb);
+    println!("  Isolate MSB: {msb:#b} (decimal {msb})");
     assert_eq!(msb, 32);
 
     let pop = SwarUtils::popcount(val);
-    println!("  Popcount:    {}", pop);
+    println!("  Popcount:    {pop}");
     assert_eq!(pop, 3);
 
     let scan_f = SwarUtils::bit_scan_forward(val);
-    println!("  Bit scan forward:  index {}", scan_f);
+    println!("  Bit scan forward:  index {scan_f}");
     assert_eq!(scan_f, 2);
 
     let scan_r = SwarUtils::bit_scan_reverse(val);
-    println!("  Bit scan reverse:  index {}", scan_r);
+    println!("  Bit scan reverse:  index {scan_r}");
     assert_eq!(scan_r, 5);
 
     // Popcount-8 (parallel byte-wise popcount)
     let bytes_val = 0x01_03_07_0f_00_ff_55_aa_u64;
     let byte_pops = SwarUtils::popcount_8(bytes_val);
-    println!("  Byte-wise popcount of {:#018x}:", bytes_val);
+    println!("  Byte-wise popcount of {bytes_val:#018x}:");
     for b in 0..8 {
         let original_byte = (bytes_val >> (b * 8)) & 0xff;
         let pop_count = (byte_pops >> (b * 8)) & 0xff;
-        println!(
-            "    Byte {}: {:#010b} has popcount {}",
-            b, original_byte, pop_count
-        );
+        println!("    Byte {b}: {original_byte:#010b} has popcount {pop_count}");
     }
 }
 

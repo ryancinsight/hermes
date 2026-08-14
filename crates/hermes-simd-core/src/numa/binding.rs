@@ -63,7 +63,7 @@ impl NumaBinding {
             unsafe {
                 let thread = GetCurrentThread();
                 let mut mask = 0u64;
-                if GetNumaNodeProcessorMask(node as u8, &mut mask) != 0 && mask != 0 {
+                if GetNumaNodeProcessorMask(node as u8, &raw mut mask) != 0 && mask != 0 {
                     let old = SetThreadAffinityMask(thread, mask as usize);
                     Self { old_mask: old }
                 } else {

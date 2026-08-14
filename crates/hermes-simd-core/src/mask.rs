@@ -88,7 +88,7 @@ impl<const N: usize> BitMask<N> {
         let mut m = 0u64;
         // Single pass, no branching beyond the loop iterator.
         for (i, &b) in bits.iter().enumerate().take(N) {
-            m |= (b as u64) << i;
+            m |= u64::from(b) << i;
         }
         Self(m)
     }
@@ -211,6 +211,10 @@ pub struct BitMaskIter<const N: usize> {
     remaining: u64,
 }
 
+#[expect(
+    clippy::copy_iterator,
+    reason = "The iterator is an eight-byte value returned by the copyable BitMask API"
+)]
 impl<const N: usize> Iterator for BitMaskIter<N> {
     type Item = usize;
 

@@ -292,7 +292,7 @@ where
         }
         match self {
             Self::Owned(ref mut vec) => vec,
-            _ => unreachable!(),
+            Self::Borrowed(_) => unreachable!(),
         }
     }
 

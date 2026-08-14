@@ -225,7 +225,7 @@ pub trait TileMatrixMultiply<
     /// Performs tile matrix multiplication: C += A * B
     ///
     /// # Safety
-    /// - Pointers `a`, `b`, and `c` must be valid for reads/writes of size M*a_stride, K*b_stride, M*c_stride.
+    /// - Pointers `a`, `b`, and `c` must be valid for reads/writes of size M*`a_stride`, K*`b_stride`, M*`c_stride`.
     unsafe fn tile_matmul(
         c: *mut TC,
         c_stride: usize,

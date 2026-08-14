@@ -308,7 +308,10 @@ where
         {
             // SAFETY: lengths validated above; `zip_into_streaming` peels the
             // output to the NT-store alignment and issues the write barrier.
-            return unsafe { self.zip_into_streaming(other, out, op, len, simd_len) };
+            unsafe {
+                self.zip_into_streaming(other, out, op, len, simd_len);
+            }
+            return Ok(());
         }
 
         let ptr_self = self.as_slice().as_ptr();
@@ -387,8 +390,7 @@ where
         op: Op,
         len: usize,
         _simd_len: usize,
-    ) -> Result<(), SimdError>
-    where
+    ) where
         ORef: 'a,
         Op: ElementOp<T>,
     {
@@ -429,8 +431,6 @@ where
         for i in mid_end..len {
             out[i] = op.apply_scalar(s[i], o[i]);
         }
-
-        Ok(())
     }
 
     /// Pairwise elementwise operation on `self` and `other`, returning a new `AlignedVec<T, Align>`.

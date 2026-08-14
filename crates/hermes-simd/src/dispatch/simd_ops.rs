@@ -145,17 +145,17 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     /// do not have equal lengths.
     fn masked_add(a: &[Self], b: &[Self], mask: &[bool], out: &mut [Self])
         -> Result<(), SimdError>;
-    /// Computes sparse SpMV using CSR.
+    /// Computes sparse `SpMV` using CSR.
     fn spmv_csr(data: ValidatedData<CsrData<'_, Self>>, x: &[Self], y: &mut [Self]);
-    /// Computes sparse SpMV using const-generic Blocked-COO tiles.
+    /// Computes sparse `SpMV` using const-generic Blocked-COO tiles.
     fn spmv_bcoo<const BM: usize, const BN: usize>(
         data: ValidatedData<BlockedCooData<'_, Self, BM, BN>>,
         x: &[Self],
         y: &mut [Self],
     );
-    /// Computes sparse SpMV using Dense-with-Mask.
+    /// Computes sparse `SpMV` using Dense-with-Mask.
     fn spmv_dense_masked(data: DenseWithMaskData<'_, Self>, x: &[Self], y: &mut [Self]);
-    /// Computes sparse SpMV using const-generic Sliced ELLPACK (SELL-p).
+    /// Computes sparse `SpMV` using const-generic Sliced ELLPACK (SELL-p).
     fn spmv_sellp<const C: usize>(
         data: ValidatedData<SellPData<'_, Self, C>>,
         x: &[Self],

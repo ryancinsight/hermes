@@ -55,7 +55,7 @@ pub struct Unaligned;
 impl<const A: usize> Alignment for Aligned<A> {
     const ALIGNMENT: Option<usize> = {
         // Evaluate the const assertion when the trait is implemented.
-        let _ = Self::_CHECK_POWER_OF_TWO;
+        let () = Self::_CHECK_POWER_OF_TWO;
         Some(A)
     };
     const IS_ALIGNED: bool = true;

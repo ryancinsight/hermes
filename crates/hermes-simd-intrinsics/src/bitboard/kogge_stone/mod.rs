@@ -25,20 +25,20 @@ pub struct KoggeStone;
 #[inline(always)]
 pub(crate) fn east_mask(s: usize) -> u64 {
     match s {
-        1 => 0xFEFEFEFEFEFEFEFE,
-        2 => 0xFCFCFCFCFCFCFCFC,
-        4 => 0xF0F0F0F0F0F0F0F0,
-        _ => 0xFFFFFFFFFFFFFFFF,
+        1 => 0xFEFE_FEFE_FEFE_FEFE,
+        2 => 0xFCFC_FCFC_FCFC_FCFC,
+        4 => 0xF0F0_F0F0_F0F0_F0F0,
+        _ => 0xFFFF_FFFF_FFFF_FFFF,
     }
 }
 
 #[inline(always)]
 pub(crate) fn west_mask(s: usize) -> u64 {
     match s {
-        1 => 0x7F7F7F7F7F7F7F7F,
-        2 => 0x3F3F3F3F3F3F3F3F,
-        4 => 0x0F0F0F0F0F0F0F0F,
-        _ => 0xFFFFFFFFFFFFFFFF,
+        1 => 0x7F7F_7F7F_7F7F_7F7F,
+        2 => 0x3F3F_3F3F_3F3F_3F3F,
+        4 => 0x0F0F_0F0F_0F0F_0F0F,
+        _ => 0xFFFF_FFFF_FFFF_FFFF,
     }
 }
 

@@ -1,3 +1,12 @@
+#![expect(
+    clippy::float_cmp,
+    reason = "These integration tests assert exact manufactured complex reference values"
+)]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "The shared error helper consumes heterogeneous Result values to inspect their error variant"
+)]
+
 use hermes_simd::{
     interleaved_complex_dot, interleaved_complex_dot_runtime, interleaved_complex_mul_assign,
     interleaved_complex_mul_assign_runtime, PreferredArch, Scalar, SimdError,

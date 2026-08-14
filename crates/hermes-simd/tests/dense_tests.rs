@@ -1,3 +1,11 @@
+#![expect(
+    clippy::float_cmp,
+    reason = "These integration tests assert exact manufactured dense reference values"
+)]
+#![expect(
+    clippy::too_many_lines,
+    reason = "The dense backend matrix is one shared value-semantic conformance test"
+)]
 use hermes_simd::*;
 
 #[test]
@@ -142,7 +150,7 @@ fn test_elementwise_add_streaming_matches_scalar() {
     let a: Vec<f32> = (0..n).map(|i| (i % 101) as f32 * 0.5).collect();
     let b: Vec<f32> = (0..n).map(|i| (i % 103) as f32 * 0.25).collect();
     let mut out_buf = vec![0.0f32; n + 8];
-    let out = &mut out_buf[1..1 + n]; // 4-byte-offset start → nonzero peel head
+    let out = &mut out_buf[1..=n]; // 4-byte-offset start → nonzero peel head
     elementwise_add::<f32>(&a, &b, out).unwrap();
 
     for i in 0..n {

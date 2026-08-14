@@ -201,7 +201,7 @@ impl<T, const BM: usize, const BN: usize> SparseValidate for OwnedBlockedCoo<T, 
     }
 }
 
-/// Owned heap-backed DenseWithMask storage.
+/// Owned heap-backed `DenseWithMask` storage.
 pub struct OwnedDenseWithMask<T> {
     pub(crate) values: AlignedVec<T, Aligned<64>>,
     pub(crate) mask: AlignedVec<bool, Aligned<64>>,
@@ -210,7 +210,7 @@ pub struct OwnedDenseWithMask<T> {
 }
 
 impl<T> OwnedDenseWithMask<T> {
-    /// Construct owned DenseWithMask storage.
+    /// Construct owned `DenseWithMask` storage.
     #[inline]
     #[must_use]
     pub fn new(

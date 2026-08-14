@@ -1,8 +1,11 @@
-//! AVX-512 specific implementations of TileMatrixMultiply for x86_64.
+//! AVX-512 specific implementations of `TileMatrixMultiply` for `x86_64`.
 
 #![cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 
 use crate::Avx512;
+use core::arch::x86_64::{
+    _mm512_fmadd_ps, _mm512_loadu_ps, _mm512_set1_ps, _mm512_setzero_ps, _mm512_storeu_ps,
+};
 use eunomia::{Bf16, Bf4, Bf8, F32, I32, I8};
 use hermes_simd_core::view::TileMatrixMultiply;
 
@@ -24,7 +27,10 @@ unsafe fn tile_matmul_bf16_native(
     b: *const Bf16,
     b_stride: usize,
 ) {
-    use core::arch::x86_64::*;
+    use core::arch::x86_64::{
+        __m512bh, __m512i, _mm512_dpbf16_ps, _mm512_loadu_ps, _mm512_loadu_si512,
+        _mm512_setzero_ps, _mm512_storeu_ps,
+    };
 
     let mut c_regs = [_mm512_setzero_ps(); 16];
     for (row, accumulator) in c_regs.iter_mut().enumerate() {
@@ -91,8 +97,6 @@ impl TileMatrixMultiply<Bf16, Bf16, F32, Avx512, Avx512, 16, 16, 32> for Avx512 
             return;
         }
 
-        use core::arch::x86_64::*;
-
         let mut c_regs = [_mm512_setzero_ps(); 16];
         for i in 0..16 {
             c_regs[i] = _mm512_loadu_ps(c.add(i * c_stride) as *const f32);
@@ -142,7 +146,12 @@ unsafe fn tile_matmul_i8(
     b: *const i8,
     b_stride: usize,
 ) {
-    use core::arch::x86_64::*;
+    use core::arch::x86_64::{
+        __m128i, __m512i, _mm512_castsi128_si512, _mm512_dpbusd_epi32, _mm512_inserti32x4,
+        _mm512_loadu_si512, _mm512_set1_epi32, _mm512_set1_epi8, _mm512_setzero_si512,
+        _mm512_storeu_si512, _mm512_sub_epi32, _mm512_xor_si512, _mm_loadu_si128,
+        _mm_unpackhi_epi16, _mm_unpackhi_epi8, _mm_unpacklo_epi16, _mm_unpacklo_epi8,
+    };
 
     let mut c_regs = [_mm512_setzero_si512(); 16];
     for (row, accumulator) in c_regs.iter_mut().enumerate() {
@@ -247,6 +256,10 @@ impl TileMatrixMultiply<I8, I8, I32, Avx512, Avx512, 16, 16, 64> for Avx512 {
 
 /// Unpacks packed 4-bit signed integers (stored 2 per byte) into an 8-bit signed integer slice.
 /// Optimized using AVX2 when available.
+///
+/// # Panics
+///
+/// Panics when `unpacked` cannot hold two output values for each packed byte.
 #[inline]
 pub fn unpack_int4(packed: &[u8], unpacked: &mut [i8]) {
     let len = packed.len();
@@ -289,7 +302,11 @@ fn unpack_int4_scalar(packed: &[u8], unpacked: &mut [i8]) {
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
 pub unsafe fn unpack_int4_avx2(packed: &[u8], unpacked: &mut [i8]) {
-    use core::arch::x86_64::*;
+    use core::arch::x86_64::{
+        _mm256_and_si256, _mm256_loadu_si256, _mm256_permute2x128_si256, _mm256_set1_epi8,
+        _mm256_setr_epi8, _mm256_shuffle_epi8, _mm256_srli_epi16, _mm256_storeu_si256,
+        _mm256_unpackhi_epi8, _mm256_unpacklo_epi8,
+    };
 
     let len = packed.len();
     let mut i = 0;
@@ -457,14 +474,15 @@ mod int8_tests {
 
     #[test]
     fn signed_tile_matches_wrapping_scalar_bitwise() {
+        const M: usize = 16;
+        const N: usize = 16;
+        const K: usize = 64;
+
         if !std::is_x86_feature_detected!("avx512f") || !std::is_x86_feature_detected!("avx512vnni")
         {
             return;
         }
 
-        const M: usize = 16;
-        const N: usize = 16;
-        const K: usize = 64;
         let a: Vec<i8> = (0..M * K)
             .map(|index| ((index * 89 + 3) % 256) as u8 as i8)
             .collect();
@@ -479,8 +497,9 @@ mod int8_tests {
             for column in 0..N {
                 let mut sum = 0i32;
                 for depth in 0..K {
-                    sum = sum
-                        .wrapping_add((a[row * K + depth] as i32) * (b[depth * N + column] as i32));
+                    sum = sum.wrapping_add(
+                        i32::from(a[row * K + depth]) * i32::from(b[depth * N + column]),
+                    );
                 }
                 expected[row * N + column] = expected[row * N + column].wrapping_add(sum);
             }

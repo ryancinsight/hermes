@@ -45,7 +45,7 @@
   | count | lint | note |
   |------:|------|------|
   | **0** | `ptr_as_ptr` | **done** — was 171, see below |
-  | 180 | `unreadable_literal` | bitboard/mask hex constants; check readability convention before sweeping |
+  | **0** | `unreadable_literal` | **done** — bitboard masks use grouped literals; the canonical generated magic table carries a local expectation because regrouping its published constants would obscure table review |
   | **0** | `must_use_candidate` | **done** — 162 exact findings closed below |
   | **0** | `elidable_lifetime_names` | **done** — 131 explicit lifetime names elided mechanically; relationships with independent input lifetimes remain explicit |
   | **0** | `semicolon_if_nothing_returned` | **done** — 92 unit, example, benchmark, kernel, and AMX wrapper return statements now make their unit-value intent explicit |
@@ -131,6 +131,17 @@
   explicit semicolons. This is a syntax-only cleanup; the affected provider
   and intrinsic suites pass 454/454, and the benchmark-target smoke gate
   completes successfully.
+
+  **Strict all-target workspace gate restored (2026-08-14).** The provider
+  workspace now passes `cargo clippy --workspace --all-targets -- -D warnings`
+  after consolidating mechanical lint fixes and documenting the few domain
+  contracts that must remain explicit: exact manufactured floating-point
+  oracles, canonical magic tables, and structural kernel-size exceptions.
+  The bitboard public boundary also validates squares before shift arithmetic,
+  so the negative regression tests assert the domain error rather than an
+  incidental overflow panic. Verification: `cargo fmt --all -- --check`,
+  `cargo test --doc -p hermes-simd-core -p hermes-simd -p
+  hermes-simd-intrinsics`, nextest 454/454, and benchmark smoke pass.
 
   **`ptr_as_ptr` burned down: 171 -> 0.** 167 sites converted mechanically by
   `cargo clippy --fix` restricted to that one lint; the remaining 4 were

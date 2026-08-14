@@ -62,7 +62,7 @@ where
     pub fn zip_cow<Op: ElementOp<T>>(
         &self,
         other: &SimdCow<'_, T, Arch, Align>,
-        _op: Op,
+        op: Op,
     ) -> Result<SimdCow<'static, T, Arch, Align>, SimdError> {
         if self.len() != other.len() {
             return Err(SimdError::LengthMismatch);
@@ -94,7 +94,7 @@ where
                 } else {
                     Arch::load_unaligned(chunk_other.as_ptr())
                 };
-                let vr = _op.apply::<Arch>(va, vb);
+                let vr = op.apply::<Arch>(va, vb);
                 if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::store_aligned(out_ptr.add(i), vr);
                 } else {
@@ -109,7 +109,7 @@ where
 
         for (&a, &b) in remainder_self.iter().zip(remainder_other.iter()) {
             unsafe {
-                core::ptr::write(out_ptr.add(i), _op.apply_scalar(a, b));
+                core::ptr::write(out_ptr.add(i), op.apply_scalar(a, b));
             }
             i += 1;
         }
@@ -142,7 +142,7 @@ where
     pub fn transform_in_place<Op: ElementOp<T>>(
         &mut self,
         other: &SimdCow<'_, T, Arch, Align>,
-        _op: Op,
+        op: Op,
     ) -> Result<(), SimdError> {
         if self.len() != other.len() {
             return Err(SimdError::LengthMismatch);
@@ -171,7 +171,7 @@ where
                 } else {
                     Arch::load_unaligned(chunk_other.as_ptr())
                 };
-                let vr = _op.apply::<Arch>(va, vb);
+                let vr = op.apply::<Arch>(va, vb);
                 if crate::align::is_aligned_for_arch::<Arch, Align>() {
                     Arch::store_aligned(chunk_self.as_mut_ptr(), vr);
                 } else {
@@ -183,7 +183,7 @@ where
         let tail_self = chunks_self.into_remainder();
         let tail_other = chunks_other.remainder();
         for (a, &b) in tail_self.iter_mut().zip(tail_other.iter()) {
-            *a = _op.apply_scalar(*a, b);
+            *a = op.apply_scalar(*a, b);
         }
 
         Ok(())

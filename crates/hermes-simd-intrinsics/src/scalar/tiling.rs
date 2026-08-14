@@ -1,4 +1,4 @@
-//! Generic scalar fallback implementation of TileMatrixMultiply.
+//! Generic scalar fallback implementation of `TileMatrixMultiply`.
 
 use crate::Scalar;
 use hermes_simd_core::scalar::NumericElement;
@@ -20,8 +20,8 @@ impl<Backend, Arch, const M: usize, const N: usize, const K: usize>
             for j in 0..N {
                 let mut sum = *c.add(i * c_stride + j);
                 for k in 0..K {
-                    let val_a = *a.add(i * a_stride + k) as i32;
-                    let val_b = *b.add(k * b_stride + j) as i32;
+                    let val_a = i32::from(*a.add(i * a_stride + k));
+                    let val_b = i32::from(*b.add(k * b_stride + j));
                     sum = sum.wrapping_add(val_a * val_b);
                 }
                 *c.add(i * c_stride + j) = sum;
@@ -73,8 +73,8 @@ impl<Backend, Arch, const M: usize, const N: usize, const K: usize>
             for j in 0..N {
                 let mut sum = (*c.add(i * c_stride + j)).0;
                 for k in 0..K {
-                    let val_a = (*a.add(i * a_stride + k)).0 as i32;
-                    let val_b = (*b.add(k * b_stride + j)).0 as i32;
+                    let val_a = i32::from((*a.add(i * a_stride + k)).0);
+                    let val_b = i32::from((*b.add(k * b_stride + j)).0);
                     sum = sum.wrapping_add(val_a * val_b);
                 }
                 *c.add(i * c_stride + j) = eunomia::I32(sum);

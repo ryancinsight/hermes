@@ -1,4 +1,4 @@
-//! x86_64 hardware specialized SIMD kernels module.
+//! `x86_64` hardware specialized SIMD kernels module.
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]

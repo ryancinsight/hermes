@@ -226,7 +226,7 @@ pub fn masked_add<T: SimdOps>(
     T::masked_add(a, b, mask, out)
 }
 
-/// Computes sparse SpMV using CSR: `y += A · x`.
+/// Computes sparse `SpMV` using CSR: `y += A · x`.
 ///
 /// # Panics
 /// Panics if `x.len() < ncols` or `y.len() < nrows`. Structural CSR validation
@@ -236,7 +236,7 @@ pub fn spmv_csr<T: SimdOps>(data: ValidatedData<CsrData<'_, T>>, x: &[T], y: &mu
     T::spmv_csr(data, x, y);
 }
 
-/// Computes sparse SpMV using const-generic Blocked-COO tiles.
+/// Computes sparse `SpMV` using const-generic Blocked-COO tiles.
 ///
 /// # Panics
 /// Panics if `x.len() < ncols` or `y.len() < nrows`. Structural Blocked-COO
@@ -251,13 +251,13 @@ pub fn spmv_bcoo<T: SimdOps, const BM: usize, const BN: usize>(
     T::spmv_bcoo::<BM, BN>(data, x, y);
 }
 
-/// Computes sparse SpMV using Dense-with-Mask.
+/// Computes sparse `SpMV` using Dense-with-Mask.
 #[inline(always)]
 pub fn spmv_dense_masked<T: SimdOps>(data: DenseWithMaskData<'_, T>, x: &[T], y: &mut [T]) {
     T::spmv_dense_masked(data, x, y);
 }
 
-/// Computes sparse SpMV using const-generic Sliced ELLPACK (SELL-p).
+/// Computes sparse `SpMV` using const-generic Sliced ELLPACK (SELL-p).
 ///
 /// # Panics
 /// Panics if `x.len() < ncols` or `y.len() < nrows`. Structural SELL-p
