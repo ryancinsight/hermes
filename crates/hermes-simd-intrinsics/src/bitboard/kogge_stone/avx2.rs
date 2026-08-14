@@ -7,7 +7,6 @@ use super::{east_mask, west_mask};
 /// Caller must ensure AVX2 is available.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[target_feature(enable = "avx2")]
-#[allow(unused_assignments)]
 pub unsafe fn kogge_stone_rook_avx2(slider: u64, occupancy: u64) -> u64 {
     use core::arch::x86_64::*;
 
@@ -103,7 +102,6 @@ pub unsafe fn kogge_stone_rook_avx2(slider: u64, occupancy: u64) -> u64 {
 /// # Safety
 /// Caller must ensure AVX2 is available.
 #[target_feature(enable = "avx2")]
-#[allow(unused_assignments)]
 pub unsafe fn kogge_stone_bishop_avx2(slider: u64, occupancy: u64) -> u64 {
     use core::arch::x86_64::*;
 
@@ -198,7 +196,6 @@ pub unsafe fn kogge_stone_bishop_avx2(slider: u64, occupancy: u64) -> u64 {
 /// # Safety
 /// Caller must ensure AVX2 is available.
 #[target_feature(enable = "avx2")]
-#[allow(unused_assignments)]
 pub unsafe fn kogge_stone_queen_avx2(slider: u64, occupancy: u64) -> u64 {
     use core::arch::x86_64::*;
 

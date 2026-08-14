@@ -114,7 +114,13 @@ pub(crate) fn step_sw(g: u64, p: u64, s: usize) -> (u64, u64) {
 
 impl BitBoardKernel for KoggeStone {
     #[inline(always)]
-    #[allow(unreachable_code)]
+    #[cfg_attr(
+        target_arch = "aarch64",
+        expect(
+            unreachable_code,
+            reason = "Architecture-specific returns are cfg-selected before scalar fallback"
+        )
+    )]
     fn rook_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
 
@@ -169,7 +175,13 @@ impl BitBoardKernel for KoggeStone {
     }
 
     #[inline(always)]
-    #[allow(unreachable_code)]
+    #[cfg_attr(
+        target_arch = "aarch64",
+        expect(
+            unreachable_code,
+            reason = "Architecture-specific returns are cfg-selected before scalar fallback"
+        )
+    )]
     fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
 
@@ -224,7 +236,13 @@ impl BitBoardKernel for KoggeStone {
     }
 
     #[inline(always)]
-    #[allow(unreachable_code)]
+    #[cfg_attr(
+        target_arch = "aarch64",
+        expect(
+            unreachable_code,
+            reason = "Architecture-specific returns are cfg-selected before scalar fallback"
+        )
+    )]
     fn queen_attacks(square: u8, occupancy: u64) -> u64 {
         let slider = 1u64 << square;
 

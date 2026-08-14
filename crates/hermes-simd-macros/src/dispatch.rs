@@ -83,7 +83,10 @@ fn replace_ident(stream: TokenStream, target: &Ident, replacement: &TokenStream)
     result
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The dispatcher generator forwards the complete macro expansion inputs"
+)]
 fn generate_dispatcher(
     arch_cfg: &TokenStream,
     active_targets: &[DispatchTarget],
@@ -282,7 +285,10 @@ fn generate_dispatcher(
     quote! {
         #[cfg(#arch_cfg)]
         #[inline(always)]
-        #[allow(unreachable_code)]
+        #[expect(
+            unreachable_code,
+            reason = "Generated architecture arms are cfg-selected before the scalar fallback"
+        )]
         #visibility fn #dispatch_name #dispatcher_generics(#inner_args) #inner_ret #dispatcher_where {
             #(#helper_fns)*
             #(#dispatch_arms)*

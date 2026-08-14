@@ -128,7 +128,10 @@ fn check_tiled_gemm_dimensions(
 // `n`/`k` dimensions, and the abstracted B source `b_base`/`b_row_stride`) are all
 // load-bearing inputs to a hot micro-kernel; bundling them into a struct would add
 // indirection to the inner loop for no clarity gain.
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The hot micro-kernel keeps each matrix operand and tile coordinate explicit"
+)]
 #[inline(always)]
 unsafe fn gemm_register_tile<T, Arch, const TILE_M: usize, const TILE_N: usize>(
     a_slice: &[T],

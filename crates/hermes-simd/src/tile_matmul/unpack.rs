@@ -184,7 +184,10 @@ pub fn widen_i8_to_i32(src: &[i8], dest: &mut [i32]) {
 
 /// Widens a slice of `crate::I8` wrapper values to `crate::I16` using sign-extension.
 #[inline]
-#[allow(non_snake_case)]
+#[expect(
+    non_snake_case,
+    reason = "Public wrappers preserve the numeric domain type spelling"
+)]
 pub fn widen_I8_to_I16(src: &[crate::I8], dest: &mut [crate::I16]) {
     unsafe {
         let src_cast = core::slice::from_raw_parts(src.as_ptr().cast::<i8>(), src.len());
@@ -196,7 +199,10 @@ pub fn widen_I8_to_I16(src: &[crate::I8], dest: &mut [crate::I16]) {
 
 /// Widens a slice of `crate::I8` wrapper values to `crate::I32` using sign-extension.
 #[inline]
-#[allow(non_snake_case)]
+#[expect(
+    non_snake_case,
+    reason = "Public wrappers preserve the numeric domain type spelling"
+)]
 pub fn widen_I8_to_I32(src: &[crate::I8], dest: &mut [crate::I32]) {
     unsafe {
         let src_cast = core::slice::from_raw_parts(src.as_ptr().cast::<i8>(), src.len());

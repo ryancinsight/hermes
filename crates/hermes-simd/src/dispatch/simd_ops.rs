@@ -15,7 +15,10 @@ use hermes_simd_core::{Add, Div, Mul, Sub};
 #[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
 use hermes_simd_intrinsics::Scalar as ScalarArch;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[allow(unused_imports)]
+#[expect(
+    unused_imports,
+    reason = "The architecture markers are consumed by cfg-selected dispatch implementations"
+)]
 use hermes_simd_intrinsics::{Avx2, Avx512, Neon, Scalar as ScalarArch};
 #[cfg(target_arch = "aarch64")]
 use hermes_simd_intrinsics::{Neon, Scalar as ScalarArch};

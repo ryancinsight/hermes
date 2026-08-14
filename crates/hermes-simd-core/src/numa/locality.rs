@@ -40,7 +40,10 @@ impl LocalityCache {
 #[cfg(feature = "std")]
 thread_local! {
     // clippy 1.97.0 FP: already const. ATLAS-MNEMOSYNE-CI-1.
-    #[allow(clippy::missing_const_for_thread_local)]
+    #[expect(
+        clippy::missing_const_for_thread_local,
+        reason = "The initializer is already const; this expectation records the toolchain diagnostic"
+    )]
     static LOCALITY_CACHE: core::cell::RefCell<LocalityCache> = const {
         core::cell::RefCell::new(LocalityCache::new())
     };

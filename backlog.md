@@ -53,7 +53,7 @@
   | 63 | `cast_lossless` | prefer `From` over `as` where infallible |
   | 62 | `doc_markdown` | backticks |
   | 49 | `uninlined_format_args` | mechanical |
-  | 26 | `allow_attributes` | the `#[allow]` -> `#[expect]` migration |
+  | **0** | `allow_attributes` | **done** — library source suppressions now use reasoned `#[expect]` or are deleted when unfulfilled; test/bench-only suppressions remain outside this library-source ratchet |
   | 21 | `cast_ptr_alignment` | **not mechanical** — each is a real alignment claim to check against the load it feeds |
   | 19 | `missing_panics_doc` | required by the documentation standard |
   | 13 | `ref_as_ptr` | `core::ptr::from_ref`; same family as the finished item |
@@ -74,6 +74,13 @@
   -A clippy::restriction` is required to keep the diff to one transform. Without
   it the run also rewrote 26 `#[allow]` -> `#[expect]` and left 19 unfulfilled
   expectations behind.
+
+  **`allow_attributes` burned down 26 -> 0 (2026-08-14).** The source sweep
+  replaced target-specific and macro-contract suppressions with reasoned
+  `#[expect]` attributes, deleted unfulfilled `unused_mut` and `dead_code`
+  suppressions, and made the aarch64-only unreachable-code expectation
+  conditional. A focused `clippy::allow_attributes` run over the affected
+  core, intrinsics, facade, and macro packages is clean; core nextest is 16/16.
 
 - [ ] [major] [arch] **HS-436 — `SimdKernel` is a god trait.** One sealed trait
   carries ~60 methods across load/store, streaming, dense arithmetic, masked

@@ -6,7 +6,10 @@ use super::{east_mask, west_mask};
 /// # Safety
 /// NEON is mandatory on aarch64; no additional caller requirements.
 #[cfg(target_arch = "aarch64")]
-#[allow(unused_assignments)]
+#[expect(
+    unused_assignments,
+    reason = "Each vector accumulator is updated across the staged Kogge-Stone fill"
+)]
 pub unsafe fn kogge_stone_rook_neon(slider: u64, occupancy: u64) -> u64 {
     use core::arch::aarch64::*;
 
@@ -118,7 +121,10 @@ pub unsafe fn kogge_stone_rook_neon(slider: u64, occupancy: u64) -> u64 {
 /// # Safety
 /// NEON is mandatory on aarch64; no additional caller requirements.
 #[cfg(target_arch = "aarch64")]
-#[allow(unused_assignments)]
+#[expect(
+    unused_assignments,
+    reason = "Each vector accumulator is updated across the staged Kogge-Stone fill"
+)]
 pub unsafe fn kogge_stone_bishop_neon(slider: u64, occupancy: u64) -> u64 {
     use core::arch::aarch64::*;
 

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::kernel::{SimdKernel, MAX_SIMD_LANES};
 use crate::scalar::Scalar;
 
