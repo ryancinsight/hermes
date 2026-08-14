@@ -127,7 +127,7 @@ impl AdaptiveDispatcher {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(target_arch = "x86_64", feature = "std"))]
 fn emit_numa_downgrade(numa_node: u32) {
     tracing::warn!(
         target: "hermes_simd::dispatcher",
@@ -139,7 +139,7 @@ fn emit_numa_downgrade(numa_node: u32) {
     );
 }
 
-#[cfg(all(test, feature = "std"))]
+#[cfg(all(test, target_arch = "x86_64", feature = "std"))]
 mod tests {
     use std::io::{self, Write};
     use std::sync::{Arc, Mutex};
@@ -194,7 +194,7 @@ mod tests {
         let output = String::from_utf8(output).expect("subscriber output is UTF-8");
         assert!(output.contains("AMX dispatch downgraded"));
         assert!(output.contains("numa_node=7"));
-        assert!(output.contains("from_backend=amx"));
-        assert!(output.contains("to_backend=avx512"));
+        assert!(output.contains("from_backend=\"amx\""));
+        assert!(output.contains("to_backend=\"avx512\""));
     }
 }
