@@ -120,7 +120,7 @@ impl<
             }
         }
         Some(Self {
-            ptr: data.as_ptr() as *mut T,
+            ptr: data.as_ptr().cast_mut(),
             stride,
             _marker: PhantomData,
         })

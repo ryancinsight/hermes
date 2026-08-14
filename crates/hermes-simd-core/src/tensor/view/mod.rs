@@ -99,7 +99,7 @@ impl<'a, 'b, T, const N: usize> TensorView<'a, T, N, RowMajor, &'b [T]> {
         }
         let strides = row_major_strides(shape);
         Ok(Self {
-            ptr: data as *const [T] as *mut [T],
+            ptr: core::ptr::from_ref(data).cast_mut(),
             shape,
             strides,
             _layout: PhantomData,
@@ -124,7 +124,7 @@ impl<'a, 'b, T, const N: usize> TensorView<'a, T, N, RowMajor, &'b mut [T]> {
         }
         let strides = row_major_strides(shape);
         Ok(Self {
-            ptr: data as *mut [T],
+            ptr: core::ptr::from_mut(data),
             shape,
             strides,
             _layout: PhantomData,
@@ -154,7 +154,7 @@ impl<'a, 'b, T, const N: usize, L: Layout> TensorView<'a, T, N, L, &'b [T]> {
             return Err(TensorError::ShapeMismatch);
         }
         Ok(Self {
-            ptr: data as *const [T] as *mut [T],
+            ptr: core::ptr::from_ref(data).cast_mut(),
             shape,
             strides,
             _layout: PhantomData,
@@ -178,7 +178,7 @@ impl<'a, 'b, T, const N: usize, L: Layout> TensorView<'a, T, N, L, &'b mut [T]> 
             return Err(TensorError::ShapeMismatch);
         }
         Ok(Self {
-            ptr: data as *mut [T],
+            ptr: core::ptr::from_mut(data),
             shape,
             strides,
             _layout: PhantomData,
@@ -218,7 +218,7 @@ impl<'a, 'b, T> TensorView<'a, T, 2, ColMajor, &'b [T]> {
         // Fortran strides: strides[0] = 1 (column-stride), strides[1] = nrows (row-stride).
         let strides = [1, shape[0]];
         Ok(Self {
-            ptr: data as *const [T] as *mut [T],
+            ptr: core::ptr::from_ref(data).cast_mut(),
             shape,
             strides,
             _layout: PhantomData,

@@ -56,8 +56,8 @@
   | **0** | `allow_attributes` | **done** — library source suppressions now use reasoned `#[expect]` or are deleted when unfulfilled; test/bench-only suppressions remain outside this library-source ratchet |
   | **0** | `cast_ptr_alignment` | **done** — 21 deliberately unaligned intrinsic sites reviewed below |
   | **0** | `missing_panics_doc` | **done** — 19 contract-bearing APIs documented below |
-  | 13 | `ref_as_ptr` | `core::ptr::from_ref`; same family as the finished item |
-  | 9 | `ptr_cast_constness` | `.cast_const()`/`.cast_mut()`; same family |
+  | **0** | `ref_as_ptr` | **done** — 13 reference-to-slice pointer sites use `from_ref`/`from_mut` |
+  | **0** | `ptr_cast_constness` | **done** — raw-pointer constness casts use typed pointer methods |
   | **0** | `missing_safety_doc` | **done** — AMX raw preconditions documented below |
 
   Sequence: the doc sections and `must_use` next (contract-bearing), then
@@ -94,6 +94,17 @@
   clean, and the focused intrinsics nextest suite passes 30/30. No alignment
   promise was weakened; each expectation is attached to the matching
   `_loadu`, `_loadl`, or `_storeu` intrinsic.
+
+  **`ref_as_ptr` burned down: 13 -> 0 (2026-08-14).** Slice-view and tensor
+  constructors now use `core::ptr::from_ref`/`from_mut` with explicit
+  const-to-mut pointer casts where their internal representation requires it.
+  The workspace all-targets `clippy::ref_as_ptr` gate is clean, and the
+  focused core nextest suite passes 16/16.
+
+  **`ptr_cast_constness` burned down: 9 -> 0 (2026-08-14).** The remaining
+  mutable-view and tile constructors now use `.cast_const()`/`.cast_mut()`
+  rather than `as` casts that changed only pointer constness. The workspace
+  all-targets gate is clean, and the focused core nextest suite passes 16/16.
 
   **`ptr_as_ptr` burned down: 171 -> 0.** 167 sites converted mechanically by
   `cargo clippy --fix` restricted to that one lint; the remaining 4 were

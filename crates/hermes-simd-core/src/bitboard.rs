@@ -66,7 +66,7 @@ impl<'a, Backend, Arch> BitBoardView<'a, Backend, Arch, &'a [u64]> {
     #[must_use]
     pub fn new(data: &'a [u64]) -> Self {
         Self {
-            ptr: data as *const [u64] as *mut [u64],
+            ptr: core::ptr::from_ref(data).cast_mut(),
             _marker: PhantomData,
         }
     }
@@ -77,7 +77,7 @@ impl<'a, Backend, Arch> BitBoardView<'a, Backend, Arch, &'a mut [u64]> {
     #[inline(always)]
     pub fn new_mut(data: &'a mut [u64]) -> Self {
         Self {
-            ptr: data as *mut [u64],
+            ptr: core::ptr::from_mut(data),
             _marker: PhantomData,
         }
     }

@@ -159,7 +159,7 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
             }
         }
         Some(Self {
-            ptr: data as *const [T] as *mut [T],
+            ptr: core::ptr::from_ref(data).cast_mut(),
             _marker: PhantomData,
         })
     }
@@ -188,7 +188,7 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
             }
         }
         Some(Self {
-            ptr: data as *mut [T],
+            ptr: core::ptr::from_mut(data),
             _marker: PhantomData,
         })
     }
@@ -279,7 +279,7 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
     ) -> SimdView<'a, T, Arch, crate::align::Unaligned, Mode, &'a [T]> {
         let sub = &self.as_slice()[range];
         SimdView {
-            ptr: sub as *const [T] as *mut [T],
+            ptr: core::ptr::from_ref(sub).cast_mut(),
             _marker: PhantomData,
         }
     }
@@ -300,7 +300,7 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
         let addr = sub.as_ptr() as usize;
         if addr % A == 0 {
             Some(SimdView {
-                ptr: sub as *const [T] as *mut [T],
+                ptr: core::ptr::from_ref(sub).cast_mut(),
                 _marker: PhantomData,
             })
         } else {
@@ -321,7 +321,7 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
     ) -> SimdView<'a, T, Arch, crate::align::Unaligned, Mode, &'a mut [T]> {
         let sub = &mut self.as_slice_mut()[range];
         SimdView {
-            ptr: sub as *mut [T],
+            ptr: core::ptr::from_mut(sub),
             _marker: PhantomData,
         }
     }
@@ -342,7 +342,7 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
         let addr = sub.as_ptr() as usize;
         if addr % A == 0 {
             Some(SimdView {
-                ptr: sub as *mut [T],
+                ptr: core::ptr::from_mut(sub),
                 _marker: PhantomData,
             })
         } else {
