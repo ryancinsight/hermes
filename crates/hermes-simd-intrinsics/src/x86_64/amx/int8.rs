@@ -22,9 +22,9 @@ macro_rules! impl_tile_matmul_int8 {
 
                 // A is M=16 rows, K=64 cols.
                 raw::tileloadd(0, a.cast(), a_stride as isize);
-                // B is packed as N=16 rows, K=64 columns for AMX dot products.
+                // B is packed as K/4=16 rows, 4N=64 byte columns for AMX dot products.
                 let mut b_tile = [<$t_in>::default(); 16 * 64];
-                pack_rhs_panel(b, b_stride, 0, 0, 64, &mut b_tile);
+                pack_rhs_panel::<_, 4>(b, b_stride, 0, 0, 64, &mut b_tile);
                 raw::tileloadd(1, b_tile.as_ptr().cast(), 64);
                 // C is M=16 rows, N=16 cols.
                 raw::tileloadd(2, c as *const _, (c_stride * 4) as isize);
@@ -93,8 +93,8 @@ impl super::AmxGemm<i8, i8, i32> for AmxInt8 {
                     raw::tileloadd(0, a.add(i * a_stride + kk).cast(), a_stride as isize);
                     raw::tileloadd(1, a.add((i + 16) * a_stride + kk).cast(), a_stride as isize);
 
-                    pack_rhs_panel(b, b_stride, j, kk, 64, &mut b_tile_0);
-                    pack_rhs_panel(b, b_stride, j + 16, kk, 64, &mut b_tile_1);
+                    pack_rhs_panel::<_, 4>(b, b_stride, j, kk, 64, &mut b_tile_0);
+                    pack_rhs_panel::<_, 4>(b, b_stride, j + 16, kk, 64, &mut b_tile_1);
                     raw::tileloadd(6, b_tile_0.as_ptr().cast(), 64);
                     raw::tileloadd(7, b_tile_1.as_ptr().cast(), 64);
 
@@ -143,7 +143,7 @@ impl super::AmxGemm<i8, i8, i32> for AmxInt8 {
                 while kk + 64 <= k {
                     raw::tileloadd(0, a.add(i * a_stride + kk).cast(), a_stride as isize);
                     raw::tileloadd(1, a.add((i + 16) * a_stride + kk).cast(), a_stride as isize);
-                    pack_rhs_panel(b, b_stride, j, kk, 64, &mut b_tile);
+                    pack_rhs_panel::<_, 4>(b, b_stride, j, kk, 64, &mut b_tile);
                     raw::tileloadd(6, b_tile.as_ptr().cast(), 64);
 
                     raw::tdpbssd(2, 0, 6);
@@ -176,7 +176,7 @@ impl super::AmxGemm<i8, i8, i32> for AmxInt8 {
                 let mut kk = 0;
                 while kk + 64 <= k {
                     raw::tileloadd(0, a.add(i * a_stride + kk).cast(), a_stride as isize);
-                    pack_rhs_panel(b, b_stride, j, kk, 64, &mut b_tile);
+                    pack_rhs_panel::<_, 4>(b, b_stride, j, kk, 64, &mut b_tile);
                     raw::tileloadd(6, b_tile.as_ptr().cast(), 64);
 
                     raw::tdpbssd(2, 0, 6);
@@ -270,8 +270,8 @@ impl super::AmxGemm<I8, I8, I32> for AmxInt8 {
                     raw::tileloadd(0, a.add(i * a_stride + kk).cast(), a_stride as isize);
                     raw::tileloadd(1, a.add((i + 16) * a_stride + kk).cast(), a_stride as isize);
 
-                    pack_rhs_panel(b, b_stride, j, kk, 64, &mut b_tile_0);
-                    pack_rhs_panel(b, b_stride, j + 16, kk, 64, &mut b_tile_1);
+                    pack_rhs_panel::<_, 4>(b, b_stride, j, kk, 64, &mut b_tile_0);
+                    pack_rhs_panel::<_, 4>(b, b_stride, j + 16, kk, 64, &mut b_tile_1);
                     raw::tileloadd(6, b_tile_0.as_ptr().cast(), 64);
                     raw::tileloadd(7, b_tile_1.as_ptr().cast(), 64);
 
@@ -320,7 +320,7 @@ impl super::AmxGemm<I8, I8, I32> for AmxInt8 {
                 while kk + 64 <= k {
                     raw::tileloadd(0, a.add(i * a_stride + kk).cast(), a_stride as isize);
                     raw::tileloadd(1, a.add((i + 16) * a_stride + kk).cast(), a_stride as isize);
-                    pack_rhs_panel(b, b_stride, j, kk, 64, &mut b_tile);
+                    pack_rhs_panel::<_, 4>(b, b_stride, j, kk, 64, &mut b_tile);
                     raw::tileloadd(6, b_tile.as_ptr().cast(), 64);
 
                     raw::tdpbssd(2, 0, 6);
@@ -353,7 +353,7 @@ impl super::AmxGemm<I8, I8, I32> for AmxInt8 {
                 let mut kk = 0;
                 while kk + 64 <= k {
                     raw::tileloadd(0, a.add(i * a_stride + kk).cast(), a_stride as isize);
-                    pack_rhs_panel(b, b_stride, j, kk, 64, &mut b_tile);
+                    pack_rhs_panel::<_, 4>(b, b_stride, j, kk, 64, &mut b_tile);
                     raw::tileloadd(6, b_tile.as_ptr().cast(), 64);
 
                     raw::tdpbssd(2, 0, 6);

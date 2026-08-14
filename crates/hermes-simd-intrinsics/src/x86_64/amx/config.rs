@@ -51,9 +51,10 @@ impl AmxConfig {
 
     /// Generate a tile config for the AMX GEMM microkernel block.
     ///
-    /// AMX stores the right-hand operand as an `N`-row tile whose byte columns
-    /// cover the `K` depth. This is the shape consumed by the dot-product
-    /// instructions, not the logical row-major `K × N` view of `B`.
+    /// AMX stores the right-hand operand in the dot-product layout: TDPBSSD
+    /// uses `K / 4` rows with `4N` byte columns, while TDPBF16PS uses `K / 2`
+    /// rows with `4N` byte columns. This is not the logical row-major `K × N`
+    /// view of `B`; the packing occurs at the instruction boundary.
     /// The palette limit and operand layout follow Intel's AMX configuration
     /// example: <https://www.intel.com/content/www/us/en/developer/articles/code-sample/advanced-matrix-extensions-intrinsics-functions.html>.
     #[inline]
@@ -61,8 +62,8 @@ impl AmxConfig {
         let tile_n = n.min(Self::MATRIX_TILE_COLUMNS);
         let r_a = m.min(16) as u8;
         let c_a_bytes = (k * element_size).min(64) as u16;
-        let r_b = tile_n as u8;
-        let c_b_bytes = (k * element_size).min(64) as u16;
+        let r_b = (k * element_size / 4).min(16) as u8;
+        let c_b_bytes = (tile_n * 4).min(64) as u16;
         let r_c = m.min(16) as u8;
         let c_c_bytes = (tile_n * 4).min(64) as u16; // Accumulation in 32-bit (F32/I32)
 
@@ -72,7 +73,7 @@ impl AmxConfig {
         // Tile 0 (A): M rows x K cols
         rows[0] = r_a;
         cols_b[0] = c_a_bytes;
-        // Tile 1 (B): N rows x K byte columns after RHS packing
+        // Tile 1 (B): K / dot-group rows x 4N byte columns after RHS packing
         rows[1] = r_b;
         cols_b[1] = c_b_bytes;
         // Tile 2 (C): M rows x N cols
