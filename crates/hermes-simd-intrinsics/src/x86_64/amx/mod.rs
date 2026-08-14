@@ -1,14 +1,23 @@
 //! Intel AMX (Advanced Matrix Extensions) backend for BF16 and INT8 matrix multiplication.
 
 mod config;
+pub mod probe;
 mod session;
 mod types;
 
 pub use config::AmxConfig;
 pub(crate) use config::ACTIVE_CONFIG;
+pub use probe::{has_amx_bf16, has_amx_int8, has_amx_tile};
 pub use session::{AmxBatchSession, AmxSession, AmxSessionError};
 pub use types::{AmxBf16, AmxInt8};
 
+/// Whether this process may execute AMX tile instructions.
+///
+/// Delegates to [`probe::has_amx_tile`], which owns the CPUID / `XCR0` /
+/// OS-permission chain. Under Miri no instruction actually executes — the
+/// `raw` wrappers are compiled out and the session tests exercise only the
+/// configuration state machine — so the probe is bypassed to keep that
+/// coverage reachable.
 #[inline]
 fn amx_runtime_supported() -> bool {
     #[cfg(miri)]
@@ -17,11 +26,36 @@ fn amx_runtime_supported() -> bool {
     }
     #[cfg(not(miri))]
     {
-        false
+        probe::has_amx_tile()
     }
 }
 
 /// AMX instruction wrappers using inline assembly.
+///
+/// # `asm!` option policy
+///
+/// Every block here declares the strongest options that are *literally* true
+/// of its instruction, because the default (no options) makes the compiler
+/// assume an arbitrary memory clobber and forces spills around each tile op in
+/// the GEMM inner loop. The three axes:
+///
+/// - `nomem` where the instruction touches only tile registers (`tilezero`,
+///   `tilerelease`, `tdpbf16ps`, `tdpbssd`); `readonly` where it reads memory
+///   but never writes it (`ldtilecfg`, `tileloadd`). `sttilecfg` and
+///   `tilestored` write through their pointer, so they claim neither and keep
+///   the conservative default.
+/// - `nostack`: no AMX instruction pushes, pops, or uses the red zone. A
+///   pointer operand that happens to address the stack is unaffected — the
+///   option constrains what the asm itself does with the stack pointer.
+/// - `preserves_flags`: no AMX instruction writes `EFLAGS`.
+///
+/// `pure` is deliberately absent everywhere, including from the `nomem`
+/// blocks. Every one of these mutates tile-register state that LLVM does not
+/// model, so the implicit "has side effects" of a non-`pure` block is the only
+/// thing keeping `ldtilecfg` ahead of the `tileloadd`/`tdp*` sequence that
+/// depends on it, and keeping a reused accumulator's ops in order. Marking any
+/// of them `pure` would license reordering or elision and silently corrupt the
+/// GEMM.
 pub mod raw {
     use super::AmxConfig;
 
@@ -34,6 +68,7 @@ pub mod raw {
             core::arch::asm!(
                 "ldtilecfg [{ptr}]",
                 ptr = in(reg) config,
+                options(readonly, nostack, preserves_flags),
             );
         }
     }
@@ -47,6 +82,7 @@ pub mod raw {
             core::arch::asm!(
                 "sttilecfg [{ptr}]",
                 ptr = in(reg) config,
+                options(nostack, preserves_flags),
             );
         }
     }
@@ -56,7 +92,7 @@ pub mod raw {
     pub unsafe fn tilerelease() {
         #[cfg(all(target_arch = "x86_64", not(miri)))]
         {
-            core::arch::asm!("tilerelease");
+            core::arch::asm!("tilerelease", options(nomem, nostack, preserves_flags));
         }
     }
 
@@ -71,14 +107,14 @@ pub mod raw {
         #[cfg(all(target_arch = "x86_64", not(miri)))]
         {
             match tile {
-                0 => core::arch::asm!("tilezero tmm0"),
-                1 => core::arch::asm!("tilezero tmm1"),
-                2 => core::arch::asm!("tilezero tmm2"),
-                3 => core::arch::asm!("tilezero tmm3"),
-                4 => core::arch::asm!("tilezero tmm4"),
-                5 => core::arch::asm!("tilezero tmm5"),
-                6 => core::arch::asm!("tilezero tmm6"),
-                7 => core::arch::asm!("tilezero tmm7"),
+                0 => core::arch::asm!("tilezero tmm0", options(nomem, nostack, preserves_flags)),
+                1 => core::arch::asm!("tilezero tmm1", options(nomem, nostack, preserves_flags)),
+                2 => core::arch::asm!("tilezero tmm2", options(nomem, nostack, preserves_flags)),
+                3 => core::arch::asm!("tilezero tmm3", options(nomem, nostack, preserves_flags)),
+                4 => core::arch::asm!("tilezero tmm4", options(nomem, nostack, preserves_flags)),
+                5 => core::arch::asm!("tilezero tmm5", options(nomem, nostack, preserves_flags)),
+                6 => core::arch::asm!("tilezero tmm6", options(nomem, nostack, preserves_flags)),
+                7 => core::arch::asm!("tilezero tmm7", options(nomem, nostack, preserves_flags)),
                 _ => unreachable!("AMX tile index out of range (valid: tmm0-tmm7)"),
             }
         }
@@ -96,28 +132,28 @@ pub mod raw {
         {
             match tile {
                 0 => {
-                    core::arch::asm!("tileloadd tmm0, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride)
+                    core::arch::asm!("tileloadd tmm0, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags))
                 }
                 1 => {
-                    core::arch::asm!("tileloadd tmm1, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride)
+                    core::arch::asm!("tileloadd tmm1, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags))
                 }
                 2 => {
-                    core::arch::asm!("tileloadd tmm2, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride)
+                    core::arch::asm!("tileloadd tmm2, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags))
                 }
                 3 => {
-                    core::arch::asm!("tileloadd tmm3, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride)
+                    core::arch::asm!("tileloadd tmm3, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags))
                 }
                 4 => {
-                    core::arch::asm!("tileloadd tmm4, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride)
+                    core::arch::asm!("tileloadd tmm4, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags))
                 }
                 5 => {
-                    core::arch::asm!("tileloadd tmm5, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride)
+                    core::arch::asm!("tileloadd tmm5, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags))
                 }
                 6 => {
-                    core::arch::asm!("tileloadd tmm6, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride)
+                    core::arch::asm!("tileloadd tmm6, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags))
                 }
                 7 => {
-                    core::arch::asm!("tileloadd tmm7, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride)
+                    core::arch::asm!("tileloadd tmm7, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags))
                 }
                 _ => unreachable!("AMX tile index out of range (valid: tmm0-tmm7)"),
             }
@@ -136,28 +172,28 @@ pub mod raw {
         {
             match tile {
                 0 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm0", base = in(reg) base, stride = in(reg) stride)
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm0", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags))
                 }
                 1 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm1", base = in(reg) base, stride = in(reg) stride)
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm1", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags))
                 }
                 2 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm2", base = in(reg) base, stride = in(reg) stride)
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm2", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags))
                 }
                 3 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm3", base = in(reg) base, stride = in(reg) stride)
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm3", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags))
                 }
                 4 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm4", base = in(reg) base, stride = in(reg) stride)
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm4", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags))
                 }
                 5 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm5", base = in(reg) base, stride = in(reg) stride)
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm5", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags))
                 }
                 6 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm6", base = in(reg) base, stride = in(reg) stride)
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm6", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags))
                 }
                 7 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm7", base = in(reg) base, stride = in(reg) stride)
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm7", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags))
                 }
                 _ => unreachable!("AMX tile index out of range (valid: tmm0-tmm7)"),
             }
@@ -175,17 +211,50 @@ pub mod raw {
         #[cfg(all(target_arch = "x86_64", not(miri)))]
         {
             match (dst, src1, src2) {
-                (2, 0, 6) => core::arch::asm!("tdpbf16ps tmm2, tmm0, tmm6"),
-                (3, 0, 7) => core::arch::asm!("tdpbf16ps tmm3, tmm0, tmm7"),
-                (4, 1, 6) => core::arch::asm!("tdpbf16ps tmm4, tmm1, tmm6"),
-                (5, 1, 7) => core::arch::asm!("tdpbf16ps tmm5, tmm1, tmm7"),
-                (5, 3, 4) => core::arch::asm!("tdpbf16ps tmm5, tmm3, tmm4"),
-                (4, 0, 2) => core::arch::asm!("tdpbf16ps tmm4, tmm0, tmm2"),
-                (5, 0, 3) => core::arch::asm!("tdpbf16ps tmm5, tmm0, tmm3"),
-                (6, 1, 2) => core::arch::asm!("tdpbf16ps tmm6, tmm1, tmm2"),
-                (7, 1, 3) => core::arch::asm!("tdpbf16ps tmm7, tmm1, tmm3"),
-                (0, 1, 2) => core::arch::asm!("tdpbf16ps tmm0, tmm1, tmm2"),
-                (2, 0, 1) => core::arch::asm!("tdpbf16ps tmm2, tmm0, tmm1"),
+                (2, 0, 6) => core::arch::asm!(
+                    "tdpbf16ps tmm2, tmm0, tmm6",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (3, 0, 7) => core::arch::asm!(
+                    "tdpbf16ps tmm3, tmm0, tmm7",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (4, 1, 6) => core::arch::asm!(
+                    "tdpbf16ps tmm4, tmm1, tmm6",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (5, 1, 7) => core::arch::asm!(
+                    "tdpbf16ps tmm5, tmm1, tmm7",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (5, 3, 4) => core::arch::asm!(
+                    "tdpbf16ps tmm5, tmm3, tmm4",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (4, 0, 2) => core::arch::asm!(
+                    "tdpbf16ps tmm4, tmm0, tmm2",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (5, 0, 3) => core::arch::asm!(
+                    "tdpbf16ps tmm5, tmm0, tmm3",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (6, 1, 2) => core::arch::asm!(
+                    "tdpbf16ps tmm6, tmm1, tmm2",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (7, 1, 3) => core::arch::asm!(
+                    "tdpbf16ps tmm7, tmm1, tmm3",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (0, 1, 2) => core::arch::asm!(
+                    "tdpbf16ps tmm0, tmm1, tmm2",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (2, 0, 1) => core::arch::asm!(
+                    "tdpbf16ps tmm2, tmm0, tmm1",
+                    options(nomem, nostack, preserves_flags)
+                ),
                 _ => unreachable!("AMX tile index out of range (valid: tmm0-tmm7)"),
             }
         }
@@ -202,17 +271,50 @@ pub mod raw {
         #[cfg(all(target_arch = "x86_64", not(miri)))]
         {
             match (dst, src1, src2) {
-                (2, 0, 6) => core::arch::asm!("tdpbssd tmm2, tmm0, tmm6"),
-                (3, 0, 7) => core::arch::asm!("tdpbssd tmm3, tmm0, tmm7"),
-                (4, 1, 6) => core::arch::asm!("tdpbssd tmm4, tmm1, tmm6"),
-                (5, 1, 7) => core::arch::asm!("tdpbssd tmm5, tmm1, tmm7"),
-                (5, 3, 4) => core::arch::asm!("tdpbssd tmm5, tmm3, tmm4"),
-                (4, 0, 2) => core::arch::asm!("tdpbssd tmm4, tmm0, tmm2"),
-                (5, 0, 3) => core::arch::asm!("tdpbssd tmm5, tmm0, tmm3"),
-                (6, 1, 2) => core::arch::asm!("tdpbssd tmm6, tmm1, tmm2"),
-                (7, 1, 3) => core::arch::asm!("tdpbssd tmm7, tmm1, tmm3"),
-                (0, 1, 2) => core::arch::asm!("tdpbssd tmm0, tmm1, tmm2"),
-                (2, 0, 1) => core::arch::asm!("tdpbssd tmm2, tmm0, tmm1"),
+                (2, 0, 6) => core::arch::asm!(
+                    "tdpbssd tmm2, tmm0, tmm6",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (3, 0, 7) => core::arch::asm!(
+                    "tdpbssd tmm3, tmm0, tmm7",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (4, 1, 6) => core::arch::asm!(
+                    "tdpbssd tmm4, tmm1, tmm6",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (5, 1, 7) => core::arch::asm!(
+                    "tdpbssd tmm5, tmm1, tmm7",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (5, 3, 4) => core::arch::asm!(
+                    "tdpbssd tmm5, tmm3, tmm4",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (4, 0, 2) => core::arch::asm!(
+                    "tdpbssd tmm4, tmm0, tmm2",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (5, 0, 3) => core::arch::asm!(
+                    "tdpbssd tmm5, tmm0, tmm3",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (6, 1, 2) => core::arch::asm!(
+                    "tdpbssd tmm6, tmm1, tmm2",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (7, 1, 3) => core::arch::asm!(
+                    "tdpbssd tmm7, tmm1, tmm3",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (0, 1, 2) => core::arch::asm!(
+                    "tdpbssd tmm0, tmm1, tmm2",
+                    options(nomem, nostack, preserves_flags)
+                ),
+                (2, 0, 1) => core::arch::asm!(
+                    "tdpbssd tmm2, tmm0, tmm1",
+                    options(nomem, nostack, preserves_flags)
+                ),
                 _ => unreachable!("AMX tile index out of range (valid: tmm0-tmm7)"),
             }
         }

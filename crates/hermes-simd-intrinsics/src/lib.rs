@@ -13,9 +13,11 @@
 //! | [`SveArch`]    | AArch64 SVE shape, emulated | 16 | 8 |
 //!
 //! Also here: the AVX-512 VNNI and 256-bit AVX-VNNI tile multipliers, packed
-//! 4-bit hardware unpacking, sliding-attack bitboard backends, and the
-//! quarantined Intel AMX engine (compiled, never dispatched — its runtime
-//! support probe reports `false` unconditionally; see the repository README).
+//! 4-bit hardware unpacking, sliding-attack bitboard backends, and the Intel
+//! AMX engine, whose kernels dispatch only where
+//! [`x86_64::amx::probe`] establishes the full CPUID / `XCR0` /
+//! OS-permission chain (see the repository README for why all three are
+//! required, and for the probe's one-time opt-in side effect).
 
 #![cfg_attr(not(feature = "std"), no_std)]
 // Lint policy is inherited from the workspace table (`[lints] workspace = true`).
@@ -278,6 +280,13 @@ pub fn has_avx512_bf16() -> bool {
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub use x86_64::amx::{AmxBatchSession, AmxBf16, AmxConfig, AmxInt8, AmxSession, AmxSessionError};
+
+/// AMX capability SSOT: the CPUID / `XCR0` / OS-permission chain that decides
+/// whether tile instructions may execute in this process. See
+/// [`x86_64::amx::probe`] for what each platform checks and why CPUID alone is
+/// unsound.
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+pub use x86_64::amx::{has_amx_bf16, has_amx_int8, has_amx_tile};
 
 // ---------------------------------------------------------------------------
 // ZST Architecture Markers

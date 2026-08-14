@@ -121,29 +121,25 @@ impl Avx512Support for i8 {
 
 // AMX / AVX-512 tile-kernel capability probes.
 //
-// AMX dispatch is disabled until Hermes has a stable, permission-aware probe
-// that verifies hardware support, XCR0 OS state, and Linux XTILEDATA process
-// permission before reporting true. Raw CPUID is insufficient because it misses
-// OS enablement and can alias unsupported leaves; the stable Rust feature macro
-// does not currently accept AMX feature strings on this toolchain. Returning
-// false preserves the safe-dispatch contract instead of risking a #UD/#NM fault.
+// The AMX probes delegate to `hermes-simd-intrinsics`, which owns the capability
+// SSOT and caches its result. Raw CPUID alone is unsound: it misses both the
+// XCR0 OS-enablement state and the per-process XTILEDATA permission that Linux
+// and Windows each gate behind their own protocol, and Rust's stable feature
+// macro does not accept AMX feature strings on this toolchain. See
+// `hermes_simd_intrinsics::x86_64::amx::probe` for the full chain.
 
 /// AMX bf16 tile GEMM (`tdpbf16ps` inline asm) requires `amx-tile` + `amx-bf16`.
 #[cfg(target_arch = "x86_64")]
 #[inline]
 fn has_amx_bf16() -> bool {
-    use std::sync::OnceLock;
-    static CACHED: OnceLock<bool> = OnceLock::new();
-    *CACHED.get_or_init(|| false)
+    hermes_simd_intrinsics::has_amx_bf16()
 }
 
 /// AMX int8 tile GEMM (`tdpbssd` inline asm) requires `amx-tile` + `amx-int8`.
 #[cfg(target_arch = "x86_64")]
 #[inline]
 fn has_amx_int8() -> bool {
-    use std::sync::OnceLock;
-    static CACHED: OnceLock<bool> = OnceLock::new();
-    *CACHED.get_or_init(|| false)
+    hermes_simd_intrinsics::has_amx_int8()
 }
 
 /// The AVX-512 BF16 conversion/FMA tile fallback enables

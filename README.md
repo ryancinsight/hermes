@@ -10,7 +10,7 @@ The project is structured as a multi-crate workspace (dependencies flow strictly
 
 - **Numeric vocabulary (external)**: the precision ladder (`Bf4`/`F4`/`Bf8`/`F8`/`F16`/`Bf16`/`F32`/`F64`/`I8`/`I16`/`I32`), packed 4-bit storage, and cast traits live in the [`eunomia`](https://github.com/ryancinsight/eunomia) crate — the Atlas numeric SSOT — and are re-exported through `hermes-simd`. (The former `hermes-numeric` member crate was migrated upstream.)
 - **`crates/hermes-simd-core`**: Core abstractions — `SimdView<'a, T, Arch, Align, Mode, Ref>` typestate views, the `SimdKernel<T>` operation trait, `SimdCow` dense copy-on-write, generic `SparseCow<T, Format, Arch>`, `BitMask<N>`, reduction/element/scan op strategy ZSTs, const-generic tiling, and N-D tensor views.
-- **`crates/hermes-simd-intrinsics`**: Architecture-specific kernels (`Scalar`, `Avx2`, `Avx512`, `AvxVnni`, `Neon` ZST markers implementing `SimdKernel<T>` / tile traits), AVX-512 VNNI and 256-bit AVX-VNNI tile multipliers, packed 4-bit hardware unpacking, sliding-attack bitboard backends, and the quarantined Intel AMX engine (see [Intel AMX status](#intel-amx-status)).
+- **`crates/hermes-simd-intrinsics`**: Architecture-specific kernels (`Scalar`, `Avx2`, `Avx512`, `AvxVnni`, `Neon` ZST markers implementing `SimdKernel<T>` / tile traits), AVX-512 VNNI and 256-bit AVX-VNNI tile multipliers, packed 4-bit hardware unpacking, sliding-attack bitboard backends, and the Intel AMX engine (gated on a permission-aware runtime probe; see [Intel AMX status](#intel-amx-status)).
 - **`crates/hermes-simd-types`**: Monomorphized convenience aliases and the compile-time `PreferredArch` selection.
 - **`crates/hermes-simd-macros`**: Procedural macros — `#[runtime_dispatch]` generates compile-time-gated plus runtime-detected dispatchers from one generic kernel function.
 - **`crates/hermes-simd`**: Public facade — the sealed `SimdOps` extension trait, runtime-dispatched free functions (`sum`, `dot`, `spmv_*`, `interleaved_complex_*`, …), and `dispatch_view` CPUID routing.
@@ -23,7 +23,7 @@ The project is structured as a multi-crate workspace (dependencies flow strictly
 2. **Interleaved complex kernels**: `interleaved_complex_dot` / `interleaved_complex_mul_assign` over `[re, im, ...]` primitive slices, fully register-resident via adjacent-pair `SimdKernel` primitives (`swap_adjacent`, `dup_even`, `dup_odd`, `fmaddsub`, `fmsubadd`) with AVX2/AVX-512/NEON overrides and a `const CONJ_B` conjugation flag (see `docs/adr/004`).
 3. **Copy-on-write containers**: `SimdCow` (dense, with map/zip/reduce/scan/norm extensions) and one generic `SparseCow<T, F, Arch>` covering every sparse format through the `CowFormat` trait — zero-copy reads, single-allocation promotion.
 4. **Sparse SIMD (SpMV)**: format-parameterized views for CSR, Sliced ELLPACK (SELL-p), Blocked COO, and Dense-with-Mask layouts.
-5. **VNNI tile GEMM**: AVX-512 VNNI and 256-bit AVX-VNNI tile multipliers behind a single internal `vpdpbssd` asm macro, plus bit-parallel INT4→INT8 unpacking. Intel AMX kernels exist in the tree but are quarantined and never dispatched — see [Intel AMX status](#intel-amx-status).
+5. **VNNI tile GEMM**: AVX-512 VNNI and 256-bit AVX-VNNI tile multipliers behind a single internal `vpdpbssd` asm macro, plus bit-parallel INT4→INT8 unpacking. Intel AMX kernels exist in the tree and dispatch only where the CPUID / `XCR0` / OS-permission chain holds, which no CI machine satisfies — see [Intel AMX status](#intel-amx-status).
 6. **SWAR chess bitboards**: Kogge-Stone, Hyperbola Quintessence, Fancy Magic, and Hybrid SWAR-Magic sliding-attack backends behind one `BitBoardView`.
 7. **Typestate safety**: alignment (`Aligned<A>`/`Unaligned`), execution mode (`Masked`/`Unmasked`), and reference mutability are compile-time parameters with zero layout overhead.
 8. **Precision ladder**: 4-bit through 64-bit numeric types with packed storage and hardware-accelerated unpacking into `SimdCow`.
@@ -106,26 +106,53 @@ unconditional parts of the library, not opt-in features.
 
 ## Intel AMX status
 
-**AMX is quarantined: it is compiled, but never dispatched.** The tile kernels
+**AMX dispatches only where the full permission chain holds — which is no
+machine currently in CI.** The hardcoded `false` is gone: the tile kernels
 (`tdpbf16ps`, `tdpbssd`), the `AmxConfig` tile descriptors, and the fallible
-RAII `AmxSession`/`AmxBatchSession` guards are present in
-`hermes-simd-intrinsics`, but every runtime support probe reports `false`
-unconditionally (`crates/hermes-simd/src/cpu.rs`,
-`crates/hermes-simd-intrinsics/src/x86_64/amx/mod.rs`). `AmxSession::new`
-therefore always returns `AmxSessionError::UnsupportedTarget`, and the tile
-GEMM ladder never enters its AMX rung on any host.
+RAII `AmxSession`/`AmxBatchSession` guards are now gated on a real runtime
+probe (`crates/hermes-simd-intrinsics/src/x86_64/amx/probe.rs`), which
+`crates/hermes-simd/src/cpu.rs` consumes as the capability SSOT.
 
-The quarantine is deliberate. Raw CPUID is insufficient to decide AMX
-availability — it misses XCR0 OS enablement and the Linux `XTILEDATA` process
-permission — and the stable Rust feature-detection macro does not accept AMX
-feature strings on the pinned toolchain. Reporting `false` preserves the
-safe-dispatch contract instead of risking a `#UD`/`#NM` fault.
+The probe refuses unless all three of these hold, because each is checked by a
+different mechanism and none implies the others:
 
-**Removal trigger** ([`backlog.md`](backlog.md) → Open): re-enable AMX
-auto-dispatch only after adding a stable, permission-aware probe that verifies
-hardware feature bits, XCR0 OS state, and Linux `XTILEDATA` process permission
-before reporting support. Acceptance: AMX GEMM dispatches and matches the
-scalar reference on a Sapphire-Rapids Linux runner.
+1. **Silicon** — `CPUID.(EAX=7,ECX=0).EDX` bit 24 (`amx-tile`), plus bit 22
+   (`amx-bf16`) or bit 25 (`amx-int8`) for the respective kernel.
+2. **OS state** — `XCR0` bits 17 (`XTILECFG`) and 18 (`XTILEDATA`), read via
+   `XGETBV` after confirming `OSXSAVE`. Clear bits mean `#UD` no matter what
+   CPUID says.
+3. **Process permission** — `XTILEDATA` is XFD-gated (8 KiB of state, so the OS
+   traps first use rather than growing every signal frame). XCR0 advertises the
+   component system-wide while `IA32_XFD` withholds it per thread, so step 2
+   does *not* subsume this. Executing without it raises `#NM`.
+
+Step 3 is platform-specific. On **Linux** the probe calls
+`arch_prctl(ARCH_GET_XCOMP_SUPP)`, then `arch_prctl(ARCH_REQ_XCOMP_PERM,
+XFEATURE_XTILEDATA)`, then re-reads `ARCH_GET_XCOMP_PERM` to confirm the grant.
+On **Windows** it requires both AMX bits in `GetEnabledXStateFeatures()`, then
+calls `EnableProcessOptionalXStateFeatures(XSTATE_MASK_AMX_TILE_DATA)` and
+verifies with `GetThreadEnabledXStateFeatures()`; both entry points are resolved
+with `GetProcAddress` because they do not exist before Windows 11 / Server 2022,
+where a static import would make the binary fail to load. Every other OS
+refuses. Note that Rust's own `is_x86_feature_detected!("amx-tile")` implements
+steps 1 and 2 only, so it is unsound for this purpose even once it stabilizes.
+
+Probing has a **side effect**: learning whether permission is obtainable
+requires requesting it, so the first call performs a process-wide, irreversible
+opt-in that enlarges the XSAVE area for every thread. The result is cached, so
+this happens at most once.
+
+**Still unvalidated on hardware.** No machine in CI has AMX silicon, and the
+`test-avx512-sde` job cannot substitute: Intel SDE emulates the instructions,
+CPUID, and `XGETBV`, but `arch_prctl` is a real syscall that passes through to
+the host kernel, which returns `EOPNOTSUPP` for `XTILEDATA` on a non-AMX host.
+A correct probe therefore refuses under SDE — by design — so `amx` is
+deliberately absent from that job's `HERMES_EXPECTED_TARGETS`. The AMX kernels
+remain compile-checked only.
+
+**Remaining trigger** ([`backlog.md`](backlog.md) → Open): a Sapphire-Rapids (or
+later) Linux runner on which the probe returns `true`, the AMX GEMM dispatches,
+and its result matches the `scalar/tiling.rs` reference within a derived bound.
 
 ---
 
@@ -206,7 +233,7 @@ cargo run -p hermes-simd-benches -- --parse-only --write-baseline --check-regres
 cargo run -p hermes-simd-benches -- --parse-only --check-regressions
 ```
 
-Differential testing policy: the AVX2, AVX-512, and NEON backends are verified against the always-available `Scalar` backend — bitwise on dyadic-exact inputs, within analytically derived rounding bounds on arbitrary inputs. AVX-512 executes under Intel SDE emulating Sapphire Rapids (`test-avx512-sde`) and NEON on a native aarch64 runner (`test-aarch64`), so neither is carried by a capability-gated skip. The AMX kernels are compile-checked only; they are not runtime-validated, because the quarantine above prevents them from being dispatched at all.
+Differential testing policy: the AVX2, AVX-512, and NEON backends are verified against the always-available `Scalar` backend — bitwise on dyadic-exact inputs, within analytically derived rounding bounds on arbitrary inputs. AVX-512 executes under Intel SDE emulating Sapphire Rapids (`test-avx512-sde`) and NEON on a native aarch64 runner (`test-aarch64`), so neither is carried by a capability-gated skip. The AMX kernels are compile-checked only; they are not runtime-validated, because no available machine satisfies the permission chain — the SDE job cannot stand in, since `arch_prctl` reaches the host kernel rather than the emulator (see [Intel AMX status](#intel-amx-status)).
 
 Benchmark regression policy: `benchmarks_baseline.json` is the structured
 Criterion baseline. `--check-regressions` fails when a committed baseline row is

@@ -25,11 +25,13 @@
   debug-only `eprintln!`, so in release builds the downgrade is silent — the
   fallback-must-surface-its-trigger rule wants a `tracing` event. Not done now:
   `hermes-simd` has no `tracing` dependency and adding one to a
-  `no_std`-capable facade is an ADR-level call that is not worth making for a
-  branch which cannot currently execute (AMX is quarantined, so `has_amx()` is
-  unconditionally false and the notice is unreachable). Carries a per-site
+  `no_std`-capable facade is an ADR-level call. Carries a per-site
   `#[expect(clippy::print_stderr)]` naming this item.
-  Re-open trigger: the AMX un-quarantine (see the README's Intel AMX status).
+  Re-open trigger fired (partially): `has_amx()` is a real probe now, so the
+  notice is no longer unreachable in principle — it fires on AMX silicon whose
+  process holds tile permission. No such machine is in CI, so the ADR call is
+  still not forced, but the "cannot execute" justification no longer holds and
+  this item is now blocked only on the `tracing` decision, not on AMX.
   Acceptance: the re-route emits a `tracing` event in release builds, asserted
   by a test capturing the subscriber.
 
@@ -610,6 +612,52 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   and Linux XTILEDATA process permission before reporting support. Acceptance:
   AMX GEMM dispatches and matches the scalar reference on a Sapphire-Rapids
   Linux runner.
+  Probe delivered: `crates/hermes-simd-intrinsics/src/x86_64/amx/probe.rs` is
+  the capability SSOT — CPUID leaf 7 EDX bits 24/22/25, `OSXSAVE`, `XCR0`
+  bits 17/18 via `XGETBV`, then per-OS permission: Linux
+  `arch_prctl` GET_XCOMP_SUPP -> REQ_XCOMP_PERM -> GET_XCOMP_PERM verify;
+  Windows `GetEnabledXStateFeatures` -> `EnableProcessOptionalXStateFeatures`
+  -> `GetThreadEnabledXStateFeatures` verify, both resolved by `GetProcAddress`
+  because they are absent before Windows 11 / Server 2022. Any other OS
+  refuses. Both hardcoded `false` sites are gone (`amx/mod.rs`, and
+  `hermes-simd/src/cpu.rs`, which now delegates). Probing requests permission,
+  which is a one-time process-wide XSAVE-area enlargement; the result caches.
+  Acceptance is NOT met: the probe returns false on every machine available,
+  and it cannot be satisfied under Intel SDE. SDE emulates the tile
+  instructions, CPUID, and `XGETBV`, but `arch_prctl` is a real syscall passed
+  through to the host kernel, which returns `EOPNOTSUPP` for XTILEDATA because
+  the runner silicon has no AMX. A correct probe therefore refuses under
+  emulation, so `amx` stays out of `test-avx512-sde`'s
+  `HERMES_EXPECTED_TARGETS` (the job's step comment now explains this). What
+  remains is exactly HS-429's hardware: Sapphire-Rapids-or-later silicon on
+  which the probe returns true, the GEMM dispatches, and its result is
+  differentially checked against `scalar/tiling.rs`.
+
+- [ ] [major] **HS-434 — `const TILE: u8` for the AMX raw tile wrappers.**
+  `raw::tilezero`/`tileloadd`/`tilestored` dispatch an 8-arm runtime `match`
+  with an `unreachable!()` inside the tile loop, and `tdpbf16ps`/`tdpbssd`
+  match an 11-entry whitelist of `(dst, src1, src2)` triples — a latent defect,
+  since any unlisted-but-valid triple panics instead of executing. Every one of
+  the ~100 call sites in `amx/bf16.rs` and `amx/int8.rs` passes a literal, so
+  `const TILE: u8` generic parameters remove the branch and the panic entirely
+  (`asm!` substitutes a `const` operand textually, so `"tilezero tmm{n}"` with
+  `n = const TILE` assembles correctly). Deferred rather than done with the
+  probe for two reasons: it breaks the `raw` public API ([major], and
+  `cargo-semver-checks` gates that), and its benefit is a branch removed from a
+  loop that executes on no available machine, so it cannot be measured — this
+  belongs in the same increment as the hardware validation above, where a
+  criterion baseline is possible. Acceptance: one `asm!` block per wrapper, no
+  `unreachable!()` in `amx/mod.rs`, all call sites converted, and a measured
+  before/after on AMX silicon.
+
+- [ ] [patch] **HS-435 — `# Safety` sections for the AMX raw wrappers.**
+  The eight `pub unsafe fn`s in `amx/mod.rs`'s `raw` module carry `///`
+  summaries but no `# Safety` section, so `clippy::missing_safety_doc` fires on
+  each. Their real preconditions are now stated (an `AmxSession` must be
+  active, hence the tile configuration loaded, and `probe::has_amx_tile()` must
+  hold), plus the pointer/stride validity and 64-byte alignment obligations for
+  the load/store pair. Pre-existing, and unrelated to the probe; folding it in
+  would have collided with the in-flight lint-floor ratchet.
 
 ## Delivered (2026-06-11)
 

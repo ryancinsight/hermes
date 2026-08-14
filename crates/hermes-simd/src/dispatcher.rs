@@ -94,11 +94,12 @@ impl AdaptiveDispatcher {
                                     // A library should surface a downgrade through
                                     // `tracing`, not stderr. Converting it means adding a
                                     // `tracing` dependency to this `no_std`-capable facade,
-                                    // which is an ADR-level call and is not worth making for
-                                    // a branch that cannot currently execute: AMX is
-                                    // quarantined, so `has_amx()` is unconditionally false
-                                    // and this diagnostic is unreachable. Tracked as HS-433,
-                                    // to be done with the AMX un-quarantine.
+                                    // which is an ADR-level call still pending as HS-433.
+                                    // The branch is no longer unreachable: `has_amx()` is a
+                                    // real probe now, so this fires on AMX silicon whose
+                                    // process holds tile permission. No such machine is in
+                                    // CI yet, which is why the conversion has not been
+                                    // forced.
                                     #[expect(
                                         clippy::print_stderr,
                                         reason = "debug-only, once-latched AMX downgrade notice; \
