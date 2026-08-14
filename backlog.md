@@ -63,6 +63,13 @@
   Sequence: the doc sections and `must_use` next (contract-bearing), then
   `cast_ptr_alignment` reviewed individually rather than swept, cosmetics last.
 
+  **Claimed increment (2026-08-14, codex session):** burn down the
+  `must_use_candidate` class in `hermes-simd-core` only. The scope is public
+  value-returning core APIs, their co-located documentation, and focused
+  contract checks; unrelated lint classes, intrinsics, and peer-owned
+  `Cargo.lock` state are non-goals. Acceptance is a lower exact class count,
+  `cargo fmt --check`, focused core nextest, and a clean targeted Clippy run.
+
   **`ptr_as_ptr` burned down: 171 -> 0.** 167 sites converted mechanically by
   `cargo clippy --fix` restricted to that one lint; the remaining 4 were
   inference-typed (`as *const _`) so carried no machine-applicable suggestion
