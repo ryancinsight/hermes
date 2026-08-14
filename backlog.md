@@ -113,7 +113,10 @@
   is clean for `clippy::missing_errors_doc`; the affected Hermes and intrinsics
   suites pass 424/424 and the doctest gate passes. The same increment also
   rejects zero NTT moduli with a typed error and canonicalizes input residues
-  before subtraction.
+  before subtraction. The `SimdOps` trait facade is now 287 lines; its blanket
+  implementations and shared method macro live in the dedicated
+  `dispatch/simd_ops/blanket_impls.rs` leaf, with the package suite passing
+  408/408 after the structural split.
 
   **`ptr_as_ptr` burned down: 171 -> 0.** 167 sites converted mechanically by
   `cargo clippy --fix` restricted to that one lint; the remaining 4 were
