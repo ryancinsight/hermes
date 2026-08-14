@@ -18,3 +18,4 @@
 | [010](010-numa-memory-layout.md) | NUMA Memory Layout and Topology Integration | Accepted |
 | [011](011-bitboard-kernel-safe-surface.md) | Make `BitBoardKernel` a Safe Trait | Accepted |
 | [012](012-structured-amx-downgrade-events.md) | Structured AMX downgrade events | Accepted |
+| [013](013-simdkernel-role-split.md) | Split `SimdKernel` into Role Supertraits | Proposed |

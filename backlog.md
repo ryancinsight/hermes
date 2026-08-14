@@ -173,7 +173,8 @@
   conditional. A focused `clippy::allow_attributes` run over the affected
   core, intrinsics, facade, and macro packages is clean; core nextest is 16/16.
 
-- [ ] [major] [arch] **HS-436 — `SimdKernel` is a god trait.** One sealed trait
+- [ ] [major] [arch] **HS-436 — `SimdKernel` is a god trait.** Owner: ryan (agent,
+  claimed 2026-08-14; ADR 013 drafted). One sealed trait
   carries ~60 methods across load/store, streaming, dense arithmetic, masked
   load/store, masked arithmetic, compress/expand, gather, scatter, mask
   construction, scan, elementwise math, comparison, reduction, cross-lane
