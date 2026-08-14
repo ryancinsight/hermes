@@ -42,7 +42,7 @@ pub fn abs_max<T: SimdOps>(data: &[T]) -> T {
 /// Multiplies every element of `data` by `scalar` in-place.
 #[inline(always)]
 pub fn scale<T: SimdOps>(data: &mut [T], scalar: T) {
-    T::scale(data, scalar)
+    T::scale(data, scalar);
 }
 
 /// Returns the first minimum, or `None` for empty or NaN-containing data.
@@ -233,7 +233,7 @@ pub fn masked_add<T: SimdOps>(
 /// is performed by [`ValidatedData::new`] before this function can be called.
 #[inline(always)]
 pub fn spmv_csr<T: SimdOps>(data: ValidatedData<CsrData<'_, T>>, x: &[T], y: &mut [T]) {
-    T::spmv_csr(data, x, y)
+    T::spmv_csr(data, x, y);
 }
 
 /// Computes sparse SpMV using const-generic Blocked-COO tiles.
@@ -248,13 +248,13 @@ pub fn spmv_bcoo<T: SimdOps, const BM: usize, const BN: usize>(
     x: &[T],
     y: &mut [T],
 ) {
-    T::spmv_bcoo::<BM, BN>(data, x, y)
+    T::spmv_bcoo::<BM, BN>(data, x, y);
 }
 
 /// Computes sparse SpMV using Dense-with-Mask.
 #[inline(always)]
 pub fn spmv_dense_masked<T: SimdOps>(data: DenseWithMaskData<'_, T>, x: &[T], y: &mut [T]) {
-    T::spmv_dense_masked(data, x, y)
+    T::spmv_dense_masked(data, x, y);
 }
 
 /// Computes sparse SpMV using const-generic Sliced ELLPACK (SELL-p).
@@ -269,7 +269,7 @@ pub fn spmv_sellp<T: SimdOps, const C: usize>(
     x: &[T],
     y: &mut [T],
 ) {
-    T::spmv_sellp::<C>(data, x, y)
+    T::spmv_sellp::<C>(data, x, y);
 }
 
 /// Computes register-blocked tiled GEMM: `c += A * B`.

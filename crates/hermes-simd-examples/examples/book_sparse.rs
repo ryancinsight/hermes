@@ -26,7 +26,7 @@ fn main() {
     let bad = CsrData::new(&[1.0f32][..], &[3i32][..], &[0i32, 1][..], 1, 3); // col 3 >= ncols
     match ValidatedData::new(bad) {
         Err(SimdError::IndexOutOfBounds) => {
-            println!("out-of-range column rejected: IndexOutOfBounds")
+            println!("out-of-range column rejected: IndexOutOfBounds");
         }
         Err(e) => panic!("unexpected error: {e:?}"),
         Ok(_) => panic!("malformed CSR validated"),

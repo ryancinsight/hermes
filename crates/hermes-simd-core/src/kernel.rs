@@ -275,7 +275,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     /// Default: scalar-emulated merge via `kernel_helpers::generic_masked_store`.
     /// Backends with a native masked store override this.
     unsafe fn masked_store_unaligned(ptr: *mut T, mask: Self::Mask, val: Self::Vector) {
-        crate::kernel_helpers::generic_masked_store::<T, Self>(ptr, mask, val)
+        crate::kernel_helpers::generic_masked_store::<T, Self>(ptr, mask, val);
     }
 
     // -------------------------------------------------------------------------

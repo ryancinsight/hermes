@@ -44,9 +44,9 @@ where
                 if crate::align::is_aligned_for_arch::<Arch, Align>()
                     && (p as usize) % Align::ALIGN_BYTES == 0
                 {
-                    Arch::store_aligned(p, v)
+                    Arch::store_aligned(p, v);
                 } else {
-                    Arch::store_unaligned(p, v)
+                    Arch::store_unaligned(p, v);
                 }
             };
             for i in (0..simd_len).step_by(lane_count) {
@@ -91,9 +91,9 @@ where
             };
             let store = |p: *mut T, v: Arch::Vector| {
                 if crate::align::is_aligned_for_arch::<Arch, Align>() {
-                    Arch::store_aligned(p, v)
+                    Arch::store_aligned(p, v);
                 } else {
-                    Arch::store_unaligned(p, v)
+                    Arch::store_unaligned(p, v);
                 }
             };
             for i in (0..simd_len).step_by(lane_count) {

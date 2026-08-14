@@ -48,7 +48,7 @@
   | 180 | `unreadable_literal` | bitboard/mask hex constants; check readability convention before sweeping |
   | **0** | `must_use_candidate` | **done** — 162 exact findings closed below |
   | **0** | `elidable_lifetime_names` | **done** — 131 explicit lifetime names elided mechanically; relationships with independent input lifetimes remain explicit |
-  | 92 | `semicolon_if_nothing_returned` | mechanical |
+  | **0** | `semicolon_if_nothing_returned` | **done** — 92 unit, example, benchmark, kernel, and AMX wrapper return statements now make their unit-value intent explicit |
   | **0** | `missing_errors_doc` | **done** — all 47 public `Result` APIs document their error contracts |
   | 63 | `cast_lossless` | prefer `From` over `as` where infallible |
   | 62 | `doc_markdown` | backticks |
@@ -125,6 +125,12 @@
   the change removes syntax without changing the borrow contract. The
   targeted Clippy audit is clean and the combined core/SIMD nextest suite
   passes 424/424.
+
+  **`semicolon_if_nothing_returned` burned down: 92 -> 0 (2026-08-14).**
+  Unit-valued kernel, AMX wrapper, example, and benchmark statements now use
+  explicit semicolons. This is a syntax-only cleanup; the affected provider
+  and intrinsic suites pass 454/454, and the benchmark-target smoke gate
+  completes successfully.
 
   **`ptr_as_ptr` burned down: 171 -> 0.** 167 sites converted mechanically by
   `cargo clippy --fix` restricted to that one lint; the remaining 4 were

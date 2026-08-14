@@ -46,7 +46,7 @@ pub(crate) unsafe fn build_index_vector<T: Scalar, Arch: SimdKernel<T>>(
             core::mem::size_of::<Arch::IndexVector>()
                 == Arch::LANE_COUNT * core::mem::size_of::<i32>(),
             "IndexVector size must equal LANE_COUNT * size_of::<i32>()"
-        )
+        );
     };
     assert!(
         cols.len() >= Arch::LANE_COUNT,

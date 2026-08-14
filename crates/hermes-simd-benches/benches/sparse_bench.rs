@@ -140,7 +140,7 @@ fn bench_csr_spmv(c: &mut Criterion) {
                 bench.iter(|| {
                     y.fill(0.0);
                     spmv_csr::<f32>(data.clone(), black_box(&x), black_box(&mut y));
-                })
+                });
             });
         }
     }
@@ -167,7 +167,7 @@ fn bench_sellp_spmv(c: &mut Criterion) {
                     bench.iter(|| {
                         y4.fill(0.0);
                         spmv_sellp::<f32, 4>(data4.clone(), black_box(&x), black_box(&mut y4));
-                    })
+                    });
                 },
             );
 
@@ -184,7 +184,7 @@ fn bench_sellp_spmv(c: &mut Criterion) {
                     bench.iter(|| {
                         y8.fill(0.0);
                         spmv_sellp::<f32, 8>(data8.clone(), black_box(&x), black_box(&mut y8));
-                    })
+                    });
                 },
             );
         }
@@ -212,7 +212,7 @@ fn bench_bcoo_spmv(c: &mut Criterion) {
                     bench.iter(|| {
                         y4.fill(0.0);
                         spmv_bcoo::<f32, 4, 4>(data4.clone(), black_box(&x), black_box(&mut y4));
-                    })
+                    });
                 },
             );
 
@@ -229,7 +229,7 @@ fn bench_bcoo_spmv(c: &mut Criterion) {
                     bench.iter(|| {
                         y8.fill(0.0);
                         spmv_bcoo::<f32, 8, 8>(data8.clone(), black_box(&x), black_box(&mut y8));
-                    })
+                    });
                 },
             );
         }
@@ -254,7 +254,7 @@ fn bench_dense_masked_spmv(c: &mut Criterion) {
                     bench.iter(|| {
                         y.fill(0.0);
                         spmv_dense_masked::<f32>(data.clone(), black_box(&x), black_box(&mut y));
-                    })
+                    });
                 },
             );
         }

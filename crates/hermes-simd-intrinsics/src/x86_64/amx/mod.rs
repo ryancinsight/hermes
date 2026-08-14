@@ -158,28 +158,28 @@ pub mod raw {
         {
             match tile {
                 0 => {
-                    core::arch::asm!("tileloadd tmm0, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags))
+                    core::arch::asm!("tileloadd tmm0, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags));
                 }
                 1 => {
-                    core::arch::asm!("tileloadd tmm1, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags))
+                    core::arch::asm!("tileloadd tmm1, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags));
                 }
                 2 => {
-                    core::arch::asm!("tileloadd tmm2, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags))
+                    core::arch::asm!("tileloadd tmm2, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags));
                 }
                 3 => {
-                    core::arch::asm!("tileloadd tmm3, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags))
+                    core::arch::asm!("tileloadd tmm3, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags));
                 }
                 4 => {
-                    core::arch::asm!("tileloadd tmm4, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags))
+                    core::arch::asm!("tileloadd tmm4, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags));
                 }
                 5 => {
-                    core::arch::asm!("tileloadd tmm5, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags))
+                    core::arch::asm!("tileloadd tmm5, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags));
                 }
                 6 => {
-                    core::arch::asm!("tileloadd tmm6, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags))
+                    core::arch::asm!("tileloadd tmm6, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags));
                 }
                 7 => {
-                    core::arch::asm!("tileloadd tmm7, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags))
+                    core::arch::asm!("tileloadd tmm7, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags));
                 }
                 _ => unreachable!("AMX tile index out of range (valid: tmm0-tmm7)"),
             }
@@ -205,28 +205,28 @@ pub mod raw {
         {
             match tile {
                 0 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm0", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags))
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm0", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags));
                 }
                 1 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm1", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags))
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm1", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags));
                 }
                 2 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm2", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags))
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm2", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags));
                 }
                 3 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm3", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags))
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm3", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags));
                 }
                 4 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm4", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags))
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm4", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags));
                 }
                 5 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm5", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags))
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm5", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags));
                 }
                 6 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm6", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags))
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm6", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags));
                 }
                 7 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm7", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags))
+                    core::arch::asm!("tilestored [{base} + {stride}], tmm7", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags));
                 }
                 _ => unreachable!("AMX tile index out of range (valid: tmm0-tmm7)"),
             }

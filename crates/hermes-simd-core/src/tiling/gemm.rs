@@ -351,7 +351,11 @@ where
                 // SAFETY: identical span to the masked load above; only the first
                 // `w` lanes are written.
                 unsafe {
-                    Arch::masked_store_unaligned(c.as_mut_ptr().add((r + i) * n + col), mask, *slot)
+                    Arch::masked_store_unaligned(
+                        c.as_mut_ptr().add((r + i) * n + col),
+                        mask,
+                        *slot,
+                    );
                 };
             }
             r += TILE_M;

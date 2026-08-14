@@ -33,7 +33,7 @@ fn bench_masked_sum(c: &mut Criterion) {
         let mask = make_mask(size, density);
         let label = format!("density_{:.0}pct", density * 100.0);
         group.bench_with_input(BenchmarkId::new("masked_sum", &label), &density, |b, _| {
-            b.iter(|| masked_sum::<f32>(&data, &mask))
+            b.iter(|| masked_sum::<f32>(&data, &mask));
         });
     }
     group.finish();
@@ -47,7 +47,7 @@ fn bench_masked_dot(c: &mut Criterion) {
     group.throughput(Throughput::Elements(size as u64));
 
     group.bench_function("dense_dot", |bencher| {
-        bencher.iter(|| dot::<f32>(&a, &b).unwrap())
+        bencher.iter(|| dot::<f32>(&a, &b).unwrap());
     });
 
     for density in [1.0f32, 0.5, 0.1, 0.01] {

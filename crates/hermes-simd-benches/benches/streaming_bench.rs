@@ -83,10 +83,10 @@ fn bench_streaming(c: &mut Criterion) {
     group.throughput(Throughput::Bytes((len * 4 * 3) as u64)); // 2 reads + 1 write
 
     group.bench_with_input(BenchmarkId::new("regular", len), &len, |bencher, _| {
-        bencher.iter(|| unsafe { add_regular(a.as_ptr(), b.as_ptr(), out.as_mut_ptr(), len) })
+        bencher.iter(|| unsafe { add_regular(a.as_ptr(), b.as_ptr(), out.as_mut_ptr(), len) });
     });
     group.bench_with_input(BenchmarkId::new("streaming", len), &len, |bencher, _| {
-        bencher.iter(|| unsafe { add_streaming(a.as_ptr(), b.as_ptr(), out.as_mut_ptr(), len) })
+        bencher.iter(|| unsafe { add_streaming(a.as_ptr(), b.as_ptr(), out.as_mut_ptr(), len) });
     });
     group.finish();
 }

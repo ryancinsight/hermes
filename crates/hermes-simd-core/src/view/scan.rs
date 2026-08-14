@@ -91,9 +91,9 @@ where
             };
             let store = |p: *mut T, v: Arch::Vector| {
                 if crate::align::is_aligned_for_arch::<Arch, Align>() {
-                    Arch::store_aligned(p, v)
+                    Arch::store_aligned(p, v);
                 } else {
-                    Arch::store_unaligned(p, v)
+                    Arch::store_unaligned(p, v);
                 }
             };
 
@@ -162,9 +162,9 @@ where
             };
             let store = |p: *mut T, v: Arch::Vector| {
                 if crate::align::is_aligned_for_arch::<Arch, Align>() {
-                    Arch::store_aligned(p, v)
+                    Arch::store_aligned(p, v);
                 } else {
-                    Arch::store_unaligned(p, v)
+                    Arch::store_unaligned(p, v);
                 }
             };
 

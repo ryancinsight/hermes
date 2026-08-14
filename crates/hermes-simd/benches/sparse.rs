@@ -62,8 +62,8 @@ fn bench_spmv_csr_f32(c: &mut Criterion) {
             bench.iter(|| {
                 // Reset output each iteration to get consistent results.
                 y.iter_mut().for_each(|v| *v = 0.0);
-                spmv_csr::<f32>(black_box(data.clone()), black_box(&x), black_box(&mut y))
-            })
+                spmv_csr::<f32>(black_box(data.clone()), black_box(&x), black_box(&mut y));
+            });
         });
     }
 

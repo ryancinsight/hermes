@@ -156,5 +156,5 @@ pub unsafe fn dispatch_tile_matmul<TA, TB, TC>(
 {
     <(TA, TB, TC) as TiledGemm<TA, TB, TC>>::dispatch_tile_matmul(
         c, c_stride, a, a_stride, b, b_stride,
-    )
+    );
 }

@@ -23,27 +23,27 @@ fn bench_tiled_dot(c: &mut Criterion) {
 
         // Baseline: standard runtime-dispatched dot product
         group.bench_with_input(BenchmarkId::new("dispatch", size), &size, |bencher, _| {
-            bencher.iter(|| dot::<f32>(&a, &b_vec).unwrap())
+            bencher.iter(|| dot::<f32>(&a, &b_vec).unwrap());
         });
 
         // TILE_M=1: degenerate single accumulator (same as a plain loop)
         group.bench_with_input(BenchmarkId::new("tile_1", size), &size, |bencher, _| {
-            bencher.iter(|| tiled_dot::<f32, Scalar, Unaligned, 1>(&view_a, &view_b).unwrap())
+            bencher.iter(|| tiled_dot::<f32, Scalar, Unaligned, 1>(&view_a, &view_b).unwrap());
         });
 
         // TILE_M=2
         group.bench_with_input(BenchmarkId::new("tile_2", size), &size, |bencher, _| {
-            bencher.iter(|| tiled_dot::<f32, Scalar, Unaligned, 2>(&view_a, &view_b).unwrap())
+            bencher.iter(|| tiled_dot::<f32, Scalar, Unaligned, 2>(&view_a, &view_b).unwrap());
         });
 
         // TILE_M=4: matches UNROLL_FACTOR for AVX2 (4 x 256-bit = 32 f32 lanes)
         group.bench_with_input(BenchmarkId::new("tile_4", size), &size, |bencher, _| {
-            bencher.iter(|| tiled_dot::<f32, Scalar, Unaligned, 4>(&view_a, &view_b).unwrap())
+            bencher.iter(|| tiled_dot::<f32, Scalar, Unaligned, 4>(&view_a, &view_b).unwrap());
         });
 
         // TILE_M=8: optimal for AVX-512 (8 x 512-bit = 128 f32 lanes)
         group.bench_with_input(BenchmarkId::new("tile_8", size), &size, |bencher, _| {
-            bencher.iter(|| tiled_dot::<f32, Scalar, Unaligned, 8>(&view_a, &view_b).unwrap())
+            bencher.iter(|| tiled_dot::<f32, Scalar, Unaligned, 8>(&view_a, &view_b).unwrap());
         });
     }
     group.finish();

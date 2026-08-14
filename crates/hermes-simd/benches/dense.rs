@@ -75,7 +75,7 @@ fn bench_sum_f32(c: &mut Criterion) {
         group.throughput(Throughput::Elements(n as u64));
         let data: Vec<f32> = (0..n).map(|i| i as f32).collect();
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
-            b.iter(|| sum(black_box(&data)))
+            b.iter(|| sum(black_box(&data)));
         });
     }
     group.finish();
@@ -88,7 +88,7 @@ fn bench_dot_f32(c: &mut Criterion) {
         let a: Vec<f32> = (0..n).map(|i| i as f32).collect();
         let b: Vec<f32> = (0..n).map(|i| (n - i) as f32).collect();
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |bench, _| {
-            bench.iter(|| dot(black_box(&a), black_box(&b)))
+            bench.iter(|| dot(black_box(&a), black_box(&b)));
         });
     }
     group.finish();
@@ -102,7 +102,7 @@ fn bench_elementwise_mul_f32(c: &mut Criterion) {
         let b: Vec<f32> = (0..n).map(|i| (n - i) as f32).collect();
         let mut out = vec![0.0f32; n];
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |bench, _| {
-            bench.iter(|| elementwise_mul(black_box(&a), black_box(&b), black_box(&mut out)))
+            bench.iter(|| elementwise_mul(black_box(&a), black_box(&b), black_box(&mut out)));
         });
     }
     group.finish();
@@ -125,7 +125,7 @@ fn bench_gemv_f32(c: &mut Criterion) {
                 gemv(black_box(&a), black_box(&x), black_box(&mut y), n, n)
                     .expect("invariant: benchmark extents are valid");
                 black_box(y)
-            })
+            });
         });
 
         group.bench_with_input(BenchmarkId::new("scalar_ref", n), &n, |bench, &n| {
@@ -140,7 +140,7 @@ fn bench_gemv_f32(c: &mut Criterion) {
                     y[r] = acc;
                 }
                 black_box(y)
-            })
+            });
         });
     }
     group.finish();
@@ -161,7 +161,7 @@ fn bench_gemv_transpose_f32(c: &mut Criterion) {
                 gemv_transpose(black_box(&a), black_box(&x), black_box(&mut y), n, n)
                     .expect("invariant: benchmark extents are valid");
                 black_box(y)
-            })
+            });
         });
 
         group.bench_with_input(BenchmarkId::new("scalar_ref", n), &n, |bench, &n| {
@@ -175,7 +175,7 @@ fn bench_gemv_transpose_f32(c: &mut Criterion) {
                     }
                 }
                 black_box(y)
-            })
+            });
         });
     }
     group.finish();
@@ -199,7 +199,7 @@ fn bench_gemv_strided_f32(c: &mut Criterion) {
                 gemv_strided(black_box(&a), black_box(&x), black_box(&mut y), n, n, lda)
                     .expect("invariant: benchmark extents are valid");
                 black_box(y)
-            })
+            });
         });
 
         group.bench_with_input(BenchmarkId::new("scalar_ref", n), &n, |bench, &n| {
@@ -214,7 +214,7 @@ fn bench_gemv_strided_f32(c: &mut Criterion) {
                     y[r] = acc;
                 }
                 black_box(y)
-            })
+            });
         });
     }
     group.finish();
@@ -240,7 +240,7 @@ fn bench_reflector_dots_f64(c: &mut Criterion) {
                     *wj = dot(black_box(&v), black_box(&cols[j * n..j * n + n])).unwrap();
                 }
                 black_box(w)
-            })
+            });
         });
 
         group.bench_with_input(BenchmarkId::new("gemv_strided", n), &n, |bench, &n| {
@@ -250,7 +250,7 @@ fn bench_reflector_dots_f64(c: &mut Criterion) {
                 gemv_strided(black_box(&cols), black_box(&v), black_box(&mut w), n, n, n)
                     .expect("invariant: extents valid");
                 black_box(w)
-            })
+            });
         });
     }
     group.finish();
@@ -265,7 +265,7 @@ fn bench_argmin_f32(c: &mut Criterion) {
         // must visit every element regardless, making this the honest cost.
         let data: Vec<f32> = (0..n).map(|i| (n - i) as f32).collect();
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
-            b.iter(|| argmin(black_box(&data)))
+            b.iter(|| argmin(black_box(&data)));
         });
     }
     group.finish();
@@ -288,34 +288,34 @@ fn bench_cow_f32(c: &mut Criterion) {
         let indices: Vec<i32> = (0..n as i32).rev().collect();
 
         group.bench_with_input(BenchmarkId::new("map_cow", n), &n, |b, _| {
-            b.iter(|| black_box(&cow).map_cow(Neg))
+            b.iter(|| black_box(&cow).map_cow(Neg));
         });
         group.bench_with_input(BenchmarkId::new("mul_scalar_cow", n), &n, |b, _| {
-            b.iter(|| black_box(&cow).mul_scalar_cow(black_box(1.5)))
+            b.iter(|| black_box(&cow).mul_scalar_cow(black_box(1.5)));
         });
         group.bench_with_input(BenchmarkId::new("splat_fill", n), &n, |b, &n| {
-            b.iter(|| BenchCow::splat_fill(black_box(0.25), n))
+            b.iter(|| BenchCow::splat_fill(black_box(0.25), n));
         });
         group.bench_with_input(BenchmarkId::new("fma_cow", n), &n, |b, _| {
             b.iter(|| {
                 black_box(&cow)
                     .fma_cow(black_box(&cow), black_box(&cow))
                     .expect("invariant: benchmark operands share a length")
-            })
+            });
         });
         group.bench_with_input(BenchmarkId::new("gather", n), &n, |b, _| {
             b.iter(|| {
                 black_box(&cow)
                     .gather(black_box(&indices))
                     .expect("invariant: benchmark indices are in range")
-            })
+            });
         });
         group.bench_with_input(BenchmarkId::new("prefix_scan", n), &n, |b, _| {
             b.iter(|| {
                 black_box(&cow)
                     .prefix_scan(ScanAdd, Inclusive)
                     .expect("invariant: output length equals input length")
-            })
+            });
         });
     }
     group.finish();

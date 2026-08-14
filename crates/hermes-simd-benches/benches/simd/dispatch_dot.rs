@@ -11,7 +11,7 @@ where
         let b = vec![b_value; size];
         group.throughput(Throughput::Elements(size as u64));
         group.bench_with_input(BenchmarkId::new("dispatch", size), &size, |bencher, _| {
-            bencher.iter(|| dispatch(black_box(&a), black_box(&b)))
+            bencher.iter(|| dispatch(black_box(&a), black_box(&b)));
         });
     }
     group.finish();
