@@ -280,9 +280,12 @@ where
 
 /// Dispatches a shared slice into the best matching `DispatchedView` based on runtime CPU feature detection.
 #[inline]
-#[expect(
-    unreachable_code,
-    reason = "Architecture-specific dispatch returns are cfg-selected before scalar fallback"
+#[cfg_attr(
+    target_arch = "aarch64",
+    expect(
+        unreachable_code,
+        reason = "Architecture-specific dispatch returns are cfg-selected before scalar fallback"
+    )
 )]
 pub fn dispatch_view<'a, T, Align>(
     data: &'a [T],
@@ -325,9 +328,12 @@ where
 
 /// Dispatches a mutable slice into the best matching `DispatchedView` based on runtime CPU feature detection.
 #[inline]
-#[expect(
-    unreachable_code,
-    reason = "Architecture-specific dispatch returns are cfg-selected before scalar fallback"
+#[cfg_attr(
+    target_arch = "aarch64",
+    expect(
+        unreachable_code,
+        reason = "Architecture-specific dispatch returns are cfg-selected before scalar fallback"
+    )
 )]
 pub fn dispatch_view_mut<'a, T, Align>(
     data: &'a mut [T],

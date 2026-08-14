@@ -87,6 +87,10 @@ fn replace_ident(stream: TokenStream, target: &Ident, replacement: &TokenStream)
     clippy::too_many_arguments,
     reason = "The dispatcher generator forwards the complete macro expansion inputs"
 )]
+#[expect(
+    clippy::too_many_lines,
+    reason = "The generator keeps target-specific helper and dispatch-arm construction together"
+)]
 fn generate_dispatcher(
     arch_cfg: &TokenStream,
     active_targets: &[DispatchTarget],
@@ -99,7 +103,7 @@ fn generate_dispatcher(
     other_param_tokens: &[TokenStream],
     call_args: &[TokenStream],
     arch_ident: &Ident,
-    original_where_clause: &Option<syn::WhereClause>,
+    original_where_clause: Option<&syn::WhereClause>,
 ) -> TokenStream {
     let mut helper_fns = Vec::new();
     let mut dispatch_arms = Vec::new();
@@ -205,7 +209,7 @@ fn generate_dispatcher(
                     return unsafe { #helper_name #helper_turbofish(#(#call_args),*) };
                 }
             },
-            _ => quote! {},
+            DispatchTarget::Scalar => quote! {},
         };
 
         dispatch_arms.push(quote! {
@@ -257,7 +261,6 @@ fn generate_dispatcher(
     }
 
     let non_arch_predicates: Vec<syn::WherePredicate> = original_where_clause
-        .as_ref()
         .map(|wc| {
             wc.predicates
                 .iter()
@@ -297,6 +300,10 @@ fn generate_dispatcher(
     }
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "The macro entry point coordinates parsing and three target dispatch expansions"
+)]
 pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
     // Parse target list from attribute args
     let targets: Vec<DispatchTarget> = {
@@ -427,7 +434,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
         &other_param_tokens,
         &call_args,
         arch_ident,
-        &inner_fn.sig.generics.where_clause,
+        inner_fn.sig.generics.where_clause.as_ref(),
     );
 
     let aarch64_dispatcher = generate_dispatcher(
@@ -442,7 +449,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
         &other_param_tokens,
         &call_args,
         arch_ident,
-        &inner_fn.sig.generics.where_clause,
+        inner_fn.sig.generics.where_clause.as_ref(),
     );
 
     let fallback_dispatcher = generate_dispatcher(
@@ -461,7 +468,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
         &other_param_tokens,
         &call_args,
         arch_ident,
-        &inner_fn.sig.generics.where_clause,
+        inner_fn.sig.generics.where_clause.as_ref(),
     );
 
     Ok(quote! {
