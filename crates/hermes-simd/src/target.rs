@@ -135,10 +135,6 @@ fn neon_supported() -> bool {
 /// Returns `None` when the target is not supported by the host or when the
 /// requested alignment typestate is not satisfied by `data`.
 #[inline]
-#[expect(
-    unreachable_code,
-    reason = "Explicit target arms are cfg-selected before the function's fallback path"
-)]
 pub fn dispatch_view_to<'a, T, Align>(
     target: TargetId,
     data: &'a [T],
@@ -204,10 +200,6 @@ where
 /// Returns `None` when the target is not supported by the host or when the
 /// requested alignment typestate is not satisfied by `data`.
 #[inline]
-#[expect(
-    unreachable_code,
-    reason = "Explicit target arms are cfg-selected before the function's fallback path"
-)]
 pub fn dispatch_view_mut_to<'a, T, Align>(
     target: TargetId,
     data: &'a mut [T],

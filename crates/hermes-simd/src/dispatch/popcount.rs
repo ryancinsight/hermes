@@ -15,10 +15,6 @@ use hermes_simd_core::{
 use hermes_simd_macros::runtime_dispatch;
 
 /// Dispatch population count reduction over a slice.
-#[expect(
-    missing_docs,
-    reason = "The public reduction operation is documented by its module contract"
-)]
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
 pub fn dispatch_reduce_popcount_kernel<T, A>(data: &[T]) -> usize
 where
@@ -32,10 +28,6 @@ where
 }
 
 /// Dispatch bitwise AND population count reduction over two slices.
-#[expect(
-    missing_docs,
-    reason = "The public reduction operation is documented by its module contract"
-)]
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
 pub fn dispatch_reduce_popcount_and_kernel<T, A>(a: &[T], b: &[T]) -> Result<usize, SimdError>
 where
@@ -52,10 +44,6 @@ where
 }
 
 /// Dispatch bitwise OR population count reduction over two slices.
-#[expect(
-    missing_docs,
-    reason = "The public reduction operation is documented by its module contract"
-)]
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
 pub fn dispatch_reduce_popcount_or_kernel<T, A>(a: &[T], b: &[T]) -> Result<usize, SimdError>
 where
@@ -72,10 +60,6 @@ where
 }
 
 /// Dispatch bitwise XOR population count reduction over two slices.
-#[expect(
-    missing_docs,
-    reason = "The public reduction operation is documented by its module contract"
-)]
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
 pub fn dispatch_reduce_popcount_xor_kernel<T, A>(a: &[T], b: &[T]) -> Result<usize, SimdError>
 where
