@@ -61,6 +61,10 @@ pub mod raw {
     use super::AmxConfig;
 
     /// Load tile configuration from memory.
+    ///
+    /// # Safety
+    /// The current thread must have AMX tile permission, and `config` must be
+    /// a valid, 64-byte-aligned `TILECFG` value for the executing processor.
     #[inline(always)]
     pub unsafe fn ldtilecfg(config: &AmxConfig) {
         let _ = config;
@@ -75,6 +79,11 @@ pub mod raw {
     }
 
     /// Store tile configuration to memory.
+    ///
+    /// # Safety
+    /// The current thread must have AMX tile permission, and `config` must be
+    /// valid writable, 64-byte-aligned storage for the processor's `TILECFG`
+    /// representation.
     #[inline(always)]
     pub unsafe fn sttilecfg(config: &mut AmxConfig) {
         let _ = config;
@@ -89,6 +98,11 @@ pub mod raw {
     }
 
     /// Release AMX tile configuration (returns tile state to initialized).
+    ///
+    /// # Safety
+    /// The current thread must have AMX tile permission. The caller must not
+    /// use the tile registers after this call until a valid configuration is
+    /// loaded again.
     #[inline(always)]
     pub unsafe fn tilerelease() {
         #[cfg(all(target_arch = "x86_64", not(miri)))]
@@ -98,6 +112,10 @@ pub mod raw {
     }
 
     /// Zero out a tile register.
+    ///
+    /// # Safety
+    /// The current thread must have an active AMX tile configuration, and
+    /// `tile` must be in the range `0..8`.
     #[inline(always)]
     pub unsafe fn tilezero(tile: u8) {
         #[cfg(miri)]
@@ -122,6 +140,13 @@ pub mod raw {
     }
 
     /// Load 2D data from memory into a tile register.
+    ///
+    /// # Safety
+    /// The current thread must have an active AMX tile configuration, and
+    /// `tile` must be in the range `0..8`. `base` and `stride` must describe
+    /// readable rows whose lengths and spacing satisfy the loaded tile's
+    /// configured shape; every address accessed by the instruction must be
+    /// valid for the duration of the call.
     #[inline(always)]
     pub unsafe fn tileloadd(tile: u8, base: *const core::ffi::c_void, stride: isize) {
         #[cfg(miri)]
@@ -162,6 +187,13 @@ pub mod raw {
     }
 
     /// Store 2D data from a tile register into memory.
+    ///
+    /// # Safety
+    /// The current thread must have an active AMX tile configuration, and
+    /// `tile` must be in the range `0..8`. `base` and `stride` must describe
+    /// writable rows whose lengths and spacing satisfy the stored tile's
+    /// configured shape; every address accessed by the instruction must be
+    /// valid for the duration of the call.
     #[inline(always)]
     pub unsafe fn tilestored(tile: u8, base: *mut core::ffi::c_void, stride: isize) {
         #[cfg(miri)]
@@ -202,6 +234,12 @@ pub mod raw {
     }
 
     /// Compute F32 dot product of BF16 elements: dst += src1 * src2
+    ///
+    /// # Safety
+    /// The current thread must have an active AMX tile configuration, and
+    /// `dst`, `src1`, and `src2` must be tile indices in the range `0..8` with
+    /// configured shapes and BF16 dot-product layout accepted by
+    /// `TDPBF16PS`. The destination tile must be initialized for accumulation.
     #[inline(always)]
     pub unsafe fn tdpbf16ps(dst: u8, src1: u8, src2: u8) {
         #[cfg(miri)]
@@ -262,6 +300,12 @@ pub mod raw {
     }
 
     /// Compute INT32 dot product of INT8 elements: dst += src1 * src2
+    ///
+    /// # Safety
+    /// The current thread must have an active AMX tile configuration, and
+    /// `dst`, `src1`, and `src2` must be tile indices in the range `0..8` with
+    /// configured shapes and INT8 VNNI dot-product layout accepted by
+    /// `TDPBSSD`. The destination tile must be initialized for accumulation.
     #[inline(always)]
     pub unsafe fn tdpbssd(dst: u8, src1: u8, src2: u8) {
         #[cfg(miri)]

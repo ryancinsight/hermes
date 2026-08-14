@@ -58,7 +58,7 @@
   | 19 | `missing_panics_doc` | required by the documentation standard |
   | 13 | `ref_as_ptr` | `core::ptr::from_ref`; same family as the finished item |
   | 9 | `ptr_cast_constness` | `.cast_const()`/`.cast_mut()`; same family |
-  | 8 | `missing_safety_doc` | the sites HS-434 unhid; safety-bearing |
+  | **0** | `missing_safety_doc` | **done** — AMX raw preconditions documented below |
 
   Sequence: the doc sections and `must_use` next (contract-bearing), then
   `cast_ptr_alignment` reviewed individually rather than swept, cosmetics last.
@@ -673,14 +673,14 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   `unreachable!()` in `amx/mod.rs`, all call sites converted, and a measured
   before/after on AMX silicon.
 
-- [ ] [patch] **HS-435 — `# Safety` sections for the AMX raw wrappers.**
+- [x] [patch] **HS-435 — `# Safety` sections for the AMX raw wrappers.**
   The eight `pub unsafe fn`s in `amx/mod.rs`'s `raw` module carry `///`
-  summaries but no `# Safety` section, so `clippy::missing_safety_doc` fires on
-  each. Their real preconditions are now stated (an `AmxSession` must be
-  active, hence the tile configuration loaded, and `probe::has_amx_tile()` must
-  hold), plus the pointer/stride validity and 64-byte alignment obligations for
-  the load/store pair. Pre-existing, and unrelated to the probe; folding it in
-  would have collided with the in-flight lint-floor ratchet.
+  summaries but no `# Safety` section, so `clippy::missing_safety_doc` fired on
+  each. The wrappers now state their real preconditions: AMX permission and an
+  active tile configuration, valid tile indices and configured operand shapes,
+  valid pointer/stride ranges for tile loads and stores, and 64-byte-aligned
+  `TILECFG` storage. The targeted safety-doc lint is clean and intrinsics
+  nextest passes 30/30.
 
 ## Delivered (2026-06-11)
 
