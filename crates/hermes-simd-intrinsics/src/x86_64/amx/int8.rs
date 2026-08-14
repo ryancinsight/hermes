@@ -13,7 +13,16 @@ macro_rules! impl_tile_matmul_int8 {
                 b: *const $t_in,
                 b_stride: usize,
             ) {
-                let is_configured = super::ACTIVE_CONFIG.with(|f| f.get().is_some());
+                let is_configured = {
+                    #[cfg(feature = "std")]
+                    {
+                        super::ACTIVE_CONFIG.with(|f| f.get().is_some())
+                    }
+                    #[cfg(not(feature = "std"))]
+                    {
+                        false
+                    }
+                };
 
                 if !is_configured {
                     let config = AmxConfig::new_uniform(16, 64);

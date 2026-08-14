@@ -12,7 +12,7 @@
 //!
 //! | Feature | Description |
 //! |---------|-------------|
-//! | `std` (default) | Runtime CPU feature detection (`is_x86_feature_detected!`); without it dispatch uses compile-time `cfg!(target_feature)` only |
+//! | `std` (default) | Runtime CPU feature detection (`is_x86_feature_detected!`) and thread-local AMX session state; without it dispatch uses compile-time `cfg!(target_feature)` and AMX sessions reject safely |
 //! | `mnemosyne-memory` (default) | Route `AlignedVec` allocation through the mnemosyne allocator |
 //! | `libnuma` | Linux NUMA affinity and residency probes via libnuma (links `-lnuma`); allocation still routes through Mnemosyne/the configured allocator |
 //!

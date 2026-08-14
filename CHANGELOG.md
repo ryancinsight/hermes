@@ -6,6 +6,11 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Fixed
 
+- [patch] The AMX-to-AVX-512 NUMA locality downgrade is emitted as a
+  structured `tracing` warning in every build, including release builds,
+  instead of a debug-only stderr message. The event carries the NUMA node,
+  source and destination backends, and the remote-memory reason.
+
 - [patch] The `codegen` binary propagates its file-I/O failures instead of
   panicking through four `unwrap()`s, and carries the crate documentation it
   previously lacked.

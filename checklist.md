@@ -1,5 +1,19 @@
 # Checklist — active sprint
 
+## HS-433 [patch] — structured AMX downgrade event
+
+- [x] Replace the debug-only stderr diagnostic with one release-visible
+      subscriber-owned `tracing` event carrying the routing fields.
+- [x] Keep the facade no-std-capable with `tracing` default features disabled;
+      enable `tracing/std` only through the facade's existing `std` feature.
+- [x] Remove the unsound no-std global `Cell`/`Sync` substitute and make
+      no-std AMX sessions reject safely.
+- [x] Add ADR 012, changelog coverage, and a subscriber-backed value-semantic
+      event test.
+- [ ] Run the merged provider hosted gate and full Hermes package verification;
+      local all-target Clippy was attempted but exceeded the shared build
+      contention window before collection.
+
 ## HS-432 [patch] — push benchmark-budget coverage
 
 - [x] Run the benchmark-budget job on push, pull request, and manual dispatch.

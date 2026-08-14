@@ -73,7 +73,11 @@ pub fn widen_i8_to_i16(src: &[i8], dest: &mut [i16]) {
         // AVX-512F. `TargetId::Avx512` only detects `avx512f`, so gating on it
         // would `#UD` on an AVX-512F-without-BW part (e.g. Knights Landing). Detect
         // `avx512bw` (which implies `avx512f` on every real CPU) directly.
-        if std::is_x86_feature_detected!("avx512bw") {
+        #[cfg(feature = "std")]
+        let avx512bw = std::is_x86_feature_detected!("avx512bw");
+        #[cfg(not(feature = "std"))]
+        let avx512bw = cfg!(target_feature = "avx512bw");
+        if avx512bw {
             while i + 32 <= len {
                 unsafe {
                     #[expect(
