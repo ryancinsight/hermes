@@ -88,9 +88,10 @@ allow_attributes = "deny"
 # Classes with few enough sites to fix outright were fixed, not listed:
 # manual_div_ceil (1 site, an overflowing `(n + C - 1) / C` replaced by
 # `div_ceil`), new_without_default (1 site, the hand-rolled `OnceLock`), and
-# missing_const_for_thread_local (SESSION_DEPTH given the `const {}` initialiser
-# its sibling already had). let_unit_value, unit_arg and manual_memcpy were
-# measured at zero sites and dropped as dead allows.
+# missing_const_for_thread_local is satisfied by the `const {}` initialisers;
+# Windows Clippy 1.97 still reports a false positive, so the three affected
+# sites carry Windows-only expectations. let_unit_value, unit_arg and
+# manual_memcpy were measured at zero sites and dropped as dead allows.
 #
 # A SIMD kernel library is built from lane-index and mask arithmetic that
 # crosses width boundaries by construction (usize lane counts into i32 gather
