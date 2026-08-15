@@ -504,3 +504,7 @@
 - [x] [minor] Sub-byte sign-extension and unpacking/widening SIMD primitives for `Bf4`/`F4`/`I8` (from [gap_audit](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17)).
 - [x] [arch] Per-type x86 kernel dedup ADR (P3).
 - [x] [arch] x86 kernel dedup generator script.
+- [x] [minor] HS-437 lane-buffer audit: release assembly for Scalar f64,
+      emulated `SveArch` f64, and AArch64 NEON f64 shows no stack frame in the
+      default `interleave` path; the proposed typed `LaneBuffer` refactor is
+      not justified by codegen evidence.

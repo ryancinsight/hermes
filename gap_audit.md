@@ -4,6 +4,21 @@ Persistent gap register. Evidence tiers follow the repository instruction
 hierarchy: machine-checked proof > type-level invariant > property/fuzz >
 differential/empirical > source audit.
 
+## HS-437 closure — default lane scratch frame measurement
+
+The proposed `LaneBuffer` refactor is closed without a source change. The
+measurement harness instantiated the default `BackendKernel::interleave` path
+for Scalar f64 and emulated `SveArch` f64 on x86-64, then compiled the same
+wrapper for AArch64 NEON f64. Release assembly showed no stack allocation in
+any wrapper: x86-64 emitted register moves/instructions directly, while the
+AArch64 NEON wrapper emitted `zip1`, `zip2`, and `stp` directly. The AArch64
+compile emitted assembly before the Windows-host linker rejected the foreign
+`--eh-frame-hdr` option, so this is code-generation evidence only and makes no
+cross-target execution claim. The over-sized source arrays are therefore not
+observable stack waste in the measured default path; `MAX_SIMD_LANES` remains
+the compile-time overflow bound and no typed-buffer abstraction is added on
+principle alone.
+
 ## HS-433 closure — structured AMX downgrade event
 
 The release-only observability gap is closed. `AdaptiveDispatcher` emits one
