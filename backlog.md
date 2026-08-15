@@ -1138,6 +1138,13 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
 
 ## P3 — Architecture & maintenance <a id="p3"></a>
 
+- [x] [patch] (2026-08-15) Reduction hierarchy cleanup: moved the
+  multiplicative `Product` strategy from the 546-line reduction module into
+  `ops/reduction/product.rs`. The parent is now 442 lines with the same
+  sealed generic `ReductionOp` contract; `cargo check`, clippy, fmt, and
+  `hermes-simd` nextest (410/410) pass. See
+  [gap_audit.md#hermes-2026-08-15](gap_audit.md#hermes-2026-08-15).
+
 - [x] **[patch] x86 VNNI asm form** (delivered post-0.2.0): factor repeated
       `vpdpbssd` inline assembly into one internal instruction macro with
       explicit target-feature contract. The portable surface remains

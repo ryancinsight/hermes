@@ -4,8 +4,12 @@
 //! is updated and how the final scalar is extracted. All methods are `#[inline(always)]`
 //! and carry no branching — DCE eliminates unused strategies entirely.
 
-use crate::kernel::{SimdArith, SimdCompare, SimdLoadStore, SimdMask, SimdReduce, SimdStorage};
+use crate::kernel::{SimdArith, SimdCompare, SimdLoadStore, SimdMask, SimdReduce};
 use crate::scalar::Scalar;
+
+mod product;
+
+pub use product::Product;
 
 // ---------------------------------------------------------------------------
 // ReductionOp — single-operand fold across lanes
@@ -215,20 +219,6 @@ pub struct AbsSum;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AbsMax;
 
-/// Multiplicative reduction: computes `∏ data[i]`.
-///
-/// Identity element is `T::ONE`. Uses SIMD `mul` to accumulate lane products, then
-/// reduces horizontally via a scalar lane-extraction loop (no `prod_reduce` on
-/// operation-family reduction facet — the hardware does not expose one
-/// universally).
-///
-/// # Zero-Cost Guarantee
-///
-/// `size_of::<Product>() == 0`. All branching over `Product` vs other ops is
-/// eliminated via DCE during monomorphization.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Product;
-
 // ---------------------------------------------------------------------------
 // Sealing impls
 // ---------------------------------------------------------------------------
@@ -239,7 +229,6 @@ impl crate::private::Sealed for Min {}
 impl crate::private::Sealed for Max {}
 impl crate::private::Sealed for AbsSum {}
 impl crate::private::Sealed for AbsMax {}
-impl crate::private::Sealed for Product {}
 
 // ---------------------------------------------------------------------------
 // ReductionOp impls
@@ -487,59 +476,5 @@ impl<T: Scalar> ReductionOp<T> for AbsMax {
         b: Arch::Vector,
     ) -> Arch::Vector {
         Arch::max(a, b)
-    }
-}
-
-impl<T: Scalar> ReductionOp<T> for Product {
-    /// Accumulate: `acc = acc * v` (lane-wise multiply).
-    ///
-    /// # Safety
-    /// Processor must support the target feature of `Arch`.
-    #[inline(always)]
-    unsafe fn accumulate<
-        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
-    >(
-        acc: Arch::Vector,
-        v: Arch::Vector,
-    ) -> Arch::Vector {
-        Arch::mul(acc, v)
-    }
-
-    /// Finalize: store the accumulated product vector and reduce over lanes.
-    ///
-    /// There is no universal `prod_reduce` intrinsic, so this falls back to:
-    /// 1. Store the `LANE_COUNT` partial products into a local stack array.
-    /// 2. Scalar-fold with `*`.
-    ///
-    /// For Scalar arch this is always a single-element store + identity.
-    ///
-    /// # Safety
-    /// Processor must support the target feature of `Arch`.
-    #[inline(always)]
-    unsafe fn finalize<
-        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
-    >(
-        acc: Arch::Vector,
-    ) -> T {
-        // Compile-time bound (per backend) against the shared scalar-fallback
-        // buffer SSOT, replacing a debug-only runtime assert.
-        const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
-        let mut buf = [T::ZERO; crate::kernel::MAX_SIMD_LANES];
-        Arch::store_unaligned(buf.as_mut_ptr(), acc);
-        let mut result = T::ONE;
-        for i in 0..Arch::LANE_COUNT {
-            result = result * buf[i];
-        }
-        result
-    }
-
-    #[inline(always)]
-    fn identity_scalar() -> T {
-        T::ONE
-    }
-
-    #[inline(always)]
-    fn scalar_combine(a: T, b: T) -> T {
-        a * b
     }
 }

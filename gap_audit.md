@@ -1052,6 +1052,21 @@ Resolved this sprint:
   the aarch64 CI runner** (no local aarch64 target), though the new intrinsics are
   the same ones already used by the NEON `sqrt`/`div`/`splat` primitives.
 
+## Hermes audit 2026-08-15 <a id="hermes-2026-08-15"></a>
+
+- [patch] The exact integrated provider head `7343402a` had 23 source files
+  over the 500-line hierarchy target; comparison with the preceding Atlas
+  pointer showed this was stale conformance state, not a new regression. The
+  546-line `ops/reduction.rs` mixed the reduction contract with the
+  multiplicative strategy. Moved `Product` and its sealed generic
+  `ReductionOp` implementation into the dedicated
+  `ops/reduction/product.rs` leaf. The parent is now 442 lines, the new leaf
+  is 60 lines, and the public export remains unchanged. Evidence: structural
+  line-count audit plus provider `cargo fmt --check`, `cargo check`, clippy
+  with `-D warnings`, and `cargo nextest run -p hermes-simd --all-features`
+  (410/410 passed). This is a hierarchy/ownership cleanup; no performance
+  claim is made without a controlled benchmark.
+
 ## Residual Risks
 
 - AVX-512 and AMX runtime validation still depends on matching hardware.
