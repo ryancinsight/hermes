@@ -1,6 +1,6 @@
 //! Hardware intrinsics and backend-specific implementations of SIMD kernels.
 //!
-//! This crate provides concrete [`SimdKernel`](hermes_simd_core::kernel::SimdKernel)
+//! This crate provides concrete [`BackendKernel`](hermes_simd_core::kernel::BackendKernel)
 //! implementations for every
 //! supported architecture marker:
 //!
@@ -38,7 +38,7 @@ extern crate alloc;
 
 use hermes_simd_core::arch::SimdArch;
 
-/// Implements `SimdKernel<$t>` for `$arch` as a lane-emulated `[T; N]` backend.
+/// Implements `BackendKernel<$t>` for `$arch` as a lane-emulated `[T; N]` backend.
 ///
 /// Used for the `Scalar` marker and for `(type, arch)` pairs without native
 /// register support; each method is a per-lane loop the optimizer is free to
@@ -47,7 +47,7 @@ use hermes_simd_core::arch::SimdArch;
 macro_rules! impl_emulated_kernel {
     ($arch:ty, $t:ty, $lanes:expr, $cfg:meta) => {
         #[$cfg]
-        impl hermes_simd_core::kernel::SimdKernel<$t> for $arch {
+        impl hermes_simd_core::kernel::BackendKernel<$t> for $arch {
             type Vector = [$t; $lanes];
             type Mask = [bool; $lanes];
             type IndexVector = [i32; $lanes];
@@ -115,7 +115,7 @@ macro_rules! impl_emulated_kernel {
 
             // masked_load_unaligned / masked_store_unaligned / masked_add /
             // masked_mul / masked_fmadd / masked_sum_reduce are inherited from the
-            // `SimdKernel` scalar-emulated defaults (blend / generic_masked_*),
+            // `BackendKernel` scalar-emulated defaults (blend / generic_masked_*),
             // which are bit-identical to the per-element loops they replaced.
 
             #[inline(always)]

@@ -49,7 +49,14 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 
 [workspace.lints.clippy]
 # `priority = -1` lets the individual entries below override the group.
-pedantic = { level = "warn", priority = -1 }
+#
+# Denied, not warned: the committed gate runs `-D warnings`, so a pedantic hit
+# already fails CI, but at `warn` a bare local `cargo clippy` reports it as
+# advisory. `deny` makes the floor identical in both. A full
+# `cargo clippy --workspace --all-targets` census (with and without
+# `--all-features`) measured 0 hits outside the curated allows below, so every
+# class not listed here is a hard error.
+pedantic = { level = "deny", priority = -1 }
 
 # Safety and hygiene floor.
 #
@@ -64,31 +71,48 @@ pedantic = { level = "warn", priority = -1 }
 dbg_macro = "deny"
 # Mechanizes the `#[allow]` -> `#[expect]` migration: `expect` self-expires when
 # the underlying finding is fixed, so stale suppressions cannot accumulate.
-allow_attributes = "warn"
+# Denied for the same reason as the pedantic group: `-D warnings` already makes
+# it fatal in CI, and `deny` makes a bare local run agree.
+allow_attributes = "deny"
 
 # Curated allows. Each entry is a pedantic lint whose signal is negative *for
-# this domain*; the set is reviewed like code, not grown on convenience.
+# this domain*; the set is reviewed like code, not grown on convenience. Every
+# class NOT listed is a hard error.
+#
+# Counts are `cargo clippy --workspace --all-targets --all-features` hits when
+# the floor was promoted to `deny`, measured by re-enabling each allow on the
+# command line; production excludes `#[cfg(test)]` modules and the test, bench
+# and example crates. Burn a class down to zero, then delete its line -- the
+# floor tightens, never loosens.
+#
+# Classes with few enough sites to fix outright were fixed, not listed:
+# manual_div_ceil (1 site, an overflowing `(n + C - 1) / C` replaced by
+# `div_ceil`), new_without_default (1 site, the hand-rolled `OnceLock`), and
+# missing_const_for_thread_local is satisfied by the `const {}` initialisers;
+# Windows Clippy 1.97 still reports a false positive, so the three affected
+# sites carry Windows-only expectations. let_unit_value, unit_arg and
+# manual_memcpy were measured at zero sites and dropped as dead allows.
 #
 # A SIMD kernel library is built from lane-index and mask arithmetic that
 # crosses width boundaries by construction (usize lane counts into i32 gather
 # indices, element counts into byte offsets). These four fire on essentially
 # every such expression, and the real defenses are the `checked_*` dimension
 # arithmetic and `overflow-checks` in dev/test, not a cast-site lint.
-cast_possible_truncation = "allow"
-cast_possible_wrap = "allow"
-cast_precision_loss = "allow"
-cast_sign_loss = "allow"
+cast_possible_wrap = "allow"           # 228 (178 prod)
+cast_precision_loss = "allow"          # 233 (6 prod)
+cast_possible_truncation = "allow"     # 124 (50 prod)
+cast_sign_loss = "allow"               # 104 (87 prod)
 # `#[inline(always)]` is load-bearing here, not a habit: the whole zero-cost
 # claim rests on kernel bodies inlining into their dispatch sites.
-inline_always = "allow"
+inline_always = "allow"                # 606 (606 prod)
 # Vector code names operands in conventional pairs (`a`/`b`, `lo`/`hi`,
 # `re`/`im`) and math kernels index with `i`/`j`/`k`/`m`/`n`. Renaming these to
 # satisfy a lint would make the kernels harder to check against their formulae.
-similar_names = "allow"
-many_single_char_names = "allow"
+similar_names = "allow"                # 63 (50 prod)
+many_single_char_names = "allow"       # 29 (18 prod)
 # `hermes_simd_core::simd::SimdView` and friends: the repetition is the domain
 # vocabulary and removing it would degrade the public API names.
-module_name_repetitions = "allow"
+module_name_repetitions = "allow"      # 89 (88 prod)
 
 # Consolidated from the three per-crate `#![allow(..)]` blocks that previously
 # stated overlapping policy in hermes-simd, -core, and -intrinsics. Kept because
@@ -98,30 +122,16 @@ module_name_repetitions = "allow"
 # Lane loops index several parallel buffers at once (`buf_a[i]`, `buf_b[i]`,
 # `out[i]`), which is precisely the shape `needless_range_loop` rewrites into
 # an unreadable zip chain.
-needless_range_loop = "allow"
+needless_range_loop = "allow"          # 61 (58 prod)
 # `a[i] = a[i] + b[i]` mirrors the fused-multiply-add formulae the kernels
 # implement; collapsing to `+=` obscures the correspondence.
-assign_op_pattern = "allow"
-# The scalar reference paths deliberately spell out element copies so they can
-# be read against the vector path they verify.
-manual_memcpy = "allow"
+assign_op_pattern = "allow"            # 7 (7 prod)
 # Kernel entry points genuinely take many operands (pointers, strides, lane
 # counts, masks); bundling them into structs would add an indirection the
 # zero-cost contract does not permit.
-too_many_arguments = "allow"
-# `const { LANE_BOUND_CHECK }` and `#[target_feature]` shims legitimately bind
-# and pass `()`.
-let_unit_value = "allow"
-unit_arg = "allow"
+too_many_arguments = "allow"           # 9 (9 prod)
 # Written in the form the surrounding lane arithmetic uses.
-manual_div_ceil = "allow"
-manual_is_multiple_of = "allow"
-# ZST architecture markers are unit structs; a `Default` impl would imply they
-# carry state.
-new_without_default = "allow"
-# The dispatch cache's thread-local cannot be `const`-initialised on the pinned
-# toolchain.
-missing_const_for_thread_local = "allow"
+manual_is_multiple_of = "allow"        # 24 (24 prod)
 
 [workspace.dependencies]
 mnemosyne = { package = "mnemosyne-memory", git = "https://github.com/ryancinsight/Mnemosyne.git", version = "0.7.0", default-features = false }

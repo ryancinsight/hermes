@@ -66,7 +66,7 @@ fn safe_aligned_load_and_store_reject_unaligned_slices() {
         .map(|offset| &input[offset..offset + 4])
         .find(|slice| {
             !(slice.as_ptr() as usize)
-                .is_multiple_of(<Scalar as hermes_simd::SimdKernel<f32>>::LANE_COUNT * 4)
+                .is_multiple_of(<Scalar as hermes_simd::SimdStorage<f32>>::LANE_COUNT * 4)
         })
         .expect("at least one f32 subslice offset is unaligned to the scalar vector width");
 
@@ -80,7 +80,7 @@ fn safe_aligned_load_and_store_reject_unaligned_slices() {
     let unaligned_offset = (0..=4)
         .find(|&offset| {
             !(output[offset..].as_ptr() as usize)
-                .is_multiple_of(<Scalar as hermes_simd::SimdKernel<f32>>::LANE_COUNT * 4)
+                .is_multiple_of(<Scalar as hermes_simd::SimdStorage<f32>>::LANE_COUNT * 4)
         })
         .expect("at least one f32 mutable subslice offset is unaligned to the scalar vector width");
 

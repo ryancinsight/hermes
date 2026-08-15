@@ -2,7 +2,7 @@
 
 Hardware intrinsics and backend-specific kernel implementations for
 [Hermes](https://github.com/ryancinsight/hermes), the Atlas CPU SIMD substrate.
-This crate provides the concrete `SimdKernel<T>` implementations that
+This crate provides the concrete sealed backend-kernel implementations that
 `hermes-simd-core` declares; most consumers depend on the `hermes-simd` facade
 rather than on this crate directly.
 

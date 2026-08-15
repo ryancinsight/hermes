@@ -11,7 +11,7 @@
 //! otherwise) and sized well past L3 so the effect is visible.
 //!
 //! Not a regression gate — a one-shot experiment. If NT wins materially the
-//! result justifies a `SimdKernel::store_streaming` seam + a size-gated path in
+//! result justifies a `SimdLoadStore::store_streaming` seam + a size-gated path in
 //! the elementwise kernels; if not, it is a recorded negative result.
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]

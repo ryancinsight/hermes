@@ -1,10 +1,10 @@
-use crate::kernel::{SimdKernel, MAX_SIMD_LANES};
+use crate::kernel::{BackendKernel, MAX_SIMD_LANES};
 use crate::scalar::Scalar;
 
 /// Generic merge-masked load default: active lanes (per `mask`) are loaded from
 /// `ptr`; inactive lanes keep their value from `src`.
 ///
-/// Backends with a native masked load override [`SimdKernel::masked_load_unaligned`];
+/// Backends with a native masked load override [`BackendKernel::masked_load_unaligned`];
 /// new backends/types inherit this scalar-emulated default for free. The bitmask
 /// shift bounds it to `LANE_COUNT <= MAX_SIMD_LANES`, checked at compile time.
 ///
@@ -18,9 +18,9 @@ pub unsafe fn generic_masked_load<T, Arch>(
 ) -> Arch::Vector
 where
     T: Scalar,
-    Arch: SimdKernel<T>,
+    Arch: BackendKernel<T>,
 {
-    const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+    const { <Arch as BackendKernel<T>>::LANE_BOUND_CHECK };
     let bm = Arch::mask_to_bitmask(mask);
     let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
     // Seed every lane from `src`, then overwrite the active lanes from memory.
@@ -36,7 +36,7 @@ where
 /// Generic merge-masked store default: active lanes (per `mask`) of `val` are
 /// written to `ptr`; inactive lanes of `ptr` are left unchanged.
 ///
-/// Backends with a native masked store override [`SimdKernel::masked_store_unaligned`].
+/// Backends with a native masked store override [`BackendKernel::masked_store_unaligned`].
 ///
 /// # Safety
 /// `ptr` must be valid for writing the active lanes' elements of `T`.
@@ -44,9 +44,9 @@ where
 pub unsafe fn generic_masked_store<T, Arch>(ptr: *mut T, mask: Arch::Mask, val: Arch::Vector)
 where
     T: Scalar,
-    Arch: SimdKernel<T>,
+    Arch: BackendKernel<T>,
 {
-    const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+    const { <Arch as BackendKernel<T>>::LANE_BOUND_CHECK };
     let bm = Arch::mask_to_bitmask(mask);
     let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
     Arch::store_unaligned(buf.as_mut_ptr().cast::<T>(), val);
@@ -60,9 +60,9 @@ where
 /// Generic indexed-store (scatter) default: lane `i` of `val` is written to
 /// `base + indices[i]`, for the lanes selected by `bitmask`.
 ///
-/// This is the write-side dual of [`SimdKernel::gather`]. Backends with a native
+/// This is the write-side dual of [`BackendKernel::gather`]. Backends with a native
 /// scatter instruction (AVX-512 `vscatterdps`/`vscatterdpd`) override
-/// [`SimdKernel::scatter`] and [`SimdKernel::scatter_masked`]; every other
+/// [`BackendKernel::scatter`] and [`BackendKernel::scatter_masked`]; every other
 /// backend inherits this lane-sequential default, since neither AVX2 nor NEON
 /// has a scatter instruction to dispatch to.
 ///
@@ -83,16 +83,16 @@ unsafe fn generic_scatter_bitmask<T, Arch>(
     bitmask: u64,
 ) where
     T: Scalar,
-    Arch: SimdKernel<T>,
+    Arch: BackendKernel<T>,
 {
-    const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+    const { <Arch as BackendKernel<T>>::LANE_BOUND_CHECK };
     // Compile-time guard binding the soundness condition the SAFETY note relies
     // on: a backend whose `IndexVector` is not `LANE_COUNT` packed `i32`s fails
     // to build rather than reading uninitialized index lanes below.
     const {
         assert!(
             core::mem::size_of::<Arch::IndexVector>()
-                == <Arch as SimdKernel<T>>::LANE_COUNT * core::mem::size_of::<i32>(),
+                == <Arch as BackendKernel<T>>::LANE_COUNT * core::mem::size_of::<i32>(),
             "IndexVector size must equal LANE_COUNT * size_of::<i32>()"
         );
     };
@@ -121,7 +121,7 @@ unsafe fn generic_scatter_bitmask<T, Arch>(
 pub unsafe fn generic_scatter<T, Arch>(base: *mut T, indices: Arch::IndexVector, val: Arch::Vector)
 where
     T: Scalar,
-    Arch: SimdKernel<T>,
+    Arch: BackendKernel<T>,
 {
     let all_active = if Arch::LANE_COUNT >= u64::BITS as usize {
         u64::MAX
@@ -144,7 +144,7 @@ pub unsafe fn generic_scatter_masked<T, Arch>(
     val: Arch::Vector,
 ) where
     T: Scalar,
-    Arch: SimdKernel<T>,
+    Arch: BackendKernel<T>,
 {
     let bitmask = Arch::mask_to_bitmask(mask);
     generic_scatter_bitmask::<T, Arch>(base, indices, val, bitmask);
@@ -158,10 +158,10 @@ pub unsafe fn generic_binary_op<T, Arch, F>(
 ) -> Arch::Vector
 where
     T: Scalar,
-    Arch: SimdKernel<T>,
+    Arch: BackendKernel<T>,
     F: FnMut(T, T) -> T,
 {
-    const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+    const { <Arch as BackendKernel<T>>::LANE_BOUND_CHECK };
     let mut buf_a = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
     let mut buf_b = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
     Arch::store_unaligned(buf_a.as_mut_ptr().cast::<T>(), a);
@@ -178,10 +178,10 @@ where
 pub unsafe fn generic_unary_op<T, Arch, F>(a: Arch::Vector, mut op: F) -> Arch::Vector
 where
     T: Scalar,
-    Arch: SimdKernel<T>,
+    Arch: BackendKernel<T>,
     F: FnMut(T) -> T,
 {
-    const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+    const { <Arch as BackendKernel<T>>::LANE_BOUND_CHECK };
     let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
     Arch::store_unaligned(buf.as_mut_ptr().cast::<T>(), a);
     for i in 0..Arch::LANE_COUNT {
@@ -199,9 +199,9 @@ pub unsafe fn generic_blend<T, Arch>(
 ) -> Arch::Vector
 where
     T: Scalar,
-    Arch: SimdKernel<T>,
+    Arch: BackendKernel<T>,
 {
-    const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+    const { <Arch as BackendKernel<T>>::LANE_BOUND_CHECK };
     let mut buf_mask = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
     let mut buf_true = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
     let mut buf_false = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
@@ -225,13 +225,13 @@ where
 pub unsafe fn generic_mask_from_bitmask<T, Arch>(bm: u64) -> Arch::Mask
 where
     T: Scalar,
-    Arch: SimdKernel<T>,
+    Arch: BackendKernel<T>,
 {
     // The `u64` bitmask (`bm >> i` is defined only for `i < 64`) and the
     // `bools` buffer bound this default; both are covered by the shared
     // `MAX_SIMD_LANES <= 64` scalar-fallback SSOT, checked at compile time
     // per backend.
-    const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+    const { <Arch as BackendKernel<T>>::LANE_BOUND_CHECK };
     let mut bools = [false; MAX_SIMD_LANES];
     for i in 0..Arch::LANE_COUNT {
         bools[i] = (bm >> i) & 1 == 1;
@@ -252,9 +252,9 @@ pub unsafe fn generic_alternating_fma<T, Arch, const ADD_EVEN: bool>(
 ) -> Arch::Vector
 where
     T: Scalar,
-    Arch: SimdKernel<T>,
+    Arch: BackendKernel<T>,
 {
-    const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+    const { <Arch as BackendKernel<T>>::LANE_BOUND_CHECK };
     let mut buf_a = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
     let mut buf_b = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
     let mut buf_c = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
@@ -283,9 +283,9 @@ pub unsafe fn generic_horizontal_reduce<T, Arch>(
 ) -> T
 where
     T: Scalar,
-    Arch: SimdKernel<T>,
+    Arch: BackendKernel<T>,
 {
-    const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+    const { <Arch as BackendKernel<T>>::LANE_BOUND_CHECK };
     let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
     Arch::store_unaligned(buf.as_mut_ptr().cast::<T>(), v);
     let mut acc = identity;

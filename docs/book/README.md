@@ -22,7 +22,7 @@ linear algebra) in the Atlas layer hierarchy.
 
 1. ISA detection and the runtime capability probes.
 2. Runtime vs. compile-time dispatch and the scalar floor.
-3. The `SimdArch` / `SimdKernel` seam and its backends.
+3. The `SimdArch` / operation-facet seams and their backends.
 
 **Part II — Core Operations**
 

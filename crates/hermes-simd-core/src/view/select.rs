@@ -40,7 +40,7 @@ where
     /// # Implementation
     ///
     /// The scalar fallback loop is the authoritative path. Hardware backends override
-    /// `SimdKernel::blend` with the matching intrinsic; the compiler selects the
+    /// `SimdCompare::blend` with the matching intrinsic; the compiler selects the
     /// appropriate specialization at monomorphization.
     pub fn select<ORef>(
         &self,

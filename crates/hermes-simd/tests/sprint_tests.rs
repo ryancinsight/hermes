@@ -19,7 +19,7 @@ mod tests {
     use hermes_simd_core::{
         align::Unaligned,
         execution::Unmasked,
-        kernel::SimdKernel,
+        kernel::SimdStorage,
         ops::{Dot, Max, Min, ReductionOp, Sum},
         scalar::NumericElement,
         view::SimdView,
@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn test_zip_reduce_dot_masked_tail_forced_sve() {
-        let len = <SveArch as SimdKernel<f32>>::LANE_COUNT + 3;
+        let len = <SveArch as SimdStorage<f32>>::LANE_COUNT + 3;
         let a: Vec<f32> = (0..len).map(|index| (index as f32 + 0.25) * 0.7).collect();
         let b: Vec<f32> = (0..len)
             .map(|index| (index as f32 - 1.75) * -0.35)
@@ -200,7 +200,7 @@ mod tests {
         let b = [10.0_f32, 20.0, 30.0, 40.0, 50.0];
         let va = make_view(&a);
         let vb = make_view(&b);
-        let lane = <ScalarArch as hermes_simd_core::kernel::SimdKernel<f32>>::LANE_COUNT;
+        let lane = <ScalarArch as hermes_simd_core::kernel::SimdStorage<f32>>::LANE_COUNT;
         let mut zip = va.zip_chunks(&vb);
         let mut chunk_count = 0;
         while let Some(_) = zip.next() {

@@ -1,7 +1,7 @@
 //! AArch64 SVE (Scalable Vector Extension) architecture marker.
 //!
 //! Stable Rust does not yet expose production-ready SVE vector register types
-//! for Hermes' generic [`SimdKernel`](hermes_simd_core::kernel::SimdKernel)
+//! for Hermes' generic [`BackendKernel`](hermes_simd_core::kernel::BackendKernel)
 //! contract. This module therefore provides an honest portable implementation;
 //! native hardware capability is probed separately and never confused with the
 //! emulated execution path:
@@ -69,7 +69,7 @@ crate::impl_emulated_kernel!(SveArch, f64, 8, cfg(all()));
 #[cfg(test)]
 mod tests {
     use super::SveArch;
-    use hermes_simd_core::kernel::SimdKernel;
+    use hermes_simd_core::kernel::BackendKernel;
 
     #[test]
     #[expect(
@@ -93,17 +93,17 @@ mod tests {
         // SAFETY: the emulated SVE backend has no hardware target-feature
         // precondition; all pointers are valid for the lane count used.
         unsafe {
-            let product = <SveArch as SimdKernel<f32>>::fmadd(lhs, rhs, addend);
+            let product = <SveArch as BackendKernel<f32>>::fmadd(lhs, rhs, addend);
             assert_eq!(product, [5.0; 16]);
             assert_eq!(
-                <SveArch as SimdKernel<f32>>::masked_sum_reduce(product, mask),
+                <SveArch as BackendKernel<f32>>::masked_sum_reduce(product, mask),
                 40.0
             );
 
-            let compact = <SveArch as SimdKernel<f32>>::compress(product, mask);
+            let compact = <SveArch as BackendKernel<f32>>::compress(product, mask);
             assert_eq!(&compact[..8], &[5.0; 8]);
 
-            let expanded = <SveArch as SimdKernel<f32>>::expand(compact, mask, [0.0; 16]);
+            let expanded = <SveArch as BackendKernel<f32>>::expand(compact, mask, [0.0; 16]);
             assert_eq!(
                 expanded,
                 [5.0, 0.0, 5.0, 0.0, 5.0, 0.0, 5.0, 0.0, 5.0, 0.0, 5.0, 0.0, 5.0, 0.0, 5.0, 0.0]
@@ -125,13 +125,17 @@ mod tests {
         // SAFETY: the emulated SVE backend has no hardware target-feature
         // precondition; source and out are valid for eight f64 lanes.
         unsafe {
-            let loaded = <SveArch as SimdKernel<f64>>::load_unaligned(source.as_ptr());
-            assert_eq!(<SveArch as SimdKernel<f64>>::sum_reduce(loaded), 36.0);
+            let loaded = <SveArch as BackendKernel<f64>>::load_unaligned(source.as_ptr());
+            assert_eq!(<SveArch as BackendKernel<f64>>::sum_reduce(loaded), 36.0);
 
-            let gathered = <SveArch as SimdKernel<f64>>::gather(source.as_ptr(), indices);
+            let gathered = <SveArch as BackendKernel<f64>>::gather(source.as_ptr(), indices);
             assert_eq!(gathered, [8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0]);
 
-            <SveArch as SimdKernel<f64>>::masked_store_unaligned(out.as_mut_ptr(), mask, gathered);
+            <SveArch as BackendKernel<f64>>::masked_store_unaligned(
+                out.as_mut_ptr(),
+                mask,
+                gathered,
+            );
         }
 
         assert_eq!(out, [8.0, 7.0, 0.0, 0.0, 4.0, 3.0, 0.0, 0.0]);

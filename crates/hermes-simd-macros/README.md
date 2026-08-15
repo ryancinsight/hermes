@@ -10,8 +10,8 @@ facade rather than depending on this crate directly.
   function into a CPU-feature-dispatched wrapper that calls the monomorphized
   per-ISA specializations in priority order, emitting the `#[target_feature]`
   wrappers and the detection ladder. This is what keeps a single
-  `<T: Scalar, A: SimdKernel<T>>` kernel per operation instead of per-type
-  clones.
+  `<T: Scalar, A: SimdKernel<T>>` aggregate-bound kernel per operation instead
+  of per-type clones; operation-family facets can be used for narrower bounds.
 - `#[derive(SparseData)]` — generates the `SparseFormat` boilerplate for sparse
   data structs.
 

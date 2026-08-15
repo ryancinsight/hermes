@@ -167,6 +167,20 @@ impl From<&AmxConfig> for ActiveAmxConfig {
 
 #[cfg(feature = "std")]
 thread_local! {
+    #[cfg_attr(
+        windows,
+        expect(
+            clippy::missing_const_for_thread_local,
+            reason = "Windows Clippy 1.97 false positive: this initializer is already a const block"
+        )
+    )]
     pub(crate) static ACTIVE_CONFIG: core::cell::Cell<Option<ActiveAmxConfig>> = const { core::cell::Cell::new(None) };
-    pub(crate) static SESSION_DEPTH: core::cell::Cell<usize> = core::cell::Cell::new(0);
+    #[cfg_attr(
+        windows,
+        expect(
+            clippy::missing_const_for_thread_local,
+            reason = "Windows Clippy 1.97 false positive: this initializer is already a const block"
+        )
+    )]
+    pub(crate) static SESSION_DEPTH: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
 }

@@ -3,7 +3,7 @@
 `hermes` is the **CPU lane-parallel kernel** provider of the Atlas stack: its
 role is "CPU SIMD/SWAR vocabulary, ISA dispatch, and vector kernels" (the
 meta-repo README's provider table). Everything in this book — the ISA
-detection, the `SimdArch`/`SimdKernel` seams, the dense and sparse kernels,
+detection, the `SimdArch` and operation-facet seams, the dense and sparse kernels,
 the aligned buffers and views — is the bounded context of that one role. The
 stack places hermes so that a consumer asking for a vector kernel gets it
 from one owner, never by hand-writing intrinsics or importing a per-ISA crate.

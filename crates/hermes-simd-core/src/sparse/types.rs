@@ -131,7 +131,7 @@ impl<T, const C: usize, V, I> SellPMatrix<T, C, V, I> {
     /// Number of row slices `ceil(nrows / C)`.
     #[inline(always)]
     pub fn nslices(&self) -> usize {
-        (self.nrows + C - 1) / C
+        self.nrows.div_ceil(C)
     }
 }
 

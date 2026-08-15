@@ -9,7 +9,7 @@ use hermes_simd_core::{
     align::Unaligned,
     arch::SimdArch,
     execution::Unmasked,
-    kernel::SimdKernel,
+    kernel::{SimdArith, SimdBitwise, SimdCompare, SimdLoadStore, SimdMask, SimdReduce},
     ops::{AbsMax, AbsSum},
     scalar::Scalar,
     view::SimdView,
@@ -20,7 +20,13 @@ use hermes_simd_macros::runtime_dispatch;
 pub(super) fn dispatch_abs_sum_kernel<T, A>(data: &[T]) -> T
 where
     T: Scalar,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch
+        + SimdLoadStore<T>
+        + SimdArith<T>
+        + SimdBitwise<T>
+        + SimdCompare<T>
+        + SimdMask<T>
+        + SimdReduce<T>,
 {
     match SimdView::<T, A, Unaligned, Unmasked, &[T]>::new(data) {
         Some(v) => v.reduce(AbsSum),
@@ -32,7 +38,13 @@ where
 pub(super) fn dispatch_abs_max_kernel<T, A>(data: &[T]) -> T
 where
     T: Scalar,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch
+        + SimdLoadStore<T>
+        + SimdArith<T>
+        + SimdBitwise<T>
+        + SimdCompare<T>
+        + SimdMask<T>
+        + SimdReduce<T>,
 {
     match SimdView::<T, A, Unaligned, Unmasked, &[T]>::new(data) {
         Some(v) => v.reduce(AbsMax),

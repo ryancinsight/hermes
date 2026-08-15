@@ -19,7 +19,7 @@ use core::arch::x86_64::{
     _mm_unpackhi_pd, _CMP_EQ_OQ, _CMP_GE_OQ, _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ,
     _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT, _MM_FROUND_TO_ZERO,
 };
-use hermes_simd_core::kernel::SimdKernel;
+use hermes_simd_core::kernel::BackendKernel;
 
 /// Newtype over `__m256d` so `Send + Sync` can be implemented on the wrapper.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -58,7 +58,7 @@ unsafe impl Send for Avx2F64Idx {}
 unsafe impl Sync for Avx2F64Idx {}
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-impl SimdKernel<f64> for Avx2 {
+impl BackendKernel<f64> for Avx2 {
     type Vector = Avx2F64Vec;
     type Mask = Avx2F64Mask;
     type IndexVector = Avx2F64Idx;

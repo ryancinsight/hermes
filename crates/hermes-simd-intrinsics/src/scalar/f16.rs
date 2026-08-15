@@ -6,9 +6,9 @@
 
 use crate::Scalar;
 use eunomia::F16;
-use hermes_simd_core::kernel::SimdKernel;
+use hermes_simd_core::kernel::BackendKernel;
 
-impl SimdKernel<F16> for Scalar {
+impl BackendKernel<F16> for Scalar {
     type Vector = [F16; 8];
     type Mask = [bool; 8];
     type IndexVector = [i32; 8];

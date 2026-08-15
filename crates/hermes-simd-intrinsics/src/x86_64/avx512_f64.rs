@@ -26,7 +26,7 @@ use core::arch::x86_64::{
     _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ, _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT,
     _MM_FROUND_TO_NEG_INF, _MM_FROUND_TO_POS_INF, _MM_FROUND_TO_ZERO,
 };
-use hermes_simd_core::kernel::SimdKernel;
+use hermes_simd_core::kernel::BackendKernel;
 
 /// Newtype over `__m512d` providing `Send + Sync`.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -40,7 +40,7 @@ unsafe impl Send for Avx512F64Vec {}
 unsafe impl Sync for Avx512F64Vec {}
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-impl SimdKernel<f64> for Avx512 {
+impl BackendKernel<f64> for Avx512 {
     type Vector = Avx512F64Vec;
     /// Native AVX-512 8-bit mask register. Bit `i` set → lane `i` active.
     type Mask = __mmask8;
@@ -635,7 +635,7 @@ impl SimdKernel<f64> for Avx512 {
         // a NaN, which an ordered predicate reports as inactive, while `-0.0`
         // carries a sign bit yet compares equal to zero under any predicate.
         Avx512F64Vec(_mm512_mask_blend_pd(
-            <Self as SimdKernel<f64>>::vector_to_mask(mask),
+            <Self as BackendKernel<f64>>::vector_to_mask(mask),
             false_val.0,
             true_val.0,
         ))

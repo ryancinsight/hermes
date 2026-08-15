@@ -14,7 +14,7 @@ rather than on this crate directly.
 | `arch` | `SimdArch` marker trait with architecture constants |
 | `align` | `Alignment`, `Aligned<N>`, `Unaligned` typestates |
 | `execution` | `ExecutionMode`, `Unmasked`, `Masked` ZSTs |
-| `kernel` | `SimdKernel<T>` — the full SIMD operation surface |
+| `kernel` | `SimdKernel<T>` and operation-family facets — the SIMD contracts |
 | `scalar` | `Scalar` sealed element trait |
 | `mask` | `BitMask<N>` bit-packed lane mask |
 | `ops` | `ReductionOp<T>`, `ElementOp<T>` ZST strategies |

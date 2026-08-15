@@ -21,7 +21,7 @@ use crate::Avx2;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use eunomia::F16;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use hermes_simd_core::kernel::SimdKernel;
+use hermes_simd_core::kernel::BackendKernel;
 
 /// True when the F16C + FMA hardware-conversion path may be entered.
 ///
@@ -144,7 +144,7 @@ mod f16c {
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-impl SimdKernel<F16> for Avx2 {
+impl BackendKernel<F16> for Avx2 {
     type Vector = [F16; 16];
     type Mask = [bool; 16];
     type IndexVector = [i32; 16];
@@ -414,10 +414,10 @@ mod tests {
         // SAFETY: f16c/fma confirmed above; array operands are plain values.
         let (hw_add, hw_sub, hw_mul, hw_fma) = unsafe {
             (
-                <Avx2 as SimdKernel<F16>>::add(a, b),
-                <Avx2 as SimdKernel<F16>>::sub(a, b),
-                <Avx2 as SimdKernel<F16>>::mul(a, b),
-                <Avx2 as SimdKernel<F16>>::fmadd(a, b, b),
+                <Avx2 as BackendKernel<F16>>::add(a, b),
+                <Avx2 as BackendKernel<F16>>::sub(a, b),
+                <Avx2 as BackendKernel<F16>>::mul(a, b),
+                <Avx2 as BackendKernel<F16>>::fmadd(a, b, b),
             )
         };
 
@@ -446,7 +446,7 @@ mod tests {
         let a = [nan; 16];
         let b = [F16::from_f32(1.0); 16];
         // SAFETY: f16c/fma confirmed above.
-        let out = unsafe { <Avx2 as SimdKernel<F16>>::add(a, b) };
+        let out = unsafe { <Avx2 as BackendKernel<F16>>::add(a, b) };
         assert!(out.iter().all(|x| x.is_nan()), "NaN must propagate");
     }
 }

@@ -4,9 +4,9 @@
 //! universal fallback when no hardware SIMD feature is detected.
 
 use crate::Scalar;
-use hermes_simd_core::kernel::SimdKernel;
+use hermes_simd_core::kernel::BackendKernel;
 
-impl SimdKernel<f32> for Scalar {
+impl BackendKernel<f32> for Scalar {
     type Vector = [f32; 4];
     type Mask = [bool; 4];
     type IndexVector = [i32; 4];

@@ -9,7 +9,7 @@ pub use eunomia::{CastFrom, CastTo, FloatElement, NumericElement};
 
 /// Float scalars with an exact round-to-nearest-ties-to-even primitive.
 ///
-/// Backs [`crate::kernel::SimdKernel::round`], whose contract is banker's
+/// Backs [`crate::kernel::SimdArith::round`], whose contract is banker's
 /// rounding: x86 `roundps`/`vrndscaleps` `_MM_FROUND_TO_NEAREST_INT` and NEON
 /// `FRINTN` both resolve exact halfway values to the even neighbor. eunomia's
 /// [`FloatElement::round`] follows libm's `roundf` (half-away-from-zero), so it

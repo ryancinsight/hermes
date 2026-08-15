@@ -3,19 +3,25 @@
 //! The write-side dual of [`gather`](crate::view::gather): where `gather` reads
 //! `view[indices[i]]` into contiguous output, `scatter` writes contiguous input
 //! into `view[indices[i]]`. Both route full vectors through the provider seam
-//! ([`SimdKernel::scatter`]) and the final partial vector through the masked
-//! seam ([`SimdKernel::scatter_masked`]), so no element-at-a-time tail loop and
+//! ([`crate::kernel::SimdGather::scatter`]) and the final partial vector
+//! through the masked seam ([`crate::kernel::SimdGather::scatter_masked`]),
+//! so no element-at-a-time tail loop and
 //! no read or write past the live slice remains.
 
 use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
-use crate::kernel::{SimdKernel, MAX_SIMD_LANES};
+use crate::kernel::{SimdGather, SimdLoadStore, SimdMask, MAX_SIMD_LANES};
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
 
-impl<'a, T: 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
-    SimdView<'a, T, Arch, Align, Mode, &'a mut [T]>
+impl<
+        'a,
+        T: 'a,
+        Arch: SimdArch + SimdGather<T> + SimdLoadStore<T> + SimdMask<T>,
+        Align: Alignment,
+        Mode: ExecutionMode,
+    > SimdView<'a, T, Arch, Align, Mode, &'a mut [T]>
 where
     T: Scalar,
 {

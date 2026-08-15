@@ -13,6 +13,14 @@ pub struct OnceLock<T> {
 unsafe impl<T: Send + Sync> Sync for OnceLock<T> {}
 unsafe impl<T: Send> Send for OnceLock<T> {}
 
+impl<T> Default for OnceLock<T> {
+    /// The empty, uninitialized cell -- matching `core::cell::OnceCell` and
+    /// `std::sync::OnceLock`, whose `Default` is likewise the unset state.
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> OnceLock<T> {
     /// Create an empty, uninitialized cell.
     pub const fn new() -> Self {

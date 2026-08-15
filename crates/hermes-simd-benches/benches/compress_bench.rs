@@ -7,14 +7,14 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use hermes_simd::{Avx2, SimdArch};
 use hermes_simd::{BitMask, Scalar, SimdView, Unaligned, Unmasked};
-use hermes_simd_core::kernel::SimdKernel;
+use hermes_simd_core::kernel::SimdStorage;
 
 const LENGTHS: [usize; 3] = [1_024, 16_384, 262_144];
 
 /// `SimdView::compress` asserts that the mask's lane count equals the backend's,
 /// so the width is taken from the backend rather than written as a literal —
 /// a hardcoded width silently rots the moment a backend's lane count changes.
-const SCALAR_LANES: usize = <Scalar as SimdKernel<f32>>::LANE_COUNT;
+const SCALAR_LANES: usize = <Scalar as SimdStorage<f32>>::LANE_COUNT;
 
 fn data(len: usize) -> Vec<f32> {
     (0..len).map(|idx| idx as f32 * 0.25 + 1.0).collect()

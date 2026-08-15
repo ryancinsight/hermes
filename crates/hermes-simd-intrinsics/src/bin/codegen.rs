@@ -339,7 +339,7 @@ fn render_avx2(p: &Param) -> String {
 use crate::Avx2;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::*;
-use hermes_simd_core::kernel::SimdKernel;
+use hermes_simd_core::kernel::BackendKernel;
 
 /// Newtype over `__VECTOR_UNDERLYING__` so `Send + Sync` can be implemented on the wrapper.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -378,7 +378,7 @@ unsafe impl Send for __INDEX_VECTOR__ {}
 unsafe impl Sync for __INDEX_VECTOR__ {}
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-impl SimdKernel<__SCALAR_TYPE__> for Avx2 {
+impl BackendKernel<__SCALAR_TYPE__> for Avx2 {
     type Vector = __VECTOR_TYPE__;
     type Mask = __MASK_TYPE__;
     type IndexVector = __INDEX_VECTOR__;
@@ -898,7 +898,7 @@ fn render_avx512(p: &Param) -> String {
 use crate::Avx512;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::*;
-use hermes_simd_core::kernel::SimdKernel;
+use hermes_simd_core::kernel::BackendKernel;
 
 /// Newtype over `__VECTOR_UNDERLYING__` providing `Send + Sync`.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -912,7 +912,7 @@ unsafe impl Send for __VECTOR_TYPE__ {}
 unsafe impl Sync for __VECTOR_TYPE__ {}
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-impl SimdKernel<__SCALAR_TYPE__> for Avx512 {
+impl BackendKernel<__SCALAR_TYPE__> for Avx512 {
     type Vector = __VECTOR_TYPE__;
     /// Native AVX-512 __LANE_COUNT__-bit mask register. Bit `i` set → lane `i` active.
     type Mask = __MASK_TYPE__;
@@ -1359,7 +1359,7 @@ impl SimdKernel<__SCALAR_TYPE__> for Avx512 {
         // a NaN, which an ordered predicate reports as inactive, while `-0.0`
         // carries a sign bit yet compares equal to zero under any predicate.
         __VECTOR_TYPE__(__PREFIX___mask_blend___SUFFIX__(
-            <Self as SimdKernel<__SCALAR_TYPE__>>::vector_to_mask(mask),
+            <Self as BackendKernel<__SCALAR_TYPE__>>::vector_to_mask(mask),
             false_val.0,
             true_val.0,
         ))

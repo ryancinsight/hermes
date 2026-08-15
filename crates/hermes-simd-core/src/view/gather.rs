@@ -1,13 +1,19 @@
 use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
-use crate::kernel::SimdKernel;
+use crate::kernel::{SimdGather, SimdLoadStore};
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
 use core::mem::MaybeUninit;
 
-impl<'a, T: 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode, Ref: 'a>
-    SimdView<'a, T, Arch, Align, Mode, Ref>
+impl<
+        'a,
+        T: 'a,
+        Arch: SimdArch + SimdGather<T> + SimdLoadStore<T>,
+        Align: Alignment,
+        Mode: ExecutionMode,
+        Ref: 'a,
+    > SimdView<'a, T, Arch, Align, Mode, Ref>
 where
     T: Scalar,
 {

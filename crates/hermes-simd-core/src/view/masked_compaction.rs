@@ -1,7 +1,7 @@
 use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
-use crate::kernel::{SimdKernel, MAX_SIMD_LANES};
+use crate::kernel::{SimdKernel, SimdStorage, MAX_SIMD_LANES};
 use crate::mask::BitMask;
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
@@ -60,7 +60,7 @@ where
             // `MaybeUninit` avoids re-zeroing a full `MAX_SIMD_LANES` buffer every
             // chunk. The compile-time `LANE_BOUND_CHECK` guarantees that the
             // store stays in bounds.
-            let () = <Arch as SimdKernel<T>>::LANE_BOUND_CHECK;
+            let () = <Arch as SimdStorage<T>>::LANE_BOUND_CHECK;
             let mut temp = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
 
             for _ in 0..(simd_len / lane_count) {

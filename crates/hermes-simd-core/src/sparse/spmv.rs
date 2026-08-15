@@ -13,7 +13,7 @@
 
 use super::{BlockedCoo, Csr, DenseWithMask, SellP, SellPData, SparseView, Validated};
 use crate::arch::SimdArch;
-use crate::kernel::SimdKernel;
+use crate::kernel::{SimdKernel, SimdStorage};
 use crate::scalar::Scalar;
 
 /// Unified trait for sparse matrix-vector multiplication.
@@ -35,7 +35,7 @@ pub trait SparseSpMv<T> {
 /// the layout invariant is enforced at compile time per backend by the
 /// `const` assert below; the length contract is enforced at runtime.
 #[inline(always)]
-pub(crate) unsafe fn build_index_vector<T: Scalar, Arch: SimdKernel<T>>(
+pub(crate) unsafe fn build_index_vector<T: Scalar, Arch: SimdStorage<T>>(
     cols: &[i32],
 ) -> Arch::IndexVector {
     // Compile-time guard binding the soundness condition the SAFETY note relies

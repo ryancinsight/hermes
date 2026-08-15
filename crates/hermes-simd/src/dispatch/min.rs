@@ -1,8 +1,13 @@
 //! Generic runtime-dispatch min-reduction kernel.
 
 use hermes_simd_core::{
-    align::Unaligned, arch::SimdArch, execution::Unmasked, kernel::SimdKernel, ops::Min,
-    scalar::Scalar, view::SimdView,
+    align::Unaligned,
+    arch::SimdArch,
+    execution::Unmasked,
+    kernel::{SimdArith, SimdBitwise, SimdCompare, SimdLoadStore, SimdMask, SimdReduce},
+    ops::Min,
+    scalar::Scalar,
+    view::SimdView,
 };
 use hermes_simd_macros::runtime_dispatch;
 
@@ -10,7 +15,13 @@ use hermes_simd_macros::runtime_dispatch;
 pub(super) fn dispatch_min_kernel<T, A>(data: &[T]) -> T
 where
     T: Scalar,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch
+        + SimdLoadStore<T>
+        + SimdArith<T>
+        + SimdBitwise<T>
+        + SimdCompare<T>
+        + SimdMask<T>
+        + SimdReduce<T>,
 {
     match SimdView::<T, A, Unaligned, Unmasked, &[T]>::new(data) {
         Some(v) => v.reduce(Min),

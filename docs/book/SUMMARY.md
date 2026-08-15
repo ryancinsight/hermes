@@ -7,7 +7,7 @@
 - [1. ISA Detection](isa_detection.md)
   - [Example: ISA Dispatch](examples/isa_dispatch.md)
 - [2. Runtime vs. Compile-Time Dispatch](dispatch_model.md)
-- [3. SimdArch and SimdKernel](simd_arch.md)
+- [3. SimdArch and SIMD kernel facets](simd_arch.md)
 
 # Part II — Core Operations
 
