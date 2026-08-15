@@ -6,18 +6,20 @@ use alloc::vec::Vec;
 use crate::Neon;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use crate::{Avx2, Avx512};
-use crate::{DispatchedView, Scalar};
+use crate::{DispatchedView, Scalar, SveArch};
 use hermes_simd_core::{
     align::Alignment, arch::SimdArch, execution::Unmasked, scalar::FloatElement, view::SimdView,
 };
 
 /// Runtime-selectable SIMD target token for tests and benchmark harnesses.
 ///
-/// `TargetId` is a closed identifier for Hermes' public CPU targets. Use
+/// `TargetId` enumerates Hermes' public CPU targets; the set is
+/// `#[non_exhaustive]`, so new backends are additive for consumers. Use
 /// [`TargetId::is_supported`] before entering a target-specific benchmark row,
 /// or call [`dispatch_view_to`] / [`dispatch_view_mut_to`] to construct a typed
 /// view only when the host can execute that target.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum TargetId {
     /// Portable scalar target; always supported.
     Scalar,
@@ -27,6 +29,8 @@ pub enum TargetId {
     Avx512,
     /// `AArch64` NEON target.
     Neon,
+    /// `AArch64` SVE shape, lane-emulated; executes on every host.
+    Sve,
 }
 
 impl TargetId {
@@ -38,7 +42,13 @@ impl TargetId {
     /// coverage from an invisible property into a reportable one — a test
     /// guarded by a feature probe otherwise skips silently, and a skip is
     /// indistinguishable from a pass in the log.
-    pub const ALL: [Self; 4] = [Self::Scalar, Self::Avx2, Self::Avx512, Self::Neon];
+    pub const ALL: [Self; 5] = [
+        Self::Scalar,
+        Self::Avx2,
+        Self::Avx512,
+        Self::Neon,
+        Self::Sve,
+    ];
 
     /// Parses a target from the lowercase name emitted by [`TargetId::name`].
     ///
@@ -61,7 +71,9 @@ impl TargetId {
     #[must_use]
     pub const fn is_architecture_applicable(self) -> bool {
         match self {
-            Self::Scalar => true,
+            // The emulated SVE backend is compiled and exported on every host,
+            // so it belongs to every build target, exactly like the scalar path.
+            Self::Scalar | Self::Sve => true,
             Self::Avx2 | Self::Avx512 => cfg!(any(target_arch = "x86", target_arch = "x86_64")),
             Self::Neon => cfg!(target_arch = "aarch64"),
         }
@@ -81,6 +93,7 @@ impl TargetId {
             Self::Avx2 => "avx2",
             Self::Avx512 => "avx512",
             Self::Neon => "neon",
+            Self::Sve => "sve",
         }
     }
 
@@ -88,7 +101,8 @@ impl TargetId {
     #[must_use]
     pub fn is_supported(self) -> bool {
         match self {
-            Self::Scalar => true,
+            // `SveArch` is lane-emulated and safe to construct on every host.
+            Self::Scalar | Self::Sve => true,
             Self::Avx2 => avx2_supported(),
             Self::Avx512 => avx512_supported(),
             Self::Neon => neon_supported(),
@@ -194,6 +208,11 @@ where
                 None
             }
         }
+        // The emulated SVE backend is unconditional, so this arm mirrors the
+        // scalar path: no capability gate, no cfg gate.
+        TargetId::Sve => {
+            SimdView::<T, SveArch, Align, Unmasked, &'a [T]>::new(data).map(DispatchedView::Sve)
+        }
     }
 }
 
@@ -258,5 +277,9 @@ where
                 None
             }
         }
+        // The emulated SVE backend is unconditional, so this arm mirrors the
+        // scalar path: no capability gate, no cfg gate.
+        TargetId::Sve => SimdView::<T, SveArch, Align, Unmasked, &'a mut [T]>::new_mut(data)
+            .map(DispatchedView::Sve),
     }
 }

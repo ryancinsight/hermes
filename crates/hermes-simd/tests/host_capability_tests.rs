@@ -31,6 +31,11 @@ fn target_id_support_matches_host_features() {
     assert_eq!(TargetId::Avx2.name(), "avx2");
     assert_eq!(TargetId::Avx512.name(), "avx512");
     assert_eq!(TargetId::Neon.name(), "neon");
+    assert_eq!(TargetId::Sve.name(), "sve");
+
+    // The emulated SVE backend executes on every host, like the scalar path.
+    assert!(TargetId::Sve.is_supported());
+    assert!(TargetId::Sve.is_architecture_applicable());
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
@@ -97,6 +102,8 @@ fn forced_scalar_dispatch_view_preserves_slice_values() {
         }
         #[cfg(target_arch = "aarch64")]
         DispatchedView::Neon(_) => panic!("forced scalar target constructed a NEON view"),
+        DispatchedView::Sve(_) => panic!("forced scalar target constructed an SVE view"),
+        _ => unreachable!("unknown future backend"),
     }
 }
 
@@ -118,6 +125,8 @@ fn forced_mut_scalar_dispatch_view_preserves_exclusive_slice() {
         }
         #[cfg(target_arch = "aarch64")]
         DispatchedView::Neon(_) => panic!("forced scalar target constructed a NEON view"),
+        DispatchedView::Sve(_) => panic!("forced scalar target constructed an SVE view"),
+        _ => unreachable!("unknown future backend"),
     }
     assert_eq!(data, [1.0, 2.0, 9.0, 4.0]);
 }
@@ -146,6 +155,7 @@ fn forced_dispatch_returns_view_for_each_supported_target() {
         TargetId::Avx2,
         TargetId::Avx512,
         TargetId::Neon,
+        TargetId::Sve,
     ] {
         let view = dispatch_view_to::<f32, Unaligned>(target, &data);
         assert_eq!(view.is_some(), target.is_supported(), "{target:?}");
@@ -166,6 +176,7 @@ fn forced_dense_facade_matches_scalar_for_every_supported_target() {
         TargetId::Avx2,
         TargetId::Avx512,
         TargetId::Neon,
+        TargetId::Sve,
     ] {
         if target.is_supported() {
             assert_forced_dense_target_matches(target, &a, &b, &indices, &mask, &expected);
@@ -241,6 +252,9 @@ fn assert_forced_dense_target_matches(
         (DispatchedView::Neon(a_view), DispatchedView::Neon(b_view)) => {
             assert_dense_view_matches_target(target, &a_view, &b_view, indices, mask, expected);
         }
+        (DispatchedView::Sve(a_view), DispatchedView::Sve(b_view)) => {
+            assert_dense_view_matches_target(target, &a_view, &b_view, indices, mask, expected);
+        }
         _ => panic!("target {target:?} constructed mismatched view variants"),
     }
 }
@@ -299,6 +313,7 @@ fn runtime_dispatch_view_matches_host_features() {
     match view {
         DispatchedView::Neon(_) => {}
         DispatchedView::Scalar(_) => panic!("aarch64 host should dispatch to NEON"),
+        _ => unreachable!("aarch64 host should never dispatch to a non-NEON backend"),
     }
 }
 
@@ -311,6 +326,7 @@ where
         DispatchedView::Avx512(_) => "avx512",
         DispatchedView::Avx2(_) => "avx2",
         DispatchedView::Scalar(_) => "scalar",
+        _ => unreachable!("dispatch_view returns only x86 or scalar backends on x86"),
     }
 }
 
@@ -379,6 +395,12 @@ fn view_exists_only_for_executable_arch() {
     assert!(
         SimdView::<f32, Scalar, Unaligned, Unmasked, &[f32]>::new(&data).is_some(),
         "the emulated backend runs everywhere"
+    );
+
+    // The emulated SVE backend is unconditional, exactly like the scalar path.
+    assert!(
+        SimdView::<f32, SveArch, Unaligned, Unmasked, &[f32]>::new(&data).is_some(),
+        "the emulated SVE backend runs everywhere"
     );
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]

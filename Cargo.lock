@@ -426,7 +426,7 @@ checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 
 [[package]]
 name = "hermes-simd"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "criterion",
  "eunomia",
@@ -443,7 +443,7 @@ dependencies = [
 
 [[package]]
 name = "hermes-simd-benches"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "chrono",
  "criterion",
@@ -456,7 +456,7 @@ dependencies = [
 
 [[package]]
 name = "hermes-simd-core"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "bytemuck",
  "eunomia",
@@ -468,14 +468,14 @@ dependencies = [
 
 [[package]]
 name = "hermes-simd-examples"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "hermes-simd",
 ]
 
 [[package]]
 name = "hermes-simd-intrinsics"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "eunomia",
  "hermes-simd-core",
@@ -483,7 +483,7 @@ dependencies = [
 
 [[package]]
 name = "hermes-simd-macros"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -492,7 +492,7 @@ dependencies = [
 
 [[package]]
 name = "hermes-simd-types"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "hermes-simd-core",
  "hermes-simd-intrinsics",

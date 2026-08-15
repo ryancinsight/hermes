@@ -12,11 +12,11 @@ readme = "README.md"
 keywords = ["simd", "vectorization", "avx512", "neon", "performance"]
 
 [dependencies]
-hermes-simd-core = { path = "../hermes-simd-core", version = "0.6.0", default-features = false }
-hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.6.0", default-features = false }
+hermes-simd-core = { path = "../hermes-simd-core", version = "0.7.0", default-features = false }
+hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.7.0", default-features = false }
 eunomia = { workspace = true }
-hermes-simd-macros = { path = "../hermes-simd-macros", version = "0.6.0" }
-hermes-simd-types = { path = "../hermes-simd-types", version = "0.6.0", default-features = false }
+hermes-simd-macros = { path = "../hermes-simd-macros", version = "0.7.0" }
+hermes-simd-types = { path = "../hermes-simd-types", version = "0.7.0", default-features = false }
 themis = { workspace = true }
 tracing = { workspace = true }
 

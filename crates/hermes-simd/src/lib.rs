@@ -262,6 +262,7 @@ pub use dispatch::{
 };
 
 /// Target-specific, runtime-dispatched SIMD view wrapper.
+#[non_exhaustive]
 pub enum DispatchedView<'a, T, Align = Unaligned, Mode = Unmasked, Ref = &'a [T]>
 where
     Align: hermes_simd_core::align::Alignment,
@@ -277,6 +278,8 @@ where
     /// NEON architecture target.
     #[cfg(target_arch = "aarch64")]
     Neon(SimdView<'a, T, Neon, Align, Mode, Ref>),
+    /// `AArch64` SVE shape, lane-emulated; executes on every host.
+    Sve(SimdView<'a, T, SveArch, Align, Mode, Ref>),
     /// Fallback scalar target.
     Scalar(SimdView<'a, T, Scalar, Align, Mode, Ref>),
 }
