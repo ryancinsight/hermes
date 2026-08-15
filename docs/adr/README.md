@@ -19,3 +19,4 @@
 | [011](011-bitboard-kernel-safe-surface.md) | Make `BitBoardKernel` a Safe Trait | Accepted |
 | [012](012-structured-amx-downgrade-events.md) | Structured AMX downgrade events | Accepted |
 | [013](013-simdkernel-role-split.md) | Split `SimdKernel` into Operation-Family Facets | Accepted |
+| [014](014-targetid-sve-backend.md) | Add `TargetId::Sve` and Seal the Target Enum Family | Proposed |

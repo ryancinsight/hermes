@@ -396,7 +396,8 @@
   Criterion's noise threshold. AVX-512 performance remains open under HS-429
   because SDE is semantic evidence only.
 
-- [ ] [major] **HS-425 — `TargetId` omits the SVE backend.** `SveArch` is a
+- [ ] [major] **HS-425 — `TargetId` omits the SVE backend.** Owner: ryan (agent,
+  claimed 2026-08-15; ADR 014 drafted). `SveArch` is a
   first-class emulated backend exercised throughout the test suite, but
   `TargetId` enumerates only Scalar/Avx2/Avx512/Neon. The public forced-dispatch
   token API therefore cannot reach a backend the workspace ships, leaving a hole
