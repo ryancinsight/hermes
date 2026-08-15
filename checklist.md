@@ -493,6 +493,12 @@
       compile-time layout guard; `forbid(unsafe_code)` on macros; magic CAS
       ordering; `SimdOps` macro-collapse; `flush_limit`/`axpy`/`scale` cleanup.
       367 tests + clippy + fmt green. See [gap_audit](gap_audit.md#audit-2026-06-26).
+- [x] [patch] Reduction hierarchy cleanup (2026-08-15): moved the
+      multiplicative `Product` strategy into the dedicated
+      `ops/reduction/product.rs` leaf, leaving `reduction.rs` at 442 lines.
+      The public strategy and generic SIMD implementation are unchanged;
+      `hermes-simd` nextest passed 410/410 and the provider lint/check gates
+      passed. See [gap_audit](gap_audit.md#hermes-2026-08-15).
 
 ## Next sprint candidates (from [backlog](backlog.md))
 
