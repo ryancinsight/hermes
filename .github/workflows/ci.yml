@@ -47,7 +47,7 @@ jobs:
       - name: Identify host backend coverage
         run: cargo nextest run -p hermes-simd -E 'test(host_backend_coverage)' --no-capture
         env:
-          HERMES_EXPECTED_TARGETS: scalar,avx2
+          HERMES_EXPECTED_TARGETS: scalar,avx2,sve
       - name: Tests (nextest, dev profile; release uses panic=abort which conflicts with the test harness)
         run: cargo nextest run --workspace
       - name: Doctests
@@ -181,7 +181,7 @@ jobs:
       - name: Identify emulated backend coverage
         env:
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER: "${{ env.SDE_PATH }}/sde64 -spr --"
-          HERMES_EXPECTED_TARGETS: scalar,avx2,avx512
+          HERMES_EXPECTED_TARGETS: scalar,avx2,avx512,sve
         run: |
           cargo nextest run -p hermes-simd -E 'test(host_backend_coverage)' \
             --profile sde --target x86_64-unknown-linux-gnu --no-capture
@@ -212,7 +212,7 @@ jobs:
       - name: Identify host backend coverage
         run: cargo nextest run -p hermes-simd -E 'test(host_backend_coverage)' --no-capture
         env:
-          HERMES_EXPECTED_TARGETS: scalar,neon
+          HERMES_EXPECTED_TARGETS: scalar,neon,sve
       - name: Tests (nextest, committed timeout config)
         run: cargo nextest run --workspace
       - name: Doctests

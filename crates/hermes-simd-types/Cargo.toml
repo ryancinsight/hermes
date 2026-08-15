@@ -12,8 +12,8 @@ readme = "README.md"
 keywords = ["simd", "vectorization", "no-std", "registers", "types"]
 
 [dependencies]
-hermes-simd-core = { path = "../hermes-simd-core", version = "0.6.0", default-features = false }
-hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.6.0", default-features = false }
+hermes-simd-core = { path = "../hermes-simd-core", version = "0.7.0", default-features = false }
+hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.7.0", default-features = false }
 
 [features]
 default = ["std", "mnemosyne-memory"]

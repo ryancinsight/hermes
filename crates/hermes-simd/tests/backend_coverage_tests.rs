@@ -133,6 +133,9 @@ fn support_implies_architecture_applicability() {
 #[test]
 fn architecture_applicability_matches_the_build_target() {
     assert!(TargetId::Scalar.is_architecture_applicable());
+    // The emulated SVE backend is compiled and exported on every host, so it is
+    // applicable to every build target, exactly like the scalar path.
+    assert!(TargetId::Sve.is_architecture_applicable());
 
     let x86 = cfg!(any(target_arch = "x86", target_arch = "x86_64"));
     assert_eq!(TargetId::Avx2.is_architecture_applicable(), x86);

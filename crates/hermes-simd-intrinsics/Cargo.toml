@@ -12,7 +12,7 @@ readme = "README.md"
 keywords = ["simd", "intrinsics", "avx512", "neon", "vnni"]
 
 [dependencies]
-hermes-simd-core = { path = "../hermes-simd-core", version = "0.6.0" }
+hermes-simd-core = { path = "../hermes-simd-core", version = "0.7.0" }
 eunomia = { workspace = true }
 
 [features]

@@ -69,14 +69,17 @@ effort".
 
 Runtime auto-selection is correct for production, but it makes testing awkward:
 a probe that returns `false` skips the code it guards. For deterministic
-coverage, `TargetId` names the closed set of targets — `Scalar`, `Avx2`,
-`Avx512`, `Neon` — and `dispatch_view_to` / `dispatch_view_mut_to` force a view
+coverage, `TargetId` names the set of targets — `Scalar`, `Avx2`,
+`Avx512`, `Neon`, and the lane-emulated `Sve` — and `dispatch_view_to` /
+`dispatch_view_mut_to` force a view
 onto a named target after a host-capability check. The CI backend-coverage
 matrix uses exactly this surface: it asserts which targets *executed* on each
 runner rather than trusting that a green run exercised any particular ISA.
 `TargetId::supported_on_host()` distinguishes "architecture applies but this
 CPU lacks the feature" from "not applicable", so a coverage report reads
-truthfully.
+truthfully. The set is `#[non_exhaustive]`: new backends are additive for
+consumers, and the emulated `Sve` target executes on every host like the
+scalar floor.
 
 ## Monomorphization is the abstraction, not an implementation
 

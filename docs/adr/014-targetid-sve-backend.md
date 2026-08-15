@@ -47,13 +47,17 @@ consumer-visible break, not two.
 Routing and capability semantics:
 
 - `TargetId::Sve` is routed through `dispatch_view_to` and
-  `dispatch_view_mut_to` exactly like the other emulated/scalar paths, gated by
-  `is_architecture_applicable` (`cfg!(target_arch = "aarch64")`) and
-  `is_supported` (SveArch emulation availability, which is always true when
-  compiled for AArch64).
+  `dispatch_view_mut_to` exactly like the scalar path, unconditionally:
+  `SveArch` is a lane-emulated backend compiled with `cfg(all())` and exported
+  on every host (crates/hermes-simd-intrinsics/src/aarch64/sve.rs), so its
+  `is_architecture_applicable()` and `is_supported()` are both `true` wherever
+  Hermes builds. It mirrors `TargetId::Scalar`, not the hardware-gated x86 /
+  aarch64 targets, and no cfg gates enter the dispatch arms.
 - `dispatch_view` auto-selection stays untouched: an emulated backend must
   remain explicitly requested, never auto-selected. `Sve` does not enter the
-  `ALL`-ordered host-support probe used by `dispatch_view`.
+  runtime feature-probe chain inside `dispatch_view`; the `ALL`-ordered
+  `supported_on_host` probe and the conformance report do include it, since it
+  executes on every host.
 - `name()` returns `"sve"` and `from_name` accepts it, so conformance
   expectations can name the backend in CI configuration.
 
@@ -70,9 +74,9 @@ rule.
   wildcard arm; this is the documented pre-1.0 **Breaking** note in the
   CHANGELOG.
 - The forced-dispatch conformance matrix can now reach every shipped backend,
-  closing the HS-425 hole. The emulated `SveArch` paths already have
-  differential coverage; this item's new coverage asserts the same value
-  semantics through the `TargetId::Sve` route on the aarch64 and SDE jobs.
+  closing the HS-425 hole. Because `SveArch` is lane-emulated and executes on
+  every host, the new `TargetId::Sve` conformance coverage runs on every
+  runner (x86-64 CI included), not only on aarch64 and SDE jobs.
 - Future backend additions (SME, a native SVE path) are additive for
   consumers, requiring no downstream `match` change.
 
@@ -81,12 +85,21 @@ rule.
 - `cargo build --workspace --all-targets` green on x86-64 and
   `cargo check --target aarch64-unknown-linux-gnu`.
 - `cargo nextest run --workspace` green; new tests assert
-  `TargetId::Sve.is_architecture_applicable()`/`is_supported()` on aarch64 and
-  `false` on other hosts, `name() == "sve"`, and value-semantic dispatch
-  through `dispatch_view_to(..., TargetId::Sve)` under the emulated backend on
-  both the aarch64 and SDE runners.
-- `cargo-semver-checks` against 0.6.0 reports the expected major transitions
-  for both enums (variant added + `#[non_exhaustive]` applied).
+  `TargetId::Sve.is_architecture_applicable()` and `is_supported()` are `true`
+  on every host (the emulated backend executes everywhere, matching
+  `SveArch::is_runtime_supported()`), `name() == "sve"`, and value-semantic
+  dispatch through `dispatch_view_to(..., TargetId::Sve)` under the emulated
+  backend. The existing `support_implies_architecture_applicability` invariant
+  holds because both predicates are `true` together.
+- `cargo-semver-checks` against 0.6.0 confirms the major transition:
+  `cargo semver-checks -p hermes-simd --baseline-rev origin/main
+  --release-type minor` reports `semver requires new major version` with
+  `enum_marked_non_exhaustive` failing for both `TargetId` and
+  `DispatchedView` (195 pass, 1 fail, 57 skip). The `--release-type minor`
+  declaration is required for the check to be meaningful: declaring `major`
+  satisfies every lint's required update, so the tool skips all checks as a
+  no-op. `enum_variant_added` passes precisely because the enums are sealed
+  `#[non_exhaustive]` in the same change.
 - Clippy `-D warnings`, doctests, and Rustdoc clean.
 
 ## References

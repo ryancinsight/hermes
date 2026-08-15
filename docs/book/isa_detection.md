@@ -57,8 +57,9 @@ answer different questions and are never substituted for each other.
 
 A probe that returns `false` and therefore *skips* a test is indistinguishable
 from a test that passed — it is a silent gap in coverage. hermes-simd's CI
-addresses this directly. `TargetId` enumerates the closed set of dispatch
-targets, and a coverage step prints the per-runner matrix and asserts against
+addresses this directly. `TargetId` enumerates the dispatch targets (an
+`#[non_exhaustive]` set, so additions are non-breaking), and a coverage step
+prints the per-runner matrix and asserts against
 `HERMES_EXPECTED_TARGETS` declared per runner as configuration. The report
 distinguishes three outcomes:
 

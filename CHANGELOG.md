@@ -12,6 +12,14 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   `SimdGather<T>`. The migration updates all in-repository callers and keeps
   no compatibility re-export.
 
+- [major][HS-425] `TargetId` and `DispatchedView` gain an `Sve` variant for the
+  lane-emulated SVE backend and become `#[non_exhaustive]`. The variant
+  addition and the sealing land as one consumer-visible break: downstream
+  exhaustive `match`es on either type must add a wildcard arm, and future
+  backend additions are no longer breaking. `TargetId::Sve` executes on every
+  host exactly like the scalar target; `dispatch_view` auto-selection remains
+  unchanged (emulated backends stay explicitly requested).
+
 ### Fixed
 
 - [patch] The AMX-to-AVX-512 NUMA locality downgrade is emitted as a
