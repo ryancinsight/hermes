@@ -35,13 +35,7 @@ const fn flush_limit_for<T>() -> usize {
 impl<
         'a,
         T: 'a,
-        Arch: SimdArch
-            + SimdLoadStore<T>
-            + SimdArith<T>
-            + SimdBitwise<T>
-            + SimdCompare<T>
-            + SimdMask<T>
-            + SimdReduce<T>,
+        Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
         Align: Alignment,
         Mode: ExecutionMode,
         Ref: 'a,
@@ -309,7 +303,25 @@ where
 
         Ok(total)
     }
+}
 
+impl<
+        'a,
+        T: 'a,
+        Arch: SimdArch
+            + SimdLoadStore<T>
+            + SimdArith<T>
+            + SimdBitwise<T>
+            + SimdCompare<T>
+            + SimdMask<T>
+            + SimdReduce<T>,
+        Align: Alignment,
+        Mode: ExecutionMode,
+        Ref: 'a,
+    > SimdView<'a, T, Arch, Align, Mode, Ref>
+where
+    T: Scalar,
+{
     /// Computes the horizontal sum of population counts of all elements.
     #[inline]
     #[must_use]
@@ -611,7 +623,6 @@ impl<
         Arch: crate::arch::SimdArch
             + crate::kernel::SimdLoadStore<T>
             + crate::kernel::SimdArith<T>
-            + crate::kernel::SimdBitwise<T>
             + crate::kernel::SimdCompare<T>
             + crate::kernel::SimdMask<T>
             + crate::kernel::SimdReduce<T>,

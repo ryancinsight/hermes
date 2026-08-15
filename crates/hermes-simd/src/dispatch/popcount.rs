@@ -8,7 +8,7 @@ use hermes_simd_core::{
     align::Unaligned,
     arch::SimdArch,
     execution::Unmasked,
-    kernel::SimdKernel,
+    kernel::{SimdArith, SimdBitwise, SimdCompare, SimdLoadStore, SimdMask, SimdReduce},
     scalar::Scalar,
     view::{SimdError, SimdView},
 };
@@ -19,7 +19,13 @@ use hermes_simd_macros::runtime_dispatch;
 pub fn dispatch_reduce_popcount_kernel<T, A>(data: &[T]) -> usize
 where
     T: Scalar,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch
+        + SimdLoadStore<T>
+        + SimdArith<T>
+        + SimdBitwise<T>
+        + SimdCompare<T>
+        + SimdMask<T>
+        + SimdReduce<T>,
 {
     match SimdView::<T, A, Unaligned, Unmasked, &[T]>::new(data) {
         Some(v) => v.reduce_popcount(),
@@ -32,7 +38,13 @@ where
 pub fn dispatch_reduce_popcount_and_kernel<T, A>(a: &[T], b: &[T]) -> Result<usize, SimdError>
 where
     T: Scalar,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch
+        + SimdLoadStore<T>
+        + SimdArith<T>
+        + SimdBitwise<T>
+        + SimdCompare<T>
+        + SimdMask<T>
+        + SimdReduce<T>,
 {
     match (
         SimdView::<T, A, Unaligned, Unmasked, &[T]>::new(a),
@@ -48,7 +60,13 @@ where
 pub fn dispatch_reduce_popcount_or_kernel<T, A>(a: &[T], b: &[T]) -> Result<usize, SimdError>
 where
     T: Scalar,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch
+        + SimdLoadStore<T>
+        + SimdArith<T>
+        + SimdBitwise<T>
+        + SimdCompare<T>
+        + SimdMask<T>
+        + SimdReduce<T>,
 {
     match (
         SimdView::<T, A, Unaligned, Unmasked, &[T]>::new(a),
@@ -64,7 +82,13 @@ where
 pub fn dispatch_reduce_popcount_xor_kernel<T, A>(a: &[T], b: &[T]) -> Result<usize, SimdError>
 where
     T: Scalar,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch
+        + SimdLoadStore<T>
+        + SimdArith<T>
+        + SimdBitwise<T>
+        + SimdCompare<T>
+        + SimdMask<T>
+        + SimdReduce<T>,
 {
     match (
         SimdView::<T, A, Unaligned, Unmasked, &[T]>::new(a),

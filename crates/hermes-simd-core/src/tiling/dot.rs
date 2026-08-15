@@ -34,7 +34,7 @@
 use crate::{
     align::Alignment,
     arch::SimdArch,
-    kernel::SimdKernel,
+    kernel::{SimdArith, SimdLoadStore, SimdReduce},
     scalar::Scalar,
     view::{SimdError, SimdView},
 };
@@ -49,7 +49,7 @@ pub(super) fn dot_impl<T, Arch, Align, const TILE_M: usize>(
     b: &SimdView<'_, T, Arch, Align>,
 ) -> Result<T, SimdError>
 where
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdReduce<T>,
     Align: Alignment,
     T: Scalar,
 {

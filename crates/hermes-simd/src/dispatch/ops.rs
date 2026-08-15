@@ -387,7 +387,10 @@ pub fn interleaved_complex_mul_assign<T, A, const CONJ_B: bool>(
 ) -> Result<(), SimdError>
 where
     T: ScalarTrait + core::ops::Neg<Output = T>,
-    A: hermes_simd_core::arch::SimdArch + hermes_simd_core::kernel::SimdKernel<T>,
+    A: hermes_simd_core::arch::SimdArch
+        + hermes_simd_core::kernel::SimdArith<T>
+        + hermes_simd_core::kernel::SimdLoadStore<T>
+        + hermes_simd_core::kernel::SimdPermute<T>,
 {
     complex::interleaved_complex_mul_assign::<T, A, CONJ_B>(a, b)
 }
@@ -409,7 +412,10 @@ pub fn interleaved_complex_dot<T, A, const CONJ_B: bool>(
 ) -> Result<(T, T), SimdError>
 where
     T: ScalarTrait + core::ops::Neg<Output = T>,
-    A: hermes_simd_core::arch::SimdArch + hermes_simd_core::kernel::SimdKernel<T>,
+    A: hermes_simd_core::arch::SimdArch
+        + hermes_simd_core::kernel::SimdArith<T>
+        + hermes_simd_core::kernel::SimdLoadStore<T>
+        + hermes_simd_core::kernel::SimdPermute<T>,
 {
     complex::interleaved_complex_dot::<T, A, CONJ_B>(a, b)
 }

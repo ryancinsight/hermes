@@ -33,7 +33,7 @@
 use super::SimdCow;
 use crate::align::Alignment;
 use crate::arch::SimdArch;
-use crate::kernel::SimdKernel;
+use crate::kernel::{SimdArith, SimdCompare, SimdKernel, SimdLoadStore, SimdMask, SimdReduce};
 use crate::ops::{Dot, Sub};
 use crate::scalar::{FloatElement, Scalar};
 use crate::vec::AlignedVec;
@@ -139,7 +139,7 @@ where
 impl<'a, T: 'a, Arch, Align> SimdCow<'a, T, Arch, Align>
 where
     T: Scalar + FloatElement,
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
     Align: Alignment,
 {
     /// Squared Euclidean norm: `∑ self[i]²`.
@@ -159,7 +159,14 @@ where
     pub fn norm(&self) -> T {
         self.norm_sq().sqrt()
     }
+}
 
+impl<'a, T: 'a, Arch, Align> SimdCow<'a, T, Arch, Align>
+where
+    T: Scalar + FloatElement,
+    Arch: SimdArch + SimdKernel<T>,
+    Align: Alignment,
+{
     /// Returns a unit-length copy: `self / ‖self‖`.
     ///
     /// - Empty vector → empty `SimdCow<'static, T, Arch, Align>`.

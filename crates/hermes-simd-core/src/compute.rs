@@ -8,6 +8,7 @@ use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::bitboard::BitBoardView;
 use crate::execution::ExecutionMode;
+use crate::kernel::{SimdArith, SimdCompare, SimdLoadStore, SimdMask, SimdReduce};
 use crate::sparse::{SparseFormat, SparseView};
 use crate::view::SimdView;
 
@@ -142,7 +143,11 @@ use crate::scalar::Scalar;
 /// ```
 pub trait ComputeReduce: ComputeView
 where
-    Self::Arch: crate::kernel::SimdKernel<Self::Element>,
+    Self::Arch: SimdLoadStore<Self::Element>
+        + SimdArith<Self::Element>
+        + SimdCompare<Self::Element>
+        + SimdMask<Self::Element>
+        + SimdReduce<Self::Element>,
     Self::Element: Scalar,
 {
     /// Reduce all elements to a scalar using the given strategy.
@@ -155,7 +160,7 @@ where
 impl<'a, T, Arch, Align, Mode, Ref> ComputeReduce for SimdView<'a, T, Arch, Align, Mode, Ref>
 where
     T: Scalar,
-    Arch: SimdArch + crate::kernel::SimdKernel<T>,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
     Align: Alignment,
     Mode: ExecutionMode,
     Ref: 'a,

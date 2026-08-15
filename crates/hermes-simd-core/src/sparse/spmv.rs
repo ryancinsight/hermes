@@ -13,7 +13,7 @@
 
 use super::{BlockedCoo, Csr, DenseWithMask, SellP, SellPData, SparseView, Validated};
 use crate::arch::SimdArch;
-use crate::kernel::{SimdKernel, SimdStorage};
+use crate::kernel::{SimdArith, SimdGather, SimdLoadStore, SimdMask, SimdReduce, SimdStorage};
 use crate::scalar::Scalar;
 
 /// Unified trait for sparse matrix-vector multiplication.
@@ -28,7 +28,7 @@ pub trait SparseSpMv<T> {
 /// Build an `Arch::IndexVector` from a slice of `i32` column indices.
 ///
 /// # Safety
-/// All implementations of `SimdKernel` in this workspace define `IndexVector`
+/// All implementations of `SimdStorage` in this workspace define `IndexVector`
 /// with the layout `[i32; LANE_COUNT]`. This function reads `&[i32]` of length
 /// `>= LANE_COUNT` as one `Arch::IndexVector` via an unaligned read (so element
 /// alignment, not vector alignment, is the only requirement). The size half of
@@ -73,7 +73,7 @@ fn validate_spmv_sizes(x_len: usize, y_len: usize, ncols: usize, nrows: usize, f
 impl<T, Arch> SparseSpMv<T> for SparseView<'_, T, Validated<Csr>, Arch>
 where
     T: Scalar,
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdGather<T> + SimdReduce<T>,
 {
     #[inline]
     fn spmv(&self, x: &[T], y: &mut [T]) {
@@ -189,7 +189,7 @@ where
 impl<T, Arch> SparseSpMv<T> for SparseView<'_, T, DenseWithMask, Arch>
 where
     T: Scalar,
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdMask<T> + SimdReduce<T>,
 {
     #[inline]
     fn spmv(&self, x: &[T], y: &mut [T]) {
@@ -308,7 +308,7 @@ impl<T, const BM: usize, const BN: usize, Arch> SparseSpMv<T>
     for SparseView<'_, T, Validated<BlockedCoo<BM, BN>>, Arch>
 where
     T: Scalar,
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdReduce<T>,
 {
     #[inline]
     fn spmv(&self, x: &[T], y: &mut [T]) {
@@ -442,7 +442,7 @@ unsafe fn sellp_spmv_vectorized<T, const C: usize, Arch>(
     y: &mut [T],
 ) where
     T: Scalar,
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdGather<T>,
 {
     assert_eq!(
         Arch::LANE_COUNT,
@@ -523,7 +523,7 @@ unsafe fn sellp_spmv_vectorized<T, const C: usize, Arch>(
 impl<T, const C: usize, Arch> SparseSpMv<T> for SparseView<'_, T, Validated<SellP<C>>, Arch>
 where
     T: Scalar,
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdGather<T>,
 {
     #[inline]
     fn spmv(&self, x: &[T], y: &mut [T]) {

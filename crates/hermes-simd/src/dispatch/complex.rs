@@ -6,7 +6,7 @@
 //!
 //! Arithmetic stays in vector registers for every `(T, Arch)` pair via the
 //! adjacent-pair shuffle and alternating-FMA primitives on
-//! [`SimdKernel`]:
+//! [`SimdArith`] and [`SimdPermute`]:
 //!
 //! - `a * b`       = `fmaddsub(dup_even(a), b, mul(dup_odd(a), swap_adjacent(b)))`
 //! - `a * conj(b)` = `fmsubadd(dup_odd(a), swap_adjacent(b), mul(dup_even(a), b))`
@@ -15,7 +15,12 @@
 //! same mechanism used by the dense kernels — no per-type provider impls and no
 //! `OnceLock` feature caching.
 
-use hermes_simd_core::{arch::SimdArch, kernel::SimdKernel, scalar::Scalar, view::SimdError};
+use hermes_simd_core::{
+    arch::SimdArch,
+    kernel::{SimdArith, SimdLoadStore, SimdPermute},
+    scalar::Scalar,
+    view::SimdError,
+};
 use hermes_simd_macros::runtime_dispatch;
 
 const MAX_STACK_LANES: usize = 128;
@@ -43,7 +48,7 @@ where
 unsafe fn complex_mul_vector<T, A, const CONJ_B: bool>(av: A::Vector, bv: A::Vector) -> A::Vector
 where
     T: Scalar,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch + SimdArith<T> + SimdPermute<T>,
 {
     let b_sw = A::swap_adjacent(bv);
     if CONJ_B {
@@ -88,7 +93,7 @@ pub fn interleaved_complex_mul_assign<T, A, const CONJ_B: bool>(
 ) -> Result<(), SimdError>
 where
     T: Scalar,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch + SimdArith<T> + SimdLoadStore<T> + SimdPermute<T>,
 {
     if a.len() != b.len() || (a.len() & 1) != 0 {
         return Err(SimdError::LengthMismatch);
@@ -214,7 +219,7 @@ pub fn interleaved_complex_dot<T, A, const CONJ_B: bool>(
 ) -> Result<(T, T), SimdError>
 where
     T: Scalar,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch + SimdArith<T> + SimdLoadStore<T> + SimdPermute<T>,
 {
     if a.len() != b.len() || (a.len() & 1) != 0 {
         return Err(SimdError::LengthMismatch);
@@ -290,7 +295,7 @@ pub(super) fn dispatch_interleaved_complex_mul_assign_impl<T, const CONJ_B: bool
 ) -> Result<(), SimdError>
 where
     T: Scalar,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch + SimdArith<T> + SimdLoadStore<T> + SimdPermute<T>,
 {
     interleaved_complex_mul_assign::<T, A, CONJ_B>(a, b)
 }
@@ -302,7 +307,7 @@ pub(super) fn dispatch_interleaved_complex_dot_impl<T, const CONJ_B: bool, A>(
 ) -> Result<(T, T), SimdError>
 where
     T: Scalar,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch + SimdArith<T> + SimdLoadStore<T> + SimdPermute<T>,
 {
     interleaved_complex_dot::<T, A, CONJ_B>(a, b)
 }

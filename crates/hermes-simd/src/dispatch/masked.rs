@@ -1,7 +1,7 @@
 //! Runtime-dispatched masked SIMD operations.
 
 use hermes_simd_core::arch::SimdArch;
-use hermes_simd_core::kernel::SimdKernel;
+use hermes_simd_core::kernel::{SimdArith, SimdLoadStore, SimdMask, SimdReduce};
 use hermes_simd_core::{view::SimdError, Scalar as ScalarTrait};
 use hermes_simd_macros::runtime_dispatch;
 
@@ -14,7 +14,7 @@ use hermes_simd_macros::runtime_dispatch;
 unsafe fn masked_sum_impl<T, Arch>(data: &[T], bool_mask: &[bool]) -> T
 where
     T: ScalarTrait,
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch + SimdLoadStore<T> + SimdMask<T> + SimdReduce<T>,
 {
     assert_eq!(
         data.len(),
@@ -56,7 +56,7 @@ unsafe fn masked_add_impl<T, Arch>(
 ) -> Result<(), SimdError>
 where
     T: ScalarTrait,
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdMask<T>,
 {
     if a.len() != b.len() || a.len() != bool_mask.len() || a.len() > out.len() {
         return Err(SimdError::LengthMismatch);
@@ -90,7 +90,7 @@ where
 unsafe fn masked_dot_impl<T, Arch>(a: &[T], b: &[T], bool_mask: &[bool]) -> Result<T, SimdError>
 where
     T: ScalarTrait,
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdMask<T> + SimdReduce<T>,
 {
     if a.len() != b.len() || a.len() != bool_mask.len() {
         return Err(SimdError::LengthMismatch);
@@ -131,7 +131,7 @@ where
 pub(super) fn dispatch_masked_sum_kernel<T, A>(data: &[T], mask: &[bool]) -> T
 where
     T: ScalarTrait,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch + SimdLoadStore<T> + SimdMask<T> + SimdReduce<T>,
 {
     unsafe { masked_sum_impl::<T, A>(data, mask) }
 }
@@ -144,7 +144,7 @@ pub(super) fn dispatch_masked_dot_kernel<T, A>(
 ) -> Result<T, SimdError>
 where
     T: ScalarTrait,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdMask<T> + SimdReduce<T>,
 {
     unsafe { masked_dot_impl::<T, A>(a, b, mask) }
 }
@@ -158,7 +158,7 @@ pub(super) fn dispatch_masked_add_kernel<T, A>(
 ) -> Result<(), SimdError>
 where
     T: ScalarTrait,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdMask<T>,
 {
     unsafe { masked_add_impl::<T, A>(a, b, mask, out) }
 }

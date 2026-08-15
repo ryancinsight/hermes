@@ -4,7 +4,7 @@ use hermes_simd_core::{
     align::Unaligned,
     arch::SimdArch,
     execution::Unmasked,
-    kernel::SimdKernel,
+    kernel::{SimdArith, SimdLoadStore, SimdMask, SimdReduce},
     scalar::Scalar,
     view::{SimdError, SimdView},
 };
@@ -14,7 +14,7 @@ use hermes_simd_macros::runtime_dispatch;
 pub(super) fn dispatch_dot_kernel<T, A>(a: &[T], b: &[T]) -> Result<T, SimdError>
 where
     T: Scalar,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdMask<T> + SimdReduce<T>,
 {
     match (
         SimdView::<T, A, Unaligned, Unmasked, &[T]>::new(a),

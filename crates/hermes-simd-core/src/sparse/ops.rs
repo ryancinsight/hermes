@@ -14,7 +14,7 @@
 use super::types::SparseValidate;
 use super::{BlockedCoo, Csr, DenseWithMask, SellP, SparseView};
 use crate::arch::SimdArch;
-use crate::kernel::SimdKernel;
+use crate::kernel::{SimdArith, SimdCompare, SimdGather, SimdLoadStore, SimdMask, SimdReduce};
 use crate::scalar::Scalar;
 use crate::sparse::spmv::build_index_vector;
 
@@ -31,7 +31,13 @@ pub trait SparseOps<T> {
 impl<T, Arch> SparseOps<T> for SparseView<'_, T, Csr, Arch>
 where
     T: Scalar,
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch
+        + SimdLoadStore<T>
+        + SimdArith<T>
+        + SimdCompare<T>
+        + SimdMask<T>
+        + SimdReduce<T>
+        + SimdGather<T>,
 {
     #[inline]
     fn sum_values(&self) -> T {
@@ -104,7 +110,13 @@ where
 impl<T, const C: usize, Arch> SparseOps<T> for SparseView<'_, T, SellP<C>, Arch>
 where
     T: Scalar,
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch
+        + SimdLoadStore<T>
+        + SimdArith<T>
+        + SimdCompare<T>
+        + SimdMask<T>
+        + SimdReduce<T>
+        + SimdGather<T>,
 {
     #[inline]
     fn sum_values(&self) -> T {
@@ -204,7 +216,7 @@ impl<T, const BM: usize, const BN: usize, Arch> SparseOps<T>
     for SparseView<'_, T, BlockedCoo<BM, BN>, Arch>
 where
     T: Scalar,
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
 {
     #[inline]
     fn sum_values(&self) -> T {
@@ -317,7 +329,7 @@ where
 impl<T, Arch> SparseOps<T> for SparseView<'_, T, DenseWithMask, Arch>
 where
     T: Scalar,
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdMask<T> + SimdReduce<T>,
 {
     #[inline]
     fn sum_values(&self) -> T {

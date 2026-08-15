@@ -22,11 +22,26 @@ use super::types::SimdCow;
 use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::execution::Unmasked;
-use crate::kernel::SimdKernel;
+use crate::kernel::{SimdArith, SimdCompare, SimdKernel, SimdLoadStore, SimdMask, SimdReduce};
 use crate::ops::{ElementOp, ReductionOp};
 use crate::scalar::Scalar;
 use crate::vec::AlignedVec;
 use crate::view::{SimdError, SimdView};
+
+impl<'a, T: 'a, Arch, Align> SimdCow<'a, T, Arch, Align>
+where
+    T: Scalar,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    Align: Alignment,
+{
+    /// Apply a `ReductionOp` to this `SimdCow`, delegating to `SimdView::reduce`.
+    ///
+    /// Monomorphization is shared with the view path — no duplicate code.
+    #[inline(always)]
+    pub fn reduce<Op: ReductionOp<T>>(&self, op: Op) -> T {
+        self.view().reduce(op)
+    }
+}
 
 impl<'a, T: 'a, Arch, Align> SimdCow<'a, T, Arch, Align>
 where
@@ -187,14 +202,6 @@ where
         }
 
         Ok(())
-    }
-
-    /// Apply a `ReductionOp` to this `SimdCow`, delegating to `SimdView::reduce`.
-    ///
-    /// Monomorphization is shared with the view path — no duplicate code.
-    #[inline(always)]
-    pub fn reduce<Op: ReductionOp<T>>(&self, op: Op) -> T {
-        self.view().reduce(op)
     }
 
     // -----------------------------------------------------------------------

@@ -31,7 +31,7 @@
 use crate::{
     align::Alignment,
     arch::SimdArch,
-    kernel::SimdKernel,
+    kernel::{SimdArith, SimdLoadStore, SimdMask, SimdReduce},
     scalar::Scalar,
     view::{SimdError, SimdView},
 };
@@ -70,7 +70,7 @@ pub(super) fn gemv_impl<T, Arch, Align, const TILE_M: usize>(
     ncols: usize,
 ) -> Result<(), SimdError>
 where
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdMask<T> + SimdReduce<T>,
     Align: Alignment,
     T: Scalar,
 {
@@ -94,7 +94,7 @@ pub(super) fn gemv_strided_impl<T, Arch, Align, const TILE_M: usize>(
     lda: usize,
 ) -> Result<(), SimdError>
 where
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdMask<T> + SimdReduce<T>,
     Align: Alignment,
     T: Scalar,
 {

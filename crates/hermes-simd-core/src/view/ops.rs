@@ -14,7 +14,10 @@
 use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
-use crate::kernel::{SimdKernel, SimdStorage, MAX_SIMD_LANES};
+use crate::kernel::{
+    SimdArith, SimdBitwise, SimdCompare, SimdLoadStore, SimdMask, SimdReduce, SimdStorage,
+    MAX_SIMD_LANES,
+};
 use crate::ops::ElementOp;
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
@@ -29,8 +32,14 @@ use crate::view::{SimdError, SimdView};
 /// reuse). Measured 1.71× at 64 MiB out-of-LLC (see `streaming_bench`).
 const NT_STORE_MIN_BYTES: usize = 8 * 1024 * 1024;
 
-impl<'a, T: 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode, Ref: 'a>
-    SimdView<'a, T, Arch, Align, Mode, Ref>
+impl<
+        'a,
+        T: 'a,
+        Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdMask<T> + SimdReduce<T>,
+        Align: Alignment,
+        Mode: ExecutionMode,
+        Ref: 'a,
+    > SimdView<'a, T, Arch, Align, Mode, Ref>
 where
     T: Scalar,
 {
@@ -175,7 +184,19 @@ where
 
         Ok(total)
     }
+}
 
+impl<
+        'a,
+        T: 'a,
+        Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdBitwise<T> + SimdCompare<T> + SimdMask<T>,
+        Align: Alignment,
+        Mode: ExecutionMode,
+        Ref: 'a,
+    > SimdView<'a, T, Arch, Align, Mode, Ref>
+where
+    T: Scalar,
+{
     /// Multiply elementwise with another view and write the output to a mutable slice.
     ///
     /// # Errors
