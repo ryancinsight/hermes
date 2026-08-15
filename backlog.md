@@ -218,6 +218,37 @@
   over-sized source arrays from these default-path frames, while
   `MAX_SIMD_LANES` remains the compile-time safety bound.
 
+  Re-measured 2026-08-15, independently, because one of the three data points
+  above does not support the conclusion it was cited for: **NEON overrides
+  `interleave`/`deinterleave`** (`aarch64/neon_f32.rs`, `neon_f64.rs`), so the
+  NEON f64 wrapper measures a native override, not the default body. AVX2 —
+  the backend that actually takes the default path on x86-64 — was not covered.
+  The conclusion holds, but on different evidence:
+
+  | probe (release, `--emit asm`) | lanes | `sub rsp` | rsp/rbp traffic |
+  |---|---:|---:|---:|
+  | Scalar f32 / f64 | 4 / 2 | 0 | 0 |
+  | SveArch f32 / f64 | 16 / 8 | 0 | 0 |
+  | AVX2 f32 / f64 | 8 / 4 | 0 | 0 |
+  | AVX2 f64, `interleave` alone | 4 | 0 | 0 |
+
+  Each probe is an `#[inline(never)] extern "C"` wrapper so it owns its
+  prologue; the AVX2 ones carry `#[target_feature(enable = "avx2,fma")]`. The
+  full-chain probes run `interleave` + `deinterleave` + `reverse` +
+  `swap_adjacent` — ten `[MaybeUninit<T>; 64]` declarations, up to 5 KB at f64
+  if any of it materialised. None does.
+  The instrument was checked rather than trusted, since a zero reading and a
+  measurement of nothing look identical: `hs437_avx2_f64_interleave_only`
+  emits `vaddsd` / `vunpcklpd` / `vaddpd` / `vshufpd` / `vaddsd` / `retq` —
+  the four 512-byte arrays lowered to one `vunpcklpd`. `SveArch` f64, whose
+  vector is an emulated array and so the hardest case for SROA, emits twelve
+  register instructions and zero `(%rsp)`/`(%rbp)` operands.
+  Per repository convention (see the note in `benches/permute.rs`) the probe
+  was a one-off and is not committed; it is reconstructible from this record.
+  Conclusion unchanged and now covering the default path on this host: the
+  typed `LaneBuffer` refactor buys nothing measurable. Re-open only if a future
+  backend's default-path frame shows a non-zero `sub rsp`.
+
 - [x] [minor] **HS-422 — scatter seam.** Add `SimdGather::scatter` and
   `scatter_masked` as defaulted trait methods over a generic lane-sequential
   helper, override them with native `vscatterdps`/`vscatterdpd` on AVX-512
