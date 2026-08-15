@@ -197,7 +197,7 @@
    forwarding symbol. No compatibility re-export, runtime branch, or
    allocation was added by the facet forwarding layer.
 
-- [ ] [minor] **HS-437 — lane scratch buffers are sized to the workspace
+- [x] [minor] **HS-437 — lane scratch buffers are sized to the workspace
   maximum.** The `SimdKernel` default methods and `kernel_helpers` declare
   scratch as `[MaybeUninit<T>; MAX_SIMD_LANES]` with `MAX_SIMD_LANES = 64`,
   the widest backend/type pair in the workspace, rather than the backend's own
@@ -208,10 +208,15 @@
   `Self::LANE_COUNT` cannot be an array length in a default body on stable, so
   the fix is an associated `type LaneBuffer` (or const-generic lane parameter)
   that each backend fixes to its exact width.
-  Evidence required before implementing: stack-frame measurement on the
-  default-path backends, since LLVM may already narrow the frame through the
-  `store_unaligned`/`load_unaligned` pair. If it does, this closes as
-  "no measurable effect" rather than being implemented on principle.
+  Closure evidence: release assembly wrappers for the default `interleave`
+  path at Scalar f64, emulated `SveArch` f64, and AArch64 NEON f64 show no
+  stack allocation in the wrapper. x86-64 emits register moves/instructions
+  directly; AArch64 emits `zip1`/`zip2` and `stp` directly. The AArch64 target
+  emitted assembly before its Windows-host linker rejected the foreign
+  `--eh-frame-hdr` option; no cross-target execution claim is made. The typed
+  `LaneBuffer` refactor is therefore not justified: LLVM already removes the
+  over-sized source arrays from these default-path frames, while
+  `MAX_SIMD_LANES` remains the compile-time safety bound.
 
 - [x] [minor] **HS-422 — scatter seam.** Add `SimdGather::scatter` and
   `scatter_masked` as defaulted trait methods over a generic lane-sequential
