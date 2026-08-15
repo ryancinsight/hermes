@@ -18,7 +18,7 @@ use hermes_simd_core::{
     align::Unaligned,
     arch::SimdArch,
     execution::Unmasked,
-    kernel::SimdKernel,
+    kernel::{SimdArith, SimdLoadStore, SimdMask},
     scalar::Scalar,
     view::{SimdError, SimdView},
 };
@@ -34,7 +34,7 @@ pub(super) fn dispatch_gemv_transpose_kernel<T, A>(
 ) -> Result<(), SimdError>
 where
     T: Scalar,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdMask<T>,
 {
     match (
         SimdView::<T, A, Unaligned, Unmasked, &[T]>::new(a),

@@ -31,7 +31,7 @@
 use crate::{
     align::Alignment,
     arch::SimdArch,
-    kernel::SimdKernel,
+    kernel::{SimdArith, SimdKernel, SimdLoadStore, SimdMask, SimdReduce},
     scalar::Scalar,
     view::{SimdError, SimdView},
 };
@@ -83,7 +83,10 @@ pub trait TilingStrategy<T, Arch: SimdArch, Align: Alignment> {
         m: usize,
         n: usize,
         k: usize,
-    ) -> Result<(), SimdError>;
+    ) -> Result<(), SimdError>
+    where
+        T: Scalar,
+        Arch: SimdKernel<T>;
 
     /// Perform tiled matrix-vector multiplication `y += A * x` using this strategy.
     ///
@@ -96,7 +99,10 @@ pub trait TilingStrategy<T, Arch: SimdArch, Align: Alignment> {
         y: &mut [T],
         nrows: usize,
         ncols: usize,
-    ) -> Result<(), SimdError>;
+    ) -> Result<(), SimdError>
+    where
+        T: Scalar,
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdMask<T> + SimdReduce<T>;
 
     /// Perform tiled transposed matrix-vector multiplication `y += Aᵀ * x`
     /// (`A` row-major `nrows × ncols`, `x` length `nrows`, `y` length `ncols`).
@@ -110,7 +116,10 @@ pub trait TilingStrategy<T, Arch: SimdArch, Align: Alignment> {
         y: &mut [T],
         nrows: usize,
         ncols: usize,
-    ) -> Result<(), SimdError>;
+    ) -> Result<(), SimdError>
+    where
+        T: Scalar,
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdMask<T>;
 
     /// Perform tiled matrix-vector multiplication `y += A * x` over a row-major
     /// **sub-matrix**: `nrows × ncols` with row stride `lda ≥ ncols`
@@ -126,7 +135,10 @@ pub trait TilingStrategy<T, Arch: SimdArch, Align: Alignment> {
         nrows: usize,
         ncols: usize,
         lda: usize,
-    ) -> Result<(), SimdError>;
+    ) -> Result<(), SimdError>
+    where
+        T: Scalar,
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdMask<T> + SimdReduce<T>;
 
     /// Perform tiled transposed matrix-vector multiplication `y += Aᵀ * x` over a
     /// row-major **sub-matrix**: `nrows × ncols` with row stride `lda ≥ ncols`
@@ -142,7 +154,10 @@ pub trait TilingStrategy<T, Arch: SimdArch, Align: Alignment> {
         nrows: usize,
         ncols: usize,
         lda: usize,
-    ) -> Result<(), SimdError>;
+    ) -> Result<(), SimdError>
+    where
+        T: Scalar,
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdMask<T>;
 
     /// Perform tiled dot product computation using this strategy.
     ///
@@ -151,7 +166,10 @@ pub trait TilingStrategy<T, Arch: SimdArch, Align: Alignment> {
     fn dot(
         a: &SimdView<'_, T, Arch, Align>,
         b: &SimdView<'_, T, Arch, Align>,
-    ) -> Result<T, SimdError>;
+    ) -> Result<T, SimdError>
+    where
+        T: Scalar,
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdReduce<T>;
 }
 
 /// Compute the dot product of two slices using `TILE_M` independent vector accumulators.
@@ -167,7 +185,7 @@ pub fn tiled_dot<T, Arch, Align, const TILE_M: usize>(
     b: &SimdView<'_, T, Arch, Align>,
 ) -> Result<T, SimdError>
 where
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdReduce<T>,
     Align: Alignment,
     T: Scalar,
 {
@@ -241,7 +259,7 @@ pub fn tiled_gemv<T, Arch, Align, const TILE_M: usize>(
     ncols: usize,
 ) -> Result<(), SimdError>
 where
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdMask<T> + SimdReduce<T>,
     Align: Alignment,
     T: Scalar,
 {
@@ -276,7 +294,7 @@ where
 impl<T, Arch, Align, const TILE_M: usize, const TILE_N: usize> TilingStrategy<T, Arch, Align>
     for TilingPolicy<TILE_M, TILE_N>
 where
-    Arch: SimdArch + SimdKernel<T>,
+    Arch: SimdArch,
     Align: Alignment,
     T: Scalar,
 {
@@ -291,7 +309,10 @@ where
         m: usize,
         n: usize,
         k: usize,
-    ) -> Result<(), SimdError> {
+    ) -> Result<(), SimdError>
+    where
+        Arch: SimdKernel<T>,
+    {
         gemm::gemm_impl::<T, Arch, Align, TILE_M, TILE_N>(a, b, c, m, n, k)
     }
 
@@ -302,7 +323,10 @@ where
         y: &mut [T],
         nrows: usize,
         ncols: usize,
-    ) -> Result<(), SimdError> {
+    ) -> Result<(), SimdError>
+    where
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdMask<T> + SimdReduce<T>,
+    {
         gemv::gemv_impl::<T, Arch, Align, TILE_M>(a, x, y, nrows, ncols)
     }
 
@@ -313,7 +337,10 @@ where
         y: &mut [T],
         nrows: usize,
         ncols: usize,
-    ) -> Result<(), SimdError> {
+    ) -> Result<(), SimdError>
+    where
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdMask<T>,
+    {
         // `TILE_N` blocks the output (`y`) lane-chunks for the transpose, mirroring
         // how `TILE_N` blocks the `B`/`c` columns in GEMM.
         gemv_transpose::gemv_transpose_impl::<T, Arch, Align, TILE_N>(a, x, y, nrows, ncols)
@@ -327,7 +354,10 @@ where
         nrows: usize,
         ncols: usize,
         lda: usize,
-    ) -> Result<(), SimdError> {
+    ) -> Result<(), SimdError>
+    where
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdMask<T> + SimdReduce<T>,
+    {
         gemv::gemv_strided_impl::<T, Arch, Align, TILE_M>(a, x, y, nrows, ncols, lda)
     }
 
@@ -339,7 +369,10 @@ where
         nrows: usize,
         ncols: usize,
         lda: usize,
-    ) -> Result<(), SimdError> {
+    ) -> Result<(), SimdError>
+    where
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdMask<T>,
+    {
         gemv_transpose::gemv_transpose_strided_impl::<T, Arch, Align, TILE_N>(
             a, x, y, nrows, ncols, lda,
         )
@@ -349,7 +382,10 @@ where
     fn dot(
         a: &SimdView<'_, T, Arch, Align>,
         b: &SimdView<'_, T, Arch, Align>,
-    ) -> Result<T, SimdError> {
+    ) -> Result<T, SimdError>
+    where
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdReduce<T>,
+    {
         dot::dot_impl::<T, Arch, Align, TILE_M>(a, b)
     }
 }
