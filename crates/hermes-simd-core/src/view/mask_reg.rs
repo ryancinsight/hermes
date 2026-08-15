@@ -2,7 +2,7 @@
 
 use super::vector_reg::{assert_runtime_supported, Vector};
 use crate::arch::SimdArch;
-use crate::kernel::SimdKernel;
+use crate::kernel::{SimdKernel, SimdStorage};
 use crate::mask::BitMask;
 use crate::scalar::Scalar;
 use core::marker::PhantomData;
@@ -116,7 +116,7 @@ where
     #[inline(always)]
     pub fn all(self) -> bool {
         assert_runtime_supported::<T, Arch>();
-        let lanes = <Arch as SimdKernel<T>>::LANE_COUNT;
+        let lanes = <Arch as SimdStorage<T>>::LANE_COUNT;
         let expected = if lanes >= 64 {
             u64::MAX
         } else {
@@ -204,7 +204,7 @@ where
         assert_runtime_supported::<T, Arch>();
         unsafe {
             let bm = self.to_bitmask();
-            let lanes = <Arch as SimdKernel<T>>::LANE_COUNT;
+            let lanes = <Arch as SimdStorage<T>>::LANE_COUNT;
             let active_mask = if lanes >= 64 {
                 u64::MAX
             } else {

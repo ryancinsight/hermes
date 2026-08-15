@@ -14,7 +14,7 @@
 use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
-use crate::kernel::SimdKernel;
+use crate::kernel::{SimdArith, SimdBitwise, SimdCompare, SimdLoadStore, SimdMask, SimdReduce};
 use crate::ops::ReductionOp;
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
@@ -32,8 +32,20 @@ const fn flush_limit_for<T>() -> usize {
     }
 }
 
-impl<'a, T: 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode, Ref: 'a>
-    SimdView<'a, T, Arch, Align, Mode, Ref>
+impl<
+        'a,
+        T: 'a,
+        Arch: SimdArch
+            + SimdLoadStore<T>
+            + SimdArith<T>
+            + SimdBitwise<T>
+            + SimdCompare<T>
+            + SimdMask<T>
+            + SimdReduce<T>,
+        Align: Alignment,
+        Mode: ExecutionMode,
+        Ref: 'a,
+    > SimdView<'a, T, Arch, Align, Mode, Ref>
 where
     T: Scalar,
 {
@@ -151,6 +163,13 @@ where
         }
 
         total
+    }
+
+    /// Sums all elements in the view through the reduction facet contract.
+    #[inline(always)]
+    #[must_use]
+    pub fn sum(&self) -> T {
+        self.reduce(crate::ops::Sum)
     }
 
     /// Generic pairwise SIMD reduction: `reduce(Op, a ⊗ b)`.
@@ -589,7 +608,13 @@ where
 impl<
         'a,
         T: 'a,
-        Arch: crate::arch::SimdArch + crate::kernel::SimdKernel<T>,
+        Arch: crate::arch::SimdArch
+            + crate::kernel::SimdLoadStore<T>
+            + crate::kernel::SimdArith<T>
+            + crate::kernel::SimdBitwise<T>
+            + crate::kernel::SimdCompare<T>
+            + crate::kernel::SimdMask<T>
+            + crate::kernel::SimdReduce<T>,
         Align: crate::align::Alignment,
         Mode: crate::execution::ExecutionMode,
         Ref: 'a,

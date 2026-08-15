@@ -1,4 +1,5 @@
-//! Property tests for `SimdKernel` mask, compress/expand, gather, and
+//! Property tests for the public SIMD kernel facets: mask, compress/expand,
+//! gather, and
 //! tail-mask primitives, exercised per architecture backend.
 //!
 //! The `Scalar` and SVE-shaped emulated backends always run; AVX2 / AVX-512 run
@@ -18,13 +19,25 @@
 use hermes_simd::{Scalar, SveArch};
 use hermes_simd_core::align::Unaligned;
 use hermes_simd_core::execution::Unmasked;
-use hermes_simd_core::kernel::SimdKernel;
+use hermes_simd_core::kernel::{SimdArith, SimdKernel, SimdReduce};
 use hermes_simd_core::view::SimdView;
 use proptest::prelude::*;
 
 /// Truncate a raw bitmask to the backend's lane count.
 fn lane_bits<A: SimdKernel<f32>>(bm: u64) -> u64 {
     bm & ((1u64 << A::LANE_COUNT) - 1)
+}
+
+fn reduce_through_role<A: SimdReduce<f32>>(vector: A::Vector) -> f32 {
+    // SAFETY: the caller supplies a vector created by the same sealed backend;
+    // the role facet preserves the backend's existing ISA contract.
+    unsafe { A::sum_reduce(vector) }
+}
+
+#[test]
+fn reduction_role_facet_preserves_backend_contract() {
+    let vector = unsafe { <Scalar as SimdArith<f32>>::splat(2.0) };
+    assert_eq!(reduce_through_role::<Scalar>(vector), 8.0);
 }
 
 /// `mask_from_bitmask` ∘ `mask_to_bitmask` must be the identity on lane bits.

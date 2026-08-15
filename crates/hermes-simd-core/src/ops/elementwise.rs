@@ -4,7 +4,7 @@
 //! `transform_in_place` to parameterize binary vector operations without code
 //! duplication. All `apply` impls are `#[inline(always)]` — DCE removes unused strategies.
 
-use crate::kernel::SimdKernel;
+use crate::kernel::{SimdArith, SimdBitwise};
 use crate::scalar::Scalar;
 
 // ---------------------------------------------------------------------------
@@ -29,7 +29,11 @@ pub trait ElementOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
     ///
     /// # Safety
     /// Processor must support the target feature of `Arch`.
-    unsafe fn apply<Arch: SimdKernel<T>>(self, a: Arch::Vector, b: Arch::Vector) -> Arch::Vector;
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(
+        self,
+        a: Arch::Vector,
+        b: Arch::Vector,
+    ) -> Arch::Vector;
 
     /// Apply the operation to two individual scalar elements.
     ///
@@ -136,7 +140,11 @@ impl<T: Copy + 'static> crate::private::Sealed for Clamp<T> {}
 
 impl<T: Scalar> ElementOp<T> for Mul {
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, a: Arch::Vector, b: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(
+        self,
+        a: Arch::Vector,
+        b: Arch::Vector,
+    ) -> Arch::Vector {
         Arch::mul(a, b)
     }
     #[inline(always)]
@@ -147,7 +155,11 @@ impl<T: Scalar> ElementOp<T> for Mul {
 
 impl<T: Scalar> ElementOp<T> for Add {
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, a: Arch::Vector, b: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(
+        self,
+        a: Arch::Vector,
+        b: Arch::Vector,
+    ) -> Arch::Vector {
         Arch::add(a, b)
     }
     #[inline(always)]
@@ -158,7 +170,11 @@ impl<T: Scalar> ElementOp<T> for Add {
 
 impl<T: Scalar> ElementOp<T> for Sub {
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, a: Arch::Vector, b: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(
+        self,
+        a: Arch::Vector,
+        b: Arch::Vector,
+    ) -> Arch::Vector {
         Arch::sub(a, b)
     }
     #[inline(always)]
@@ -169,7 +185,11 @@ impl<T: Scalar> ElementOp<T> for Sub {
 
 impl<T: Scalar> ElementOp<T> for Div {
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, a: Arch::Vector, b: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(
+        self,
+        a: Arch::Vector,
+        b: Arch::Vector,
+    ) -> Arch::Vector {
         Arch::div(a, b)
     }
     #[inline(always)]
@@ -180,7 +200,11 @@ impl<T: Scalar> ElementOp<T> for Div {
 
 impl<T: Scalar> ElementOp<T> for BitAnd {
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, a: Arch::Vector, b: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(
+        self,
+        a: Arch::Vector,
+        b: Arch::Vector,
+    ) -> Arch::Vector {
         Arch::bitand(a, b)
     }
     #[inline(always)]
@@ -191,7 +215,11 @@ impl<T: Scalar> ElementOp<T> for BitAnd {
 
 impl<T: Scalar> ElementOp<T> for BitOr {
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, a: Arch::Vector, b: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(
+        self,
+        a: Arch::Vector,
+        b: Arch::Vector,
+    ) -> Arch::Vector {
         Arch::bitor(a, b)
     }
     #[inline(always)]
@@ -202,7 +230,11 @@ impl<T: Scalar> ElementOp<T> for BitOr {
 
 impl<T: Scalar> ElementOp<T> for BitXor {
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, a: Arch::Vector, b: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(
+        self,
+        a: Arch::Vector,
+        b: Arch::Vector,
+    ) -> Arch::Vector {
         Arch::bitxor(a, b)
     }
     #[inline(always)]
@@ -217,7 +249,11 @@ impl<T: Scalar> ElementOp<T> for FmaAdd {
     /// # Safety
     /// Processor must support the target feature of `Arch`.
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, a: Arch::Vector, b: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(
+        self,
+        a: Arch::Vector,
+        b: Arch::Vector,
+    ) -> Arch::Vector {
         // Accumulate into a zero register: a[i] * b[i] + 0.
         let zero = Arch::zero();
         Arch::fmadd(a, b, zero)
@@ -241,7 +277,11 @@ impl<T: Scalar + Copy> ElementOp<T> for Clamp<T> {
     /// The compiler hoists the `splat(lo)` and `splat(hi)` outside the vectorized
     /// loop because `self` is captured by value in each `zip_cow` iteration.
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, a: Arch::Vector, _b: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(
+        self,
+        a: Arch::Vector,
+        _b: Arch::Vector,
+    ) -> Arch::Vector {
         let lo_vec = Arch::splat(self.lo);
         let hi_vec = Arch::splat(self.hi);
         Arch::min(Arch::max(a, lo_vec), hi_vec)

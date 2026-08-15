@@ -1,7 +1,7 @@
 use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
-use crate::kernel::{SimdKernel, MAX_SIMD_LANES};
+use crate::kernel::{SimdKernel, SimdStorage, MAX_SIMD_LANES};
 use crate::mask::BitMask;
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
@@ -88,7 +88,7 @@ where
             // prefix into initialized provider-local buffers makes that load
             // bounded by the local allocation; the combined mask prevents the
             // inactive tail lanes from reaching the output.
-            const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+            const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
             let mut left = [T::ZERO; MAX_SIMD_LANES];
             let mut right = [T::ZERO; MAX_SIMD_LANES];
             let mut result = [T::ZERO; MAX_SIMD_LANES];
@@ -182,7 +182,7 @@ where
 
         let tail = len - simd_len;
         if tail != 0 {
-            const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+            const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
             let mut left = [T::ZERO; MAX_SIMD_LANES];
             let mut right = [T::ZERO; MAX_SIMD_LANES];
             let mut result = [T::ZERO; MAX_SIMD_LANES];
@@ -282,7 +282,7 @@ where
 
         let tail = len - simd_len;
         if tail != 0 {
-            const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+            const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
             let mut left = [T::ZERO; MAX_SIMD_LANES];
             let mut right = [T::ZERO; MAX_SIMD_LANES];
             let mut addend = [T::ZERO; MAX_SIMD_LANES];

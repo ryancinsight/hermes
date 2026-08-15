@@ -2,7 +2,7 @@
 //!
 //! # Operation Families
 //!
-//! [`SimdKernel`] is the single seam every backend implements. Its methods group
+//! [`BackendKernel`] is the single sealed seam every backend implements. Its methods group
 //! into the families below; a backend must supply the required ones and may
 //! override any default where the ISA has a native instruction.
 //!
@@ -24,7 +24,7 @@
 //!   the low lanes of the result; `expand` scatters the low lanes of `src` back to
 //!   the positions where `mask[i] = 1`.
 //! - **Gather / scatter** — `gather`, `gather_masked`, `scatter`, `scatter_masked`:
-//!   indirect indexed load and store through [`SimdKernel::IndexVector`].
+//!   indirect indexed load and store through [`BackendKernel::IndexVector`].
 //! - **Mask construction** — `mask_from_bools`, `mask_from_bitmask`,
 //!   `leading_k_mask` (tail handling), and the `mask_to_vector` /
 //!   `vector_to_mask` / `mask_to_bitmask` conversions.
@@ -45,11 +45,11 @@
 //! | `gather` | `_mm512_i32gather_ps` | `_mm256_i32gather_ps` | emulated | loop |
 
 /// Lane capacity of the fixed scalar-fallback stack buffers used by the default
-/// `SimdKernel` methods (`scan_vector`, `swap_adjacent`, `dup_even`/`dup_odd`,
-/// and the `kernel_helpers` scalar emulations). A backend's [`SimdKernel::LANE_COUNT`]
+/// `BackendKernel` methods (`scan_vector`, `swap_adjacent`, `dup_even`/`dup_odd`,
+/// and the `kernel_helpers` scalar emulations). A backend's [`BackendKernel::LANE_COUNT`]
 /// must not exceed this, or `store_unaligned` into those buffers would overflow
 /// the stack. The current workspace maximum is 64 (AVX-512 `i8`, 64×`i8`); the
-/// bound is checked at compile time by [`SimdKernel::LANE_BOUND_CHECK`], so a
+/// bound is checked at compile time by [`BackendKernel::LANE_BOUND_CHECK`], so a
 /// future wider backend fails to build rather than silently overflowing the stack.
 pub const MAX_SIMD_LANES: usize = 64;
 
@@ -67,15 +67,16 @@ pub const MAX_SIMD_LANES: usize = 64;
 ///
 /// ```rust
 /// use hermes_simd_intrinsics::Scalar;
-/// use hermes_simd_core::kernel::SimdKernel;
+/// use hermes_simd_core::kernel::BackendKernel;
 ///
 /// // SAFETY: `Scalar` requires no special ISA features.
-/// let splat4: <Scalar as SimdKernel<f32>>::Vector =
-///     unsafe { <Scalar as SimdKernel<f32>>::splat(1.0_f32) };
-/// let sum: f32 = unsafe { <Scalar as SimdKernel<f32>>::sum_reduce(splat4) };
-/// assert_eq!(sum, <Scalar as SimdKernel<f32>>::LANE_COUNT as f32);
+/// let splat4: <Scalar as BackendKernel<f32>>::Vector =
+///     unsafe { <Scalar as BackendKernel<f32>>::splat(1.0_f32) };
+/// let sum: f32 = unsafe { <Scalar as BackendKernel<f32>>::sum_reduce(splat4) };
+/// assert_eq!(sum, <Scalar as BackendKernel<f32>>::LANE_COUNT as f32);
 /// ```
-pub trait SimdKernel<T: crate::scalar::Scalar>:
+#[doc(hidden)]
+pub trait BackendKernel<T: crate::scalar::Scalar>:
     crate::private::Sealed + Send + Sync + Sized + 'static
 {
     /// The underlying raw register/vector type for this architecture and element type.
@@ -112,7 +113,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     /// stack-buffer overflow into a compile error.
     const LANE_BOUND_CHECK: () = assert!(
         Self::LANE_COUNT <= MAX_SIMD_LANES,
-        "SimdKernel::LANE_COUNT exceeds MAX_SIMD_LANES; widen the scalar-fallback stack buffers"
+        "BackendKernel::LANE_COUNT exceeds MAX_SIMD_LANES; widen the scalar-fallback stack buffers"
     );
 
     /// Loop unrolling register accumulation factor to break loop-carried dependency chains.
@@ -131,15 +132,15 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     ///
     /// ```rust
     /// use hermes_simd_intrinsics::Scalar;
-    /// use hermes_simd_core::kernel::SimdKernel;
+    /// use hermes_simd_core::kernel::BackendKernel;
     ///
     /// #[repr(align(64))]
     /// struct AlignedBuf([f32; 4]);
     ///
     /// let buf = AlignedBuf([1.0, 2.0, 3.0, 4.0]);
     /// // SAFETY: buf is 64-byte aligned and valid for LANE_COUNT reads.
-    /// let v = unsafe { <Scalar as SimdKernel<f32>>::load_aligned(buf.0.as_ptr()) };
-    /// let sum: f32 = unsafe { <Scalar as SimdKernel<f32>>::sum_reduce(v) };
+    /// let v = unsafe { <Scalar as BackendKernel<f32>>::load_aligned(buf.0.as_ptr()) };
+    /// let sum: f32 = unsafe { <Scalar as BackendKernel<f32>>::sum_reduce(v) };
     /// assert_eq!(sum, 10.0_f32);
     /// ```
     unsafe fn load_aligned(ptr: *const T) -> Self::Vector;
@@ -238,12 +239,12 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     ///
     /// ```rust
     /// use hermes_simd_intrinsics::Scalar;
-    /// use hermes_simd_core::kernel::SimdKernel;
+    /// use hermes_simd_core::kernel::BackendKernel;
     ///
     /// let data = [1.0_f32, 2.0, 3.0, 4.0];
     /// // SAFETY: Scalar requires no ISA feature; pointer is valid for LANE_COUNT reads.
-    /// let v = unsafe { <Scalar as SimdKernel<f32>>::load_unaligned(data.as_ptr()) };
-    /// let total: f32 = unsafe { <Scalar as SimdKernel<f32>>::sum_reduce(v) };
+    /// let v = unsafe { <Scalar as BackendKernel<f32>>::load_unaligned(data.as_ptr()) };
+    /// let total: f32 = unsafe { <Scalar as BackendKernel<f32>>::sum_reduce(v) };
     /// assert!((total - 10.0_f32).abs() < 1e-6);
     /// ```
     unsafe fn sum_reduce(v: Self::Vector) -> T;
@@ -391,7 +392,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
 
     /// Scatter: store lane `i` of `val` to `base + indices[i]` for each lane `i`.
     ///
-    /// The write-side dual of [`SimdKernel::gather`]. When `indices` repeats a
+    /// The write-side dual of [`BackendKernel::gather`]. When `indices` repeats a
     /// value the highest lane holding it wins, matching the hardware
     /// last-writer-wins rule; callers needing a deterministic combine over
     /// duplicate indices must deduplicate before scattering.
@@ -462,12 +463,12 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     unsafe fn mask_to_vector(mask: Self::Mask) -> Self::Vector;
 
     /// Convert a comparison-result vector into the native mask, the inverse of
-    /// [`SimdKernel::mask_to_vector`].
+    /// [`BackendKernel::mask_to_vector`].
     ///
     /// A lane is active iff its sign bit is set, matching hardware movemask
     /// semantics (`_mm256_movemask_ps` and friends). The `cmp_*` family returns
     /// `Self::Vector` with active lanes set to `T::ALL_ONES` — whose sign bit is
-    /// set — so composing this with [`SimdKernel::mask_to_bitmask`] yields one
+    /// set — so composing this with [`BackendKernel::mask_to_bitmask`] yields one
     /// bit per comparison outcome, and `trailing_zeros` then locates the first
     /// matching lane without leaving vector registers.
     ///
@@ -530,12 +531,12 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
     ///
     /// ```rust
     /// use hermes_simd_intrinsics::Scalar;
-    /// use hermes_simd_core::kernel::SimdKernel;
+    /// use hermes_simd_core::kernel::BackendKernel;
     ///
     /// // SAFETY: Scalar backend requires no ISA feature.
-    /// let v = unsafe { <Scalar as SimdKernel<f32>>::splat(42.0_f32) };
-    /// let sum: f32 = unsafe { <Scalar as SimdKernel<f32>>::sum_reduce(v) };
-    /// assert_eq!(sum, 42.0_f32 * <Scalar as SimdKernel<f32>>::LANE_COUNT as f32);
+    /// let v = unsafe { <Scalar as BackendKernel<f32>>::splat(42.0_f32) };
+    /// let sum: f32 = unsafe { <Scalar as BackendKernel<f32>>::sum_reduce(v) };
+    /// assert_eq!(sum, 42.0_f32 * <Scalar as BackendKernel<f32>>::LANE_COUNT as f32);
     /// ```
     unsafe fn splat(val: T) -> Self::Vector;
 
@@ -997,7 +998,7 @@ pub trait SimdKernel<T: crate::scalar::Scalar>:
         )
     }
 
-    /// Deinterleave two vectors, the exact inverse of [`SimdKernel::interleave`].
+    /// Deinterleave two vectors, the exact inverse of [`BackendKernel::interleave`].
     ///
     /// Treating `a` followed by `b` as one `2n`-lane sequence, `.0` collects its
     /// even-indexed lanes and `.1` its odd-indexed lanes, so

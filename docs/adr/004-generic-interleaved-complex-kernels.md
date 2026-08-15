@@ -22,7 +22,7 @@ had three structural defects:
 
 ## Decision
 
-Extend `SimdKernel<T>` with five adjacent-pair primitives, each with a
+Extend the `BackendKernel<T>` implementation seam with five adjacent-pair primitives, each with a
 default scalar-emulated implementation (surface minimization via default
 trait methods) and hardware overrides in the AVX2/AVX-512 float kernels:
 
@@ -57,7 +57,7 @@ differential validation on aarch64 hardware remains outstanding.
 
 ## Consequences
 
-- Any present or future `Scalar` type with `SimdKernel` impls gets vectorized
+- Any present or future `Scalar` type with `BackendKernel` impls gets vectorized
   complex kernels automatically; the dot product gains a SIMD path it never had.
 - Breaking (pre-0.2): `InterleavedComplexLane` is removed; the runtime entry
   points keep their names and signatures but now bound on `SimdOps`.

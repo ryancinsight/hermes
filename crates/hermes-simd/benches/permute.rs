@@ -17,7 +17,7 @@ use criterion::{
     black_box, criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, BenchmarkId,
     Criterion, Throughput,
 };
-use hermes_simd_core::kernel::SimdKernel;
+use hermes_simd_core::kernel::{SimdLoadStore, SimdPermute, SimdStorage};
 use hermes_simd_types::PreferredArch;
 use std::time::Duration;
 
@@ -35,7 +35,7 @@ fn configure(group: &mut BenchmarkGroup<'_, WallTime>) {
 fn reverse_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("reverse_f32");
     configure(&mut group);
-    let lanes = <PreferredArch as SimdKernel<f32>>::LANE_COUNT;
+    let lanes = <PreferredArch as SimdStorage<f32>>::LANE_COUNT;
 
     for &n in SIZES {
         let src: Vec<f32> = (0..n).map(|i| i as f32).collect();
@@ -48,11 +48,11 @@ fn reverse_f32(c: &mut Criterion) {
                 // exactly one full vector inside the allocation.
                 unsafe {
                     for chunk in 0..n / lanes {
-                        let v = <PreferredArch as SimdKernel<f32>>::load_unaligned(
+                        let v = <PreferredArch as SimdLoadStore<f32>>::load_unaligned(
                             src.as_ptr().add(chunk * lanes),
                         );
-                        let r = <PreferredArch as SimdKernel<f32>>::reverse(v);
-                        <PreferredArch as SimdKernel<f32>>::store_unaligned(
+                        let r = <PreferredArch as SimdPermute<f32>>::reverse(v);
+                        <PreferredArch as SimdLoadStore<f32>>::store_unaligned(
                             dst.as_mut_ptr().add(chunk * lanes),
                             r,
                         );
@@ -69,7 +69,7 @@ fn reverse_f32(c: &mut Criterion) {
 fn reverse_f64(c: &mut Criterion) {
     let mut group = c.benchmark_group("reverse_f64");
     configure(&mut group);
-    let lanes = <PreferredArch as SimdKernel<f64>>::LANE_COUNT;
+    let lanes = <PreferredArch as SimdStorage<f64>>::LANE_COUNT;
 
     for &n in SIZES {
         let src: Vec<f64> = (0..n).map(|i| i as f64).collect();
@@ -80,11 +80,11 @@ fn reverse_f64(c: &mut Criterion) {
                 // SAFETY: as in `reverse_f32`.
                 unsafe {
                     for chunk in 0..n / lanes {
-                        let v = <PreferredArch as SimdKernel<f64>>::load_unaligned(
+                        let v = <PreferredArch as SimdLoadStore<f64>>::load_unaligned(
                             src.as_ptr().add(chunk * lanes),
                         );
-                        let r = <PreferredArch as SimdKernel<f64>>::reverse(v);
-                        <PreferredArch as SimdKernel<f64>>::store_unaligned(
+                        let r = <PreferredArch as SimdPermute<f64>>::reverse(v);
+                        <PreferredArch as SimdLoadStore<f64>>::store_unaligned(
                             dst.as_mut_ptr().add(chunk * lanes),
                             r,
                         );
@@ -100,7 +100,7 @@ fn reverse_f64(c: &mut Criterion) {
 fn interleave_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("interleave_f32");
     configure(&mut group);
-    let lanes = <PreferredArch as SimdKernel<f32>>::LANE_COUNT;
+    let lanes = <PreferredArch as SimdStorage<f32>>::LANE_COUNT;
 
     for &n in SIZES {
         let a: Vec<f32> = (0..n).map(|i| i as f32).collect();
@@ -113,18 +113,18 @@ fn interleave_f32(c: &mut Criterion) {
                 // each chunk's two stores stay inside the allocation.
                 unsafe {
                     for chunk in 0..n / lanes {
-                        let va = <PreferredArch as SimdKernel<f32>>::load_unaligned(
+                        let va = <PreferredArch as SimdLoadStore<f32>>::load_unaligned(
                             a.as_ptr().add(chunk * lanes),
                         );
-                        let vb = <PreferredArch as SimdKernel<f32>>::load_unaligned(
+                        let vb = <PreferredArch as SimdLoadStore<f32>>::load_unaligned(
                             b.as_ptr().add(chunk * lanes),
                         );
-                        let (lo, hi) = <PreferredArch as SimdKernel<f32>>::interleave(va, vb);
-                        <PreferredArch as SimdKernel<f32>>::store_unaligned(
+                        let (lo, hi) = <PreferredArch as SimdPermute<f32>>::interleave(va, vb);
+                        <PreferredArch as SimdLoadStore<f32>>::store_unaligned(
                             dst.as_mut_ptr().add(2 * chunk * lanes),
                             lo,
                         );
-                        <PreferredArch as SimdKernel<f32>>::store_unaligned(
+                        <PreferredArch as SimdLoadStore<f32>>::store_unaligned(
                             dst.as_mut_ptr().add((2 * chunk + 1) * lanes),
                             hi,
                         );
@@ -140,7 +140,7 @@ fn interleave_f32(c: &mut Criterion) {
 fn deinterleave_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("deinterleave_f32");
     configure(&mut group);
-    let lanes = <PreferredArch as SimdKernel<f32>>::LANE_COUNT;
+    let lanes = <PreferredArch as SimdStorage<f32>>::LANE_COUNT;
 
     for &n in SIZES {
         let a: Vec<f32> = (0..n).map(|i| i as f32).collect();
@@ -153,18 +153,18 @@ fn deinterleave_f32(c: &mut Criterion) {
                 // SAFETY: as in `reverse_f32`.
                 unsafe {
                     for chunk in 0..n / lanes {
-                        let va = <PreferredArch as SimdKernel<f32>>::load_unaligned(
+                        let va = <PreferredArch as SimdLoadStore<f32>>::load_unaligned(
                             a.as_ptr().add(chunk * lanes),
                         );
-                        let vb = <PreferredArch as SimdKernel<f32>>::load_unaligned(
+                        let vb = <PreferredArch as SimdLoadStore<f32>>::load_unaligned(
                             b.as_ptr().add(chunk * lanes),
                         );
-                        let (e, o) = <PreferredArch as SimdKernel<f32>>::deinterleave(va, vb);
-                        <PreferredArch as SimdKernel<f32>>::store_unaligned(
+                        let (e, o) = <PreferredArch as SimdPermute<f32>>::deinterleave(va, vb);
+                        <PreferredArch as SimdLoadStore<f32>>::store_unaligned(
                             even.as_mut_ptr().add(chunk * lanes),
                             e,
                         );
-                        <PreferredArch as SimdKernel<f32>>::store_unaligned(
+                        <PreferredArch as SimdLoadStore<f32>>::store_unaligned(
                             odd.as_mut_ptr().add(chunk * lanes),
                             o,
                         );

@@ -173,25 +173,29 @@
   conditional. A focused `clippy::allow_attributes` run over the affected
   core, intrinsics, facade, and macro packages is clean; core nextest is 16/16.
 
-- [ ] [major] [arch] **HS-436 — `SimdKernel` is a god trait.** Owner: ryan (agent,
-  claimed 2026-08-14; ADR 013 drafted). One sealed trait
-  carries ~60 methods across load/store, streaming, dense arithmetic, masked
-  load/store, masked arithmetic, compress/expand, gather, scatter, mask
-  construction, scan, elementwise math, comparison, reduction, cross-lane
-  permute, and adjacent-pair complex support.
-  Note on the file size: `kernel.rs` is 1115 lines but 622 of those are doc
-  comments, so it holds roughly 490 lines of code and is *not* over the
-  500-line target. This item is therefore about interface segregation, not
-  file length — do not justify it on line count.
-  Interface segregation wants role supertraits (`SimdLoadStore`, `SimdArith`,
-  `SimdMask`, `SimdPermute`, `SimdReduce`, ...) with `SimdKernel` retained as
-  the aggregate so call-site bounds and the five backend impls keep working.
-  Not free: every `#[target_feature]` impl block splits per role, which
-  multiplies impl blocks across 5 backends x several scalar types.
-  Needs an ADR before implementation — record the split, the aggregate-trait
-  compatibility argument, and the measured impl-block cost. Acceptance: no
-  behavioural change, `cargo bloat`/codegen evidence that dispatch stays
-  monomorphized, and each role module under the 500-line target.
+ - [x] [major] [arch] **HS-436 — `SimdKernel` operation-family facets.** Owner:
+   ryan (agent, claimed 2026-08-14; ADR 013 accepted). The former monolithic
+   implementation seam is now `BackendKernel` under `kernel/backend.rs`, and
+   the public `SimdKernel` aggregate exposes the operation-family facets
+   `SimdLoadStore`, `SimdArith`, `SimdBitwise`, `SimdCompare`, `SimdReduce`,
+   `SimdMask`, `SimdGather`, and `SimdPermute` under `kernel/roles/`.
+   The facets are zero-sized public operation contracts with blanket forwarding
+   implementations over the sealed backend seam, so consumer bounds name one
+   family without exposing unrelated methods, duplicating generated ISA
+   implementations, or adding runtime dispatch. Shared register associations
+   are carried by `SimdStorage`; in-repository qualified projections were
+   migrated to the appropriate storage or backend seam. No compatibility
+   re-export is retained.
+   Completion evidence (2026-08-14): single-family consumer paths use the
+   narrowest applicable facet; composite algorithms retain the aggregate only
+   where they require several families. Exact-head gates pass: `cargo fmt
+   --all -- --check`, workspace Clippy with `-D warnings`, `cargo nextest run
+   --workspace --no-fail-fast` (465/465), workspace doctests, and warning-clean
+   workspace Rustdoc. `cargo-semver-checks` passes with `--release-type major`
+   for the intentional public migration, and release `cargo llvm-lines`
+   evidence shows backend monomorphizations with no separate `SimdReduce`
+   forwarding symbol. No compatibility re-export, runtime branch, or
+   allocation was added by the facet forwarding layer.
 
 - [ ] [minor] **HS-437 — lane scratch buffers are sized to the workspace
   maximum.** The `SimdKernel` default methods and `kernel_helpers` declare
@@ -209,7 +213,7 @@
   `store_unaligned`/`load_unaligned` pair. If it does, this closes as
   "no measurable effect" rather than being implemented on principle.
 
-- [x] [minor] **HS-422 — scatter seam.** Add `SimdKernel::scatter` and
+- [x] [minor] **HS-422 — scatter seam.** Add `SimdGather::scatter` and
   `scatter_masked` as defaulted trait methods over a generic lane-sequential
   helper, override them with native `vscatterdps`/`vscatterdpd` on AVX-512
   f32/f64, and expose `SimdView::scatter` as the public dual of
@@ -321,7 +325,7 @@
   benchmark job runs only on pull requests and dispatches, and the one
   intervening pull request failed earlier at the gates — the budget job never
   reached it. The width now derives from
-  `<Scalar as SimdKernel<f32>>::LANE_COUNT` rather than a literal, so a backend
+  `<Scalar as SimdStorage<f32>>::LANE_COUNT` rather than a literal, so a backend
   width change cannot silently rot it again. All thirteen bench targets smoke
   clean locally.
   Trigger-coverage finding: a job gated to pull requests is not a gate for work

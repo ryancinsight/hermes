@@ -4,7 +4,7 @@
 //! is updated and how the final scalar is extracted. All methods are `#[inline(always)]`
 //! and carry no branching — DCE eliminates unused strategies entirely.
 
-use crate::kernel::SimdKernel;
+use crate::kernel::{SimdArith, SimdCompare, SimdLoadStore, SimdMask, SimdReduce, SimdStorage};
 use crate::scalar::Scalar;
 
 // ---------------------------------------------------------------------------
@@ -37,7 +37,12 @@ pub trait ReductionOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
     ///
     /// # Safety
     /// Processor must support the target feature of `Arch`.
-    unsafe fn accumulate<Arch: SimdKernel<T>>(acc: Arch::Vector, v: Arch::Vector) -> Arch::Vector;
+    unsafe fn accumulate<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        acc: Arch::Vector,
+        v: Arch::Vector,
+    ) -> Arch::Vector;
 
     /// FMA-aware pairwise accumulation: `acc = fuse(acc, a, b)` where `fuse` may use
     /// a single fused multiply-add instruction rather than a separate `mul` + `accumulate`.
@@ -48,7 +53,9 @@ pub trait ReductionOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
     /// # Safety
     /// Processor must support the target feature of `Arch`.
     #[inline(always)]
-    unsafe fn fma_pair_accumulate<Arch: SimdKernel<T>>(
+    unsafe fn fma_pair_accumulate<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
         acc: Arch::Vector,
         a: Arch::Vector,
         b: Arch::Vector,
@@ -60,7 +67,11 @@ pub trait ReductionOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
     ///
     /// # Safety
     /// Processor must support the target feature of `Arch`.
-    unsafe fn finalize<Arch: SimdKernel<T>>(acc: Arch::Vector) -> T;
+    unsafe fn finalize<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        acc: Arch::Vector,
+    ) -> T;
 
     /// The identity element for this reduction as a scalar.
     ///
@@ -94,7 +105,12 @@ pub trait ReductionOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
     /// # Safety
     /// Processor must support the target feature of `Arch`.
     #[inline(always)]
-    unsafe fn masked_finalize<Arch: SimdKernel<T>>(v: Arch::Vector, mask: Arch::Mask) -> T {
+    unsafe fn masked_finalize<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        v: Arch::Vector,
+        mask: Arch::Mask,
+    ) -> T {
         let transformed = Self::transform_vector::<Arch>(v);
         let identity = Self::identity_vector::<Arch>();
         let active = Arch::blend(Arch::mask_to_vector(mask), transformed, identity);
@@ -109,7 +125,9 @@ pub trait ReductionOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
     /// Processor must support the target feature of `Arch`.
     #[inline(always)]
     #[must_use]
-    unsafe fn identity_vector<Arch: SimdKernel<T>>() -> Arch::Vector {
+    unsafe fn identity_vector<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >() -> Arch::Vector {
         Arch::splat(Self::identity_scalar())
     }
 
@@ -122,7 +140,11 @@ pub trait ReductionOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
     /// # Safety
     /// Processor must support the target feature of `Arch`.
     #[inline(always)]
-    unsafe fn transform_vector<Arch: SimdKernel<T>>(v: Arch::Vector) -> Arch::Vector {
+    unsafe fn transform_vector<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        v: Arch::Vector,
+    ) -> Arch::Vector {
         v
     }
 
@@ -137,7 +159,9 @@ pub trait ReductionOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
     /// # Safety
     /// Processor must support the target feature of `Arch`.
     #[inline(always)]
-    unsafe fn combine_vectors<Arch: SimdKernel<T>>(
+    unsafe fn combine_vectors<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
         a: Arch::Vector,
         b: Arch::Vector,
     ) -> Arch::Vector {
@@ -195,7 +219,8 @@ pub struct AbsMax;
 ///
 /// Identity element is `T::ONE`. Uses SIMD `mul` to accumulate lane products, then
 /// reduces horizontally via a scalar lane-extraction loop (no `prod_reduce` on
-/// `SimdKernel` — the hardware does not expose one universally).
+/// operation-family reduction facet — the hardware does not expose one
+/// universally).
 ///
 /// # Zero-Cost Guarantee
 ///
@@ -224,11 +249,20 @@ impl<T: Scalar> ReductionOp<T> for Sum {
     const USE_MASKED_TAIL: bool = true;
 
     #[inline(always)]
-    unsafe fn accumulate<Arch: SimdKernel<T>>(acc: Arch::Vector, v: Arch::Vector) -> Arch::Vector {
+    unsafe fn accumulate<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        acc: Arch::Vector,
+        v: Arch::Vector,
+    ) -> Arch::Vector {
         Arch::add(acc, v)
     }
     #[inline(always)]
-    unsafe fn finalize<Arch: SimdKernel<T>>(acc: Arch::Vector) -> T {
+    unsafe fn finalize<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        acc: Arch::Vector,
+    ) -> T {
         Arch::sum_reduce(acc)
     }
     #[inline(always)]
@@ -251,7 +285,12 @@ impl<T: Scalar> ReductionOp<T> for Dot {
     ///
     /// The `zip_reduce` loop computes `v = mul(a_chunk, b_chunk)` then calls `accumulate(acc, v)`.
     #[inline(always)]
-    unsafe fn accumulate<Arch: SimdKernel<T>>(acc: Arch::Vector, v: Arch::Vector) -> Arch::Vector {
+    unsafe fn accumulate<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        acc: Arch::Vector,
+        v: Arch::Vector,
+    ) -> Arch::Vector {
         // v already holds a[i]*b[i] product from the zip loop; just add to accumulator.
         Arch::add(acc, v)
     }
@@ -261,7 +300,9 @@ impl<T: Scalar> ReductionOp<T> for Dot {
     /// Overrides the default `accumulate(acc, mul(a, b))` two-instruction sequence
     /// with a single `fmadd(a, b, acc)` when the architecture supports it.
     #[inline(always)]
-    unsafe fn fma_pair_accumulate<Arch: SimdKernel<T>>(
+    unsafe fn fma_pair_accumulate<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
         acc: Arch::Vector,
         a: Arch::Vector,
         b: Arch::Vector,
@@ -270,7 +311,11 @@ impl<T: Scalar> ReductionOp<T> for Dot {
     }
 
     #[inline(always)]
-    unsafe fn finalize<Arch: SimdKernel<T>>(acc: Arch::Vector) -> T {
+    unsafe fn finalize<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        acc: Arch::Vector,
+    ) -> T {
         Arch::sum_reduce(acc)
     }
     #[inline(always)]
@@ -287,11 +332,20 @@ impl<T: Scalar> ReductionOp<T> for Min {
     const USE_MASKED_TAIL: bool = true;
 
     #[inline(always)]
-    unsafe fn accumulate<Arch: SimdKernel<T>>(acc: Arch::Vector, v: Arch::Vector) -> Arch::Vector {
+    unsafe fn accumulate<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        acc: Arch::Vector,
+        v: Arch::Vector,
+    ) -> Arch::Vector {
         Arch::min(acc, v)
     }
     #[inline(always)]
-    unsafe fn finalize<Arch: SimdKernel<T>>(acc: Arch::Vector) -> T {
+    unsafe fn finalize<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        acc: Arch::Vector,
+    ) -> T {
         Arch::min_reduce(acc)
     }
     #[inline(always)]
@@ -308,11 +362,20 @@ impl<T: Scalar> ReductionOp<T> for Max {
     const USE_MASKED_TAIL: bool = true;
 
     #[inline(always)]
-    unsafe fn accumulate<Arch: SimdKernel<T>>(acc: Arch::Vector, v: Arch::Vector) -> Arch::Vector {
+    unsafe fn accumulate<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        acc: Arch::Vector,
+        v: Arch::Vector,
+    ) -> Arch::Vector {
         Arch::max(acc, v)
     }
     #[inline(always)]
-    unsafe fn finalize<Arch: SimdKernel<T>>(acc: Arch::Vector) -> T {
+    unsafe fn finalize<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        acc: Arch::Vector,
+    ) -> T {
         Arch::max_reduce(acc)
     }
     #[inline(always)]
@@ -329,11 +392,20 @@ impl<T: Scalar> ReductionOp<T> for AbsSum {
     const USE_MASKED_TAIL: bool = true;
 
     #[inline(always)]
-    unsafe fn accumulate<Arch: SimdKernel<T>>(acc: Arch::Vector, v: Arch::Vector) -> Arch::Vector {
+    unsafe fn accumulate<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        acc: Arch::Vector,
+        v: Arch::Vector,
+    ) -> Arch::Vector {
         Arch::add(acc, Arch::abs(v))
     }
     #[inline(always)]
-    unsafe fn finalize<Arch: SimdKernel<T>>(acc: Arch::Vector) -> T {
+    unsafe fn finalize<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        acc: Arch::Vector,
+    ) -> T {
         Arch::sum_reduce(acc)
     }
     #[inline(always)]
@@ -349,11 +421,17 @@ impl<T: Scalar> ReductionOp<T> for AbsSum {
         acc + elem.abs()
     }
     #[inline(always)]
-    unsafe fn transform_vector<Arch: SimdKernel<T>>(v: Arch::Vector) -> Arch::Vector {
+    unsafe fn transform_vector<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        v: Arch::Vector,
+    ) -> Arch::Vector {
         Arch::abs(v)
     }
     #[inline(always)]
-    unsafe fn combine_vectors<Arch: SimdKernel<T>>(
+    unsafe fn combine_vectors<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
         a: Arch::Vector,
         b: Arch::Vector,
     ) -> Arch::Vector {
@@ -365,11 +443,20 @@ impl<T: Scalar> ReductionOp<T> for AbsMax {
     const USE_MASKED_TAIL: bool = true;
 
     #[inline(always)]
-    unsafe fn accumulate<Arch: SimdKernel<T>>(acc: Arch::Vector, v: Arch::Vector) -> Arch::Vector {
+    unsafe fn accumulate<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        acc: Arch::Vector,
+        v: Arch::Vector,
+    ) -> Arch::Vector {
         Arch::max(acc, Arch::abs(v))
     }
     #[inline(always)]
-    unsafe fn finalize<Arch: SimdKernel<T>>(acc: Arch::Vector) -> T {
+    unsafe fn finalize<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        acc: Arch::Vector,
+    ) -> T {
         Arch::max_reduce(acc)
     }
     #[inline(always)]
@@ -385,11 +472,17 @@ impl<T: Scalar> ReductionOp<T> for AbsMax {
         acc.max_scalar(elem.abs())
     }
     #[inline(always)]
-    unsafe fn transform_vector<Arch: SimdKernel<T>>(v: Arch::Vector) -> Arch::Vector {
+    unsafe fn transform_vector<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        v: Arch::Vector,
+    ) -> Arch::Vector {
         Arch::abs(v)
     }
     #[inline(always)]
-    unsafe fn combine_vectors<Arch: SimdKernel<T>>(
+    unsafe fn combine_vectors<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
         a: Arch::Vector,
         b: Arch::Vector,
     ) -> Arch::Vector {
@@ -403,7 +496,12 @@ impl<T: Scalar> ReductionOp<T> for Product {
     /// # Safety
     /// Processor must support the target feature of `Arch`.
     #[inline(always)]
-    unsafe fn accumulate<Arch: SimdKernel<T>>(acc: Arch::Vector, v: Arch::Vector) -> Arch::Vector {
+    unsafe fn accumulate<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        acc: Arch::Vector,
+        v: Arch::Vector,
+    ) -> Arch::Vector {
         Arch::mul(acc, v)
     }
 
@@ -418,10 +516,14 @@ impl<T: Scalar> ReductionOp<T> for Product {
     /// # Safety
     /// Processor must support the target feature of `Arch`.
     #[inline(always)]
-    unsafe fn finalize<Arch: SimdKernel<T>>(acc: Arch::Vector) -> T {
+    unsafe fn finalize<
+        Arch: SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
+    >(
+        acc: Arch::Vector,
+    ) -> T {
         // Compile-time bound (per backend) against the shared scalar-fallback
         // buffer SSOT, replacing a debug-only runtime assert.
-        const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+        const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
         let mut buf = [T::ZERO; crate::kernel::MAX_SIMD_LANES];
         Arch::store_unaligned(buf.as_mut_ptr(), acc);
         let mut result = T::ONE;

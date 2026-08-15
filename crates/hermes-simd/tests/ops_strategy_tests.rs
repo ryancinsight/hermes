@@ -11,7 +11,7 @@ use hermes_simd::{
     Add, BitAnd, BitOr, BitXor, Div, Mul, Scalar, SimdError, SimdView, Sub, SveArch, Unaligned,
     Unmasked,
 };
-use hermes_simd_core::kernel::SimdKernel;
+use hermes_simd_core::kernel::SimdStorage;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -281,7 +281,7 @@ fn test_transform_in_place_odd_length() {
 
 #[test]
 fn test_transform_in_place_masked_tail_forced_sve() {
-    let len = <SveArch as SimdKernel<f32>>::LANE_COUNT + 3;
+    let len = <SveArch as SimdStorage<f32>>::LANE_COUNT + 3;
     let a: Vec<f32> = (0..len).map(|index| index as f32 + 0.25).collect();
     let b: Vec<f32> = (0..len).map(|index| index as f32 * -0.5).collect();
     let expected: Vec<f32> = a

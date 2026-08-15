@@ -7,7 +7,7 @@ Accepted
 
 The initial Highway comparison audit ([gap_audit.md](file:///d:/atlas/repos/hermes/gap_audit.md#highway-2026-06-14)) identified that Hermes currently lacks an intermediate 128-bit x86_64 SIMD backend (SSE2/SSE4). On older x86_64 hardware, VMs, or conservative CI targets lacking AVX2 support, Hermes falls back to the portable `Scalar` backend. 
 
-Adding a native SSE2 backend would bring 128-bit vector hardware acceleration to these environments. However, SSE2 lacks support for key features defined in `SimdKernel<T>`, including:
+Adding a native SSE2 backend would bring 128-bit vector hardware acceleration to these environments. However, SSE2 lacks support for key features defined by the `BackendKernel<T>` seam and exposed through operation-family facets, including:
 1. **Fused Multiply-Add (FMA)**: Only introduced in FMA3/AVX2.
 2. **Gather/Scatter**: Only introduced in AVX2/AVX-512.
 3. **Advanced Integer/Byte Shuffle**: `_mm_shuffle_epi8` requires SSSE3.
@@ -18,7 +18,7 @@ We need to evaluate the feasibility, CI value, and maintenance cost of implement
 ## Evaluation
 
 ### 1. Trait Compatibility and Emulation Slop
-Implementing `SimdKernel<T>` for SSE2 requires emulating missing hardware primitives:
+Implementing `BackendKernel<T>` for SSE2 requires emulating missing hardware primitives:
 - **FMA**: Must be emulated as `(a * b) + c`, paying double rounding penalties and instruction latency.
 - **Gather**: Must be emulated via scalar pointer extraction and loading loops, yielding no performance benefit over the `Scalar` backend.
 - **Adjacent-Pair Primitives**: Interleaved complex multiplication swaps and duplicates require complex shuffles that are slow in pure SSE2.
@@ -43,5 +43,5 @@ Instead, we recommend:
 ## Consequences
 
 - Legacy x86_64 hosts continue to execute via the portable `Scalar` fallback, which LLVM compiles to optimized SSE2/SSE3 instructions where appropriate.
-- The `SimdKernel` interface remains clean, avoiding the pollution of SSE2-specific emulation branches.
+- The `BackendKernel` and operation-family interfaces remain clean, avoiding the pollution of SSE2-specific emulation branches.
 - The next step for 128-bit x86_64 targets remains defined as SSE4.1/SSSE3 rather than legacy SSE2.

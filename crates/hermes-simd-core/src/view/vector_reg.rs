@@ -23,7 +23,7 @@
 use super::mask_reg::Mask;
 use super::SimdError;
 use crate::arch::SimdArch;
-use crate::kernel::{SimdKernel, MAX_SIMD_LANES};
+use crate::kernel::{SimdKernel, SimdStorage, MAX_SIMD_LANES};
 use crate::mask::BitMask;
 use crate::scalar::{CastFrom, Scalar};
 use core::marker::PhantomData;
@@ -72,7 +72,7 @@ where
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         assert_runtime_supported::<T, Arch>();
-        const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+        const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
         let lane_count = Arch::LANE_COUNT;
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         // SAFETY: target feature checked above. The store writes exactly
@@ -95,7 +95,7 @@ where
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         assert_runtime_supported::<T, Arch>();
-        const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+        const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
         let lane_count = Arch::LANE_COUNT;
         let mut buf_self = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let mut buf_other = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
@@ -350,7 +350,7 @@ where
             // `MAX_SIMD_LANES`-lane buffer.
             // The buffer holds `LANE_COUNT` lanes; `LANE_BOUND_CHECK` proves
             // `LANE_COUNT <= MAX_SIMD_LANES` at compile time per backend.
-            const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+            const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
             let mut buf = AlignedBuf([core::mem::MaybeUninit::uninit(); MAX_SIMD_LANES]);
             for i in 0..len {
                 buf.0[i].write(data[i]);
@@ -408,7 +408,7 @@ where
             // then copy active elements back.
             // The buffer holds `LANE_COUNT` lanes; `LANE_BOUND_CHECK` proves
             // `LANE_COUNT <= MAX_SIMD_LANES` at compile time per backend.
-            const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+            const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
             let mut buf = AlignedBuf([core::mem::MaybeUninit::uninit(); MAX_SIMD_LANES]);
             for i in 0..len {
                 buf.0[i].write(data[i]);
@@ -594,9 +594,9 @@ where
     #[inline(always)]
     pub fn to_bitmask(self) -> BitMask<64> {
         assert_runtime_supported::<T, Arch>();
-        const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+        const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        let lanes = <Arch as SimdKernel<T>>::LANE_COUNT;
+        let lanes = <Arch as SimdStorage<T>>::LANE_COUNT;
         // SAFETY: target feature checked above; the store writes `lanes` elements
         // into the `MAX_SIMD_LANES`-slot buffer (bounded by `LANE_BOUND_CHECK`),
         // so `assume_init` reads only those initialized lanes.
@@ -672,10 +672,10 @@ where
         assert_runtime_supported::<T, Arch>();
         assert_runtime_supported::<U, Arch>();
         let () = AssertLaneCountSame::<T, U, Arch>::OK;
-        const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+        const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
         let mut buf_t = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let mut buf_u = [core::mem::MaybeUninit::<U>::uninit(); MAX_SIMD_LANES];
-        let lanes = <Arch as SimdKernel<T>>::LANE_COUNT;
+        let lanes = <Arch as SimdStorage<T>>::LANE_COUNT;
         // SAFETY: target features for both `T` and `U` checked above;
         // `AssertLaneCountSame` and `LANE_BOUND_CHECK` bound `lanes` within both
         // buffers. The `T` store initializes `buf_t[..lanes]` before `assume_init`
@@ -696,7 +696,7 @@ where
     pub fn extract<const I: usize>(self) -> T {
         assert_runtime_supported::<T, Arch>();
         let () = AssertLaneIndex::<T, Arch, I>::OK;
-        const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+        const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         // SAFETY: target feature checked above; `AssertLaneIndex` proved
         // `I < LANE_COUNT`, and the store initializes `buf[..LANE_COUNT]`, so
@@ -713,7 +713,7 @@ where
     pub fn insert<const I: usize>(self, val: T) -> Self {
         assert_runtime_supported::<T, Arch>();
         let () = AssertLaneIndex::<T, Arch, I>::OK;
-        const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+        const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         // SAFETY: target feature checked above; `AssertLaneIndex` proved
         // `I < LANE_COUNT`. The store initializes `buf[..LANE_COUNT]`, `buf[I]` is
@@ -841,7 +841,7 @@ where
 {
     const OK: () = {
         assert!(
-            I < <Arch as SimdKernel<T>>::LANE_COUNT,
+            I < <Arch as SimdStorage<T>>::LANE_COUNT,
             "Lane index out of bounds"
         );
     };
@@ -856,7 +856,7 @@ where
 {
     const OK: () = {
         assert!(
-            <Arch as SimdKernel<T>>::LANE_COUNT == <Arch as SimdKernel<U>>::LANE_COUNT,
+            <Arch as SimdStorage<T>>::LANE_COUNT == <Arch as SimdStorage<U>>::LANE_COUNT,
             "Source and destination vectors must have the same lane count"
         );
     };

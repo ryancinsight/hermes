@@ -9,8 +9,8 @@ The workspace is designed for extreme runtime efficiency, using traits, ZST mark
 The project is structured as a multi-crate workspace (dependencies flow strictly downward):
 
 - **Numeric vocabulary (external)**: the precision ladder (`Bf4`/`F4`/`Bf8`/`F8`/`F16`/`Bf16`/`F32`/`F64`/`I8`/`I16`/`I32`), packed 4-bit storage, and cast traits live in the [`eunomia`](https://github.com/ryancinsight/eunomia) crate — the Atlas numeric SSOT — and are re-exported through `hermes-simd`. (The former `hermes-numeric` member crate was migrated upstream.)
-- **`crates/hermes-simd-core`**: Core abstractions — `SimdView<'a, T, Arch, Align, Mode, Ref>` typestate views, the `SimdKernel<T>` operation trait, `SimdCow` dense copy-on-write, generic `SparseCow<T, Format, Arch>`, `BitMask<N>`, reduction/element/scan op strategy ZSTs, const-generic tiling, and N-D tensor views.
-- **`crates/hermes-simd-intrinsics`**: Architecture-specific kernels (`Scalar`, `Avx2`, `Avx512`, `AvxVnni`, `Neon` ZST markers implementing `SimdKernel<T>` / tile traits), AVX-512 VNNI and 256-bit AVX-VNNI tile multipliers, packed 4-bit hardware unpacking, sliding-attack bitboard backends, and the Intel AMX engine (gated on a permission-aware runtime probe; see [Intel AMX status](#intel-amx-status)).
+- **`crates/hermes-simd-core`**: Core abstractions — `SimdView<'a, T, Arch, Align, Mode, Ref>` typestate views, the `SimdKernel<T>` aggregate and operation-family facets over the `BackendKernel<T>` implementation seam, `SimdCow` dense copy-on-write, generic `SparseCow<T, Format, Arch>`, `BitMask<N>`, reduction/element/scan op strategy ZSTs, const-generic tiling, and N-D tensor views.
+- **`crates/hermes-simd-intrinsics`**: Architecture-specific kernels (`Scalar`, `Avx2`, `Avx512`, `AvxVnni`, `Neon` ZST markers implementing the sealed `BackendKernel<T>` seam / tile traits), AVX-512 VNNI and 256-bit AVX-VNNI tile multipliers, packed 4-bit hardware unpacking, sliding-attack bitboard backends, and the Intel AMX engine (gated on a permission-aware runtime probe; see [Intel AMX status](#intel-amx-status)).
 - **`crates/hermes-simd-types`**: Monomorphized convenience aliases and the compile-time `PreferredArch` selection.
 - **`crates/hermes-simd-macros`**: Procedural macros — `#[runtime_dispatch]` generates compile-time-gated plus runtime-detected dispatchers from one generic kernel function.
 - **`crates/hermes-simd`**: Public facade — the sealed `SimdOps` extension trait, runtime-dispatched free functions (`sum`, `dot`, `spmv_*`, `interleaved_complex_*`, …), and `dispatch_view` CPUID routing.
@@ -19,8 +19,8 @@ The project is structured as a multi-crate workspace (dependencies flow strictly
 
 ## Key Features
 
-1. **Generic runtime dispatch**: one `<T: Scalar, A: SimdKernel<T>>` kernel per operation; `#[runtime_dispatch(avx512f, avx2, neon, scalar)]` emits the per-ISA `#[target_feature]` wrappers and the detection ladder. No per-type kernel clones, no type names in identifiers.
-2. **Interleaved complex kernels**: `interleaved_complex_dot` / `interleaved_complex_mul_assign` over `[re, im, ...]` primitive slices, fully register-resident via adjacent-pair `SimdKernel` primitives (`swap_adjacent`, `dup_even`, `dup_odd`, `fmaddsub`, `fmsubadd`) with AVX2/AVX-512/NEON overrides and a `const CONJ_B` conjugation flag (see `docs/adr/004`).
+1. **Generic runtime dispatch**: one `<T: Scalar, A: SimdKernel<T>>` aggregate-bound kernel per operation, with narrow operation-family facets where applicable; `#[runtime_dispatch(avx512f, avx2, neon, scalar)]` emits the per-ISA `#[target_feature]` wrappers and the detection ladder. No per-type kernel clones, no type names in identifiers.
+2. **Interleaved complex kernels**: `interleaved_complex_dot` / `interleaved_complex_mul_assign` over `[re, im, ...]` primitive slices, fully register-resident via adjacent-pair operation-family facets (`SimdPermute`, `SimdArith`) with AVX2/AVX-512/NEON overrides and a `const CONJ_B` conjugation flag (see `docs/adr/004`).
 3. **Copy-on-write containers**: `SimdCow` (dense, with map/zip/reduce/scan/norm extensions) and one generic `SparseCow<T, F, Arch>` covering every sparse format through the `CowFormat` trait — zero-copy reads, single-allocation promotion.
 4. **Sparse SIMD (SpMV)**: format-parameterized views for CSR, Sliced ELLPACK (SELL-p), Blocked COO, and Dense-with-Mask layouts.
 5. **VNNI tile GEMM**: AVX-512 VNNI and 256-bit AVX-VNNI tile multipliers behind a single internal `vpdpbssd` asm macro, plus bit-parallel INT4→INT8 unpacking. Intel AMX kernels exist in the tree and dispatch only where the CPUID / `XCR0` / OS-permission chain holds, which no CI machine satisfies — see [Intel AMX status](#intel-amx-status).
@@ -49,9 +49,9 @@ authorities. The current external audit compares Hermes with
 
 Actionable gaps from that audit are Hermes-native: target-token forced
 dispatch for tests/benchmarks, safe one-vector slice wrappers over raw
-`SimdKernel` load/store primitives, an SSE2 feasibility ADR, a public dense
+`SimdLoadStore` load/store primitives, an SSE2 feasibility ADR, a public dense
 cross-target conformance matrix, and a finer operation-family coverage map.
-The audit does not replace Hermes' sealed `SimdKernel` facade, sparse/packed
+The audit does not replace Hermes' sealed `SimdKernel` aggregate/facets, sparse/packed
 domain kernels, AMX tiling, COW containers, tensor views, or Atlas compute
 boundaries.
 
@@ -63,8 +63,8 @@ harnesses can force a backend only when the host can execute it.
 Safe one-vector slice wrappers are available on `Vector<T, Arch>` as
 `load_unaligned_from_slice`, `load_aligned_from_slice`,
 `store_unaligned_to_slice`, and `store_aligned_to_slice`. These wrappers check
-slice length and vector-width alignment before calling the raw `SimdKernel`
-load/store primitives.
+slice length and vector-width alignment before calling the raw
+`SimdLoadStore` load/store primitives.
 
 Dense target conformance is covered by host-capability tests that force every
 supported `TargetId` and compare sum, dot, elementwise arithmetic, gather, and

@@ -8,10 +8,10 @@ use crate::Neon;
 #[cfg(target_arch = "aarch64")]
 use eunomia::F16;
 #[cfg(target_arch = "aarch64")]
-use hermes_simd_core::kernel::SimdKernel;
+use hermes_simd_core::kernel::BackendKernel;
 
 #[cfg(target_arch = "aarch64")]
-impl SimdKernel<F16> for Neon {
+impl BackendKernel<F16> for Neon {
     type Vector = [F16; 8];
     type Mask = [bool; 8];
     type IndexVector = [i32; 8];

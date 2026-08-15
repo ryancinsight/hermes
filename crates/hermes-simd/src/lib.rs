@@ -64,7 +64,10 @@ pub use hermes_simd_core::{
     execution::{ExecutionMode, Masked, Unmasked},
     // Chunk iterators
     iter::{SimdChunks, SimdChunksMut, ZipChunks, ZipChunksMut},
-    kernel::SimdKernel,
+    kernel::{
+        SimdArith, SimdBitwise, SimdCompare, SimdGather, SimdKernel, SimdLoadStore, SimdMask,
+        SimdPermute, SimdReduce, SimdStorage,
+    },
     mask::BitMask,
     refresh_numa_node,
     scalar::{CastFrom, CastTo, FloatElement, Scalar as SimdScalar},

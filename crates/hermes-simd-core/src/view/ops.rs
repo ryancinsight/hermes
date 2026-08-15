@@ -14,7 +14,7 @@
 use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
-use crate::kernel::{SimdKernel, MAX_SIMD_LANES};
+use crate::kernel::{SimdKernel, SimdStorage, MAX_SIMD_LANES};
 use crate::ops::ElementOp;
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
@@ -34,19 +34,6 @@ impl<'a, T: 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: Executio
 where
     T: Scalar,
 {
-    /// Sum all elements in the view.
-    ///
-    /// Iterates in unrolled chunks of `Arch::LANE_COUNT * Arch::UNROLL_FACTOR` elements,
-    /// accumulating into multiple registers in parallel to break loop dependencies.
-    #[inline(always)]
-    #[must_use]
-    pub fn sum(&self) -> T {
-        // Keep the public sum facade on the generic reduction SSOT so its final
-        // partial vector receives the same initialized-buffer masked-tail proof
-        // as `reduce(Sum)` and the runtime-dispatched sum path.
-        self.reduce(crate::ops::Sum)
-    }
-
     /// Compute the dot product between this view and another view of the same architecture and alignment.
     ///
     /// # Errors
@@ -170,7 +157,7 @@ where
         // lanes contribute; this avoids reading beyond either caller slice.
         let tail = len - simd_len;
         if tail != 0 {
-            const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+            const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
             let mut left = [T::ZERO; MAX_SIMD_LANES];
             let mut right = [T::ZERO; MAX_SIMD_LANES];
             left[..tail].copy_from_slice(&self.as_slice()[simd_len..]);
@@ -248,7 +235,7 @@ where
 
         let tail = len - simd_len;
         if tail != 0 {
-            const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+            const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
             let mut left = [T::ZERO; MAX_SIMD_LANES];
             let mut right = [T::ZERO; MAX_SIMD_LANES];
             let mut result = [T::ZERO; MAX_SIMD_LANES];
@@ -347,7 +334,7 @@ where
 
         let tail = len - simd_len;
         if tail != 0 {
-            const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+            const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
             let mut left = [T::ZERO; MAX_SIMD_LANES];
             let mut right = [T::ZERO; MAX_SIMD_LANES];
             let mut result = [T::ZERO; MAX_SIMD_LANES];
@@ -381,7 +368,7 @@ where
     /// `Arch::SUPPORTS_NT_STORE` must hold; `self`/`other`/`out` share `len`
     /// (validated by the caller); `simd_len == (len / LANE_COUNT) · LANE_COUNT`.
     ///
-    /// [`stream_write_barrier`]: crate::kernel::SimdKernel::stream_write_barrier
+    /// [`stream_write_barrier`]: crate::kernel::SimdLoadStore::stream_write_barrier
     #[inline]
     unsafe fn zip_into_streaming<ORef, Op>(
         &self,

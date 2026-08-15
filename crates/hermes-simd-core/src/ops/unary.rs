@@ -4,7 +4,7 @@
 //! define how a single vector is transformed (`apply`) and how a single scalar element
 //! is transformed (`apply_scalar`). Both paths are `#[inline(always)]`.
 
-use crate::kernel::SimdKernel;
+use crate::kernel::{SimdArith, SimdBitwise};
 use crate::ops::elementwise::Clamp;
 use crate::scalar::{FloatElement, NumericElement, Scalar};
 
@@ -20,8 +20,8 @@ use crate::scalar::{FloatElement, NumericElement, Scalar};
 ///
 /// # Zero-Cost Guarantee
 ///
-/// Every `impl UnaryOp<T>` passes through to an `#[inline(always)]
-/// SimdKernel<T>` method. The ZST strategy parameter is erased at every
+/// Every `impl UnaryOp<T>` passes through to an `#[inline(always)]`
+/// operation-family facet method. The ZST strategy parameter is erased at every
 /// monomorphization site: `size_of::<Abs>() == 0`.
 pub trait UnaryOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
     /// Apply the operation to a vector: `self.apply::<Arch>(v) -> result`.
@@ -32,7 +32,7 @@ pub trait UnaryOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
     ///
     /// # Safety
     /// Processor must support the target feature of `Arch`.
-    unsafe fn apply<Arch: SimdKernel<T>>(self, v: Arch::Vector) -> Arch::Vector;
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(self, v: Arch::Vector) -> Arch::Vector;
 
     /// Apply the operation to a single scalar element.
     ///
@@ -101,7 +101,7 @@ impl crate::private::Sealed for Trunc {}
 
 impl<T: Scalar> UnaryOp<T> for Abs {
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, v: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(self, v: Arch::Vector) -> Arch::Vector {
         Arch::abs(v)
     }
     #[inline(always)]
@@ -112,7 +112,7 @@ impl<T: Scalar> UnaryOp<T> for Abs {
 
 impl<T: Scalar> UnaryOp<T> for Neg {
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, v: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(self, v: Arch::Vector) -> Arch::Vector {
         Arch::neg(v)
     }
     #[inline(always)]
@@ -123,7 +123,7 @@ impl<T: Scalar> UnaryOp<T> for Neg {
 
 impl<T: Scalar> UnaryOp<T> for Sqrt {
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, v: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(self, v: Arch::Vector) -> Arch::Vector {
         Arch::sqrt(v)
     }
     #[inline(always)]
@@ -134,7 +134,7 @@ impl<T: Scalar> UnaryOp<T> for Sqrt {
 
 impl<T: Scalar> UnaryOp<T> for RecipSqrt {
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, v: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(self, v: Arch::Vector) -> Arch::Vector {
         Arch::recip_sqrt(v)
     }
     #[inline(always)]
@@ -145,7 +145,7 @@ impl<T: Scalar> UnaryOp<T> for RecipSqrt {
 
 impl<T: Scalar + PartialOrd + NumericElement> UnaryOp<T> for Clamp<T> {
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, v: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(self, v: Arch::Vector) -> Arch::Vector {
         // clamp(v, lo, hi) = max(lo, min(v, hi))
         let lo_vec = Arch::splat(self.lo);
         let hi_vec = Arch::splat(self.hi);
@@ -160,7 +160,7 @@ impl<T: Scalar + PartialOrd + NumericElement> UnaryOp<T> for Clamp<T> {
 
 impl<T: Scalar> UnaryOp<T> for Popcount {
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, v: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(self, v: Arch::Vector) -> Arch::Vector {
         Arch::popcount(v)
     }
     #[inline(always)]
@@ -171,7 +171,7 @@ impl<T: Scalar> UnaryOp<T> for Popcount {
 
 impl<T: FloatElement> UnaryOp<T> for Floor {
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, v: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(self, v: Arch::Vector) -> Arch::Vector {
         Arch::floor(v)
     }
     #[inline(always)]
@@ -182,7 +182,7 @@ impl<T: FloatElement> UnaryOp<T> for Floor {
 
 impl<T: FloatElement> UnaryOp<T> for Ceil {
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, v: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(self, v: Arch::Vector) -> Arch::Vector {
         Arch::ceil(v)
     }
     #[inline(always)]
@@ -193,7 +193,7 @@ impl<T: FloatElement> UnaryOp<T> for Ceil {
 
 impl<T: crate::scalar::RoundTiesEven> UnaryOp<T> for Round {
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, v: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(self, v: Arch::Vector) -> Arch::Vector {
         Arch::round(v)
     }
     #[inline(always)]
@@ -204,7 +204,7 @@ impl<T: crate::scalar::RoundTiesEven> UnaryOp<T> for Round {
 
 impl<T: FloatElement> UnaryOp<T> for Trunc {
     #[inline(always)]
-    unsafe fn apply<Arch: SimdKernel<T>>(self, v: Arch::Vector) -> Arch::Vector {
+    unsafe fn apply<Arch: SimdArith<T> + SimdBitwise<T>>(self, v: Arch::Vector) -> Arch::Vector {
         Arch::trunc(v)
     }
     #[inline(always)]

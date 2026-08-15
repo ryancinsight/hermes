@@ -152,14 +152,14 @@ macro_rules! test_masked_ops_for_type {
                 idx_arr[i] = (i * 3) as i32;
             }
 
-            let indices: <$arch as SimdKernel<$t>>::IndexVector =
+            let indices: <$arch as SimdStorage<$t>>::IndexVector =
                 unsafe { core::ptr::read_unaligned(idx_arr.as_ptr().cast()) };
 
             // Gather
-            let vec_res = unsafe { <$arch as SimdKernel<$t>>::gather(base_data.as_ptr(), indices) };
+            let vec_res = unsafe { <$arch as SimdGather<$t>>::gather(base_data.as_ptr(), indices) };
             let mut res_arr = [<$t as hermes_simd_core::scalar::NumericElement>::ZERO; $lanes];
             unsafe {
-                <$arch as SimdKernel<$t>>::store_unaligned(res_arr.as_mut_ptr(), vec_res);
+                <$arch as SimdLoadStore<$t>>::store_unaligned(res_arr.as_mut_ptr(), vec_res);
             }
 
             for i in 0..$lanes {
@@ -179,9 +179,9 @@ macro_rules! test_masked_ops_for_type {
             let native_mask = unsafe { mask.to_native_mask::<$t, $arch>() };
 
             let fill_val = conv(88);
-            let fill_vec = unsafe { <$arch as SimdKernel<$t>>::splat(fill_val) };
+            let fill_vec = unsafe { <$arch as SimdArith<$t>>::splat(fill_val) };
             let vec_res_masked = unsafe {
-                <$arch as SimdKernel<$t>>::gather_masked(
+                <$arch as SimdGather<$t>>::gather_masked(
                     base_data.as_ptr(),
                     indices,
                     native_mask,
@@ -192,7 +192,7 @@ macro_rules! test_masked_ops_for_type {
             let mut res_arr_masked =
                 [<$t as hermes_simd_core::scalar::NumericElement>::ZERO; $lanes];
             unsafe {
-                <$arch as SimdKernel<$t>>::store_unaligned(
+                <$arch as SimdLoadStore<$t>>::store_unaligned(
                     res_arr_masked.as_mut_ptr(),
                     vec_res_masked,
                 );

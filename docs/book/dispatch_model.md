@@ -81,7 +81,8 @@ truthfully.
 ## Monomorphization is the abstraction, not an implementation
 
 Every op is parameterized by `T: Scalar` (via the sealed `SimdOps` trait for
-the slice facade, or `SimdArch + SimdKernel<T>` at the kernel level) and is
+the slice facade, or `SimdArch` plus a narrow operation-family facet such as
+`SimdReduce<T>` at the kernel level) and is
 compiled to machine code identical to a hand-written specialization. The
 arch markers and op-strategy ZSTs (Chapter 3) are zero-sized and erase at
 codegen. The dispatch wrapper is `#[inline(always)]`: once runtime selection

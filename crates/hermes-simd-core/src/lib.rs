@@ -7,7 +7,7 @@
 //! | [`arch`] | `SimdArch` marker trait with architecture constants |
 //! | [`align`] | `Alignment`, `Aligned<N>`, `Unaligned` typestates |
 //! | [`execution`] | `ExecutionMode`, `Unmasked`, `Masked` ZSTs |
-//! | [`kernel`] | `SimdKernel<T>` trait — full SIMD operation surface |
+//! | [`kernel`] | `SimdKernel<T>` aggregate and operation-family facets |
 //! | [`scalar`] | `Scalar` sealed element trait |
 //! | [`mask`] | `BitMask<N>` bit-packed lane mask |
 //! | [`ops`] | `ReductionOp<T>`, `ElementOp<T>` ZST strategies |
@@ -65,7 +65,10 @@ pub use compute::ComputeView;
 pub use cow::{ArchivedPacked4Cow, ArchivedSimdCow, Packed4CowResolver, SimdCow, SimdCowResolver};
 pub use execution::{ExecutionMode, Masked, Unmasked};
 pub use iter::{SimdChunks, SimdChunksMut, ZipChunks};
-pub use kernel::SimdKernel;
+pub use kernel::{
+    BackendKernel, SimdArith, SimdBitwise, SimdCompare, SimdGather, SimdKernel, SimdLoadStore,
+    SimdMask, SimdPermute, SimdReduce, SimdStorage,
+};
 pub use mask::BitMask;
 pub use numa::{
     current_numa_node, refresh_numa_node, verify_numa_locality, MnemosyneNumaAllocator,

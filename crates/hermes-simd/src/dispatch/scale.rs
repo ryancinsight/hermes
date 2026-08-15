@@ -7,7 +7,7 @@
 
 use hermes_simd_core::{
     arch::SimdArch,
-    kernel::{SimdKernel, MAX_SIMD_LANES},
+    kernel::{SimdArith, SimdLoadStore, SimdMask, MAX_SIMD_LANES},
     scalar::Scalar,
 };
 use hermes_simd_macros::runtime_dispatch;
@@ -20,7 +20,7 @@ use hermes_simd_macros::runtime_dispatch;
 unsafe fn scale_masked_tail<T, A>(data: *mut T, scalar: T, tail: usize)
 where
     T: Scalar,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch + SimdArith<T> + SimdLoadStore<T> + SimdMask<T>,
 {
     const { A::LANE_BOUND_CHECK };
     debug_assert!(tail > 0 && tail < A::LANE_COUNT);
@@ -51,7 +51,7 @@ where
 pub(super) fn dispatch_scale_kernel<T, A>(data: &mut [T], scalar: T)
 where
     T: Scalar,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch + SimdArith<T> + SimdLoadStore<T> + SimdMask<T>,
 {
     let len = data.len();
     if len == 0 {

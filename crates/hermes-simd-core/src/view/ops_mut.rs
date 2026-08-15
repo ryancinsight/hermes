@@ -13,7 +13,7 @@
 use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
-use crate::kernel::{SimdKernel, MAX_SIMD_LANES};
+use crate::kernel::{SimdKernel, SimdStorage, MAX_SIMD_LANES};
 use crate::ops::{Add, ElementOp, Mul};
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
@@ -98,7 +98,7 @@ where
         // without reading or writing beyond the caller's tail.
         let tail = len - simd_len;
         if tail != 0 {
-            const { <Arch as SimdKernel<T>>::LANE_BOUND_CHECK };
+            const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
             let mut left = [T::ZERO; MAX_SIMD_LANES];
             let mut right = [T::ZERO; MAX_SIMD_LANES];
             let mut result = [T::ZERO; MAX_SIMD_LANES];

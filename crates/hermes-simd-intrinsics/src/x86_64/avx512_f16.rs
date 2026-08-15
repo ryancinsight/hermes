@@ -8,10 +8,10 @@ use crate::Avx512;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use eunomia::F16;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use hermes_simd_core::kernel::SimdKernel;
+use hermes_simd_core::kernel::BackendKernel;
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-impl SimdKernel<F16> for Avx512 {
+impl BackendKernel<F16> for Avx512 {
     type Vector = [F16; 32];
     type Mask = [bool; 32];
     type IndexVector = [i32; 32];

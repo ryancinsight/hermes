@@ -1,15 +1,23 @@
-# 3. SimdArch and SimdKernel
+# 3. SimdArch and SIMD kernel facets
 
-The kernel layer is two traits with a strict division of labor:
+The kernel layer has an architecture seam, one implementation seam, and
+operation-family facets with a strict division of labor:
 
 - `SimdArch` — architecture *constants*, no scalar type. Implemented by
   zero-sized marker types.
-- `SimdKernel<T>` — vector *operations* for a concrete scalar `T` on a
-  concrete architecture.
+- `BackendKernel<T>` — the sealed implementation seam retaining the canonical
+  backend defaults and native overrides for a concrete scalar `T`.
+- `SimdStorage<T>` — the shared register and lane contract used by every
+  operation family.
+- `SimdArith<T>`, `SimdLoadStore<T>`, `SimdReduce<T>`, and the other role
+  facets — consumer-facing contracts for one operation family.
+- `SimdKernel<T>` — the aggregate bound for consumers that use several facets.
 
 Together they give a generic kernel its monomorphization: a function written
-`f<T, A: SimdArch + SimdKernel<T>>` compiles once per `(T, A)` pair into
-machine code identical to a hand-written specialization.
+`f<T, A: SimdArch + SimdReduce<T>>` compiles once per `(T, A)` pair into
+machine code identical to a hand-written specialization. The facets forward
+to the one `BackendKernel<T>` body; they do not add dynamic dispatch or a
+second implementation.
 
 ## `SimdArch`: the architecture marker
 
@@ -40,34 +48,53 @@ can run. This is the `HS-405` invariant — possessing a `SimdView` or entering 
 dispatched kernel *proves* the kernels it would call are executable on this
 host.
 
-## `SimdKernel<T>`: the vector operations
+## Backend seam and operation-family facets
 
-`SimdKernel<T: Scalar>` provides the primitive operations each backend
-implements for element type `T`:
+`BackendKernel<T: Scalar>` retains the primitive implementation surface for
+each backend and element type `T`. Consumers select the narrowest public facet
+that covers the operation they use:
 
-- **Types**: associated `Vector` and `Mask` register types, plus `LANE_COUNT`
+- **`SimdStorage<T>`**: associated `Vector`, `Mask`, and `IndexVector` register
+  types, plus `LANE_COUNT`
   — the number of `T` lanes in one vector register (e.g. 8 for `f32` on AVX2,
   16 on AVX-512).
-- **Load/store**: `load_aligned`, `load_unaligned`, `store_aligned`,
+- **`SimdLoadStore<T>`**: `load_aligned`, `load_unaligned`, `store_aligned`,
   `store_unaligned`, plus masked `masked_load_unaligned` /
   `masked_store_unaligned` and `masked_fmadd` / `masked_add` / `masked_mul`.
   Masked operations follow AVX-512 merge-masking semantics: lanes where the
   mask is inactive are taken from `src`.
-- **Arithmetic**: `splat`, `add`, `sub`, `mul`, `fmadd`, and the reduction
-  primitives (`sum_reduce`, and the masked `masked_sum_reduce`).
-- **Data movement**: `compress` / `expand` between contiguous storage and
-  selected lanes, and indexed `gather` / `gather_masked`.
-- **Mask construction**: `mask_from_bools`, `leading_k_mask`, and the
-  `mask_from_bitmask` / `vector_to_mask` round-trips.
+- **`SimdArith<T>`**: `splat`, `add`, `sub`, `mul`, and `fmadd`.
+- **`SimdReduce<T>`**: horizontal reductions such as `sum_reduce` and
+  `masked_sum_reduce`.
+- **`SimdGather<T>` and `SimdPermute<T>`**: indexed movement and lane
+  rearrangement such as `gather`, `compress`, and `expand`.
+- **`SimdMask<T>`**: mask construction and conversion such as
+  `mask_from_bools`, `leading_k_mask`, and `mask_from_bitmask`.
+- **Other facets**: `SimdBitwise<T>` and `SimdCompare<T>` own their respective
+  operation families.
+
+`SimdKernel<T>` is the aggregate of these facets for consumers that genuinely
+need several families. It is not the implementation home: all defaults and
+native overrides remain in `BackendKernel<T>`, and `SimdStorage<T>` is the
+single source for shared associated storage metadata.
+
+The operation-family split keeps consumer bounds honest. A gather-only view
+does not require reductions, while a multi-operation algorithm can retain the
+aggregate `SimdKernel<T>` bound. Both forms monomorphize to the same backend
+code.
 
 Every method has an implementation on the `Scalar` backend (a plain loop) and
 native overrides where the ISA provides the instruction. The architecture
-mapping is documented per method — for example `masked_add` is
+mapping is documented per method — for example, `masked_add` is
 `_mm512_mask_add_ps` on AVX-512, `_mm256_blendv_ps` on AVX2, `vbslq_f32` on
 NEON, and a `loop + if` on the scalar fallback. A method with no native
 instruction keeps its defaulted scalar-emulated implementation; new methods
-join as defaulted trait methods so a new backend inherits the whole family
-without touching every impl.
+join the backend seam once, and every facet forwards to that canonical body.
+
+- **Load/store**: `load_aligned`, `load_unaligned`, `store_aligned`,
+  `store_unaligned`.
+- **Data movement**: `compress` / `expand` between contiguous storage and
+  selected lanes, and indexed `gather` / `gather_masked`.
 
 ## Backend implementations and `Scalar`
 
@@ -80,12 +107,12 @@ backends are tested against.
 
 ```rust
 use hermes_simd_intrinsics::Scalar;
-use hermes_simd_core::kernel::SimdKernel;
+use hermes_simd_core::kernel::{SimdArith, SimdReduce, SimdStorage};
 
 // SAFETY: `Scalar` requires no special ISA features.
-let splat4 = unsafe { <Scalar as SimdKernel<f32>>::splat(1.0_f32) };
-let total = unsafe { <Scalar as SimdKernel<f32>>::sum_reduce(splat4) };
-assert_eq!(total, <Scalar as SimdKernel<f32>>::LANE_COUNT as f32);
+let splat4 = unsafe { <Scalar as SimdArith<f32>>::splat(1.0_f32) };
+let total = unsafe { <Scalar as SimdReduce<f32>>::sum_reduce(splat4) };
+assert_eq!(total, <Scalar as SimdStorage<f32>>::LANE_COUNT as f32);
 ```
 
 ## Bounds: lanes and buffers
@@ -99,18 +126,18 @@ current workspace maximum is AVX-512 `i8` at 64 lanes.
 
 ## Why the seam is sealed
 
-`SimdArch` and `SimdKernel` are sealed: the implementor set is closed to the
-workspace, and `Scalar` implementations are extended upstream in
-`hermes_simd_intrinsics`, never downstream. The seal is what lets the kernel
-layer promise that every defaulted method has a correct scalar fallback and
-that new backends inherit the full family — the trait is a closed contract, not
-an open extension point.
+`SimdArch`, `BackendKernel`, and the public facets are sealed: the implementor
+set is closed to the workspace, and `Scalar` implementations are extended
+upstream in `hermes_simd_intrinsics`, never downstream. The seal is what lets
+the kernel layer promise that every defaulted method has a correct scalar
+fallback and that new backends inherit the full family — these traits are
+closed contracts, not open extension points.
 
 ## What to notice
 
-- **Constants belong to the architecture, operations belong to the pair.**
-  `SimdArch` is type-independent; `SimdKernel<T>` binds a scalar type. A kernel
-  generic over both compiles once per `(T, A)`.
+- **Constants belong to the architecture, operations belong to facets.**
+  `SimdArch` is type-independent; `BackendKernel<T>` and each public facet bind
+  a scalar type. A kernel generic over both compiles once per `(T, A)`.
 - **Unsafe is contained.** The `unsafe` surface is the `#[target_feature]`
   kernel methods; the support check at construction time makes "the host can
   execute this architecture" a property of holding the value.

@@ -3,7 +3,11 @@
 //! Returns the first maximum, or `None` for empty or NaN-containing slices.
 
 use hermes_simd_core::{
-    align::Unaligned, arch::SimdArch, execution::Unmasked, kernel::SimdKernel, scalar::Scalar,
+    align::Unaligned,
+    arch::SimdArch,
+    execution::Unmasked,
+    kernel::{SimdArith, SimdBitwise, SimdCompare, SimdLoadStore, SimdMask, SimdReduce},
+    scalar::Scalar,
     view::SimdView,
 };
 use hermes_simd_macros::runtime_dispatch;
@@ -12,7 +16,13 @@ use hermes_simd_macros::runtime_dispatch;
 pub(super) fn dispatch_argmax_kernel<T, A>(data: &[T]) -> Option<(usize, T)>
 where
     T: Scalar,
-    A: SimdArch + SimdKernel<T>,
+    A: SimdArch
+        + SimdLoadStore<T>
+        + SimdArith<T>
+        + SimdBitwise<T>
+        + SimdCompare<T>
+        + SimdMask<T>
+        + SimdReduce<T>,
 {
     SimdView::<T, A, Unaligned, Unmasked, &[T]>::new(data)?.argmax()
 }

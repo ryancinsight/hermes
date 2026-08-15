@@ -4,6 +4,14 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ## [Unreleased]
 
+### Breaking
+
+- [major][HS-436] `SimdKernel<T>` is now the public aggregate of operation
+  facets. Backend implementations move to the hidden `BackendKernel<T>` seam,
+  while consumers can bind only the required facet such as `SimdReduce<T>` or
+  `SimdGather<T>`. The migration updates all in-repository callers and keeps
+  no compatibility re-export.
+
 ### Fixed
 
 - [patch] The AMX-to-AVX-512 NUMA locality downgrade is emitted as a

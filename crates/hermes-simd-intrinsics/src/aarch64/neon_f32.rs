@@ -7,7 +7,7 @@
 use crate::Neon;
 #[cfg(target_arch = "aarch64")]
 use core::arch::aarch64::*;
-use hermes_simd_core::kernel::SimdKernel;
+use hermes_simd_core::kernel::BackendKernel;
 
 /// Newtype over `float32x4_t` providing `Send + Sync`.
 #[cfg(target_arch = "aarch64")]
@@ -35,7 +35,7 @@ unsafe impl Send for NeonF32Mask {}
 unsafe impl Sync for NeonF32Mask {}
 
 #[cfg(target_arch = "aarch64")]
-impl SimdKernel<f32> for Neon {
+impl BackendKernel<f32> for Neon {
     type Vector = NeonF32Vec;
     type Mask = NeonF32Mask;
     /// Scalar index array — NEON has no native gather; emulated lane-by-lane.
