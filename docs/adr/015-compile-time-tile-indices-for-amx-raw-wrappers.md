@@ -42,8 +42,10 @@ Option 1. The five wrappers take the tile indices as const generic
 parameters and call sites in `amx/bf16.rs` and `amx/int8.rs` supply them as
 turbofish literals in the same change. The `raw` API break is released as a
 pre-1.0 minor bump per the repository convention (ADR 014), documented under
-**Breaking** in the CHANGELOG. The Miri arms drop the now-unused `let _ = …;`
-bindings, since no runtime value exists to bind.
+**Breaking** in the CHANGELOG. The Miri arms bind the runtime parameters the
+wrappers still take (`base`/`stride` for the tile-load/store pair) so the
+`-D warnings` miri compile stays clean; the const-generic tile index needs no
+binding because no runtime value exists for it.
 
 The change is compile-time-only by construction: the generated instruction
 stream for every previously-reachable call site is unchanged, and the index
@@ -73,9 +75,13 @@ branch vanishes from the tile loop.
   --release-type minor` reports `semver requires new major version: 2 major
   and 0 minor checks failed` — `function_parameter_count_changed` and
   `function_requires_different_const_generic_params` on all five functions.
-- The SDE emulation job (nextest `sde` profile) executes the rewritten `asm!`
-  text under whole-program emulation on hosts without AMX silicon — the
-  value-semantic gate for the instruction text.
+- The x86_64 build assembles the rewritten instruction text in every target,
+  including the SDE whole-program-emulation job. The AMX instructions
+  themselves are not executed on any available machine: the capability probe
+  correctly refuses under SDE (the `arch_prctl` permission syscall passes
+  through to a host kernel without AMX), so `amx` stays out of
+  `test-avx512-sde`'s expected targets (HS-429 note). Execution-level
+  verification is therefore deferred to HS-429's hardware.
 - Measured before/after on AMX silicon: deferred to HS-429 hardware.
 
 ## References

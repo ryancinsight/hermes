@@ -807,8 +807,11 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   `function_requires_different_const_generic_params` on all five) — confirming
   the [major] class. The before/after measurement on AMX silicon remains the one
   unmet acceptance item; it is deferred to HS-429's hardware per this item's own
-  reasoning (the loop executes on no available machine), and the SDE whole-program
-  emulation job gates the rewritten instruction text in the meantime.
+  reasoning (the loop executes on no available machine), and the x86_64 build
+  (including the SDE whole-program-emulation job) assembles the rewritten
+  instruction text — the AMX instructions themselves are not executed anywhere
+  until HS-429's silicon, since the capability probe correctly refuses under
+  SDE.
 
 - [x] [patch] **HS-439 — `# Safety` sections for the AMX raw wrappers.**
   The eight `pub unsafe fn`s in `amx/mod.rs`'s `raw` module carry `///`
