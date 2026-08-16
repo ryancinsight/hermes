@@ -427,7 +427,7 @@
   Criterion's noise threshold. AVX-512 performance remains open under HS-429
   because SDE is semantic evidence only.
 
-- [ ] [major] **HS-425 — `TargetId` omits the SVE backend.** Owner: ryan (agent,
+- [x] [major] **HS-425 — `TargetId` omits the SVE backend.** Owner: ryan (agent,
   claimed 2026-08-15; ADR 014 drafted). `SveArch` is a
   first-class emulated backend exercised throughout the test suite, but
   `TargetId` enumerates only Scalar/Avx2/Avx512/Neon. The public forced-dispatch
@@ -442,6 +442,17 @@
   the variant addition, whether to apply `#[non_exhaustive]` to both enums in
   the same break so this never recurs, and the pre-1.0 minor-bump migration
   note. Precondition: that ADR drafted and the version decision made.
+  Delivered 2026-08-16 (closure takeover; the implementation merged via PR #49,
+  merge commit fb36e0f / feature commit dd4cc78, but the item was left open).
+  Acceptance verified on current `main`: `TargetId::Sve` routes through
+  `dispatch_view_to` (`target.rs:213`) and `dispatch_view_mut_to`
+  (`target.rs:282`, via `SimdView::<T, SveArch, …>::new_mut`); conformance
+  coverage exists in `tests/backend_coverage_tests.rs:138` and
+  `tests/host_capability_tests.rs:34-38/158/179`; `#[non_exhaustive]` is applied
+  to `TargetId` (`target.rs:22`); `dispatch_view` auto-selection
+  (`lib.rs:296-333`) has no `Sve` branch, so the emulated backend stays
+  explicitly requested. ADR 014 (Proposed) and the CHANGELOG **Breaking**
+  `[major][HS-425]` entry were part of the same merge.
 
 - [x] [patch] **HS-426 — ADR index hygiene.** `docs/adr/` carried two ADRs
   numbered 007, eight of eleven with no `## Status` section (the generated index
