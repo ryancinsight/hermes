@@ -158,6 +158,7 @@ pub mod raw {
     pub unsafe fn tileloadd<const TILE: u8>(base: *const core::ffi::c_void, stride: isize) {
         #[cfg(miri)]
         {
+            let _ = (base, stride);
             panic!("AMX tile execution is not available under Miri");
         }
         #[cfg(all(target_arch = "x86_64", not(miri)))]
@@ -187,6 +188,7 @@ pub mod raw {
     pub unsafe fn tilestored<const TILE: u8>(base: *mut core::ffi::c_void, stride: isize) {
         #[cfg(miri)]
         {
+            let _ = (base, stride);
             panic!("AMX tile execution is not available under Miri");
         }
         #[cfg(all(target_arch = "x86_64", not(miri)))]
