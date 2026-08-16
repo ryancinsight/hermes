@@ -121,255 +121,143 @@ pub mod raw {
 
     /// Zero out a tile register.
     ///
+    /// The tile index is a compile-time constant: `TILE` must name a valid
+    /// register (`0..8`), and the assembler rejects out-of-range indices at
+    /// compile time.
+    ///
     /// # Safety
-    /// The current thread must have an active AMX tile configuration, and
-    /// `tile` must be in the range `0..8`.
+    /// The current thread must have an active AMX tile configuration.
     #[inline(always)]
-    pub unsafe fn tilezero(tile: u8) {
+    pub unsafe fn tilezero<const TILE: u8>() {
         #[cfg(miri)]
         {
-            let _ = tile;
             panic!("AMX tile execution is not available under Miri");
         }
         #[cfg(all(target_arch = "x86_64", not(miri)))]
         {
-            match tile {
-                0 => core::arch::asm!("tilezero tmm0", options(nomem, nostack, preserves_flags)),
-                1 => core::arch::asm!("tilezero tmm1", options(nomem, nostack, preserves_flags)),
-                2 => core::arch::asm!("tilezero tmm2", options(nomem, nostack, preserves_flags)),
-                3 => core::arch::asm!("tilezero tmm3", options(nomem, nostack, preserves_flags)),
-                4 => core::arch::asm!("tilezero tmm4", options(nomem, nostack, preserves_flags)),
-                5 => core::arch::asm!("tilezero tmm5", options(nomem, nostack, preserves_flags)),
-                6 => core::arch::asm!("tilezero tmm6", options(nomem, nostack, preserves_flags)),
-                7 => core::arch::asm!("tilezero tmm7", options(nomem, nostack, preserves_flags)),
-                _ => unreachable!("AMX tile index out of range (valid: tmm0-tmm7)"),
-            }
+            core::arch::asm!(
+                "tilezero tmm{TILE}",
+                TILE = const TILE,
+                options(nomem, nostack, preserves_flags),
+            );
         }
     }
 
     /// Load 2D data from memory into a tile register.
     ///
+    /// The tile index is a compile-time constant: `TILE` must name a valid
+    /// register (`0..8`), and the assembler rejects out-of-range indices at
+    /// compile time.
+    ///
     /// # Safety
-    /// The current thread must have an active AMX tile configuration, and
-    /// `tile` must be in the range `0..8`. `base` and `stride` must describe
-    /// readable rows whose lengths and spacing satisfy the loaded tile's
-    /// configured shape; every address accessed by the instruction must be
-    /// valid for the duration of the call.
+    /// The current thread must have an active AMX tile configuration. `base`
+    /// and `stride` must describe readable rows whose lengths and spacing
+    /// satisfy the loaded tile's configured shape; every address accessed by
+    /// the instruction must be valid for the duration of the call.
     #[inline(always)]
-    pub unsafe fn tileloadd(tile: u8, base: *const core::ffi::c_void, stride: isize) {
+    pub unsafe fn tileloadd<const TILE: u8>(base: *const core::ffi::c_void, stride: isize) {
         #[cfg(miri)]
         {
-            let _ = (tile, base, stride);
+            let _ = (base, stride);
             panic!("AMX tile execution is not available under Miri");
         }
         #[cfg(all(target_arch = "x86_64", not(miri)))]
         {
-            match tile {
-                0 => {
-                    core::arch::asm!("tileloadd tmm0, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags));
-                }
-                1 => {
-                    core::arch::asm!("tileloadd tmm1, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags));
-                }
-                2 => {
-                    core::arch::asm!("tileloadd tmm2, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags));
-                }
-                3 => {
-                    core::arch::asm!("tileloadd tmm3, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags));
-                }
-                4 => {
-                    core::arch::asm!("tileloadd tmm4, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags));
-                }
-                5 => {
-                    core::arch::asm!("tileloadd tmm5, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags));
-                }
-                6 => {
-                    core::arch::asm!("tileloadd tmm6, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags));
-                }
-                7 => {
-                    core::arch::asm!("tileloadd tmm7, [{base} + {stride}]", base = in(reg) base, stride = in(reg) stride, options(readonly, nostack, preserves_flags));
-                }
-                _ => unreachable!("AMX tile index out of range (valid: tmm0-tmm7)"),
-            }
+            core::arch::asm!(
+                "tileloadd tmm{TILE}, [{base} + {stride}]",
+                TILE = const TILE,
+                base = in(reg) base,
+                stride = in(reg) stride,
+                options(readonly, nostack, preserves_flags),
+            );
         }
     }
 
     /// Store 2D data from a tile register into memory.
     ///
+    /// The tile index is a compile-time constant: `TILE` must name a valid
+    /// register (`0..8`), and the assembler rejects out-of-range indices at
+    /// compile time.
+    ///
     /// # Safety
-    /// The current thread must have an active AMX tile configuration, and
-    /// `tile` must be in the range `0..8`. `base` and `stride` must describe
-    /// writable rows whose lengths and spacing satisfy the stored tile's
-    /// configured shape; every address accessed by the instruction must be
-    /// valid for the duration of the call.
+    /// The current thread must have an active AMX tile configuration. `base`
+    /// and `stride` must describe writable rows whose lengths and spacing
+    /// satisfy the stored tile's configured shape; every address accessed by
+    /// the instruction must be valid for the duration of the call.
     #[inline(always)]
-    pub unsafe fn tilestored(tile: u8, base: *mut core::ffi::c_void, stride: isize) {
+    pub unsafe fn tilestored<const TILE: u8>(base: *mut core::ffi::c_void, stride: isize) {
         #[cfg(miri)]
         {
-            let _ = (tile, base, stride);
+            let _ = (base, stride);
             panic!("AMX tile execution is not available under Miri");
         }
         #[cfg(all(target_arch = "x86_64", not(miri)))]
         {
-            match tile {
-                0 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm0", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags));
-                }
-                1 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm1", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags));
-                }
-                2 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm2", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags));
-                }
-                3 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm3", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags));
-                }
-                4 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm4", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags));
-                }
-                5 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm5", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags));
-                }
-                6 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm6", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags));
-                }
-                7 => {
-                    core::arch::asm!("tilestored [{base} + {stride}], tmm7", base = in(reg) base, stride = in(reg) stride, options(nostack, preserves_flags));
-                }
-                _ => unreachable!("AMX tile index out of range (valid: tmm0-tmm7)"),
-            }
+            core::arch::asm!(
+                "tilestored [{base} + {stride}], tmm{TILE}",
+                TILE = const TILE,
+                base = in(reg) base,
+                stride = in(reg) stride,
+                options(nostack, preserves_flags),
+            );
         }
     }
 
     /// Compute F32 dot product of BF16 elements: dst += src1 * src2
     ///
+    /// The tile indices are compile-time constants: `DST`, `SRC1`, and `SRC2`
+    /// must name valid registers (`0..8`), and the assembler rejects
+    /// out-of-range indices at compile time.
+    ///
     /// # Safety
-    /// The current thread must have an active AMX tile configuration, and
-    /// `dst`, `src1`, and `src2` must be tile indices in the range `0..8` with
-    /// configured shapes and BF16 dot-product layout accepted by
-    /// `TDPBF16PS`. The destination tile must be initialized for accumulation.
+    /// The current thread must have an active AMX tile configuration, and the
+    /// tiles must have configured shapes and BF16 dot-product layout accepted
+    /// by `TDPBF16PS`. The destination tile must be initialized for
+    /// accumulation.
     #[inline(always)]
-    pub unsafe fn tdpbf16ps(dst: u8, src1: u8, src2: u8) {
+    pub unsafe fn tdpbf16ps<const DST: u8, const SRC1: u8, const SRC2: u8>() {
         #[cfg(miri)]
         {
-            let _ = (dst, src1, src2);
             panic!("AMX tile execution is not available under Miri");
         }
         #[cfg(all(target_arch = "x86_64", not(miri)))]
         {
-            match (dst, src1, src2) {
-                (2, 0, 6) => core::arch::asm!(
-                    "tdpbf16ps tmm2, tmm0, tmm6",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (3, 0, 7) => core::arch::asm!(
-                    "tdpbf16ps tmm3, tmm0, tmm7",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (4, 1, 6) => core::arch::asm!(
-                    "tdpbf16ps tmm4, tmm1, tmm6",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (5, 1, 7) => core::arch::asm!(
-                    "tdpbf16ps tmm5, tmm1, tmm7",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (5, 3, 4) => core::arch::asm!(
-                    "tdpbf16ps tmm5, tmm3, tmm4",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (4, 0, 2) => core::arch::asm!(
-                    "tdpbf16ps tmm4, tmm0, tmm2",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (5, 0, 3) => core::arch::asm!(
-                    "tdpbf16ps tmm5, tmm0, tmm3",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (6, 1, 2) => core::arch::asm!(
-                    "tdpbf16ps tmm6, tmm1, tmm2",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (7, 1, 3) => core::arch::asm!(
-                    "tdpbf16ps tmm7, tmm1, tmm3",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (0, 1, 2) => core::arch::asm!(
-                    "tdpbf16ps tmm0, tmm1, tmm2",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (2, 0, 1) => core::arch::asm!(
-                    "tdpbf16ps tmm2, tmm0, tmm1",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                _ => unreachable!("AMX tile index out of range (valid: tmm0-tmm7)"),
-            }
+            core::arch::asm!(
+                "tdpbf16ps tmm{DST}, tmm{SRC1}, tmm{SRC2}",
+                DST = const DST,
+                SRC1 = const SRC1,
+                SRC2 = const SRC2,
+                options(nomem, nostack, preserves_flags),
+            );
         }
     }
 
     /// Compute INT32 dot product of INT8 elements: dst += src1 * src2
     ///
+    /// The tile indices are compile-time constants: `DST`, `SRC1`, and `SRC2`
+    /// must name valid registers (`0..8`), and the assembler rejects
+    /// out-of-range indices at compile time.
+    ///
     /// # Safety
-    /// The current thread must have an active AMX tile configuration, and
-    /// `dst`, `src1`, and `src2` must be tile indices in the range `0..8` with
-    /// configured shapes and INT8 VNNI dot-product layout accepted by
-    /// `TDPBSSD`. The destination tile must be initialized for accumulation.
+    /// The current thread must have an active AMX tile configuration, and the
+    /// tiles must have configured shapes and INT8 VNNI dot-product layout
+    /// accepted by `TDPBSSD`. The destination tile must be initialized for
+    /// accumulation.
     #[inline(always)]
-    pub unsafe fn tdpbssd(dst: u8, src1: u8, src2: u8) {
+    pub unsafe fn tdpbssd<const DST: u8, const SRC1: u8, const SRC2: u8>() {
         #[cfg(miri)]
         {
-            let _ = (dst, src1, src2);
             panic!("AMX tile execution is not available under Miri");
         }
         #[cfg(all(target_arch = "x86_64", not(miri)))]
         {
-            match (dst, src1, src2) {
-                (2, 0, 6) => core::arch::asm!(
-                    "tdpbssd tmm2, tmm0, tmm6",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (3, 0, 7) => core::arch::asm!(
-                    "tdpbssd tmm3, tmm0, tmm7",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (4, 1, 6) => core::arch::asm!(
-                    "tdpbssd tmm4, tmm1, tmm6",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (5, 1, 7) => core::arch::asm!(
-                    "tdpbssd tmm5, tmm1, tmm7",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (5, 3, 4) => core::arch::asm!(
-                    "tdpbssd tmm5, tmm3, tmm4",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (4, 0, 2) => core::arch::asm!(
-                    "tdpbssd tmm4, tmm0, tmm2",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (5, 0, 3) => core::arch::asm!(
-                    "tdpbssd tmm5, tmm0, tmm3",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (6, 1, 2) => core::arch::asm!(
-                    "tdpbssd tmm6, tmm1, tmm2",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (7, 1, 3) => core::arch::asm!(
-                    "tdpbssd tmm7, tmm1, tmm3",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (0, 1, 2) => core::arch::asm!(
-                    "tdpbssd tmm0, tmm1, tmm2",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                (2, 0, 1) => core::arch::asm!(
-                    "tdpbssd tmm2, tmm0, tmm1",
-                    options(nomem, nostack, preserves_flags)
-                ),
-                _ => unreachable!("AMX tile index out of range (valid: tmm0-tmm7)"),
-            }
+            core::arch::asm!(
+                "tdpbssd tmm{DST}, tmm{SRC1}, tmm{SRC2}",
+                DST = const DST,
+                SRC1 = const SRC1,
+                SRC2 = const SRC2,
+                options(nomem, nostack, preserves_flags),
+            );
         }
     }
 }

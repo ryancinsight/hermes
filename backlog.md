@@ -774,7 +774,7 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   which the probe returns true, the GEMM dispatches, and its result is
   differentially checked against `scalar/tiling.rs`.
 
-- [ ] [major] **HS-438 — `const TILE: u8` for the AMX raw tile wrappers.**
+- [x] [major] **HS-438 — `const TILE: u8` for the AMX raw tile wrappers.**
   *(Renumbered from HS-434 on 2026-08-14: that ID was already held by the
   workspace lint floor item at the top of this file. See the note under
   HS-439.)*
@@ -793,6 +793,25 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   criterion baseline is possible. Acceptance: one `asm!` block per wrapper, no
   `unreachable!()` in `amx/mod.rs`, all call sites converted, and a measured
   before/after on AMX silicon.
+  Delivered 2026-08-16: the five wrappers are const generic
+  (`tilezero::<TILE>()`, `tileloadd::<TILE>(base, stride)`,
+  `tilestored::<TILE>(base, stride)`, `tdpbf16ps::<DST, SRC1, SRC2>()`,
+  `tdpbssd::<DST, SRC1, SRC2>()`), each a single `asm!` with
+  `TILE = const TILE` operands; the 8-arm match, 11-entry whitelist, and both
+  `unreachable!()`s are deleted. All call sites in `amx/bf16.rs` (35) and
+  `amx/int8.rs` (65) converted to turbofish literals in the same change.
+  Verified: build + clippy `-D warnings` clean, nextest 30/30, doctests clean,
+  workspace `cargo check --all-targets` green. `cargo-semver-checks --baseline-rev
+  origin/main --release-type minor` fails exactly as expected — "2 major and 0
+  minor checks failed" (`function_parameter_count_changed` and
+  `function_requires_different_const_generic_params` on all five) — confirming
+  the [major] class. The before/after measurement on AMX silicon remains the one
+  unmet acceptance item; it is deferred to HS-429's hardware per this item's own
+  reasoning (the loop executes on no available machine), and the x86_64 build
+  (including the SDE whole-program-emulation job) assembles the rewritten
+  instruction text — the AMX instructions themselves are not executed anywhere
+  until HS-429's silicon, since the capability probe correctly refuses under
+  SDE.
 
 - [x] [patch] **HS-439 — `# Safety` sections for the AMX raw wrappers.**
   The eight `pub unsafe fn`s in `amx/mod.rs`'s `raw` module carry `///`

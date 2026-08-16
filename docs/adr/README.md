@@ -20,3 +20,4 @@
 | [012](012-structured-amx-downgrade-events.md) | Structured AMX downgrade events | Accepted |
 | [013](013-simdkernel-role-split.md) | Split `SimdKernel` into Operation-Family Facets | Accepted |
 | [014](014-targetid-sve-backend.md) | Add `TargetId::Sve` and Seal the Target Enum Family | Proposed |
+| [015](015-compile-time-tile-indices-for-amx-raw-wrappers.md) | Compile-Time Tile Indices for the AMX Raw Wrappers | Proposed |
