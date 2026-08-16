@@ -6,6 +6,16 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Breaking
 
+- [major][HS-438] The AMX `raw` tile wrappers in `hermes-simd-intrinsics`
+  (`tilezero`/`tileloadd`/`tilestored`/`tdpbf16ps`/`tdpbssd`) take their tile
+  indices as `const` generic parameters instead of positional `u8` arguments,
+  removing the runtime `match`/whitelist dispatch and its `unreachable!()`
+  tails. `tdpbf16ps`/`tdpbssd` previously panicked on any valid-but-unlisted
+  `(dst, src1, src2)` triple; out-of-range indices now fail to compile.
+  Migration: move the index literal into turbofish position —
+  `raw::tileloadd(0, p, s)` becomes `raw::tileloadd::<0>(p, s)`, and
+  `raw::tdpbf16ps(2, 0, 1)` becomes `raw::tdpbf16ps::<2, 0, 1>()`.
+
 - [major][HS-436] `SimdKernel<T>` is now the public aggregate of operation
   facets. Backend implementations move to the hidden `BackendKernel<T>` seam,
   while consumers can bind only the required facet such as `SimdReduce<T>` or
