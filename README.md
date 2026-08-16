@@ -142,17 +142,30 @@ requires requesting it, so the first call performs a process-wide, irreversible
 opt-in that enlarges the XSAVE area for every thread. The result is cached, so
 this happens at most once.
 
-**Still unvalidated on hardware.** No machine in CI has AMX silicon, and the
-`test-avx512-sde` job cannot substitute: Intel SDE emulates the instructions,
-CPUID, and `XGETBV`, but `arch_prctl` is a real syscall that passes through to
-the host kernel, which returns `EOPNOTSUPP` for `XTILEDATA` on a non-AMX host.
-A correct probe therefore refuses under SDE — by design — so `amx` is
-deliberately absent from that job's `HERMES_EXPECTED_TARGETS`. The AMX kernels
-remain compile-checked only.
+**AVX-512 executes under emulation; real-silicon timing is best-effort.** The
+`test-avx512-sde` job runs the suite under Intel SDE emulating Sapphire
+Rapids, so the AVX-512 paths execute deterministically on every push and the
+coverage step asserts `scalar,avx2,avx512,sve` without requiring silicon.
+Performance evidence is a separate claim SDE cannot make, so the
+`test-avx512-hosted` job additionally records the machine class of the
+GitHub-hosted x86 runner and, when that host happens to carry AVX-512, asserts
+`scalar,avx2,avx512` and captures the permute A/B benchmark natively.
+GitHub's hosted x86 pool is heterogeneous — some Intel parts have AVX-512 and
+others (AMD, older Intel) do not — so native timing is opportunistic: on hosts
+without the silicon the coverage report shows AVX-512 as `NOT COVERED` and the
+benchmark is skipped loudly, never silently. AMX remains a possibility rather
+than a claim: the probe's third condition is the real
+`arch_prctl(ARCH_REQ_XCOMP_PERM, XTILEDATA)` syscall, which the runner kernel
+may or may not grant, so `amx` is deliberately absent from both jobs'
+`HERMES_EXPECTED_TARGETS`. Where it is admitted, the AMX GEMM dispatches and
+must match the `scalar/tiling.rs` reference within a derived bound.
 
 **Remaining trigger** ([`backlog.md`](backlog.md) → Open): a Sapphire-Rapids (or
-later) Linux runner on which the probe returns `true`, the AMX GEMM dispatches,
-and its result matches the `scalar/tiling.rs` reference within a derived bound.
+later) Linux runner on which the probe returns `true` — i.e. the runner kernel
+admits `XTILEDATA` — the AMX GEMM dispatches, and its result matches the
+`scalar/tiling.rs` reference within a derived bound. A `test-avx512-hosted`
+host whose kernel admits XTILEDATA may satisfy this; it is not asserted
+because kernel admission varies.
 
 ---
 
@@ -233,7 +246,7 @@ cargo run -p hermes-simd-benches -- --parse-only --write-baseline --check-regres
 cargo run -p hermes-simd-benches -- --parse-only --check-regressions
 ```
 
-Differential testing policy: the AVX2, AVX-512, and NEON backends are verified against the always-available `Scalar` backend — bitwise on dyadic-exact inputs, within analytically derived rounding bounds on arbitrary inputs. AVX-512 executes under Intel SDE emulating Sapphire Rapids (`test-avx512-sde`) and NEON on a native aarch64 runner (`test-aarch64`), so neither is carried by a capability-gated skip. The AMX kernels are compile-checked only; they are not runtime-validated, because no available machine satisfies the permission chain — the SDE job cannot stand in, since `arch_prctl` reaches the host kernel rather than the emulator (see [Intel AMX status](#intel-amx-status)).
+Differential testing policy: the AVX2, AVX-512, and NEON backends are verified against the always-available `Scalar` backend — bitwise on dyadic-exact inputs, within analytically derived rounding bounds on arbitrary inputs. AVX-512 executes under Intel SDE emulating Sapphire Rapids (`test-avx512-sde`), with native timing captured best-effort on hosted silicon whenever it is present (`test-avx512-hosted`), and NEON runs on a native aarch64 runner (`test-aarch64`), so no backend is carried by a capability-gated skip. The AMX kernels are compile-checked only; they are not runtime-validated, because no available machine satisfies the permission chain — the SDE job cannot stand in, since `arch_prctl` reaches the host kernel rather than the emulator (see [Intel AMX status](#intel-amx-status)).
 
 Benchmark regression policy: `benchmarks_baseline.json` is the structured
 Criterion baseline. `--check-regressions` fails when a committed baseline row is

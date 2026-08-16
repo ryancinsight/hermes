@@ -40,7 +40,9 @@ jobs:
       # Declares the backends this runner must actually execute. AVX-512 is
       # deliberately absent: GitHub's x86 runners vary between parts that have
       # it and parts that do not, so requiring it here would fail at random.
-      # That non-determinism is why the SDE job exists.
+      # That non-determinism is why the SDE job supplies the deterministic
+      # semantic gate and the test-avx512-hosted job asserts AVX-512 only when
+      # the hosted silicon happens to have it.
       # --no-capture is required: nextest swallows stdout for passing tests,
       # so without it the matrix would print only when the assertion fails —
       # exactly the silence this step exists to remove.
@@ -191,6 +193,96 @@ jobs:
         run: |
           cargo nextest run --workspace --profile sde \
             --target x86_64-unknown-linux-gnu
+
+  test-avx512-hosted:
+    name: test (AVX-512 best-effort on GitHub-hosted x86)
+    runs-on: ubuntu-latest
+    # GitHub's hosted x86 pool is heterogeneous: some Intel parts carry AVX-512
+    # and others (AMD, older Intel) do not, and the CPU family cannot be pinned.
+    # This job therefore records the machine class, then asserts AVX-512
+    # coverage and captures the native benchmark only when the host happens to
+    # provide the silicon. Coverage never degrades silently: the identification
+    # report prints AVX-512 as NOT COVERED on hosts that lack it, the benchmark
+    # skip is loud, and the SDE job remains the deterministic semantic gate.
+    # The value this job adds is real-silicon timing evidence, which SDE cannot
+    # provide.
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: hermes
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: hermes
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          toolchain: 1.97.0
+      - uses: taiki-e/install-action@ea4c0b50b0d394ee91c5bb68a6a295b0556feb8e
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          workspaces: hermes
+      # Machine-class record: which hosted silicon produced this job's data.
+      # The model name tags any baseline saved below; the flags decide whether
+      # the AVX-512 assertion and benchmark run at all. avx512f is the probe
+      # that gates the override kernels (VPERMPS/VPERMPD/VPERMI2PS/VPERMI2PD).
+      - name: Record machine class
+        id: machine
+        shell: bash
+        run: |
+          model=$(grep -m1 'model name' /proc/cpuinfo | sed 's/^.*: //')
+          echo "model=$model" >> "$GITHUB_OUTPUT"
+          echo "machine class: $model"
+          echo "AVX-512 flags: $(grep -m1 '^flags' /proc/cpuinfo | grep -o 'avx512[a-z0-9_]*' | sort -u | tr '\n' ' ')"
+          if grep -m1 '^flags' /proc/cpuinfo | grep -qw avx512f; then
+            echo "avx512=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "avx512=false" >> "$GITHUB_OUTPUT"
+          fi
+      # The expectation is computed, not guessed: avx512 joins the asserted set
+      # only when this host has the silicon, so the assertion is exactly as
+      # strong as the host allows while a host that silently lost a declared
+      # capability still fails. On hosts without AVX-512 the report row prints
+      # NOT COVERED, making the gap visible rather than silent.
+      - name: Identify host backend coverage
+        env:
+          HERMES_EXPECTED_TARGETS: "scalar,avx2${{ steps.machine.outputs.avx512 == 'true' && ',avx512' || '' }}"
+        run: cargo nextest run -p hermes-simd -E 'test(host_backend_coverage)' --no-capture
+      - name: Skip note (no AVX-512 silicon on this host)
+        if: steps.machine.outputs.avx512 != 'true'
+        shell: bash
+        run: |
+          echo "This hosted runner has no AVX-512 silicon, so the native AVX-512"
+          echo "benchmark is skipped. Coverage on this host is visible as NOT"
+          echo "COVERED in the identification report above; deterministic"
+          echo "semantic coverage stays under the SDE job."
+      # HS-429 acceptance: a criterion baseline captured on real silicon when
+      # the host provides it. The permute A/B also executes HS-430's still-open
+      # AVX-512 measurement, the x86 analog of the aarch64 job's neon-native
+      # compare. save-baseline overwrites any cached prior-run baseline, so the
+      # compare step always measures against the current host's own run.
+      - name: Benchmark native AVX-512 permutes
+        if: steps.machine.outputs.avx512 == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Machine class: ${{ steps.machine.outputs.model }}"
+          timeout --foreground --kill-after=10s 300s \
+            cargo bench --locked -p hermes-simd --bench permute \
+              -- --save-baseline avx512-native --noplot
+      - name: Compare AVX-512 overrides with the generic default
+        if: steps.machine.outputs.avx512 == 'true'
+        shell: bash
+        env:
+          RUSTFLAGS: >-
+            -D warnings
+            --check-cfg=cfg(hermes_benchmark_generic_default)
+            --cfg hermes_benchmark_generic_default
+        run: |
+          set -euo pipefail
+          echo "Machine class: ${{ steps.machine.outputs.model }}"
+          timeout --foreground --kill-after=10s 300s \
+            cargo bench --locked -p hermes-simd --bench permute \
+              -- --baseline avx512-native --noplot
 
   test-aarch64:
     name: test (aarch64, runtime NEON validation)

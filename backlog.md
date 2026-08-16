@@ -256,7 +256,9 @@
   `SimdView::gather`. Full vectors use the unmasked seam and the final partial
   vector uses the masked seam, so no scalar tail remains. Indices are validated
   before any write; duplicate indices are last-writer-wins. The native AVX-512
-  path is executed under the HS-428 Intel SDE job.
+  path executed under the SDE job; native silicon execution is best-effort on
+  the HS-429 `test-avx512-hosted` job when the hosted x86 runner carries
+  AVX-512.
 
 - [x] [minor] **HS-423 — rounding primitives.** The kernel trait has no
   `floor`/`ceil`/`round`/`trunc` although every target ISA provides them
@@ -309,26 +311,40 @@
   last two makes an ARM log read as missing AVX-512.
   Fallback only where no selectable silicon exists: AVX-512 cannot be requested
   on GitHub-hosted runners (some x86 machines have it, some do not, and this
-  repository has no self-hosted runners), and AMX is unavailable there
-  entirely. `test-avx512-sde` therefore runs the suite under Intel SDE emulating
-  Sapphire Rapids (447/447 in 176s, ~11x native) through the cargo target
-  runner, so only test binaries pay the cost. Its identification step runs under
-  the emulator too, so passing is a hard assertion that SDE satisfies the
-  runtime probes rather than merely not breaking. Uses a dedicated
-  `[profile.sde]` 300s budget; the 30s native budget is untouched.
+  repository had no self-hosted runners), and AMX is unavailable there
+  entirely. `test-avx512-sde` therefore ran the suite under Intel SDE emulating
+  Sapphire Rapids (444/444 in 176s, ~11x native) through the cargo target
+  runner, so only test binaries paid the cost. Its identification step ran under
+  the emulator too, so passing was a hard assertion that SDE satisfies the
+  runtime probes rather than merely not breaking. It used a dedicated
+  `[profile.sde]` 300s budget; the 30s native budget was untouched. The job and
+  profile remain the deterministic semantic gate; HS-429 adds best-effort
+  native timing on hosted silicon.
   Known limit: SDE validates semantics, never performance — any benchmark claim
   still requires real silicon. See HS-429.
 
 - [ ] [minor] **HS-429 — real AVX-512/AMX silicon for performance evidence.**
   SDE gives deterministic semantic coverage but cannot support a performance
   claim, so HS-427's "override beats the default" acceptance is unsatisfiable
-  under emulation. A runner provider that pins instance families (RunsOn-class,
-  resolving e.g. `family=c7i` — Sapphire Rapids, AVX-512 plus AMX) supplies
-  genuine hardware in the project's own cloud account. Acceptance: an AVX-512
-  job on real silicon whose coverage step asserts `scalar,avx2,avx512` without
-  the emulator, plus a criterion baseline captured there. If adopted, the SDE
-  job becomes redundant and is deleted rather than kept alongside.
-  Precondition: a cost/infrastructure decision, which is the user's to make.
+  under emulation. Acceptance: an AVX-512 job on real silicon whose coverage
+  step asserts `scalar,avx2,avx512` without the emulator, plus a criterion
+  baseline captured there. If a deterministic real-silicon source were adopted,
+  the SDE job would become redundant and be deleted rather than kept alongside.
+  Decided 2026-08-16: the RunsOn Flex `family=c7i` option (AWS account,
+  CloudFormation stack, license key, GitHub App install — user-side
+  provisioning) was rejected; billing the user's own cloud account to pin an
+  instance family was the wrong cost. Instead `test-avx512-hosted` runs on the
+  existing GitHub-hosted x86 pool and covers AVX-512 on a best-effort basis:
+  it records the machine class, asserts `scalar,avx2` plus `avx512` only when
+  the host silicon has it, and captures the permute A/B (`--save-baseline
+  avx512-native` then generic-default compare) only on such hosts. Hosts
+  lacking the silicon print AVX-512 as NOT COVERED in the coverage report and
+  skip the benchmark loudly, so coverage never degrades silently; the SDE job
+  is retained as the deterministic semantic gate, since hosted x86 is
+  heterogeneous — that determinism was the premise that made SDE redundant,
+  and it no longer holds. Drafted as `test-avx512-hosted` alongside the
+  retained `test-avx512-sde` job; `[profile.sde]` stays. AMX admission remains
+  kernel-dependent and is never asserted.
 
 - [x] [minor] **HS-427 — native permute overrides beyond AVX2 reverse.**
   Delivered with one premise falsified. AVX-512 f32/f64 override all three ops
@@ -780,7 +796,9 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   through to the host kernel, which returns `EOPNOTSUPP` for XTILEDATA because
   the runner silicon has no AMX. A correct probe therefore refuses under
   emulation, so `amx` stays out of `test-avx512-sde`'s
-  `HERMES_EXPECTED_TARGETS` (the job's step comment now explains this). What
+  `HERMES_EXPECTED_TARGETS` (the job's step comment now explains this).
+  HS-429's `test-avx512-hosted` job may admit XTILEDATA on hosts whose kernel
+  grants the permission; it is not asserted there either. What
   remains is exactly HS-429's hardware: Sapphire-Rapids-or-later silicon on
   which the probe returns true, the GEMM dispatches, and its result is
   differentially checked against `scalar/tiling.rs`.
@@ -819,10 +837,12 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   the [major] class. The before/after measurement on AMX silicon remains the one
   unmet acceptance item; it is deferred to HS-429's hardware per this item's own
   reasoning (the loop executes on no available machine), and the x86_64 build
-  (including the SDE whole-program-emulation job) assembles the rewritten
-  instruction text — the AMX instructions themselves are not executed anywhere
-  until HS-429's silicon, since the capability probe correctly refuses under
-  SDE.
+  (including the SDE job and the best-effort `test-avx512-hosted` job)
+  assembles the rewritten instruction text — whether the AMX instructions
+  themselves execute on a hosted runner depends on the kernel admitting
+  XTILEDATA (the probe's condition 3 is a real `arch_prctl` permission
+  syscall, not emulated), so `amx` stays out of that job's
+  `HERMES_EXPECTED_TARGETS` until admission is observed.
 
 - [x] [patch] **HS-439 — `# Safety` sections for the AMX raw wrappers.**
   The eight `pub unsafe fn`s in `amx/mod.rs`'s `raw` module carry `///`

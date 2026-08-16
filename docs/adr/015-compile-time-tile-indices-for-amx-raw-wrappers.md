@@ -65,7 +65,6 @@ branch vanishes from the tile loop.
 - The AMX-silicon before/after measurement in HS-438's acceptance rides on
   the HS-429 hardware validation increment, where a criterion baseline is
   possible; it is a recorded watchpoint, not a software blocker.
-
 ## Evidence / Verification Plan
 
 - `cargo build -p hermes-simd-intrinsics --all-targets` and
@@ -76,12 +75,16 @@ branch vanishes from the tile loop.
   and 0 minor checks failed` — `function_parameter_count_changed` and
   `function_requires_different_const_generic_params` on all five functions.
 - The x86_64 build assembles the rewritten instruction text in every target,
-  including the SDE whole-program-emulation job. The AMX instructions
-  themselves are not executed on any available machine: the capability probe
-  correctly refuses under SDE (the `arch_prctl` permission syscall passes
-  through to a host kernel without AMX), so `amx` stays out of
-  `test-avx512-sde`'s expected targets (HS-429 note). Execution-level
-  verification is therefore deferred to HS-429's hardware.
+  including the SDE whole-program-emulation job and the best-effort
+  `test-avx512-hosted` job on GitHub-hosted x86. Whether the AMX instructions
+  themselves execute on a hosted runner depends on the kernel admitting
+  XTILEDATA: the capability probe's condition 3 is a real `arch_prctl`
+  permission syscall, which a kernel with AMX support grants, so `amx` is
+  deliberately not asserted in either job's `HERMES_EXPECTED_TARGETS` (the
+  hosted job asserts `scalar,avx2` plus `avx512` only when the silicon is
+  present). Execution-level verification of AMX therefore remains deferred to
+  a host whose kernel admits XTILEDATA; the hosted job may satisfy this
+  opportunistically.
 - Measured before/after on AMX silicon: deferred to HS-429 hardware.
 
 ## References

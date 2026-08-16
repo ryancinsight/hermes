@@ -88,8 +88,10 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   `hermes_benchmark_generic_default` comparison configuration, and reruns the
   same bounded benchmark rows. The workflow records evidence on real ARM
   silicon; it makes no speed claim until the comparison is adjudicated. AVX-512
-  performance remains gated on HS-429 real silicon because Intel SDE cannot
-  provide timing evidence.
+  timing is assigned to the HS-429 `test-avx512-hosted` job, which captures the
+  same permute A/B on a GitHub-hosted x86 runner when that silicon is present;
+  Intel SDE remains the deterministic semantic gate and cannot provide timing
+  evidence.
 
 ### Added
 
@@ -105,17 +107,24 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   is not yet measured. On native aarch64, the HS-430 A/B gate found
   NEON reverse neutral against the generic default and removed both f32/f64
   overrides; large f32 interleave and deinterleave improved 1.27% and 1.40%
-  respectively and remain. The exact hosted run was 31694336159; AVX-512
-  timing remains gated on HS-429 real silicon.
-- [patch] CI now executes the capability-gated ISA paths instead of skipping
-  them. AVX-512 branches are `is_x86_feature_detected!`-guarded, and the
-  capability report added with the new `test-avx512-sde` job proved the x86
-  runner has no AVX-512 or AMX flags — so those paths, including the AVX-512
-  scatter override, BF16 tile dispatch, VNNI, and AMX, had never run in CI. The
-  job executes the suite under Intel SDE emulating Sapphire Rapids (444/444,
-  ~11x native) via the cargo target runner, so compilation stays native. A
-  dedicated `sde` nextest profile carries the emulation budget; the native 30s
-  budget is unchanged.
+  respectively and remain. The exact hosted run was 31694336159. The AVX-512
+  timing rows are assigned to the HS-429 `test-avx512-hosted` best-effort job,
+  which measures them when the hosted x86 runner carries AVX-512.
+- [patch] CI executes the capability-gated ISA paths instead of skipping them.
+  AVX-512 branches are `is_x86_feature_detected!`-guarded, and the capability
+  report added with the `test-avx512-sde` job proved the GitHub x86 runner has no
+  AVX-512 or AMX flags — so those paths, including the AVX-512 scatter override,
+  BF16 tile dispatch, VNNI, and AMX, had never run in CI. The job executes the
+  suite under Intel SDE emulating Sapphire Rapids (444/444, ~11x native) via
+  the cargo target runner, so compilation stays native; a dedicated `sde`
+  nextest profile carries the emulation budget, and the native 30s budget is
+  unchanged. The new `test-avx512-hosted` job adds real-silicon coverage and
+  timing on a best-effort basis: GitHub's hosted x86 pool is heterogeneous
+  (some Intel parts carry AVX-512, others do not), so the job records the
+  machine class, asserts `scalar,avx2` plus `avx512` only when the host has the
+  silicon, and captures the native permute A/B on such hosts. Hosts without
+  AVX-512 print it as NOT COVERED in the coverage report, so the gap is
+  visible, never silent.
 - [minor] Cross-lane permutes: `SimdKernel::reverse`, `interleave`, and
   `deinterleave` join the trait as defaulted methods, so general lane
   reordering no longer requires leaving the vector domain and no existing
@@ -142,8 +151,10 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   resolve last-writer-wins, matching the hardware rule on both paths.
   Verification: per-backend differential property tests against the scalar
   reference, a gather∘scatter round-trip identity, duplicate-index and
-  error-contract tests. The native AVX-512 path is executed under the Intel SDE
-  job, so the earlier "runner-gated" caveat on this entry is discharged.
+  error-contract tests. The native AVX-512 path executed under the SDE job, so
+  the earlier "not executed" caveat on this entry is discharged for semantic
+  evidence; native silicon execution follows on the HS-429 `test-avx512-hosted`
+  job when the hosted x86 runner carries AVX-512.
 
 ### Changed
 

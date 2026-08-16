@@ -67,12 +67,18 @@ distinguishes three outcomes:
 - **not covered** — the architecture applies but the CPU lacks the feature,
 - **n/a** — different architecture.
 
-Collapsing the last two would make an ARM log read as missing AVX-512. Where
-no selectable silicon exists (AVX-512 and AMX on GitHub-hosted runners), the
-suite runs under Intel SDE emulating Sapphire Rapids — under the emulator the
-identification step must still pass, so a green run is a hard assertion that
-the emulator satisfies the same runtime probes, not merely that the test did
-not break.
+Collapsing the last two would make an ARM log read as missing AVX-512. Real
+silicon is used wherever it can be requested: NEON runs on an
+`ubuntu-24.04-arm` runner, AVX2 runs on every x86 host, and AVX-512 is
+asserted and benchmarked on GitHub-hosted x86 whenever that silicon happens
+to be present (`test-avx512-hosted`). Where no pinned silicon can be
+requested, the suite runs under Intel SDE emulating Sapphire Rapids
+(`test-avx512-sde`) — under the emulator the identification step must still
+pass, so a green run is a hard assertion that the emulator satisfies the same
+runtime probes, not merely that the tests did not break. Where a runner
+executes a backend, the identification step asserts it as `HERMES_EXPECTED_TARGETS`
+configuration, so a green run is a hard assertion that the host genuinely
+executed those paths, not merely that the tests did not break.
 
 ## Reading the probes
 

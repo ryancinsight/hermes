@@ -1,5 +1,17 @@
 # Checklist — active sprint
 
+## HS-429 [minor] — real AVX-512/AMX silicon for performance evidence
+
+- [ ] Draft `test-avx512-hosted`: GitHub-hosted x86, machine-class record,
+      AVX-512 asserted and benchmarked only when the host silicon has it.
+- [ ] Keep `test-avx512-sde` and `[profile.sde]` as the deterministic semantic
+      gate (hosted x86 is heterogeneous, so SDE is no longer redundant).
+- [ ] Coverage step asserts `scalar,avx2` plus `avx512` when present, without
+      the emulator; absence prints as NOT COVERED, never silence.
+- [ ] Capture the `avx512-native` Criterion permute baseline and the
+      generic-default A/B compare on a host with AVX-512.
+- [ ] Adjudicate the AVX-512 permute rows (closes HS-430's AVX-512 half).
+
 ## HS-433 [patch] — structured AMX downgrade event
 
 - [x] Replace the debug-only stderr diagnostic with one release-visible
@@ -47,8 +59,10 @@
       both f32/f64 rows and its NEON overrides are deleted; large f32
       `interleave` and `deinterleave` improve 1.27% and 1.40% respectively and
       remain. Small rows are within Criterion's noise threshold.
-- [ ] Measure AVX-512 on HS-429 real silicon; SDE remains semantic evidence
-      only.
+- [ ] Measure AVX-512 when a hosted runner with the silicon appears (the
+      `test-avx512-hosted` permute A/B); SDE remains semantic evidence only.
+- [ ] Measure AMX before/after if a runner kernel admits XTILEDATA
+      (HS-438 watchpoint).
 
 ## HS-424 [minor] — cross-lane permute family
 
@@ -67,7 +81,8 @@
       overrides — HS-427, correctness verified on SDE and aarch64. Neutral
       NEON `reverse` overrides were removed after the HS-430 measurement.
 - [ ] Measure the remaining AVX-512 overrides — HS-430/HS-429; performance
-      evidence is separate from semantic coverage.
+      evidence is separate from semantic coverage. The HS-429
+      `test-avx512-hosted` job carries the measurement path.
 
 ## HS-422 [minor] — scatter seam
 
@@ -81,9 +96,12 @@
 - [x] Route the final partial vector through `scatter_masked`, not a scalar tail.
 - [x] Cover per-backend differential equality, the gather∘scatter round-trip
       identity, duplicate-index last-writer-wins, and both error contracts.
-- [x] Validate native AVX-512 execution. Delivered by HS-428: the Intel SDE
-      job executes the scatter property, round-trip, duplicate-index, and
-      error-contract tests against the `vscatterdps`/`vscatterdpd` override.
+- [x] Validate native AVX-512 execution. Delivered by HS-428 (the SDE job,
+      which stays the deterministic semantic gate); HS-429's
+      `test-avx512-hosted` job executes the scatter property, round-trip,
+      duplicate-index, and error-contract tests against the
+      `vscatterdps`/`vscatterdpd` override natively when the hosted x86
+      runner carries AVX-512.
 
 ## HS-421 [arch] — native AVX-512 BF16 tile dispatch
 
