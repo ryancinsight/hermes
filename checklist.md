@@ -1,5 +1,11 @@
 # Checklist — active sprint
 
+## ATLAS-HERMES-ROOT-CLEANUP [patch]
+
+- [x] Move generated benchmark baseline and result files under `benchmarks/`;
+      update the benchmark runner and active documentation references.
+- [x] Exact-head conformance scan: Hermes `root_sprawl` 2 → 0.
+
 ## ATLAS-ORPHAN-MODULES-096-HERMES — provider cleanup
 
 - [x] Confirm `crates/hermes-simd-core/src/tensor/mut_view.rs` is unreachable
@@ -374,7 +380,7 @@
       `--no-default-features` check green locally and in CI.
 - [x] [patch] `#![deny(missing_docs)]` on all six public crates; 12 items documented.
 - [x] [minor] Complex criterion bench suite + recorded baselines
-      (benchmarks_results.md); threshold automation delivered below.
+      (benchmarks/benchmarks_results.md); threshold automation delivered below.
 - [x] [patch] x86 VNNI asm cleanup: `vpdpbssd` factored into one internal
       asm macro with `nostack`/`nomem`/`preserves_flags`; both AVX-512 tile
       kernels expand it inside the target-feature-gated loop. Added complete
@@ -417,7 +423,7 @@
       Evidence tier: value-semantic tests plus full workspace gate (`fmt`,
       `check`, `test`, `clippy -D warnings`, docs).
 - [x] [minor] Criterion threshold automation: `run-benches` now writes
-      `benchmarks_baseline.json`, enforces baseline rows with
+      `benchmarks/benchmarks_baseline.json`, enforces baseline rows with
       `--check-regressions`, and is split into SRP modules (`cli`,
       `criterion_results`, `host`, `regression`, `report`) instead of a
       542-line mixed-concern entrypoint. Evidence tier: value-semantic unit
@@ -444,13 +450,13 @@
       `0.2.0`.
 - [x] [patch] Benchmark baseline refresh: `run-benches --parse-only
       --write-baseline --check-regressions` regenerated
-      `benchmarks_baseline.json` and `benchmarks_results.md` from local
+      `benchmarks/benchmarks_baseline.json` and `benchmarks/benchmarks_results.md` from local
       Criterion output, including packed4 COW unpack and the unrolled complex
       `mul_assign` rows. Regression self-check covered 48 rows.
 - [x] [patch] Compress scratch-hoist benchmark: added
       `compress_bench` with public `SimdView::compress` scalar and host-AVX2
       all/half/quarter-mask rows at 1K, 16K, and 256K elements. Refreshed
-      `benchmarks_baseline.json` / `benchmarks_results.md`; regression
+      `benchmarks/benchmarks_baseline.json` / `benchmarks/benchmarks_results.md`; regression
       self-check covered 102 Hermes rows. Evidence tier: empirical Criterion
       validation plus existing value-semantic compress regressions.
 - [x] [minor] Const-generic Blocked-COO dispatch: removed fixed public

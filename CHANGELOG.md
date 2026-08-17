@@ -4,6 +4,12 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ## [Unreleased]
 
+### Changed
+
+- [patch] Move the generated benchmark baseline and result report under
+  `benchmarks/` and update the runner plus documentation references so the
+  repository root contains only sanctioned manifest artifacts.
+
 ### Breaking
 
 - [major][HS-438] The AMX `raw` tile wrappers in `hermes-simd-intrinsics`
@@ -615,7 +621,7 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   Behavior unchanged (verified by the existing compress tests). A focused
   `SimdView compress` Criterion group now records scalar and host-AVX2
   all/half/quarter-mask rows at 1K, 16K, and 256K elements in
-  `benchmarks_baseline.json` / `benchmarks_results.md`.
+  `benchmarks/benchmarks_baseline.json` / `benchmarks/benchmarks_results.md`.
 - `hermes-simd-core` [patch]: consolidate `reduce_popcount_{and,or,xor}` — three
   byte-identical ~104-line 4-accumulator popcount reductions differing only in
   the bitwise combining op — into one generic `reduce_popcount_op<Op:
@@ -981,7 +987,7 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 - `#![deny(missing_docs)]` on all six public crates; remaining undocumented items (bitboard backends, AMX submodules, emulated-kernel macro, magic `OnceLock`) documented.
 - Internal x86 VNNI asm instruction macro for `vpdpbssd`, keeping assembly behind the monomorphized tile-matmul backend contract without a hot-loop wrapper call.
 - Benchmark reports now record benchmark-relevant host ISA features and the runtime dense-dispatch backend selected on the runner.
-- Benchmark regression enforcement now uses `benchmarks_baseline.json` plus
+- Benchmark regression enforcement now uses `benchmarks/benchmarks_baseline.json` plus
   `run-benches --check-regressions`; the runner is split into CLI, Criterion
   parsing, host reporting, Markdown rendering, and threshold-check modules.
 - Sparse SpMV benchmarks now sweep CSR, SELL-p, and Blocked-COO across 1K,
@@ -1049,7 +1055,7 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   iteration on SIMD backends and uses a direct four-pair scalar loop for large
   scalar inputs, reducing loop overhead in the measured complex benchmark
   range.
-- `benchmarks_baseline.json` and `benchmarks_results.md` now include the
+- `benchmarks/benchmarks_baseline.json` and `benchmarks/benchmarks_results.md` now include the
   packed4 COW unpack benchmark rows and refreshed complex `mul_assign`
   measurements from the local AVX2 host.
 
