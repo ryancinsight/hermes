@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let baseline_path = args
         .baseline_path
         .clone()
-        .unwrap_or_else(|| workspace_root.join("benchmarks_baseline.json"));
+        .unwrap_or_else(|| workspace_root.join("benchmarks/benchmarks_baseline.json"));
 
     if args.parse_only {
         println!(
@@ -96,7 +96,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let markdown = render_markdown(&results, &cpu, capabilities, &generated_at);
-    let output_path = workspace_root.join("benchmarks_results.md");
+    let output_path = workspace_root.join("benchmarks/benchmarks_results.md");
     std::fs::write(&output_path, markdown)?;
     println!(
         "Successfully wrote benchmark results to {}",
