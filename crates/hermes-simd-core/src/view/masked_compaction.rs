@@ -1,3 +1,5 @@
+use core::mem::MaybeUninit;
+
 use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
@@ -61,7 +63,7 @@ where
             // chunk. The compile-time `LANE_BOUND_CHECK` guarantees that the
             // store stays in bounds.
             let () = <Arch as SimdStorage<T>>::LANE_BOUND_CHECK;
-            let mut temp = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+            let mut temp = [MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
 
             for _ in 0..(simd_len / lane_count) {
                 let v = load(ptr);

@@ -1,5 +1,6 @@
 //! Concrete data structures for sparse matrix formats.
 
+use crate::mask::BitMask;
 use core::marker::PhantomData;
 
 /// Trait providing uniform row/column dimension access for sparse data structs.
@@ -291,6 +292,20 @@ impl<T, V: AsRef<[T]>, M: AsRef<[bool]>> DenseWithMaskMatrix<T, V, M> {
     }
 }
 
+impl<T, V: AsRef<[T]>, const N: usize> DenseWithMaskMatrix<T, V, BitMask<N>> {
+    /// Return a borrowed representation of this Dense-with-Mask data.
+    #[inline]
+    pub fn as_borrowed_bitmask(&self) -> DenseWithMaskMatrix<T, &[T], BitMask<N>> {
+        DenseWithMaskMatrix {
+            values: self.values.as_ref(),
+            mask: self.mask,
+            nrows: self.nrows,
+            ncols: self.ncols,
+            _marker: PhantomData,
+        }
+    }
+}
+
 impl<T, V, M> SparseShape for DenseWithMaskMatrix<T, V, M> {
     #[inline(always)]
     fn nrows(&self) -> usize {
@@ -314,10 +329,13 @@ impl<T, V: AsRef<[T]>, M: AsRef<[bool]>> DenseWithMaskMatrix<T, V, M> {
             _marker: PhantomData,
         }
     }
+
 }
 
 /// Backward-compatible type alias.
 pub type DenseWithMaskData<'a, T> = DenseWithMaskMatrix<T, &'a [T], &'a [bool]>;
+/// Borrowed dense-with-mask storage using bit-packed masks.
+pub type DenseWithMaskBitMaskData<'a, T, const N: usize> = DenseWithMaskMatrix<T, &'a [T], BitMask<N>>;
 
 /// Sparse storage whose structural invariants have been checked once at
 /// construction.
@@ -499,6 +517,20 @@ impl<T, const BM: usize, const BN: usize, V: AsRef<[T]>, I: AsRef<[i32]>> Sparse
             if bc < 0 || bc as usize + BN > self.ncols {
                 return Err(crate::SimdError::IndexOutOfBounds);
             }
+        }
+        Ok(())
+    }
+}
+
+impl<T, V: AsRef<[T]>, const N: usize> SparseValidate for DenseWithMaskMatrix<T, V, BitMask<N>> {
+    fn validate(&self) -> Result<(), crate::SimdError> {
+        let values = self.values.as_ref();
+        let req_len = self.nrows * self.ncols;
+        if values.len() < req_len {
+            return Err(crate::SimdError::LengthMismatch);
+        }
+        if N < req_len {
+            return Err(crate::SimdError::LengthMismatch);
         }
         Ok(())
     }

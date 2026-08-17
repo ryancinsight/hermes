@@ -89,22 +89,31 @@ where
             // bounded by the local allocation; the combined mask prevents the
             // inactive tail lanes from reaching the output.
             const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
-            let mut left = [T::ZERO; MAX_SIMD_LANES];
-            let mut right = [T::ZERO; MAX_SIMD_LANES];
-            let mut result = [T::ZERO; MAX_SIMD_LANES];
-            left[..tail].copy_from_slice(&self.as_slice()[simd_len..]);
-            right[..tail].copy_from_slice(&other.as_slice()[simd_len..]);
+            let mut left = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+            let mut right = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+            let mut result = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+            for i in 0..tail {
+                left[i].write(self.as_slice()[simd_len + i]);
+                right[i].write(other.as_slice()[simd_len + i]);
+            }
+            for i in tail..lane_count {
+                left[i].write(T::ZERO);
+                right[i].write(T::ZERO);
+                result[i].write(T::ZERO);
+            }
             unsafe {
                 let tail_mask = *mask & BitMask::<N>::leading_k(tail);
                 let value = Arch::masked_add(
-                    Arch::load_unaligned(left.as_ptr()),
-                    Arch::load_unaligned(right.as_ptr()),
+                    Arch::load_unaligned(left.as_ptr().cast::<T>()),
+                    Arch::load_unaligned(right.as_ptr().cast::<T>()),
                     tail_mask.to_native_mask::<T, Arch>(),
-                    Arch::load_unaligned(left.as_ptr()),
+                    Arch::load_unaligned(left.as_ptr().cast::<T>()),
                 );
-                Arch::store_unaligned(result.as_mut_ptr(), value);
+                Arch::store_unaligned(result.as_mut_ptr().cast::<T>(), value);
             }
-            out[simd_len..].copy_from_slice(&result[..tail]);
+            out[simd_len..].copy_from_slice(unsafe {
+                core::slice::from_raw_parts(result.as_ptr().cast::<T>(), tail)
+            });
         }
 
         Ok(())
@@ -183,22 +192,31 @@ where
         let tail = len - simd_len;
         if tail != 0 {
             const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
-            let mut left = [T::ZERO; MAX_SIMD_LANES];
-            let mut right = [T::ZERO; MAX_SIMD_LANES];
-            let mut result = [T::ZERO; MAX_SIMD_LANES];
-            left[..tail].copy_from_slice(&self.as_slice()[simd_len..]);
-            right[..tail].copy_from_slice(&other.as_slice()[simd_len..]);
+            let mut left = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+            let mut right = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+            let mut result = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+            for i in 0..tail {
+                left[i].write(self.as_slice()[simd_len + i]);
+                right[i].write(other.as_slice()[simd_len + i]);
+            }
+            for i in tail..lane_count {
+                left[i].write(T::ZERO);
+                right[i].write(T::ZERO);
+                result[i].write(T::ZERO);
+            }
             unsafe {
                 let tail_mask = *mask & BitMask::<N>::leading_k(tail);
                 let value = Arch::masked_mul(
-                    Arch::load_unaligned(left.as_ptr()),
-                    Arch::load_unaligned(right.as_ptr()),
+                    Arch::load_unaligned(left.as_ptr().cast::<T>()),
+                    Arch::load_unaligned(right.as_ptr().cast::<T>()),
                     tail_mask.to_native_mask::<T, Arch>(),
-                    Arch::load_unaligned(left.as_ptr()),
+                    Arch::load_unaligned(left.as_ptr().cast::<T>()),
                 );
-                Arch::store_unaligned(result.as_mut_ptr(), value);
+                Arch::store_unaligned(result.as_mut_ptr().cast::<T>(), value);
             }
-            out[simd_len..].copy_from_slice(&result[..tail]);
+            out[simd_len..].copy_from_slice(unsafe {
+                core::slice::from_raw_parts(result.as_ptr().cast::<T>(), tail)
+            });
         }
 
         Ok(())
@@ -283,24 +301,34 @@ where
         let tail = len - simd_len;
         if tail != 0 {
             const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
-            let mut left = [T::ZERO; MAX_SIMD_LANES];
-            let mut right = [T::ZERO; MAX_SIMD_LANES];
-            let mut addend = [T::ZERO; MAX_SIMD_LANES];
-            let mut result = [T::ZERO; MAX_SIMD_LANES];
-            left[..tail].copy_from_slice(&self.as_slice()[simd_len..]);
-            right[..tail].copy_from_slice(&b.as_slice()[simd_len..]);
-            addend[..tail].copy_from_slice(&c.as_slice()[simd_len..]);
+            let mut left = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+            let mut right = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+            let mut addend = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+            let mut result = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+            for i in 0..tail {
+                left[i].write(self.as_slice()[simd_len + i]);
+                right[i].write(b.as_slice()[simd_len + i]);
+                addend[i].write(c.as_slice()[simd_len + i]);
+            }
+            for i in tail..lane_count {
+                left[i].write(T::ZERO);
+                right[i].write(T::ZERO);
+                addend[i].write(T::ZERO);
+                result[i].write(T::ZERO);
+            }
             unsafe {
                 let tail_mask = *mask & BitMask::<N>::leading_k(tail);
                 let value = Arch::masked_fmadd(
-                    Arch::load_unaligned(left.as_ptr()),
-                    Arch::load_unaligned(right.as_ptr()),
-                    Arch::load_unaligned(addend.as_ptr()),
+                    Arch::load_unaligned(left.as_ptr().cast::<T>()),
+                    Arch::load_unaligned(right.as_ptr().cast::<T>()),
+                    Arch::load_unaligned(addend.as_ptr().cast::<T>()),
                     tail_mask.to_native_mask::<T, Arch>(),
                 );
-                Arch::store_unaligned(result.as_mut_ptr(), value);
+                Arch::store_unaligned(result.as_mut_ptr().cast::<T>(), value);
             }
-            out[simd_len..].copy_from_slice(&result[..tail]);
+            out[simd_len..].copy_from_slice(unsafe {
+                core::slice::from_raw_parts(result.as_ptr().cast::<T>(), tail)
+            });
         }
 
         Ok(())

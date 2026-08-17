@@ -38,6 +38,10 @@ harness = false
 name = "complex"
 harness = false
 
+[[bench]]
+name = "simd_isa_comparison"
+harness = false
+
 [features]
 default = ["std", "mnemosyne-memory"]
 # Linux NUMA affinity and residency probes via libnuma (links -lnuma); off by default.

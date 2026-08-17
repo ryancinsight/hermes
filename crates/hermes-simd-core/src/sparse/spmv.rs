@@ -202,7 +202,6 @@ where
             let row_offset = r * data.ncols;
             let vals = &data.values[row_offset..row_offset + data.ncols];
             let mask_bits = &data.mask[row_offset..row_offset + data.ncols];
-
             let simd_len = (data.ncols / lane_count) * lane_count;
 
             // SAFETY: `Arch::*` are the target-feature kernels covered by the
@@ -230,8 +229,7 @@ where
                         msk0,
                     );
 
-                    let msk1 =
-                        Arch::mask_from_bools(&mask_bits[j + lane_count..j + lane_count * 2]);
+                    let msk1 = Arch::mask_from_bools(&mask_bits[j + lane_count..j + lane_count * 2]);
                     acc_vec1 = Arch::masked_fmadd(
                         Arch::masked_load_unaligned(
                             vals[j + lane_count..].as_ptr(),
@@ -243,8 +241,7 @@ where
                         msk1,
                     );
 
-                    let msk2 =
-                        Arch::mask_from_bools(&mask_bits[j + lane_count * 2..j + lane_count * 3]);
+                    let msk2 = Arch::mask_from_bools(&mask_bits[j + lane_count * 2..j + lane_count * 3]);
                     acc_vec2 = Arch::masked_fmadd(
                         Arch::masked_load_unaligned(
                             vals[j + lane_count * 2..].as_ptr(),
@@ -256,8 +253,7 @@ where
                         msk2,
                     );
 
-                    let msk3 =
-                        Arch::mask_from_bools(&mask_bits[j + lane_count * 3..j + lane_count * 4]);
+                    let msk3 = Arch::mask_from_bools(&mask_bits[j + lane_count * 3..j + lane_count * 4]);
                     acc_vec3 = Arch::masked_fmadd(
                         Arch::masked_load_unaligned(
                             vals[j + lane_count * 3..].as_ptr(),
@@ -293,7 +289,7 @@ where
 
             let mut j = simd_len;
             while j < data.ncols {
-                if mask_bits[j] {
+                if data.mask[row_offset + j] {
                     acc += vals[j] * x[j];
                 }
                 j += 1;

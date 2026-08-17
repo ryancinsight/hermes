@@ -14,7 +14,9 @@
 use super::types::SparseValidate;
 use super::{BlockedCoo, Csr, DenseWithMask, SellP, SparseView};
 use crate::arch::SimdArch;
-use crate::kernel::{SimdArith, SimdCompare, SimdGather, SimdLoadStore, SimdMask, SimdReduce};
+use crate::kernel::{
+    SimdArith, SimdCompare, SimdGather, SimdLoadStore, SimdMask, SimdReduce, SimdStorage,
+};
 use crate::scalar::Scalar;
 use crate::sparse::spmv::build_index_vector;
 
@@ -53,7 +55,7 @@ where
     #[inline]
     fn elementwise_mul_dense(&self, dense: &[T], out_values: &mut [T]) {
         let d = &self.data;
-        let lane_count = Arch::LANE_COUNT;
+        let lane_count = <Arch as SimdStorage<T>>::LANE_COUNT;
 
         // SOUNDNESS: the SIMD path below gathers `dense[col_indices[j]]` with an
         // unchecked `Arch::gather`. `SparseView<Csr>` is the *unvalidated* type
@@ -90,11 +92,11 @@ where
             unsafe {
                 while j < simd_len {
                     let idx = build_index_vector::<T, Arch>(&cols[j..j + lane_count]);
-                    let res_vec = Arch::mul(
-                        Arch::load_unaligned(vals[j..].as_ptr()),
-                        Arch::gather(dense.as_ptr(), idx),
+                    let res_vec = <Arch as SimdArith<T>>::mul(
+                        <Arch as SimdLoadStore<T>>::load_unaligned(vals[j..].as_ptr()),
+                        <Arch as SimdGather<T>>::gather(dense.as_ptr(), idx),
                     );
-                    Arch::store_unaligned(out[j..].as_mut_ptr(), res_vec);
+                    <Arch as SimdLoadStore<T>>::store_unaligned(out[j..].as_mut_ptr(), res_vec);
                     j += lane_count;
                 }
             }
@@ -133,7 +135,7 @@ where
     fn elementwise_mul_dense(&self, dense: &[T], out_values: &mut [T]) {
         let d = &self.data;
         let nslices = d.nslices();
-        let lane_count = Arch::LANE_COUNT;
+        let lane_count = <Arch as SimdStorage<T>>::LANE_COUNT;
 
         if lane_count == C {
             // SOUNDNESS: the vectorized path loads `values[offset..]` and stores
@@ -159,8 +161,8 @@ where
                 for col in 0..col_count {
                     let offset = start_offset + col * C;
 
-                    let mut idx_arr = [0i32; 64];
-                    let mut mask_arr = [false; 64];
+                    let mut idx_arr = [0i32; C];
+                    let mut mask_arr = [false; C];
                     for row in 0..C {
                         let r = slice_base_r + row;
                         let c = d.col_indices[offset + row] as usize;
