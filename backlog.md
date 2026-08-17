@@ -1,5 +1,19 @@
 # Backlog — hermes-simd
 
+## ATLAS-ORPHAN-MODULES-096-HERMES — Remove orphan tensor view [patch] — in progress 2026-08-17
+
+- Owner: Atlas integration; the provider change is limited to the unreferenced
+  `crates/hermes-simd-core/src/tensor/mut_view.rs` source file and this item’s
+  provider PM records. Existing peer edits to sparse/view implementations,
+  `Cargo.toml`, `Cargo.lock`, examples, and delivery notes are excluded.
+- Acceptance: prove no `mod`, `#[path]`, or `include!` edge reaches the file;
+  delete the unreachable duplicate; run the direct orphan detector, format,
+  warning-denied provider checks, focused Nextest, doctests, and rustdoc; then
+  synchronize the Atlas gitlink only after the provider commit is pushed.
+- Claim: 2026-08-17. The exact root scan reports one Hermes orphan; source
+  search finds no consumer of `TensorMut` or `mut_view`, while the live tensor
+  module exports only the canonical `view` tree.
+
 - [x] [patch] **HS-434 — workspace lint floor.** The workspace had no
   `[workspace.lints]` table at all, so the lint policy lived in three
   overlapping per-crate `#![allow(..)]` blocks and four copies of

@@ -1,5 +1,15 @@
 # Checklist — active sprint
 
+## ATLAS-ORPHAN-MODULES-096-HERMES — provider cleanup
+
+- [ ] Confirm `crates/hermes-simd-core/src/tensor/mut_view.rs` is unreachable
+      from every Cargo target root and has no textual consumer.
+- [ ] Delete the unreachable duplicate without touching peer-owned Hermes files.
+- [ ] Run the direct orphan detector plus provider format, locked check,
+      warning-denied Clippy, focused Nextest, doctests, and rustdoc gates.
+- [ ] Commit and push the provider increment; advance the Atlas gitlink only
+      after the exact provider head is available.
+
 ## HS-429 [minor] — real AVX-512/AMX silicon for performance evidence
 
 - [ ] Draft `test-avx512-hosted`: GitHub-hosted x86, machine-class record,
