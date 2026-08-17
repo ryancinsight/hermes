@@ -2,11 +2,15 @@
 
 ## ATLAS-ORPHAN-MODULES-096-HERMES — provider cleanup
 
-- [ ] Confirm `crates/hermes-simd-core/src/tensor/mut_view.rs` is unreachable
-      from every Cargo target root and has no textual consumer.
-- [ ] Delete the unreachable duplicate without touching peer-owned Hermes files.
+- [x] Confirm `crates/hermes-simd-core/src/tensor/mut_view.rs` is unreachable
+      from every Cargo target root and has no textual consumer; the direct
+      detector returns `hermes_orphan_modules=0` after the deletion.
+- [x] Delete the unreachable duplicate without touching peer-owned Hermes files.
 - [ ] Run the direct orphan detector plus provider format, locked check,
       warning-denied Clippy, focused Nextest, doctests, and rustdoc gates.
+      The detector passes; format is currently red only on peer-owned sparse
+      edits and the untracked benchmark, while `cargo check --locked` stops
+      before compilation because the peer-owned Cargo.lock requires refresh.
 - [ ] Commit and push the provider increment; advance the Atlas gitlink only
       after the exact provider head is available.
 
