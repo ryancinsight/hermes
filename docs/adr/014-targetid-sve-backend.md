@@ -1,7 +1,13 @@
 # ADR 014: Add `TargetId::Sve` and Seal the Target Enum Family
 
 ## Status
-Proposed
+Accepted
+
+*Accepted 2026-08-17, retroactively: the decision below was implemented and
+merged (PR #49, merge `fb36e0f`, feature commit `dd4cc78`) while this record
+still read `Proposed`, so the index reported a settled decision as open. The
+status is corrected to match what shipped; the decision text is unchanged. See
+the acceptance record at the end for what was verified on `main`.*
 
 ## Context
 
@@ -101,6 +107,23 @@ rule.
   no-op. `enum_variant_added` passes precisely because the enums are sealed
   `#[non_exhaustive]` in the same change.
 - Clippy `-D warnings`, doctests, and Rustdoc clean.
+
+### Acceptance record (2026-08-17)
+
+Checked against `main` at the time of acceptance, because a status flip that
+does not verify the shipped code only moves the drift from the status line into
+the record:
+
+- Both enums are sealed, which is the part of the decision that had to ride the
+  same break: `#[non_exhaustive]` on `TargetId` (`target.rs:22`) and on
+  `DispatchedView` (`lib.rs:265`). Option 3 — sealing only `TargetId` — was
+  rejected here, and the code follows the decision rather than that option.
+- `dispatch_view` auto-selection contains no `Sve` arm, so the emulated backend
+  stays explicitly requested and is never auto-selected. This was the item's
+  sharpest acceptance criterion and it holds.
+- `TargetId::Sve` is reachable through the forced-dispatch helpers, and `Sve`
+  is present in the `ALL` ordering and the `name()`/`from_name` mapping, so the
+  conformance matrix can name the backend in CI configuration.
 
 ## References
 
