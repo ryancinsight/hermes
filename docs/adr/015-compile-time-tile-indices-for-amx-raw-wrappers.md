@@ -1,7 +1,18 @@
 # ADR 015: Compile-Time Tile Indices for the AMX Raw Wrappers
 
 ## Status
-Proposed
+Accepted
+
+*Accepted 2026-08-17, retroactively: the decision below shipped (HS-438,
+delivered 2026-08-16) while this record still read `Proposed`. Verified on
+`main` at acceptance: all five raw wrappers are const-generic —
+`tilezero<const TILE: u8>` (`amx/mod.rs:131`), `tileloadd<const TILE: u8>`
+(`:158`), `tilestored<const TILE: u8>` (`:188`),
+`tdpbf16ps<const DST, SRC1, SRC2>` (`:218`), and
+`tdpbssd<const DST, SRC1, SRC2>` (`:247`) — and `amx/mod.rs` now contains zero
+`unreachable!()`, which was the defect this decision existed to remove: an
+unlisted-but-valid tile triple used to panic instead of executing. The decision
+text is unchanged.*
 
 ## Context
 

@@ -329,13 +329,13 @@ impl<T, V: AsRef<[T]>, M: AsRef<[bool]>> DenseWithMaskMatrix<T, V, M> {
             _marker: PhantomData,
         }
     }
-
 }
 
 /// Backward-compatible type alias.
 pub type DenseWithMaskData<'a, T> = DenseWithMaskMatrix<T, &'a [T], &'a [bool]>;
 /// Borrowed dense-with-mask storage using bit-packed masks.
-pub type DenseWithMaskBitMaskData<'a, T, const N: usize> = DenseWithMaskMatrix<T, &'a [T], BitMask<N>>;
+pub type DenseWithMaskBitMaskData<'a, T, const N: usize> =
+    DenseWithMaskMatrix<T, &'a [T], BitMask<N>>;
 
 /// Sparse storage whose structural invariants have been checked once at
 /// construction.
