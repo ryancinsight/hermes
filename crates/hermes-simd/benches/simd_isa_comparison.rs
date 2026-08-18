@@ -5,7 +5,7 @@
 //! - Dot product (fused multiply-add reduction)
 //! - Sum reduction (horizontal reduction)
 //! - Min/Max reduction
-//! - ArgMin (Min + Location)
+//! - `ArgMin` (Min + Location)
 //!
 //! Run with:
 //! ```
@@ -67,7 +67,7 @@ fn bench_dot_product(c: &mut Criterion) {
         let b = black_box(generate_test_data(n));
 
         group.bench_with_input(
-            BenchmarkId::from_parameter(format!("n={}", n)),
+            BenchmarkId::from_parameter(format!("n={n}")),
             &n,
             |bench, _| {
                 bench.iter(|| dot(&a, &b));
@@ -92,7 +92,7 @@ fn bench_sum_reduction(c: &mut Criterion) {
         let data = black_box(generate_test_data(n));
 
         group.bench_with_input(
-            BenchmarkId::from_parameter(format!("n={}", n)),
+            BenchmarkId::from_parameter(format!("n={n}")),
             &n,
             |bench, _| {
                 bench.iter(|| sum(&data));
@@ -117,7 +117,7 @@ fn bench_min_reduction(c: &mut Criterion) {
         let data = black_box(generate_test_data(n));
 
         group.bench_with_input(
-            BenchmarkId::from_parameter(format!("n={}", n)),
+            BenchmarkId::from_parameter(format!("n={n}")),
             &n,
             |bench, _| {
                 bench.iter(|| min(&data));
@@ -142,7 +142,7 @@ fn bench_max_reduction(c: &mut Criterion) {
         let data = black_box(generate_test_data(n));
 
         group.bench_with_input(
-            BenchmarkId::from_parameter(format!("n={}", n)),
+            BenchmarkId::from_parameter(format!("n={n}")),
             &n,
             |bench, _| {
                 bench.iter(|| max(&data));
@@ -167,7 +167,7 @@ fn bench_argmin_reduction(c: &mut Criterion) {
         let data = black_box(generate_test_data(n));
 
         group.bench_with_input(
-            BenchmarkId::from_parameter(format!("n={}", n)),
+            BenchmarkId::from_parameter(format!("n={n}")),
             &n,
             |bench, _| {
                 bench.iter(|| argmin(&data));
