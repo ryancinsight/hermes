@@ -236,7 +236,7 @@ cargo fmt --all -- --check
 # Cross-target compile check (NEON kernels)
 cargo check --workspace --target aarch64-unknown-linux-gnu
 
-# Benchmarks → updates benchmarks_results.md
+# Benchmarks → updates benchmarks/benchmarks_results.md
 cargo run -p hermes-simd-benches
 
 # Parse existing Criterion output, refresh the JSON baseline, and enforce it
@@ -248,7 +248,7 @@ cargo run -p hermes-simd-benches -- --parse-only --check-regressions
 
 Differential testing policy: the AVX2, AVX-512, and NEON backends are verified against the always-available `Scalar` backend — bitwise on dyadic-exact inputs, within analytically derived rounding bounds on arbitrary inputs. AVX-512 executes under Intel SDE emulating Sapphire Rapids (`test-avx512-sde`), with native timing captured best-effort on hosted silicon whenever it is present (`test-avx512-hosted`), and NEON runs on a native aarch64 runner (`test-aarch64`), so no backend is carried by a capability-gated skip. The AMX kernels are compile-checked only; they are not runtime-validated, because no available machine satisfies the permission chain — the SDE job cannot stand in, since `arch_prctl` reaches the host kernel rather than the emulator (see [Intel AMX status](#intel-amx-status)).
 
-Benchmark regression policy: `benchmarks_baseline.json` is the structured
+Benchmark regression policy: `benchmarks/benchmarks_baseline.json` is the structured
 Criterion baseline. `--check-regressions` fails when a committed baseline row is
 missing from the current run or when the current point estimate exceeds the
 baseline by the configured threshold.

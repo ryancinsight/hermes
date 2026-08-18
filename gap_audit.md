@@ -551,7 +551,7 @@ order (correctness → architecture → tests → docs → PM).
   `do_changes.ps1`, `check_errors.txt` deleted from git; untracked logs removed;
   `check_errors.txt` gitignored. Dead dep declarations dropped (`divan`,
   2×`bytemuck`, intrinsics `rkyv`; facade `rkyv` corrected to dev-dependency).
-  `benchmarks_baseline.json`/`benchmarks_results.md` kept (live baseline).
+  `benchmarks/benchmarks_baseline.json`/`benchmarks/benchmarks_results.md` kept (live baseline).
 - **[open] `codegen.rs` ungoverned SSOT (1334 lines, live generator of the 4 x86
   kernel files).** Not dead — regenerates `avx2_f32/f64`, `avx512_f32/f64`; but no
   `@generated` banner, no CI regeneration-diff gate. `[patch→minor]` process.

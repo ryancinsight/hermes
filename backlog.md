@@ -1197,7 +1197,7 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
 ## P2 — Performance & memory <a id="p2"></a>
 
 - [x] **[minor] Criterion regression thresholds** (delivered 2026-06-12):
-      `benchmarks_baseline.json` records structured Criterion point estimates;
+      `benchmarks/benchmarks_baseline.json` records structured Criterion point estimates;
       `run-benches --check-regressions` fails on missing baseline rows or rows
       exceeding the configured ratio threshold. The runner is split into
       cohesive modules for CLI parsing, result discovery, host metadata,
