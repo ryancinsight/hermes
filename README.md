@@ -262,4 +262,4 @@ depth-major row-panel accumulation against repeated public `axpy_rows` calls.
 - Active sprint tactics: [`checklist.md`](checklist.md)
 - Version history: [`CHANGELOG.md`](CHANGELOG.md)
 
-Current version: **0.6.0** (pre-release; canonical trait surfaces defined, breaking changes documented per minor release).
+Current version: **0.7.0** (pre-release; canonical trait surfaces defined, breaking changes documented per minor release).
