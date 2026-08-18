@@ -168,18 +168,18 @@ impl From<&AmxConfig> for ActiveAmxConfig {
 #[cfg(feature = "std")]
 thread_local! {
     #[cfg_attr(
-        windows,
+        all(windows, target_env = "gnu"),
         expect(
             clippy::missing_const_for_thread_local,
-            reason = "Windows Clippy 1.97 false positive: this initializer is already a const block"
+            reason = "clippy 1.97 false positive on the windows-gnu thread_local expansion: the initializer is already a const block"
         )
     )]
     pub(crate) static ACTIVE_CONFIG: core::cell::Cell<Option<ActiveAmxConfig>> = const { core::cell::Cell::new(None) };
     #[cfg_attr(
-        windows,
+        all(windows, target_env = "gnu"),
         expect(
             clippy::missing_const_for_thread_local,
-            reason = "Windows Clippy 1.97 false positive: this initializer is already a const block"
+            reason = "clippy 1.97 false positive on the windows-gnu thread_local expansion: the initializer is already a const block"
         )
     )]
     pub(crate) static SESSION_DEPTH: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
