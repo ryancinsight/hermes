@@ -18,12 +18,10 @@
 //! ```
 
 use criterion::{
-    black_box, criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup,
-    BenchmarkId, Criterion, SamplingMode, Throughput,
+    black_box, criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, BenchmarkId,
+    Criterion, SamplingMode, Throughput,
 };
-use hermes_simd::{
-    argmin, dot, max, min, sum,
-};
+use hermes_simd::{argmin, dot, max, min, sum};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test Data Generators
@@ -55,11 +53,11 @@ fn benchmark_group<'criterion>(
 
 fn bench_dot_product(c: &mut Criterion) {
     let mut group = benchmark_group(c, "dot_product_f32");
-    
+
     let sizes = vec![
-        256,    // Small: cache-friendly
-        4096,   // Medium: L2/L3 boundary
-        65536,  // Large: DRAM-bound
+        256,       // Small: cache-friendly
+        4096,      // Medium: L2/L3 boundary
+        65536,     // Large: DRAM-bound
         1_048_576, // Very large: multi-threaded candidate
     ];
 
@@ -72,9 +70,7 @@ fn bench_dot_product(c: &mut Criterion) {
             BenchmarkId::from_parameter(format!("n={}", n)),
             &n,
             |bench, _| {
-                bench.iter(|| {
-                    dot(&a, &b)
-                });
+                bench.iter(|| dot(&a, &b));
             },
         );
     }
@@ -89,12 +85,7 @@ fn bench_dot_product(c: &mut Criterion) {
 fn bench_sum_reduction(c: &mut Criterion) {
     let mut group = benchmark_group(c, "sum_reduction_f32");
 
-    let sizes = vec![
-        256,
-        4096,
-        65536,
-        1_048_576,
-    ];
+    let sizes = vec![256, 4096, 65536, 1_048_576];
 
     for n in sizes {
         group.throughput(Throughput::Elements(n as u64));
@@ -104,9 +95,7 @@ fn bench_sum_reduction(c: &mut Criterion) {
             BenchmarkId::from_parameter(format!("n={}", n)),
             &n,
             |bench, _| {
-                bench.iter(|| {
-                    sum(&data)
-                });
+                bench.iter(|| sum(&data));
             },
         );
     }
@@ -131,9 +120,7 @@ fn bench_min_reduction(c: &mut Criterion) {
             BenchmarkId::from_parameter(format!("n={}", n)),
             &n,
             |bench, _| {
-                bench.iter(|| {
-                    min(&data)
-                });
+                bench.iter(|| min(&data));
             },
         );
     }
@@ -158,9 +145,7 @@ fn bench_max_reduction(c: &mut Criterion) {
             BenchmarkId::from_parameter(format!("n={}", n)),
             &n,
             |bench, _| {
-                bench.iter(|| {
-                    max(&data)
-                });
+                bench.iter(|| max(&data));
             },
         );
     }
@@ -185,9 +170,7 @@ fn bench_argmin_reduction(c: &mut Criterion) {
             BenchmarkId::from_parameter(format!("n={}", n)),
             &n,
             |bench, _| {
-                bench.iter(|| {
-                    argmin(&data)
-                });
+                bench.iter(|| argmin(&data));
             },
         );
     }
