@@ -62,7 +62,7 @@ tail routing; every hot kernel runs the provider-owned masked seam).
   differential property tests, a gather∘scatter round-trip identity, and
   duplicate-index/error-contract tests. AVX-512 native execution is runner-gated.
 
-### Open operation-catalog gaps (source-audit tier)
+### Operation-catalog status (source-audit tier)
 
 First, the fact that bounds the rest of this section: `SimdKernel` is
 implemented for `F16`, `f32`, and `f64` only — there is no generic integer lane
@@ -70,16 +70,14 @@ backend. Integer SIMD lives outside this trait, in the AMX/VNNI tiling kernels
 and the SWAR bitboards, each with its own operation set. Gaps must therefore be
 assessed against a float-lane trait, not a general one.
 
-- [minor] No rounding family (`floor`/`ceil`/`round`/`trunc`). This is the
-  clearest catalog hole: the operations are float-native, every target ISA has
-  them (`_mm256_round_ps`, `_mm512_roundscale_ps`, NEON `vrndm`/`vrndp`/`vrndn`/
-  `vrnd`), and consumers currently have no vector-domain route to them. The
-  generic default is the blocker, not the overrides: `NumericElement` exposes no
-  rounding, so a default written today would have to widen through `to_f64` and
-  narrow back — the widen-compute-narrow shape the integrity rules classify as a
-  fake generic. The correct sequence is an upstream eunomia increment adding
-  rounding to `NumericElement` (identity on integer impls), then the Hermes
-  default plus native overrides. Tracked as HS-423, gated on that upstream unit.
+- [minor] Resolved as HS-423. The rounding family (`floor`/`ceil`/`round`/
+  `trunc`) is now defined through Eunomia's native-precision scalar seam and
+  Hermes' `generic_unary_op`, with AVX2, AVX-512, and NEON overrides. The
+  `RoundTiesEven` policy keeps halfway behavior explicit, and differential
+  coverage includes negative values, ties, infinities, NaNs, and signed zero
+  across Scalar, SveArch, and AVX2, with the other ISA paths compile-covered
+  for hosted execution. The delivered implementation is recorded in Hermes
+  commits `58c31a9` and `df32296`; no widen-compute-narrow fallback remains.
 - [minor] Resolved as HS-424. General cross-lane permute (`reverse`,
   `interleave`, `deinterleave`) had no seam; the only lane shuffles were the
   complex adjacent-pair primitives. All three now exist as defaulted trait
@@ -164,14 +162,13 @@ assessed against a float-lane trait, not a general one.
 
 ### Backend matrix
 
-- [patch] `TargetId` omits `SveArch` although the workspace ships it as a
-  first-class emulated backend used throughout the suite. The forced-dispatch
-  token API — the mechanism the Highway audit added for exactly this purpose —
-  therefore cannot reach it, so the cross-target conformance matrix has a hole
-  in a backend that exists. Tracked as HS-425 — reclassified [patch] → [major]
-  on inspection, because `TargetId` and `DispatchedView` are public enums
-  without `#[non_exhaustive]`, so the variant addition breaks downstream
-  exhaustive matches and needs an ADR plus a migration note.
+- [major] Resolved as HS-425. `TargetId::Sve` now routes through both forced
+  dispatch helpers to the lane-emulated `SveArch` backend, and conformance
+  tests cover the public target and host-capability surfaces. `TargetId` is
+  `#[non_exhaustive]`; automatic dispatch intentionally has no SVE branch, so
+  the emulated backend remains explicitly requested. The breaking migration is
+  recorded by ADR 014 and the changelog entry delivered with Hermes PR #49
+  (merge `fb36e0f`, implementation `dd4cc78`).
 - Native SVE remains blocked on stable Rust (scalable vectors are not
   expressible); `SveArch` stays lane-emulated and its hardware probe stays
   informational. Unchanged, correctly documented, not a defect.
