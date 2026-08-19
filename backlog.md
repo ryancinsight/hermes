@@ -26,19 +26,21 @@
 - Re-open trigger: a hosted exact-head source or Pages failure, or a second
   Hermes package that requires multi-package book staging.
 
-## ATLAS-ORPHAN-MODULES-096-HERMES — Remove orphan tensor view [patch] — in progress 2026-08-17
+## ATLAS-ORPHAN-MODULES-096-HERMES — Remove orphan tensor view [patch] — done 2026-08-19
 
 - Owner: Atlas integration; the provider change is limited to the unreferenced
   `crates/hermes-simd-core/src/tensor/mut_view.rs` source file and this item’s
   provider PM records. Existing peer edits to sparse/view implementations,
   `Cargo.toml`, `Cargo.lock`, examples, and delivery notes are excluded.
-- Acceptance: prove no `mod`, `#[path]`, or `include!` edge reaches the file;
-  delete the unreachable duplicate; run the direct orphan detector, format,
-  warning-denied provider checks, focused Nextest, doctests, and rustdoc; then
-  synchronize the Atlas gitlink only after the provider commit is pushed.
-- Claim: 2026-08-17. The exact root scan reports one Hermes orphan; source
-  search finds no consumer of `TensorMut` or `mut_view`, while the live tensor
-  module exports only the canonical `view` tree.
+- Acceptance is met: no `mod`, `#[path]`, or `include!` edge reaches the
+  deleted file; the unreachable duplicate is removed; the direct orphan
+  detector returns zero; and the required provider matrix is green.
+- Source closure landed in `1fe438c`. The exact hosted provider matrix at the
+  merged code state passes in `31819198076`: formatting, warning-denied
+  Clippy, configured Nextest, doctests, Rustdoc, Miri, cross-compilation,
+  ARM NEON, Intel SDE, benchmark budgets, and supply-chain checks. Atlas
+  already records the merged provider head; this commit closes the stale PM
+  state without changing provider source or the peer-owned lockfile.
 
 - [x] [patch] **HS-434 — workspace lint floor.** The workspace had no
   `[workspace.lints]` table at all, so the lint policy lived in three
