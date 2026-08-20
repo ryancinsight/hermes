@@ -1,6 +1,6 @@
 # Backlog — hermes-simd
 
-## ATLAS-HERMES-BOOK-TEST-2026-08-20 — Enable executable book samples [patch] — hosted verification pending
+## ATLAS-HERMES-BOOK-TEST-2026-08-20 — Enable executable book samples [patch] — done 2026-08-20
 
 - Owner: Atlas integration. Scope is `.github/workflows/book-pages.yml`, the
   four included example sources, `docs/book/simd_arch.md`, and this PM record.
@@ -15,8 +15,14 @@
   executes the architecture snippet 1/1. Normal `--locked` Cargo gates stop
   before compilation because the Atlas development overlay requires lockfile
   updates; the peer-owned dirty lock is preserved.
-- Hosted state: the caller is ready to push from this branch. Do not advance
-  the Atlas gitlink until exact-head verification and Pages build pass.
+- Hosted evidence: source `932468dac5ef4abadea4bdd12d62b420a4225ba7`, PR #56,
+  and merged default `3a39ef16d679dbac9c1a479b2b9c44135e262af3`. Exact PR CI
+  `32340240365` and Pages build `32340240860` pass, including the benchmark
+  runtime gate. Post-merge CI `32341395485`, Deploy mdBook `32341395955`, and
+  dynamic Pages `32341394367` pass; live Pages returns HTTP 200 with the
+  expected Hermes title.
+- Delivery: the Atlas gitlink records the merged default and this provider item
+  is closed.
 - Re-open trigger: a hosted exact-head source or Pages failure, or a second
   Hermes package that requires multi-package book staging.
 

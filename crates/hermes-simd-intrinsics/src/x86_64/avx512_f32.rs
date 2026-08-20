@@ -20,13 +20,14 @@ use core::arch::x86_64::{
     _mm512_mask_i32scatter_ps, _mm512_mask_loadu_ps, _mm512_mask_mov_ps, _mm512_mask_mul_ps,
     _mm512_mask_storeu_ps, _mm512_maskz_compress_ps, _mm512_max_ps, _mm512_min_ps,
     _mm512_movehdup_ps, _mm512_moveldup_ps, _mm512_mul_ps, _mm512_or_ps, _mm512_permute_ps,
-    _mm512_permutex2var_ps, _mm512_permutexvar_ps, _mm512_reduce_add_ps, _mm512_roundscale_ps,
-    _mm512_rsqrt14_ps, _mm512_set1_ps, _mm512_setr_epi32, _mm512_setzero_ps, _mm512_setzero_si512,
-    _mm512_sqrt_ps, _mm512_store_ps, _mm512_storeu_ps, _mm512_stream_ps, _mm512_sub_ps,
-    _mm512_xor_ps, _CMP_EQ_OQ, _CMP_GE_OQ, _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ,
-    _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT, _MM_FROUND_TO_NEG_INF, _MM_FROUND_TO_POS_INF,
-    _MM_FROUND_TO_ZERO,
+    _mm512_reduce_add_ps, _mm512_roundscale_ps, _mm512_rsqrt14_ps, _mm512_set1_ps,
+    _mm512_setzero_ps, _mm512_setzero_si512, _mm512_sqrt_ps, _mm512_store_ps, _mm512_storeu_ps,
+    _mm512_stream_ps, _mm512_sub_ps, _mm512_xor_ps, _CMP_EQ_OQ, _CMP_GE_OQ, _CMP_GT_OQ, _CMP_LE_OQ,
+    _CMP_LT_OQ, _CMP_NEQ_UQ, _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT, _MM_FROUND_TO_NEG_INF,
+    _MM_FROUND_TO_POS_INF, _MM_FROUND_TO_ZERO,
 };
+#[cfg(not(hermes_benchmark_generic_default))]
+use core::arch::x86_64::{_mm512_permutex2var_ps, _mm512_permutexvar_ps, _mm512_setr_epi32};
 use hermes_simd_core::kernel::BackendKernel;
 
 /// Newtype over `__m512` providing `Send + Sync`.
