@@ -9,6 +9,8 @@
     reason = "The runnable example asserts exact manufactured sparse outputs"
 )]
 
+extern crate hermes_simd;
+
 use hermes_simd::{
     spmv_csr, spmv_dense_masked, CsrData, DenseWithMaskData, SimdError, ValidatedData,
 };

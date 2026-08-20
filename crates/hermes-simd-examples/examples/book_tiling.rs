@@ -10,6 +10,8 @@
     reason = "The runnable example asserts exact manufactured tile outputs"
 )]
 
+extern crate hermes_simd;
+
 use hermes_simd::{dot, gemv, tiled_dot, Scalar, SimdError, SimdView, Unaligned};
 
 fn main() -> Result<(), SimdError> {
