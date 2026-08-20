@@ -6,6 +6,8 @@
 //! `dot` with runtime dispatch so the numbers are computed by whichever
 //! ISA the host supports.
 
+extern crate hermes_simd;
+
 use hermes_simd::{
     cpu::{has_fma3, FmaSupport},
     dot, sum,

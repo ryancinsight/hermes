@@ -106,6 +106,9 @@ and runs on every target and serves as the differential oracle the native
 backends are tested against.
 
 ```rust
+extern crate hermes_simd_core;
+extern crate hermes_simd_intrinsics;
+
 use hermes_simd_intrinsics::Scalar;
 use hermes_simd_core::kernel::{SimdArith, SimdReduce, SimdStorage};
 

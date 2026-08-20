@@ -1,5 +1,25 @@
 # Backlog — hermes-simd
 
+## ATLAS-HERMES-BOOK-TEST-2026-08-20 — Enable executable book samples [patch] — hosted verification pending
+
+- Owner: Atlas integration. Scope is `.github/workflows/book-pages.yml`, the
+  four included example sources, `docs/book/simd_arch.md`, and this PM record.
+  The active orphan-module item and existing peer-owned `Cargo.lock` remain
+  outside scope.
+- Acceptance: call the pinned Atlas Pages workflow with `mdbook-test: true`,
+  stage `hermes-simd` as `hermes_simd`, declare every directly referenced
+  staged crate, and pass the four end-to-end examples plus the architecture
+  snippet through the real mdBook rustdoc path.
+- Local evidence: Rust 1.97.0 formatting and diff checks pass; the four
+  included examples compile and run with value assertions; direct rustdoc
+  executes the architecture snippet 1/1. Normal `--locked` Cargo gates stop
+  before compilation because the Atlas development overlay requires lockfile
+  updates; the peer-owned dirty lock is preserved.
+- Hosted state: the caller is ready to push from this branch. Do not advance
+  the Atlas gitlink until exact-head verification and Pages build pass.
+- Re-open trigger: a hosted exact-head source or Pages failure, or a second
+  Hermes package that requires multi-package book staging.
+
 ## ATLAS-ORPHAN-MODULES-096-HERMES — Remove orphan tensor view [patch] — in progress 2026-08-17
 
 - Owner: Atlas integration; the provider change is limited to the unreferenced

@@ -6,6 +6,10 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch] Enable the Atlas shared Pages workflow's package-staged `mdbook
+  test` gate for the four Hermes end-to-end examples and the SIMD architecture
+  snippet.
+
 - [patch] Move the generated benchmark baseline and result report under
   `benchmarks/` and update the runner plus documentation references so the
   repository root contains only sanctioned manifest artifacts.

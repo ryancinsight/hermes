@@ -9,6 +9,8 @@
     reason = "The runnable example asserts the exact empty reduction identity"
 )]
 
+extern crate hermes_simd;
+
 use hermes_simd::{abs_sum, argmax, argmin, max, min, sum};
 
 fn main() {
