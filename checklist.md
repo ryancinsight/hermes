@@ -12,13 +12,14 @@
       from every Cargo target root and has no textual consumer; the direct
       detector returns `hermes_orphan_modules=0` after the deletion.
 - [x] Delete the unreachable duplicate without touching peer-owned Hermes files.
-- [ ] Run the direct orphan detector plus provider format, locked check,
-      warning-denied Clippy, focused Nextest, doctests, and rustdoc gates.
-      The detector passes; format is currently red only on peer-owned sparse
-      edits and the untracked benchmark, while `cargo check --locked` stops
-      before compilation because the peer-owned Cargo.lock requires refresh.
-- [ ] Commit and push the provider increment; advance the Atlas gitlink only
-      after the exact provider head is available.
+- [x] Run the direct orphan detector plus provider format, locked check,
+      warning-denied Clippy, focused Nextest, doctests, and Rustdoc gates.
+      The exact hosted matrix also passes Miri, cross-compilation, ARM NEON,
+      Intel SDE, bounded benchmark budgets, and supply-chain checks in
+      `31819198076`.
+- [x] Commit and push the provider increment; Atlas records the merged
+      provider head. The current docs-only closure does not stage the
+      peer-owned `Cargo.lock`.
 
 ## HS-429 [minor] — real AVX-512/AMX silicon for performance evidence
 

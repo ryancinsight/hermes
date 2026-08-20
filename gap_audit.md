@@ -4,6 +4,21 @@ Persistent gap register. Evidence tiers follow the repository instruction
 hierarchy: machine-checked proof > type-level invariant > property/fuzz >
 differential/empirical > source audit.
 
+## ATLAS-ORPHAN-MODULES-096-HERMES closure — 2026-08-19
+
+The stale orphan-module item is closed. `crates/hermes-simd-core/src/tensor/
+mut_view.rs` was unreachable from every Cargo target root and had no textual
+consumer; commit `1fe438c` deleted the 259-line duplicate. The isolated-tree
+orphan detector reports `0`, and the merged provider matrix at code state
+`f4d444b5` passes in hosted run `31819198076` (format, warning-denied Clippy,
+configured Nextest, doctests, Rustdoc, Miri, cross-compilation, ARM NEON,
+Intel SDE, benchmark budgets, and supply-chain checks).
+
+The local all-workspace Nextest retry was not used as closure evidence: the
+Atlas development overlay redirects the Hermes package to the primary
+checkout while its peer-owned `Cargo.lock` is dirty, so Cargo stops before
+compilation under `--locked`. No lockfile or peer-owned source was changed.
+
 ## HS-437 closure — default lane scratch frame measurement
 
 The proposed `LaneBuffer` refactor is closed without a source change. The
