@@ -10,9 +10,9 @@ Accepted
 load/store, dense arithmetic, bitwise operations, comparisons, reductions,
 masking, gather/scatter, scans, and cross-lane permutations. Every consumer
 therefore named the full backend contract even when it used one operation
-family. The implementation set is sealed and generated across the Scalar,
-AVX2, AVX-512, NEON, and SVE backends; splitting every generated implementation
-block would multiply method-bearing blocks without changing the machine code.
+family. The implementation set is sealed across the Scalar, AVX2, AVX-512,
+NEON, and SVE backends; splitting every implementation block would multiply
+method-bearing blocks without changing the machine code.
 
 The existing associated types (`Vector`, `Mask`, `IndexVector`) and constants
 (`LANE_COUNT`, `LANE_BOUND_CHECK`, `UNROLL_FACTOR`, and `SUPPORTS_NT_STORE`)
@@ -48,9 +48,9 @@ target-feature dispatch are unchanged. The operation-family modules live under
 `kernel/roles/`, while the implementation seam lives in `kernel/backend.rs`.
 
 The direct implementation-level split described in the original proposal is
-rejected for this closed generated backend set. It would duplicate the
-associated-type contract across eight traits and multiply generated impl
-blocks without reducing code or changing consumer behavior. If a second
+rejected for this closed backend set. It would duplicate the associated-type
+contract across eight traits and multiply impl blocks without reducing code or
+changing consumer behavior. If a second
 independently implemented backend family is admitted, this decision must be
 revisited before opening that seam.
 
@@ -107,4 +107,4 @@ were `cargo clippy --workspace --all-targets -- -D warnings`,
 - HS-436 in `backlog.md`.
 - `crates/hermes-simd-core/src/kernel/backend.rs`.
 - `crates/hermes-simd-core/src/kernel/roles/`.
-- `crates/hermes-simd-intrinsics/src/bin/codegen.rs`.
+- `docs/adr/005-per-type-x86-kernel-dedup.md`.
