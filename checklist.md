@@ -547,8 +547,12 @@
 - [x] [arch] Masked tail-load/store infrastructure for AVX-512 / SveArch to enable Leto to run tail-free kernels (from [gap_audit](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17)).
 - [x] [minor] Expose popcount and horizontal reductions to support Jaccard/Hamming in Leto (from [gap_audit](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17)).
 - [x] [minor] Sub-byte sign-extension and unpacking/widening SIMD primitives for `Bf4`/`F4`/`I8` (from [gap_audit](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17)).
-- [x] [arch] Per-type x86 kernel dedup ADR (P3).
-- [x] [arch] x86 kernel dedup generator script.
+- [x] [arch] Per-type x86 kernel dedup ADR (P3); revised as ADR 005 on
+      2026-08-21 when the incomplete generator was retired and checked-in ISA
+      files became canonical.
+- [x] [arch] x86 kernel dedup generator script; retired on 2026-08-21 after a
+      pinned regeneration audit showed destructive coverage drift across the
+      shipped x86 surface. See `backlog.md` and `gap_audit.md`.
 - [x] [minor] HS-437 lane-buffer audit: release assembly for Scalar f64,
       emulated `SveArch` f64, and AArch64 NEON f64 shows no stack frame in the
       default `interleave` path; the proposed typed `LaneBuffer` refactor is

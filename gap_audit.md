@@ -564,12 +564,19 @@ order (correctness → architecture → tests → docs → PM).
   `check_errors.txt` gitignored. Dead dep declarations dropped (`divan`,
   2×`bytemuck`, intrinsics `rkyv`; facade `rkyv` corrected to dev-dependency).
   `benchmarks/benchmarks_baseline.json`/`benchmarks/benchmarks_results.md` kept (live baseline).
-- **[open] `codegen.rs` ungoverned SSOT (1334 lines, live generator of the 4 x86
-  kernel files).** Not dead — regenerates `avx2_f32/f64`, `avx512_f32/f64`; but no
-  `@generated` banner, no CI regeneration-diff gate. `[patch→minor]` process.
+- **[RESOLVED 2026-08-21] `codegen.rs` ungoverned SSOT.** The former 1424-line
+  binary was not a complete source of truth: a direct `rustc +1.97.0` build and
+  run rewrote all four x86 f32/f64 files while dropping 28 shipped methods
+  (five from each AVX2 file and nine from each AVX-512 file). It also had no
+  x86 f16 or AArch64 NEON model, no generated-file marker, and no CI freshness
+  gate. The binary is deleted, ADR 005 now records checked-in ISA files as the
+  canonical sources, and the four files were restored unchanged before the
+  cleanup was committed.
 - **[open] ~150-200 lines cross-backend scaffold duplication** — compress/expand
-  emulation, AVX-512 cmp-mask blend, popcount LUT, masked-reduce, NEON sign-flip
-  constants; hoist into `kernel_helpers`/codegen templates per ADR-005. `[minor]`.
+  emulation, AVX-512 cmp-mask blend, popcount LUT, masked-reduce, and NEON
+  sign-flip constants remain candidates for shared helpers or trait defaults.
+  A future consolidation must preserve each ISA/precision contract; the retired
+  generator is not a sanctioned destination. `[minor]`.
 - **[PARTIAL 2026-07-02] Doc drift** — README `hermes-numeric` entry replaced
   with the eunomia provenance note; the fictional lib.rs feature table replaced
   with the real set; `gemm_int8` example corrected to `gemm::<i8,i8,i32>`.
@@ -891,8 +898,9 @@ Resolved this sprint:
 Considered, deferred (recorded):
 - NEON `neon_f32`/`neon_f64` (~92% overlap) is seam-level, not a clean macro: the
   divergent 8% (popcount reduction depth, `cmp_ne` u64 round-trip, `swap_adjacent`
-  instruction, mask construction) needs a `codegen.rs`-style template, not a thin
-  suffix macro. Route through the codegen generator if pursued.
+  instruction, and mask construction) needs a complete backend-family design,
+  not a thin suffix macro. Any future consolidation must be evaluated against
+  the checked-in-source decision in ADR 005.
 - scalar `f32`/`f64` kernels are a cleaner macro/const-generic candidate (no
   intrinsics); deferred to keep this round focused.
 

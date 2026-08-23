@@ -1,5 +1,32 @@
 # Backlog — hermes-simd
 
+## ATLAS-HERMES-CODEGEN-SSOT-2026-08-21 — Resolve SIMD codegen source of truth [arch] [minor] — in-progress (hosted verification pending)
+
+- **Owner / scope:** Atlas integration, clean `origin/main` lane; the former
+  `crates/hermes-simd-intrinsics/src/bin/codegen.rs`, ADR 005, ADR index,
+  affected PM records, and stale ADR 013 references. Runtime kernels, f16 and
+  NEON implementation work, and Atlas gitlinks are out of scope.
+- **Finding:** a pinned direct `rustc +1.97.0` run rewrote all four x86 f32/f64
+  files and dropped 28 shipped methods; the 1424-line generator also modeled
+  neither x86 f16 nor AArch64 NEON and had no invocation or freshness gate.
+- **Resolution:** delete the incomplete generator; retain the checked-in ISA
+  files as canonical; revise ADR 005 in place and synchronize the index,
+  ADR 013, checklist, changelog, and gap audit. The alternative of restoring
+  freshness was rejected because it requires a complete shipped-surface model
+  absent from the audited generator.
+- **Acceptance:** no executable stale generator remains; no runtime source
+  file changes; ADR/index/PM references agree; provider gates pass on the exact
+  commit.
+- **Evidence:** source comparison before and after the direct pinned run,
+  four-file destructive diff (415 deletions before restoration), and the
+  method-set comparison are recorded in ADR 005 and `gap_audit.md`.
+- **Local verification:** `cargo +1.97.0 fmt --all -- --check`, workspace
+  Clippy with `-D warnings`, Nextest (465/465), doctests (18 executed, all
+  passing; documented ignores remain), warning-denied workspace Rustdoc, and
+  workspace example builds pass. The Atlas development overlay rewrites the
+  provider lock during unlocked local commands; its derived lock changes were
+  discarded. Hosted locked CI remains the delivery gate.
+
 ## ATLAS-HERMES-BOOK-TEST-2026-08-20 — Enable executable book samples [patch] — done 2026-08-20
 
 - Owner: Atlas integration. Scope is `.github/workflows/book-pages.yml`, the
@@ -1274,9 +1301,10 @@ cross-compile verified. The dominant remaining risks are *infrastructure*
       explicit target-feature contract. The portable surface remains
       `TileMatrixMultiply`/runtime dispatch; asm is not promoted to a separate
       public abstraction.
-- [x] **[arch] Per-type x86 kernel dedup** (delivered 2026-06-21): evaluated build-time
-      code generation vs macros for AVX2/AVX-512 duplication, resulting in
-      ADR 005 recommending build-time code generation via a custom `build.rs` script.
+- [x] **[arch] Per-type x86 kernel dedup** (delivered 2026-06-21; ADR 005
+      revised 2026-08-21): the initial build-time-generator decision was
+      retired after the freshness audit found destructive coverage drift. The
+      checked-in ISA files are now the canonical sources.
 - [x] **[patch] SVE callable fallback**: removed `unimplemented!()` SVE
       `SimdKernel` methods and routed `SveArch` f32/f64 through the existing
       lane-emulated kernel macro with value-semantic tests.

@@ -10,7 +10,7 @@
 | [002](002-amx-context-management.md) | AMX Context Management and State Tracking | Accepted |
 | [003](003-intel-amx-and-avx512-vnni-runtime-dispatch.md) | Intel AMX Session Cache and AVX-512 VNNI Runtime Dispatch on Stable Rust | Accepted |
 | [004](004-generic-interleaved-complex-kernels.md) | Generic Interleaved Complex Kernels via Adjacent-Pair Primitives | Accepted |
-| [005](005-per-type-x86-kernel-dedup.md) | Code Generation vs Macros for Per-Type x86 Kernel Deduplication | Accepted |
+| [005](005-per-type-x86-kernel-dedup.md) | Checked-In Per-Type x86 Kernel Sources | Accepted |
 | [006](006-sse2-backend-feasibility.md) | SSE2 Backend Feasibility Study | Accepted |
 | [007](007-arm-sme-backend-feasibility.md) | Arm SME Backend Feasibility Study | Accepted |
 | [008](008-refined-simd-view-type-state.md) | Refined SimdView Design with Reference Type-State Parameterization | Accepted |

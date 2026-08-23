@@ -6,6 +6,11 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch][HS-440] Retire the incomplete x86 kernel `codegen` binary and revise
+  ADR 005 so checked-in ISA files are the canonical source. A pinned direct
+  regeneration audit showed that the binary omitted shipped operations and
+  precision/ISA families; runtime kernels are unchanged.
+
 - [patch] Enable the Atlas shared Pages workflow's package-staged `mdbook
   test` gate for the four Hermes end-to-end examples and the SIMD architecture
   snippet. Exact PR and merged-default CI, benchmark, mdBook, and Pages gates
