@@ -255,6 +255,23 @@ baseline by the configured threshold.
 The dense suite includes `axpy_rows_batch_f32`, which compares fused
 depth-major row-panel accumulation against repeated public `axpy_rows` calls.
 
+### Pre-push hook
+
+Install the hooks once per clone:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+Git never applies tracked hooks on its own, so this is a one-time step per
+clone. The `pre-push` hook runs `scripts/lockfile.py --check`, which is the
+same check CI runs. It matters most when working inside the Atlas stack: the
+stack's `[patch]` overlay makes cargo resolve first-party dependencies to
+local paths and write a `Cargo.lock` with every `source = "git+..."` line
+stripped. That lock resolves fine under the overlay and fails every
+`--locked` job in CI, so without the hook the corruption is invisible until a
+runner reports it. Repair with `python3 scripts/lockfile.py --regenerate`.
+
 ## Project Management
 
 - Design decisions: [`docs/adr/`](docs/adr/)
