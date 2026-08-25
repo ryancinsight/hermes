@@ -1,5 +1,55 @@
 # Backlog — hermes-simd
 
+## HS-FEARLESS-TOKEN-2026-08-25 — Consumer target-feature entry and token-carried safe operations [minor] — todo
+
+- **Outcome:** a crate outside `hermes-simd` writes one generic lane kernel with
+  safe operation calls, hands it to Hermes, and the kernel body is monomorphized
+  inside the selected backend's `#[target_feature]` scope. Today that route does
+  not exist: `#[runtime_dispatch]` is applied only within
+  `crates/hermes-simd/src/dispatch/` and `hermes-simd` re-exports no path to it,
+  so a consumer either writes its own `#[target_feature]` trampolines and raw
+  intrinsics or accepts baseline codegen for the generic body.
+- **Scope:** a value-carrying capability token per public backend, its
+  construction path (runtime probe plus the forced-target route already
+  available as `TargetId`), a `vectorize`-class entry that runs a consumer
+  `#[inline(always)]` kernel inside that scope, and a safe operation surface on
+  the token delegating to the existing `BackendKernel<T>` facets. ADR 011's
+  recorded exclusion of `SimdKernel` from the safe-surface argument is revised
+  in the same change with the mechanism that changed it — safe
+  `#[target_feature]` functions (RFC 2396) are stable since Rust 1.86 and the
+  workspace floor is 1.95.
+- **Non-goals:** removing or unsealing the `BackendKernel<T>` facets, which stay
+  as the implementation seam backends implement; adding `fearless_simd` as a
+  dependency; any change to sparse, packed, AMX, tensor, or COW surfaces;
+  migrating a consumer, which is that consumer's own item.
+- **Acceptance oracle:**
+  1. A consumer-shaped integration test defines one generic butterfly-style
+     kernel using only safe token operations and executes it through the entry
+     for every host-supported `TargetId`, asserting value-semantic equality
+     against the scalar target.
+  2. Codegen evidence: the kernel body compiled through the AVX2 entry emits
+     256-bit vector instructions with no call boundary to the facet operations,
+     and the same body compiled without the entry does not. This is the
+     measurement ADR 009 asserts and this item must confirm rather than assume.
+  3. The safe surface adds no `unsafe` at consumer call sites: the test compiles
+     under `#![forbid(unsafe_code)]`.
+- **Dependencies:** none. ADR 009 (target-feature inlining) and ADR 011
+  (bitboard safe surface) are the governing decisions; ADR 011 is revised by
+  this item and ADR 009 is extended, not contradicted.
+- **Risk / change class:** [minor] — additive public surface. `cargo-semver-checks`
+  is authoritative and reclassifies upward if the ADR 011 revision changes an
+  existing signature.
+- **Required authority:** Change on an allowlisted repository; no release.
+- **Verification plan:** workspace Clippy at the pedantic floor, Nextest
+  including the new conformance test, doctests on the new surface, Rustdoc,
+  `cargo-semver-checks`, and the codegen inspection above.
+- **Driver:** `gap_audit.md#fearless-simd-2026-08-25`. The measured consumer is
+  Apollo at revision `424ce431`: 28 files importing `core::arch`, 90
+  `#[target_feature]` attributes, 429 `unsafe` blocks, and one `hermes-simd`
+  call site in `apollo-fft`; and `apollo-fwht`, which does write a generic
+  Hermes kernel and calls it from a function carrying no `#[target_feature]`
+  attribute anywhere in that crate.
+
 ## ATLAS-HERMES-CODEGEN-SSOT-2026-08-21 — Resolve SIMD codegen source of truth [arch] [minor] — in-progress (hosted verification pending)
 
 - **Owner / scope:** Atlas integration, clean `origin/main` lane; the former

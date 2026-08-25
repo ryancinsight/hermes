@@ -6,6 +6,15 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch] Add a Fearless SIMD reference gap audit (`gap_audit.md`) and a second
+  README external baseline entry. The audit reaches Hermes through PhastFT, an
+  `#![forbid(unsafe_code)]` FFT library whose kernels are written entirely
+  against that model, and records one actionable Hermes-native gap: a consumer
+  outside `hermes-simd` has no exported route into a `#[target_feature]` scope,
+  so a generic lane kernel written downstream gets the baseline codegen ADR 009
+  exists to prevent. Filed as `HS-FEARLESS-TOKEN-2026-08-25`. Neither reference
+  is adopted as a dependency.
+
 - [patch][HS-440] Retire the incomplete x86 kernel `codegen` binary and revise
   ADR 005 so checked-in ISA files are the canonical source. A pinned direct
   regeneration audit showed that the binary omitted shipped operations and

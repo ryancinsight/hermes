@@ -4,6 +4,109 @@ Persistent gap register. Evidence tiers follow the repository instruction
 hierarchy: machine-checked proof > type-level invariant > property/fuzz >
 differential/empirical > source audit.
 
+## Fearless SIMD Reference Audit - 2026-08-25 <a id="fearless-simd-2026-08-25"></a>
+
+Reference: `https://github.com/linebender/fearless_simd` at commit
+`3ac40f9aad237183f8178ffd33a8f9c71fee644a`; crates.io `fearless_simd` 0.7.0,
+published 2026-08-11, MSRV 1.89.
+
+Entry route: the reference surfaced through
+`https://github.com/QuState/PhastFT` at commit
+`7bbbfa5bbac8681af7d1abf6fb02990d8eacb552` (crates.io `phastft` 0.4.1), an FFT
+library Apollo now tracks as an external comparison. PhastFT declares
+`#![forbid(unsafe_code)]` at its crate root and writes every butterfly and
+bit-reversal kernel against Fearless SIMD's safe surface, so it is a working
+consumer of the authorship model audited here rather than a claim about one.
+The transform-side findings live in Apollo's `gap_audit.md`.
+
+Evidence tier: source audit of both references, local Hermes code search, and
+consumer measurement at a named Apollo revision. No benchmark or codegen claim
+is made from this audit alone; the codegen measurement is the acceptance oracle
+of the increment it drives, not evidence already collected.
+
+Scope fit:
+- In scope for Hermes: consumer-facing kernel authorship — how a crate outside
+  `hermes-simd` writes one generic lane kernel and obtains per-ISA machine code
+  for it.
+- Out of scope for Hermes: replacing the sealed `SimdKernel` seam, the sparse,
+  packed, AMX, tensor, or COW surfaces, or the Atlas compute boundaries.
+  Fearless SIMD is a portable-lane substrate only and owns none of them.
+
+Findings:
+- [minor] Consumer target-feature entry. ADR 009 records why a lane kernel must
+  be monomorphized inside a `#[target_feature]` scope: without it the annotated
+  backend operations cannot be inlined into the loop body, which that ADR
+  states "completely neutralizing SIMD throughput advantages". Hermes solves
+  this only for its own kernels — `#[runtime_dispatch]` is applied across
+  `crates/hermes-simd/src/dispatch/`, and `hermes-simd` re-exports no path to
+  it. `dispatch_view`/`dispatch_view_to` hand a consumer a typed view but no
+  target-feature scope to use it in. Fearless SIMD's equivalent is a
+  `Simd`-token method that takes the consumer's `#[inline(always)]` kernel and
+  runs it inside the level's target-feature scope, so the consumer writes one
+  generic body and the substrate owns the per-ISA entry.
+- [minor] Safe operation surface behind a capability token. Every
+  `BackendKernel<T>` facet method is `unsafe fn` — `SimdArith::{add, mul,
+  fmadd, splat, ...}` in `crates/hermes-simd-core/src/kernel/roles/arithmetic.rs`
+  and `SimdPermute::{reverse, interleave, deinterleave, fmaddsub, ...}` in
+  `.../roles/permute.rs`. The obligation each carries is "the target feature is
+  active", which is a property of the enclosing scope rather than of the
+  arguments. Fearless SIMD discharges that obligation once, at token
+  construction, and exposes the operations as safe methods on the token. ADR 011
+  already made `BitBoardKernel` safe on the grounds that its stated obligation
+  matched no implementation, and explicitly excluded `SimdKernel` as "genuinely
+  `#[target_feature]`-gated". That exclusion was correct for the mechanism
+  available when it was written; safe `#[target_feature]` functions (RFC 2396)
+  are stable since Rust 1.86 and the Hermes toolchain floor is 1.95, so the
+  obligation can now be carried by a token instead of by every caller. Revising
+  ADR 011's exclusion is part of the increment, not a silent divergence from it.
+- [minor] Measured consumer cost. Apollo at revision `424ce431` depends on
+  `hermes-simd` from every transform crate, yet `apollo-fft` reaches it in one
+  file for one function (`interleaved_complex_mul_assign`) and otherwise carries
+  its own ISA fork: 28 files importing `core::arch`/`std::arch` — every such
+  file in the Apollo workspace — 90 `#[target_feature]` attributes, 429 `unsafe`
+  blocks, and 228 `unsafe fn` declarations. The one Apollo crate that did write
+  a generic Hermes kernel, `apollo-fwht`, calls `Vector::<T, Arch>::load_unaligned`
+  and the arithmetic facets inside its dyadic butterfly loop from a function
+  with no `#[target_feature]` attribute anywhere in the crate — the ADR 009
+  defect reproduced in a consumer. The substrate is not being declined on
+  preference; it currently gives a consumer no way to reach the codegen its own
+  ADR requires.
+- [patch] Second independent corroboration of the sub-AVX2 x86 baseline gap.
+  PhastFT ships SSE4.2 and WASM levels through Fearless SIMD. The Highway audit
+  already recorded Hermes jumping Scalar to AVX2 on x86 (ADR 006 assessed SSE2
+  feasibility). A second unrelated reference reaching below AVX2 raises that
+  finding from one reference's choice to a portable-substrate norm.
+- [patch] README positioning. The External SIMD Reference Baseline section named
+  only the Highway audit, so a reader could not tell whether the safe-authorship
+  model had been assessed.
+
+Decisions:
+- Do not adopt `fearless_simd` as a dependency. Hermes is the Atlas owner of CPU
+  lane kernels and ISA dispatch; taking a third-party portable-SIMD substrate
+  would re-fork the dimension Hermes exists to own and would not carry Hermes'
+  sparse, packed, AMX, tensor, or COW surfaces. Use it as a design reference for
+  the authorship model only.
+- Note the reference's own negative result. Fearless SIMD's README records that
+  its 0.1.1 CPU-capability *witness type* approach "couldn't quite be made to
+  work" and that the current design carries the capability in a value instead.
+  Hermes' `Avx2`/`Avx512`/`Neon` ZST markers are that same witness-type shape.
+  The increment below therefore adds a value-carrying token beside the markers
+  rather than reinterpreting the markers as one; the markers keep their role as
+  the type-level backend selector for monomorphization.
+- Keep the sealed `SimdKernel` seam and its `unsafe` primitives. The safe
+  surface is a layer above them, not a replacement: the raw facets stay as the
+  implementation seam that backends implement, exactly as ADR 011 left
+  `KoggeStone`'s ISA fills unsafe beneath a safe trait.
+
+Next increments:
+- P1: consumer-facing target-feature entry and token-carried safe operation
+  surface — filed as `HS-FEARLESS-TOKEN-2026-08-25` in `backlog.md`.
+- P2: publish the consumer authorship path in the README and the book, so a
+  downstream crate has one documented route from "I have a lane kernel" to
+  per-ISA code.
+- P3: re-assess the sub-AVX2 x86 baseline against ADR 006 now that a second
+  reference corroborates it.
+
 ## ATLAS-ORPHAN-MODULES-096-HERMES closure — 2026-08-19
 
 The stale orphan-module item is closed. `crates/hermes-simd-core/src/tensor/

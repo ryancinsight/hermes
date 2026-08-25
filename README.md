@@ -42,12 +42,26 @@ they do not own task scheduling or GPU resource lifetimes.
 ## External SIMD Reference Baseline
 
 Hermes tracks external SIMD libraries as coverage references, not as API
-authorities. The current external audit compares Hermes with
-[`NikoMalik/highway`](https://github.com/NikoMalik/highway) at commit
-`0984271e74db124cf5e200de542e745348eb0b9e`; findings live in
-[`gap_audit.md`](gap_audit.md#highway-2026-06-14).
+authorities. Two audits are current:
 
-Actionable gaps from that audit are Hermes-native: target-token forced
+- [`NikoMalik/highway`](https://github.com/NikoMalik/highway) at commit
+  `0984271e74db124cf5e200de542e745348eb0b9e` — operation-family and
+  portable-target coverage. Findings live in
+  [`gap_audit.md`](gap_audit.md#highway-2026-06-14).
+- [`linebender/fearless_simd`](https://github.com/linebender/fearless_simd) at
+  commit `3ac40f9aad237183f8178ffd33a8f9c71fee644a` (crates.io 0.7.0) —
+  consumer-facing kernel authorship: how a crate outside `hermes-simd` writes
+  one generic lane kernel and obtains per-ISA machine code for it. Reached
+  through [`QuState/PhastFT`](https://github.com/QuState/PhastFT), an
+  `#![forbid(unsafe_code)]` FFT library built entirely on that model and tracked
+  as an Apollo transform comparison. Findings live in
+  [`gap_audit.md`](gap_audit.md#fearless-simd-2026-08-25).
+
+Neither library is a dependency. Hermes owns CPU lane kernels and ISA dispatch
+for Atlas, so adopting a third-party portable-SIMD substrate would re-fork the
+dimension Hermes exists to own; both are read as design and coverage references.
+
+Actionable gaps from the Highway audit are Hermes-native: target-token forced
 dispatch for tests/benchmarks, safe one-vector slice wrappers over raw
 `SimdLoadStore` load/store primitives, an SSE2 feasibility ADR, a public dense
 cross-target conformance matrix, and a finer operation-family coverage map.
