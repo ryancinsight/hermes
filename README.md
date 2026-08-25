@@ -70,6 +70,23 @@ already means the host executes `Arch`, and the safe surface discharges the
 backend obligation. `tests/consumer_vectorize.rs` is written as a downstream
 crate would write it and compiles under `#![forbid(unsafe_code)]`.
 
+### Where to put the call
+
+Two rules, both measured rather than stylistic (ADR 016 records the numbers):
+
+- **Never wrap a thread-spawning call.** The scope does not follow a closure
+  onto another thread, so the backend operations stop inlining on the worker and
+  you get the penalty the entry exists to remove. Dispatch inside the per-thread
+  work unit.
+- **Never place it in the innermost loop.** One probe per handful of elements
+  costs more than it saves. Hoist to the largest unit that stays on one thread.
+
+And one suitability question before migrating anything: `vectorize` pays for
+compute-dense kernels with large per-dispatch work units. For a bandwidth-bound
+elementwise kernel it can lose to the `Scalar` backend, which is a plain
+`[T; N]` array loop the optimizer inlines and auto-vectorizes with no dispatch
+at all. Measure before converting existing code.
+
 To force a specific backend in a test or benchmark, use `TargetId` with
 `dispatch_view_to` rather than `vectorize`, which always picks the widest.
 

@@ -124,6 +124,31 @@ That limitation was invisible until a public dispatcher was wanted.
   done. Apollo found this as the first consumer; the entry did not survive
   contact with a generic caller until it was added, which is the argument for
   migrating a real consumer before declaring a substrate API finished.
+- **Where the call goes matters as much as that it is made.** The first
+  consumer migration (Apollo's Walsh-Hadamard transform) measured *slower* than
+  the code it replaced under all three placements tried — 1.6x, 1.9x, and 8.8x —
+  and was reverted. Two constraints follow, and both are properties of the
+  mechanism rather than of that kernel:
+
+  1. **Never wrap a thread-spawning call.** The `#[target_feature]` scope does
+     not follow a closure onto another thread. Putting a work-partitioning call
+     inside `vectorize` leaves the backend operations unable to inline on the
+     worker, which applies the ADR 009 penalty to the hot path by way of the
+     mechanism meant to remove it. That placement was the 8.8x case. Dispatch
+     belongs *inside* the per-thread work unit.
+  2. **Never place it inside the innermost loop.** A kernel whose stride starts
+     at one pays a feature probe and a non-inlinable call per handful of
+     elements. Hoist to the largest unit that stays on one thread.
+
+  Between those bounds there is a suitability question, not just a placement
+  one. The entry pays where the kernel is compute-dense and the per-dispatch
+  work unit is large — the AXPY measurement above is that shape. It loses to
+  Hermes' own `Scalar` backend where the kernel is bandwidth-bound and
+  elementwise: that backend is a plain `[T; N]` array loop which the optimizer
+  inlines completely and auto-vectorizes at the build's baseline ISA, with no
+  dispatch and no call boundary, so there is no arithmetic for wider registers
+  to save and the boundary is pure overhead. A consumer migration should be
+  preceded by a measurement rather than scheduled from a `core::arch` census.
 - **`vectorize` runs one backend, the widest available.** A consumer needing a
   specific backend for a test or benchmark uses the existing `TargetId` forced
   dispatch, which remains the mechanism for that.
