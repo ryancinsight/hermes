@@ -197,6 +197,14 @@ pub mod cpu;
 /// Dynamic dispatcher choosing optimal backends based on hardware/layout.
 pub mod dispatcher;
 
+// Consumer-facing entry into a `#[target_feature]` scope for generic lane
+// kernels. The module is private and its two items are re-exported: a public
+// module named `vectorize` beside a function of the same name makes every
+// `[`vectorize`]` doc link ambiguous, and the module carries nothing else worth
+// a separate path.
+mod vectorize;
+pub use vectorize::{vectorize, LaneKernel};
+
 /// Tiled matrix multiplication dispatch and kernel interfaces.
 pub mod tile_matmul;
 
