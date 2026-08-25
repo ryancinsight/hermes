@@ -114,6 +114,16 @@ That limitation was invisible until a public dispatcher was wanted.
   `#![expect(missing_docs)]` solely because the macro dropped docs; the
   expectation is now unfulfilled and removed. Any future `pub` dispatcher
   inherits its documentation.
+- **The bound is carried by `LaneScalar`, not by the caller.** The dispatch
+  ladder names concrete backends, so entering it needs `Avx2: SimdKernel<T>`
+  and the rest proven. A caller generic over `T` cannot discharge that without
+  repeating the cfg-gated backend list in its own signature. `LaneScalar` moves
+  the obligation to one impl per supported scalar — `f32`, `f64`, `F16`, the
+  exact set for which every backend implements `BackendKernel` — each entering
+  the ladder at a concrete type, so a consumer writes `T: LaneScalar` and is
+  done. Apollo found this as the first consumer; the entry did not survive
+  contact with a generic caller until it was added, which is the argument for
+  migrating a real consumer before declaring a substrate API finished.
 - **`vectorize` runs one backend, the widest available.** A consumer needing a
   specific backend for a test or benchmark uses the existing `TargetId` forced
   dispatch, which remains the mechanism for that.
