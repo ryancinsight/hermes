@@ -16,7 +16,11 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   kernel through the entry emits 41 ymm-bearing instructions including
   `vfmadd213ps` with no call into the backend operations; the same body without
   it emits zero ymm in the caller and five calls into `hermes-simd-intrinsics`.
-  Adds `Vector::{mul_add, reverse, interleave, deinterleave, swap_adjacent,
+  The entry is bounded by `LaneScalar` (`f32`, `f64`, `F16`) rather than by
+  `Scalar`: the ladder names concrete backends, so a caller generic over `T`
+  would otherwise have to prove `Avx2: SimdKernel<T>` and the rest itself and
+  carry the whole cfg-gated backend list in its signature. Adds
+  `Vector::{mul_add, reverse, interleave, deinterleave, swap_adjacent,
   dup_even, dup_odd, fmaddsub, fmsubadd}`, completing the safe surface for
   multiply-accumulate and cross-lane kernels. `#[runtime_dispatch]` now forwards
   doc comments to the generated dispatcher, which is what allows a public one at

@@ -1,5 +1,24 @@
 # Backlog — hermes-simd
 
+## HS-NUMA-GEN-ISOLATION-2026-08-25 — Assert the property, not the global counter [patch] — todo
+
+- **Outcome:** `test_numa_locality_caching_correctness_and_invalidation` verifies
+  that allocation does not bump the NUMA allocation generation and deallocation
+  does, without asserting an absolute value of a process-global counter.
+- **Finding:** the test asserts `gen_after_alloc == gen_start` on a counter that
+  any `AlignedVec` deallocation anywhere in the process bumps. Nextest's
+  process-per-test isolation makes that hold; under a shared-process runner the
+  three sibling NUMA tests race it. Reproduced: one failure, passing on
+  immediate re-run. Details in `gap_audit.md`.
+- **Scope:** that test. **Non-goals:** changing `get_alloc_generation`,
+  `AlignedVec`, or the runner.
+- **Acceptance oracle:** the test passes under both `cargo nextest run` and a
+  shared-process run of the whole suite, and still fails if the generation bump
+  is removed from the deallocation path — so it keeps testing the behavior
+  rather than becoming unfalsifiable.
+- **Risk / change class:** [patch], test-only. **Dependencies:** none.
+- **Driver:** `gap_audit.md`, NUMA generation-counter test isolation.
+
 ## HS-FEARLESS-TOKEN-2026-08-25 — Consumer target-feature entry and safe FMA/permute surface [minor] — done 2026-08-25
 
 - **Outcome:** a crate outside `hermes-simd` writes one generic lane kernel with

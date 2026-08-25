@@ -4,6 +4,43 @@ Persistent gap register. Evidence tiers follow the repository instruction
 hierarchy: machine-checked proof > type-level invariant > property/fuzz >
 differential/empirical > source audit.
 
+## NUMA generation-counter test isolation (2026-08-25)
+
+Evidence tier: reproduced failure plus source audit. Found incidentally while
+running the workspace suite under bare `cargo test` rather than the committed
+nextest runner.
+
+`test_numa_locality_caching_correctness_and_invalidation` in
+`crates/hermes-simd/tests/types_tests.rs` reads a process-global counter twice
+and asserts exact equality across the gap:
+
+```text
+let gen_start = get_alloc_generation();
+...
+let gen_after_alloc = get_alloc_generation();
+assert_eq!(gen_after_alloc, gen_start);
+```
+
+`get_alloc_generation` is bumped by any `AlignedVec` deallocation anywhere in
+the process. Under nextest each test is its own process, so nothing else can
+bump it and the assertion holds. Under bare `cargo test` the tests are threads
+in one process, and three sibling NUMA tests allocate and drop `AlignedVec`s —
+so the counter moves between the two reads and the assertion fails. Observed
+failing once and passing on immediate re-run, which is the signature.
+
+The committed runner therefore hides a real property of the test: it asserts on
+shared mutable global state rather than on the behavior it means to check. The
+intended property is "allocation alone does not bump the generation, and
+deallocation does". The second half is already tested correctly and robustly
+(`assert!(gen_after_drop > gen_start)`); the first half cannot be expressed as
+exact equality on a shared counter, because it is a statement about what *this*
+allocation did, not about the counter's absolute value.
+
+This is not a flake to re-run. Filed as `HS-NUMA-GEN-ISOLATION-2026-08-25`.
+Nothing in the current gate is wrong — nextest is the sanctioned runner and it
+passes — so this is latent rather than breaking, and the risk is that the
+assertion is read as verifying something it does not.
+
 ## Fearless SIMD audit — amendment and closure (2026-08-25) <a id="fearless-simd-amendment"></a>
 
 Two corrections to the audit below, found while implementing the increment it

@@ -105,6 +105,45 @@ pub trait LaneKernel<T: Scalar> {
     fn call<A: SimdArch + SimdKernel<T>>(self) -> Self::Output;
 }
 
+/// A scalar type every Hermes backend can operate on.
+///
+/// The dispatch ladder names concrete backends, so entering it needs
+/// `Avx2: SimdKernel<T>`, `Avx512: SimdKernel<T>`, and the rest proven for the
+/// caller's `T`. A caller generic over `T` cannot discharge that without
+/// repeating the whole cfg-gated backend list in its own signature — which is
+/// exactly the friction that pushes a consumer back to hand-written intrinsics.
+///
+/// This trait moves the obligation to where it is provable: one impl per scalar
+/// the backends actually support, each entering the ladder at a concrete type.
+/// A consumer writes `T: LaneScalar` and is done.
+///
+/// Implemented for `f32`, `f64`, and `F16` — the exact set for which every
+/// backend implements `BackendKernel`. It is not extensible from outside: a new
+/// scalar becomes vectorizable by gaining backend implementations upstream, not
+/// by a downstream impl of this trait.
+pub trait LaneScalar: Scalar {
+    /// Enters the dispatch ladder at this concrete scalar type.
+    ///
+    /// Call [`vectorize`] instead; this is the per-type step it forwards to.
+    #[doc(hidden)]
+    fn run_lane_kernel<K: LaneKernel<Self>>(kernel: K) -> K::Output;
+}
+
+macro_rules! impl_lane_scalar {
+    ($($t:ty),+ $(,)?) => {
+        $(
+            impl LaneScalar for $t {
+                #[inline(always)]
+                fn run_lane_kernel<K: LaneKernel<Self>>(kernel: K) -> K::Output {
+                    dispatch_backend::<$t, K>(kernel)
+                }
+            }
+        )+
+    };
+}
+
+impl_lane_scalar!(f32, f64, eunomia::F16);
+
 /// Runs `kernel` inside the `#[target_feature]` scope of the widest backend
 /// this host supports.
 ///
@@ -116,8 +155,13 @@ pub trait LaneKernel<T: Scalar> {
 ///
 /// The dispatch decision is made once, here, not per operation inside the
 /// kernel — so a kernel that transforms a whole buffer pays for it once.
+#[inline(always)]
+pub fn vectorize<T: LaneScalar, K: LaneKernel<T>>(kernel: K) -> K::Output {
+    T::run_lane_kernel(kernel)
+}
+
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
-pub fn vectorize_kernel<T, K, A>(kernel: K) -> K::Output
+fn dispatch_backend_kernel<T, K, A>(kernel: K) -> K::Output
 where
     T: Scalar,
     K: LaneKernel<T>,
