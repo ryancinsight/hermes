@@ -796,6 +796,132 @@ where
             }
         }
     }
+
+    /// Fused multiply-add: `self * b + c`, with one rounding.
+    ///
+    /// The single-rounding contract is the point: it is both faster and more
+    /// accurate than a separate multiply and add, and an error analysis that
+    /// assumes it is not satisfied by the two-operation form. Rust never
+    /// contracts `a * b + c` on its own, so the fusion must be written.
+    ///
+    /// This completes the safe surface for the multiply-accumulate kernels that
+    /// dominate transforms, stencils, and dot products; before it, a consumer
+    /// needing FMA had to drop to the `unsafe` `SimdArith` facet.
+    #[inline(always)]
+    #[must_use]
+    pub fn mul_add(self, b: Self, c: Self) -> Self {
+        assert_runtime_supported::<T, Arch>();
+        // SAFETY: the facet's obligation is that the host executes `Arch`,
+        // which the assertion above discharges.
+        Self::new(unsafe { Arch::fmadd(self.raw, b.raw, c.raw) })
+    }
+
+    /// Reverses the lane order.
+    #[inline(always)]
+    #[must_use]
+    pub fn reverse(self) -> Self {
+        assert_runtime_supported::<T, Arch>();
+        // SAFETY: the facet's obligation is that the host executes `Arch`,
+        // which the assertion above discharges.
+        Self::new(unsafe { Arch::reverse(self.raw) })
+    }
+
+    /// Interleaves the lanes of `self` and `other`, returning the low and high
+    /// halves of the interleaved sequence.
+    ///
+    /// This is the array-of-structures direction: given planar real and
+    /// imaginary vectors it produces interleaved complex samples.
+    #[inline(always)]
+    #[must_use]
+    pub fn interleave(self, other: Self) -> (Self, Self) {
+        assert_runtime_supported::<T, Arch>();
+        // SAFETY: the facet's obligation is that the host executes `Arch`,
+        // which the assertion above discharges.
+        let (lo, hi) = unsafe { Arch::interleave(self.raw, other.raw) };
+        (Self::new(lo), Self::new(hi))
+    }
+
+    /// Deinterleaves two vectors into even-indexed and odd-indexed lanes.
+    ///
+    /// The inverse of [`Vector::interleave`]: given interleaved complex samples
+    /// it produces planar real and imaginary vectors.
+    #[inline(always)]
+    #[must_use]
+    pub fn deinterleave(self, other: Self) -> (Self, Self) {
+        assert_runtime_supported::<T, Arch>();
+        // SAFETY: the facet's obligation is that the host executes `Arch`,
+        // which the assertion above discharges.
+        let (even, odd) = unsafe { Arch::deinterleave(self.raw, other.raw) };
+        (Self::new(even), Self::new(odd))
+    }
+
+    /// Swaps each adjacent lane pair: `[a, b, c, d]` becomes `[b, a, d, c]`.
+    ///
+    /// On interleaved complex data this exchanges the real and imaginary parts
+    /// of every sample, which is the shuffle a complex multiply needs.
+    #[inline(always)]
+    #[must_use]
+    pub fn swap_adjacent(self) -> Self {
+        assert_runtime_supported::<T, Arch>();
+        // SAFETY: the facet's obligation is that the host executes `Arch`,
+        // which the assertion above discharges.
+        Self::new(unsafe { Arch::swap_adjacent(self.raw) })
+    }
+
+    /// Duplicates each even-indexed lane over its odd neighbour:
+    /// `[a, b, c, d]` becomes `[a, a, c, c]`.
+    ///
+    /// On interleaved complex data this broadcasts the real part of each sample.
+    #[inline(always)]
+    #[must_use]
+    pub fn dup_even(self) -> Self {
+        assert_runtime_supported::<T, Arch>();
+        // SAFETY: the facet's obligation is that the host executes `Arch`,
+        // which the assertion above discharges.
+        Self::new(unsafe { Arch::dup_even(self.raw) })
+    }
+
+    /// Duplicates each odd-indexed lane over its even neighbour:
+    /// `[a, b, c, d]` becomes `[b, b, d, d]`.
+    ///
+    /// On interleaved complex data this broadcasts the imaginary part.
+    #[inline(always)]
+    #[must_use]
+    pub fn dup_odd(self) -> Self {
+        assert_runtime_supported::<T, Arch>();
+        // SAFETY: the facet's obligation is that the host executes `Arch`,
+        // which the assertion above discharges.
+        Self::new(unsafe { Arch::dup_odd(self.raw) })
+    }
+
+    /// Fused multiply then alternately subtract and add: `self * b -+ c`,
+    /// subtracting on even lanes and adding on odd lanes.
+    ///
+    /// With [`Vector::dup_even`], [`Vector::dup_odd`], and
+    /// [`Vector::swap_adjacent`], this is the complete interleaved-complex
+    /// multiply: one `fmaddsub` finishes the operation that would otherwise
+    /// take a separate multiply, shuffle, and sign correction.
+    #[inline(always)]
+    #[must_use]
+    pub fn fmaddsub(self, b: Self, c: Self) -> Self {
+        assert_runtime_supported::<T, Arch>();
+        // SAFETY: the facet's obligation is that the host executes `Arch`,
+        // which the assertion above discharges.
+        Self::new(unsafe { Arch::fmaddsub(self.raw, b.raw, c.raw) })
+    }
+
+    /// Fused multiply then alternately add and subtract: `self * b +- c`,
+    /// adding on even lanes and subtracting on odd lanes.
+    ///
+    /// The conjugated counterpart of [`Vector::fmaddsub`].
+    #[inline(always)]
+    #[must_use]
+    pub fn fmsubadd(self, b: Self, c: Self) -> Self {
+        assert_runtime_supported::<T, Arch>();
+        // SAFETY: the facet's obligation is that the host executes `Arch`,
+        // which the assertion above discharges.
+        Self::new(unsafe { Arch::fmsubadd(self.raw, b.raw, c.raw) })
+    }
 }
 
 #[inline(always)]

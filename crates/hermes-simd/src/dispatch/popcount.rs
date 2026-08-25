@@ -1,8 +1,4 @@
 //! Generic runtime-dispatch population count and bitwise reduction kernels.
-#![expect(
-    missing_docs,
-    reason = "Runtime-dispatch kernel documentation is attached to the public facade"
-)]
 
 use hermes_simd_core::{
     align::Unaligned,

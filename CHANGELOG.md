@@ -6,6 +6,23 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [minor][HS-FEARLESS-TOKEN] Add `hermes_simd::vectorize` and the
+  `LaneKernel<T>` trait: a consumer outside this crate writes one generic lane
+  kernel and Hermes runs it inside the `#[target_feature]` scope of the widest
+  backend the host supports. Until now that scope was reachable only from
+  `hermes-simd`'s own dispatch module, so a downstream generic kernel compiled
+  at baseline features -- the outcome ADR 009 exists to prevent -- and four
+  Atlas members had written their own intrinsics instead. Measured: an AXPY
+  kernel through the entry emits 41 ymm-bearing instructions including
+  `vfmadd213ps` with no call into the backend operations; the same body without
+  it emits zero ymm in the caller and five calls into `hermes-simd-intrinsics`.
+  Adds `Vector::{mul_add, reverse, interleave, deinterleave, swap_adjacent,
+  dup_even, dup_odd, fmaddsub, fmsubadd}`, completing the safe surface for
+  multiply-accumulate and cross-lane kernels. `#[runtime_dispatch]` now forwards
+  doc comments to the generated dispatcher, which is what allows a public one at
+  all; the `#![expect(missing_docs)]` in `dispatch/popcount.rs` that existed
+  only for that reason is retired. See ADR 016.
+
 - [patch] Add a Fearless SIMD reference gap audit (`gap_audit.md`) and a second
   README external baseline entry. The audit reaches Hermes through PhastFT, an
   `#![forbid(unsafe_code)]` FFT library whose kernels are written entirely

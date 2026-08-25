@@ -104,6 +104,7 @@ fn generate_dispatcher(
     call_args: &[TokenStream],
     arch_ident: &Ident,
     original_where_clause: Option<&syn::WhereClause>,
+    doc_attrs: &[syn::Attribute],
 ) -> TokenStream {
     let mut helper_fns = Vec::new();
     let mut dispatch_arms = Vec::new();
@@ -300,6 +301,7 @@ fn generate_dispatcher(
     };
 
     quote! {
+        #(#doc_attrs)*
         #[cfg(#arch_cfg)]
         #[inline(always)]
         #unreachable_code_expectation
@@ -332,6 +334,16 @@ pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
     let inner_args = &inner_fn.sig.inputs;
     let inner_ret = &inner_fn.sig.output;
     let inner_vis = &inner_fn.vis;
+    // The generated dispatcher is what callers see, so it inherits the
+    // annotated function's documentation. Without this the dispatcher is
+    // undocumented, which `#![deny(missing_docs)]` rejects for any `pub`
+    // kernel -- the reason every dispatch module here had to stay crate-local.
+    let doc_attrs: Vec<syn::Attribute> = inner_fn
+        .attrs
+        .iter()
+        .filter(|a| a.path().is_ident("doc"))
+        .cloned()
+        .collect();
 
     // Find type/const parameters and identify the architecture parameter
     let mut type_params = Vec::new();
@@ -446,6 +458,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
         &call_args,
         arch_ident,
         inner_fn.sig.generics.where_clause.as_ref(),
+        &doc_attrs,
     );
 
     let aarch64_dispatcher = generate_dispatcher(
@@ -461,6 +474,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
         &call_args,
         arch_ident,
         inner_fn.sig.generics.where_clause.as_ref(),
+        &doc_attrs,
     );
 
     let fallback_dispatcher = generate_dispatcher(
@@ -480,6 +494,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
         &call_args,
         arch_ident,
         inner_fn.sig.generics.where_clause.as_ref(),
+        &doc_attrs,
     );
 
     Ok(quote! {

@@ -28,6 +28,51 @@ The project is structured as a multi-crate workspace (dependencies flow strictly
 7. **Typestate safety**: alignment (`Aligned<A>`/`Unaligned`), execution mode (`Masked`/`Unmasked`), and reference mutability are compile-time parameters with zero layout overhead.
 8. **Precision ladder**: 4-bit through 64-bit numeric types with packed storage and hardware-accelerated unpacking into `SimdCow`.
 
+## Writing Your Own Lane Kernel
+
+Hermes' runtime-dispatched functions (`sum`, `dot`, `spmv_*`, …) cover the
+operations it owns. For a kernel it does not — a transform butterfly, a stencil,
+a domain-specific reduction — write it once against the generic lane surface and
+hand it to `vectorize`:
+
+```rust
+struct Axpy<'a> { a: f32, x: &'a [f32], y: &'a mut [f32] }
+
+impl LaneKernel<f32> for Axpy<'_> {
+    type Output = ();
+    fn call<A: SimdArch + SimdKernel<f32>>(self) {
+        // one body, every ISA: Vector<f32, A> and its operators
+    }
+}
+
+vectorize(Axpy { a: 3.0, x: &x, y: &mut y });
+```
+
+The complete, compiled version of this example is the module documentation on
+`vectorize`, which runs as a doctest; `tests/consumer_vectorize.rs` carries a
+fuller one. Both are executable, so neither can rot — unlike the sketch above,
+which exists to show the shape.
+
+`vectorize` selects the widest backend the host supports and runs the kernel
+inside that backend's `#[target_feature]` scope. That scope is not optional
+polish: `#[target_feature]` does not propagate through monomorphization, so the
+same kernel called directly at a concrete backend compiles as if the host had no
+vector unit — the backend operations become out-of-line calls instead of
+inlining into the loop. Measured on an AXPY kernel, the entry emits 41
+ymm-bearing instructions including a real `vfmadd213ps` with no call into the
+backend operations; without it the caller emits zero ymm and five calls into
+`hermes-simd-intrinsics`. [ADR 009](docs/adr/009-target-feature-inlining.md)
+records the mechanism and [ADR 016](docs/adr/016-consumer-target-feature-entry.md)
+the consumer entry.
+
+The kernel body needs no `unsafe`: holding an `Arch`-parameterized `Vector`
+already means the host executes `Arch`, and the safe surface discharges the
+backend obligation. `tests/consumer_vectorize.rs` is written as a downstream
+crate would write it and compiles under `#![forbid(unsafe_code)]`.
+
+To force a specific backend in a test or benchmark, use `TargetId` with
+`dispatch_view_to` rather than `vectorize`, which always picks the widest.
+
 ## Atlas Compute Boundaries
 
 Hermes is the Atlas SIMD substrate: it owns lane-parallel CPU kernels, scalar

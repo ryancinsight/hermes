@@ -21,3 +21,4 @@
 | [013](013-simdkernel-role-split.md) | Split `SimdKernel` into Operation-Family Facets | Accepted |
 | [014](014-targetid-sve-backend.md) | Add `TargetId::Sve` and Seal the Target Enum Family | Accepted |
 | [015](015-compile-time-tile-indices-for-amx-raw-wrappers.md) | Compile-Time Tile Indices for the AMX Raw Wrappers | Accepted |
+| [016](016-consumer-target-feature-entry.md) | Consumer-Facing Target-Feature Entry for Generic Lane Kernels | Accepted |
