@@ -259,11 +259,16 @@ fn generic_consumer_kernel_compiles_and_runs() {
         hermes_simd::vectorize(Doubling(data));
     }
 
+    // Doubling a small integer-valued float is exact in binary floating point,
+    // so equality is the correct oracle here rather than a tolerance. The
+    // comparison goes through slices because `assert_eq!` on float *arrays* is
+    // what `clippy::float_cmp` flags, and silencing that lint would suppress it
+    // for the cases where it is right.
     let mut a32 = [1.0f32, 2.0, 3.0, 4.0, 5.0];
     double_all(&mut a32);
-    assert_eq!(a32, [2.0f32, 4.0, 6.0, 8.0, 10.0]);
+    assert_eq!(a32.as_slice(), [2.0f32, 4.0, 6.0, 8.0, 10.0].as_slice());
 
     let mut a64 = [1.0f64, 2.0, 3.0];
     double_all(&mut a64);
-    assert_eq!(a64, [2.0f64, 4.0, 6.0]);
+    assert_eq!(a64.as_slice(), [2.0f64, 4.0, 6.0].as_slice());
 }
