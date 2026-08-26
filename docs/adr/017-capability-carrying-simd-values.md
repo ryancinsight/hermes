@@ -171,6 +171,15 @@ claim. No compatibility alias or forwarding constructor is retained.
   instructions, one loop branch, and no calls or bounds branches. Timings are
   compared only within one run; affinity experiments on the shared hybrid-core
   host widened variance and are not retained as evidence.
+- The same-address cross-lane instrument covers native f32/f64 interleave and
+  deinterleave. Two unchanged runs moved absolute medians by 15--55% and changed
+  or converged candidate ordering, so they do not establish a stable speed
+  difference. Exact AVX2 loops have equal load, shuffle, store, call, and branch
+  classes for f32 and interleave f64. The two four-shuffle f64 deinterleave
+  sequences both model at 4.0 cycles per iteration under `llvm-mca` 22.1.8 for
+  Arrow Lake S. No production change follows from unstable wall-clock ordering
+  with equivalent hot-loop structure; the full intervals remain in
+  `gap_audit.md`.
 - AVX-512 floating bitwise operations use AVX-512F integer-domain bitwise
   instructions around zero-cost casts. The float-typed intrinsics require
   AVX-512DQ and otherwise remained outlined calls inside an AVX-512F kernel.
@@ -189,6 +198,9 @@ claim. No compatibility alias or forwarding constructor is retained.
 
 ## Revisions
 
+- 2026-08-26: Added shared cross-lane f32/f64 comparison evidence under
+  `HS-FEARLESS-PERMUTE-THROUGHPUT-2026-08-26`; exact codegen and modeled
+  throughput reject a provider correction despite unstable wall-clock ordering.
 - 2026-08-26: Extended the accepted comparison evidence to the native f32
   contract under `HS-FEARLESS-F32-THROUGHPUT-2026-08-26`; no provider change
   followed because the pinned intervals and AVX2 hot-loop structures match.

@@ -286,6 +286,64 @@ multiply-subtract, and the immutable iterator `Send` bound (`T: Sync`, not
 without a current consumer contract; adding unused surface would expand the
 sealed provider without acceptance evidence.
 
+### Cross-lane throughput confirmation — 2026-08-26
+
+The same-binary lane instrument now compares the shared f32/f64 interleave and
+deinterleave operations. Each provider reads the same two input allocations,
+writes the same two output allocations, selects the same AVX2 lane width on the
+measurement host, and is checked against an exact scalar lane-order oracle
+before timing. Fearless exposes no direct whole-vector reverse operation, so
+Hermes' reverse remains in the native-only permute suite rather than being
+compared with a synthesized reference operation.
+
+The first exact locked run reported these medians and 95% confidence intervals
+(all values in ns):
+
+| Operation | Type | Scalars | Hermes | `fearless_simd` |
+| --- | --- | ---: | ---: | ---: |
+| interleave | f32 | 256 | 19.746 [19.627, 19.951] | 19.372 [19.294, 19.496] |
+| interleave | f32 | 1,024 | 66.580 [66.390, 66.796] | 87.963 [74.834, 103.31] |
+| interleave | f32 | 4,096 | 774.01 [745.53, 808.85] | 706.09 [699.60, 712.92] |
+| interleave | f64 | 256 | 31.216 [30.841, 31.732] | 33.720 [33.369, 34.529] |
+| interleave | f64 | 1,024 | 142.76 [142.41, 143.13] | 142.57 [142.02, 143.03] |
+| interleave | f64 | 4,096 | 1,346.7 [1,276.2, 1,425.6] | 1,216.5 [1,211.4, 1,221.4] |
+| deinterleave | f32 | 256 | 28.881 [28.767, 29.006] | 28.664 [28.620, 28.703] |
+| deinterleave | f32 | 1,024 | 73.404 [72.595, 74.322] | 72.420 [72.180, 72.790] |
+| deinterleave | f32 | 4,096 | 989.34 [987.50, 991.77] | 983.46 [980.61, 985.65] |
+| deinterleave | f64 | 256 | 31.732 [31.695, 31.765] | 31.429 [31.359, 31.489] |
+| deinterleave | f64 | 1,024 | 183.18 [182.33, 184.25] | 181.80 [181.41, 182.29] |
+| deinterleave | f64 | 4,096 | 1,614.3 [1,598.8, 1,622.6] | 1,598.9 [1,561.3, 1,618.7] |
+
+An unchanged confirmation run then reported:
+
+| Operation | Type | Scalars | Hermes | `fearless_simd` |
+| --- | --- | ---: | ---: | ---: |
+| interleave | f32 | 256 | 16.726 [16.707, 16.748] | 16.492 [16.353, 16.696] |
+| interleave | f32 | 1,024 | 76.804 [76.648, 77.000] | 77.392 [76.465, 78.603] |
+| interleave | f32 | 4,096 | 718.08 [709.68, 727.03] | 718.11 [709.11, 727.15] |
+| interleave | f64 | 256 | 41.580 [37.708, 46.657] | 35.424 [34.472, 36.962] |
+| interleave | f64 | 1,024 | 153.13 [152.08, 154.94] | 151.83 [151.57, 152.17] |
+| interleave | f64 | 4,096 | 1,909.4 [1,843.6, 1,953.1] | 1,820.8 [1,773.0, 1,884.3] |
+| deinterleave | f32 | 256 | 19.554 [17.782, 21.438] | 18.350 [16.507, 20.237] |
+| deinterleave | f32 | 1,024 | 103.31 [96.499, 110.02] | 101.26 [93.032, 110.18] |
+| deinterleave | f32 | 4,096 | 711.55 [668.78, 752.25] | 676.40 [611.36, 757.16] |
+| deinterleave | f64 | 256 | 46.774 [43.937, 49.305] | 50.560 [46.934, 53.348] |
+| deinterleave | f64 | 1,024 | 165.50 [152.18, 184.37] | 171.88 [156.82, 190.63] |
+| deinterleave | f64 | 4,096 | 1,430.7 [1,235.7, 1,576.5] | 1,434.4 [1,288.1, 1,570.1] |
+
+The material result is the instability, not a speedup claim. Absolute medians
+moved by 15--55% between the two unchanged runs on the shared hybrid-core host,
+and the candidate ordering changed or converged. Exact AVX2 assembly shows the
+f32 pairs have two loads, four shuffles, two stores, and one loop branch with
+the same shuffle instructions in a different order. Both f64 interleave loops
+use six shuffles. The f64 deinterleave loops use different four-shuffle
+sequences; `llvm-mca` 22.1.8 for the host's Arrow Lake S model predicts the same
+4.0-cycle block throughput (423 Hermes versus 425 Fearless modeled cycles over
+100 iterations). No calls, bounds branches, or provider-only hot-loop work
+explain the disjoint intervals. The evidence therefore rejects a production
+SIMD correction and records that wall-clock ordering on this host is not stable
+enough to distinguish equivalent cross-lane loops.
+
 Findings:
 - [minor] Consumer target-feature entry. ADR 009 records why a lane kernel must
   be monomorphized inside a `#[target_feature]` scope: without it the annotated

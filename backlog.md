@@ -1,5 +1,11 @@
 # Backlog — hermes-simd
 
+## HS-FEARLESS-PERMUTE-THROUGHPUT-2026-08-26 — Measure shared cross-lane parity [patch] — complete 2026-08-26
+
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`. **Lease:** none. Implementation `4ef5145`.
+- **Outcome:** one generic same-address f32/f64 instrument covers shared interleave/deinterleave; unstable host ordering plus equivalent AVX2/model evidence rejects a production correction.
+- **Evidence:** exact Clippy, 475/475 Nextest, 19 runnable doctests, Rustdoc, no-default-features, examples, 45-case smoke, two bounded timings, assembly, and `llvm-mca` are green; full intervals are in `gap_audit.md#fearless-simd-2026-08-25`.
+
 ## HS-FEARLESS-F32-THROUGHPUT-2026-08-26 — Verify native single-precision lane parity [patch] — complete 2026-08-26
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`. **Lease:** none. Implementation `937c120`.
