@@ -1,26 +1,10 @@
 # Backlog — hermes-simd
 
-## HS-FEARLESS-PERMUTE-THROUGHPUT-2026-08-26 — Measure shared cross-lane parity [patch] — in-progress
+## HS-FEARLESS-PERMUTE-THROUGHPUT-2026-08-26 — Measure shared cross-lane parity [patch] — complete 2026-08-26
 
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** Codex `crates/hermes-simd/benches/lane_throughput/**`,
-  `backlog.md`, `checklist.md`, `gap_audit.md`, `CHANGELOG.md`, and ADR 017.
-- **Outcome:** compare Hermes and `fearless_simd` 0.7 on identical f32/f64
-  interleave and deinterleave workloads, then correct only a measured
-  provider-owned deficit. Fearless exposes no direct whole-vector reverse
-  operation, so that Hermes-only operation stays in the native permute suite.
-- **Scope / non-goals:** the existing lane-throughput instrument and its
-  evidence records; no unused integer, four-way-I/O, approximate-reciprocal,
-  copysign, SSE, or WASM surface without a current consumer contract.
-- **Acceptance oracle:** each candidate reuses the same input and output
-  addresses, matches an analytical lane-order oracle before timing, and reports
-  median plus 95% confidence interval at 256, 1,024, and 4,096 scalars. A
-  non-overlapping Hermes regression requires codegen inspection and a production
-  correction; overlapping intervals or equivalent codegen closes the gap with
-  the measurement limit recorded.
-- **Risk / verification:** [patch], benchmark-only unless evidence identifies a
-  provider defect. Run formatting, warning-denied Clippy, focused Nextest,
-  doctests, Rustdoc, bench smoke, the bounded timing suite, and exact-diff review.
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`. **Lease:** none. Implementation `4ef5145`.
+- **Outcome:** one generic same-address f32/f64 instrument covers shared interleave/deinterleave; unstable host ordering plus equivalent AVX2/model evidence rejects a production correction.
+- **Evidence:** exact Clippy, 475/475 Nextest, 19 runnable doctests, Rustdoc, no-default-features, examples, 45-case smoke, two bounded timings, assembly, and `llvm-mca` are green; full intervals are in `gap_audit.md#fearless-simd-2026-08-25`.
 
 ## HS-FEARLESS-F32-THROUGHPUT-2026-08-26 — Verify native single-precision lane parity [patch] — complete 2026-08-26
 

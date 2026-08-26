@@ -12,7 +12,7 @@
       non-overlapping Hermes deficit.
 - [x] Implement and verify any provider-owned correction justified by the
       measurement; otherwise record the evidence limit.
-- [ ] Run the exact-diff gates, synchronize evidence, commit, publish, and merge.
+- [x] Run the exact-diff gates, synchronize evidence, commit, publish, and merge.
 
 ## HS-FEARLESS-F32-THROUGHPUT-2026-08-26 [patch]
 
