@@ -1,5 +1,30 @@
 # Backlog — hermes-simd
 
+## HS-FEARLESS-F32-THROUGHPUT-2026-08-26 — Verify native single-precision lane parity [patch] — in-progress
+
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+- **Lease:** `crates/hermes-simd/benches/lane_throughput.rs`, benchmark-facing
+  provider code reached by the measurement, this item, and its checklist/audit
+  evidence until the next commit.
+- **Outcome:** the consumer-shaped planar butterfly benchmark verifies Hermes'
+  native single-precision lane path against `fearless_simd` 0.7 in the same
+  process, with the existing double-precision rows retained from one generic
+  instrument.
+- **Scope:** parameterize the planar benchmark over both supported floating lane
+  scalars; reuse identical inputs and output addresses per pair; optimize only a
+  provider-owned mechanism demonstrated by the comparison. **Non-goals:** new
+  operations or targets, adopting `fearless_simd`, and consumer changes.
+- **Acceptance oracle:** every candidate passes the scalar oracle before timing;
+  Criterion records medians and 95% confidence intervals at 256, 1024, and 4096
+  scalars under the committed 300-second suite budget; Hermes has overlapping
+  intervals with `fearless_simd`, or a non-overlap is traced through codegen and
+  corrected in production code before closure.
+- **Risk / change class:** [patch], benchmark generalization plus any measured
+  internal optimization. **Dependencies:** merged ADR 017 and provider PR 68.
+- **Driver:** the closed comparison establishes only f64 parity even though f32
+  is a current Hermes/Apollo lane contract; precision-specific backend codegen
+  makes f64 evidence insufficient for f32.
+
 ## HS-LANE-THROUGHPUT-2026-08-25 — Locate the gap between the lane surface and fearless_simd [arch] — complete 2026-08-26
 
 - **Integrator:** Codex task `01a0253c-6013-7552-99cc-36bbbcf77f6d`.
