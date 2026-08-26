@@ -1,6 +1,11 @@
 # Backlog — hermes-simd
 
-## HS-LANE-THROUGHPUT-2026-08-25 — Locate the gap between the lane surface and fearless_simd [arch] — todo
+## HS-LANE-THROUGHPUT-2026-08-25 — Locate the gap between the lane surface and fearless_simd [arch] — in progress 2026-08-26
+
+- **Integrator:** Codex task `01a0253c-6013-7552-99cc-36bbbcf77f6d`.
+- **Lease:** `crates/hermes-simd/{src,benches,tests}`,
+  `docs/adr/017-*.md`, and this item's PM blocks through the next verified
+  commit.
 
 - **Outcome:** a consumer kernel written against Hermes' lane surface reaches
   arithmetic rates comparable to `fearless_simd` on the same host and workload,

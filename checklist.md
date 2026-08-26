@@ -1,5 +1,22 @@
 # Checklist — active sprint
 
+## HS-LANE-THROUGHPUT-2026-08-25 [arch]
+
+- [x] Reconcile Apollo's seven-variant same-binary evidence with the current
+  Hermes provider and claim the upstream item.
+- [ ] Measure a consumer-shaped interleaved complex kernel through
+  `SimdView`/`SimdChunks` against direct Hermes facets and `fearless_simd`
+  in one bounded binary.
+- [ ] Inspect the emitted inner loops and locate every residual instruction,
+  branch, call, spill, and bounds check absent from the reference.
+- [ ] Record the selected lane contract and rejected alternative in ADR 017.
+- [ ] Implement the minimal provider-owned correction with differential,
+  property, and adversarial boundary coverage.
+- [ ] Re-run the Apollo power-of-two matrix and allocation census at the exact
+  provider revisions; update both repositories' evidence and consumer pin.
+- [ ] Pass focused Nextest, doctest, Clippy, Rustdoc, benchmark, SemVer, and
+  applicable unsafe/release gates before integration.
+
 ## ATLAS-HERMES-ROOT-CLEANUP [patch]
 
 - [x] Move generated benchmark baseline and result files under `benchmarks/`;
