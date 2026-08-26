@@ -1,5 +1,20 @@
 # Checklist — active sprint
 
+## HS-FEARLESS-F32-THROUGHPUT-2026-08-26 [patch]
+
+- [x] Confirm the official `fearless_simd` release remains 0.7.0 and its main
+      revision remains `3ac40f9a`.
+- [x] Re-run the committed f64 comparison from clean current Hermes main.
+- [x] Generalize the planar benchmark over the current f32/f64 lane contract
+      without duplicating the kernel or benchmark body.
+- [x] Compare f32 medians and 95% confidence intervals in the same binary and
+      inspect codegen if Hermes and `fearless_simd` do not overlap.
+- [x] Adjudicate provider ownership: pinned intervals overlap and the AVX2 hot
+      loops have equivalent instruction classes, so no production correction is
+      justified by this measurement.
+- [x] Run formatting, Clippy, focused tests, bench smoke, bounded timing,
+      doctests, Rustdoc, and the exact-diff review before delivery.
+
 ## HS-LANE-THROUGHPUT-2026-08-25 [arch]
 
 - [x] Reconcile Apollo's seven-variant same-binary evidence with the current

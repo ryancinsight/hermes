@@ -1,5 +1,11 @@
 # Backlog — hermes-simd
 
+## HS-FEARLESS-F32-THROUGHPUT-2026-08-26 — Verify native single-precision lane parity [patch] — complete 2026-08-26
+
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`. **Lease:** none. Implementation `937c120`.
+- **Outcome:** one same-address generic f32/f64 instrument retains the f64 identity; exact locked f32 intervals overlap at 256, 1,024, and 4,096 scalars, so no production correction is justified.
+- **Evidence:** workspace Clippy, 475/475 nextest, 19 runnable doctests, examples, Rustdoc, no-default-features, 21-case bench smoke, bounded timing, and AVX2 assembly are green; full measurements and limits are in `gap_audit.md#lane-throughput-2026-08-25`.
+
 ## HS-LANE-THROUGHPUT-2026-08-25 — Locate the gap between the lane surface and fearless_simd [arch] — complete 2026-08-26
 
 - **Integrator:** Codex task `01a0253c-6013-7552-99cc-36bbbcf77f6d`.
