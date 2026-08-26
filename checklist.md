@@ -12,13 +12,15 @@
 - [x] Record the selected lane contract and rejected alternative in ADR 017.
 - [x] Implement the minimal provider-owned correction with differential,
   property, and adversarial boundary coverage.
-- [ ] Re-run the Apollo power-of-two matrix and allocation census at the exact
-  provider revisions; update both repositories' evidence and consumer pin.
+- [x] Re-run the Apollo power-of-two matrix and allocation census at the exact
+  provider revision; Apollo PR 120 (`e3bdd7c3`) pins `4abbde8f`, passes the
+  exact-Git all-target check and six batched analytical tests, and retains zero
+  transient allocations on the complex path.
 - [x] Pass focused Nextest, doctest, Clippy, Rustdoc, benchmark, SemVer
   classification, AArch64 compile, and release gates before the provider
   commit.
-- [ ] Complete exact-commit Miri, cross-target, SemVer, and ADR-index review,
-  then integrate the provider branch.
+- [x] Complete exact-commit Miri, cross-target, SemVer, and ADR-index review,
+  then integrate provider PR 68 as merge commit `ae4e8efa`.
 
 ## ATLAS-HERMES-ROOT-CLEANUP [patch]
 
