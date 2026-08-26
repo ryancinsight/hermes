@@ -3,44 +3,38 @@
 ## HS-LANE-THROUGHPUT-2026-08-25 — Locate the gap between the lane surface and fearless_simd [arch] — in progress 2026-08-26
 
 - **Integrator:** Codex task `01a0253c-6013-7552-99cc-36bbbcf77f6d`.
-- **Lease:** `crates/hermes-simd/{src,benches,tests}`,
-  `docs/adr/017-*.md`, and this item's PM blocks through the next verified
-  commit.
+- **Lease:** none. The provider implementation and documentation are complete;
+  the remaining work is exact-revision consumer validation in Apollo.
 
 - **Outcome:** a consumer kernel written against Hermes' lane surface reaches
   arithmetic rates comparable to `fearless_simd` on the same host and workload,
   or the reason it cannot is understood and recorded.
-- **Finding:** Apollo built seven power-of-two FFT kernel variants — planar and
-  interleaved, with and without stage fusion, with and without cache blocking,
-  using autovectorization, `Vector` ops through `vectorize`, and the exact
-  `dup_even`/`dup_odd`/`swap_adjacent`/`fmaddsub` complex-multiply sequence
-  RustFFT's AVX path uses. Every one landed between **3.4 and 6.1 flops/ns**.
-  RustFFT reached **38.5** and PhastFT — an `#![forbid(unsafe_code)]` FFT built
-  on `fearless_simd` — reached **32.8**, in the same test binary with the same
-  profile and flags. Scalar f64 on that host is ~6 flops/ns and AVX2 ~48. Full
-  measurement in `gap_audit.md#lane-throughput-2026-08-25`.
-- **Excluded by measurement, not assumption:** build configuration (the fast
-  engines are in the same binary), bandwidth (L1-resident at 2^10), pass count
-  (Apollo runs four passes for ten radix-2 stages, fewer than RustFFT's radix-4),
-  transient allocation (zero per call, counted with a global allocator), and
-  layout (planar measured no better than interleaved).
-- **Located so far:** the checked slice wrappers cost about 45% in a
-  fine-grained kernel — swapping `load_unaligned_from_slice(..).unwrap()` for the
-  raw pointer form moved one variant from 4.2 to 6.1 flops/ns. Real, actionable,
-  and not the whole gap.
-- **First step:** re-run the interleaved variant using `SimdView` typestates and
-  the `SimdChunks`/`ZipChunks` iterators, which exist to hoist exactly those
-  checks and which the prototypes did not use. If they close the distance, the
-  finding is a discoverability defect and the fix is guidance plus an example.
-  If they do not, the remainder is in the lane operations and the next step is
-  codegen comparison against `fearless_simd` on one butterfly.
+- **Resolution:** the deficit came from capability provenance that was not
+  preserved across operations, repeated support probes, non-exact chunk values,
+  and bounds-heavy consumer iteration. `Simd<T, A>` now carries the proven host
+  capability into `LaneKernel`; exact-width chunks, grouped planar I/O, fused
+  multiply-subtract, and probe-free operations preserve that proof through the
+  hot loop. Immutable iterator `Send` bounds and child alignment semantics were
+  corrected while making the capability contract sound.
+- **Provider evidence:** a same-binary planar f64 butterfly reuses identical
+  output addresses for Hermes and `fearless_simd` 0.7. At 256, 1024, and 4096
+  elements the pinned Hermes medians are 77.024 ns, 1.0134 us, and 3.9417 us;
+  Fearless medians are 76.687 ns, 1.0022 us, and 3.9392 us. Every 95% confidence
+  interval overlaps. Both AVX2 hot loops contain one loop branch, six loads,
+  four stores, fused arithmetic, and no calls, support probes, bounds checks, or
+  panic paths. Full entry-baseline and resolved evidence is in
+  `gap_audit.md#lane-throughput-2026-08-25`.
+- **Remaining:** re-run Apollo's power-of-two matrix and allocation census at
+  the committed provider revision, then close this cross-repository item.
 - **Non-goals:** adopting `fearless_simd`, which would re-fork the dimension
-  Hermes owns; changing Apollo, which has exhausted its algorithmic levers here.
+  Hermes owns; changing Apollo inside this provider increment. Apollo adoption
+  and its remaining allocation/kernel work are the next consumer increment.
 - **Acceptance oracle:** a consumer-shaped kernel in this repository reaching a
   recorded arithmetic rate within a stated factor of `fearless_simd` on the same
   host, or a recorded explanation of the residual with codegen evidence.
-- **Risk / change class:** [arch]; likely touches the load/store surface or its
-  guidance. **Dependencies:** none.
+- **Risk / change class:** [arch][major]; `LaneKernel::call` gains the
+  capability argument and raw register constructors become crate-private.
+  **Dependencies:** none.
 - **Why this is Hermes' item:** the consumer eliminated every lever available to
   it. What separates 3.4-6.1 from 33-38 is not reachable from an algorithm
   choice; it is a property of the lane operations, which is this crate's bounded

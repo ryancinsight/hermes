@@ -40,8 +40,8 @@ struct Axpy<'a> { a: f32, x: &'a [f32], y: &'a mut [f32] }
 
 impl LaneKernel<f32> for Axpy<'_> {
     type Output = ();
-    fn call<A: SimdArch + SimdKernel<f32>>(self) {
-        // one body, every ISA: Vector<f32, A> and its operators
+    fn call<A: SimdArch + SimdKernel<f32>>(self, simd: Simd<f32, A>) {
+        // one body, every ISA: `simd` creates probe-free views and chunks
     }
 }
 
@@ -65,10 +65,11 @@ backend operations; without it the caller emits zero ymm and five calls into
 records the mechanism and [ADR 016](docs/adr/016-consumer-target-feature-entry.md)
 the consumer entry.
 
-The kernel body needs no `unsafe`: holding an `Arch`-parameterized `Vector`
-already means the host executes `Arch`, and the safe surface discharges the
-backend obligation. `tests/consumer_vectorize.rs` is written as a downstream
-crate would write it and compiles under `#![forbid(unsafe_code)]`.
+The kernel body needs no `unsafe`: `vectorize` passes a `Simd<T, A>` capability
+only after proving that the host executes `A`; vectors, views, and exact-width
+chunks derived from it carry that proof without per-operation probes.
+`tests/consumer_vectorize.rs` is written as a downstream crate would write it
+and compiles under `#![forbid(unsafe_code)]`.
 
 ### Where to put the call
 

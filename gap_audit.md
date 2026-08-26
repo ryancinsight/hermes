@@ -126,6 +126,32 @@ substrate all failed within a narrow band, that the checked-load overhead
 accounts for part of it, and that the remainder is unlocated. Locating it is
 `HS-LANE-THROUGHPUT-2026-08-25`.
 
+### Resolution (2026-08-26)
+
+The gap was not one arithmetic instruction. Hermes repeatedly probed host
+support at operations on already architecture-bearing values, reconstructed
+dynamically sized child views for every lane group, inherited invalid alignment
+claims into over-aligned children, lacked uniform fused multiply-subtract, and
+made a many-plane consumer compose iterators whose checks LLVM could not reduce
+to one loop limit. ADR 017 corrects those provider contracts and adds
+`Simd::io_chunks` for const-generic planar input/output groups.
+
+The corrected same-binary comparison reuses identical output addresses for both
+substrates. Its pinned AVX2 medians (95% confidence intervals) are:
+
+| f64 scalars | Hermes | `fearless_simd` 0.7 | median delta |
+| ---: | ---: | ---: | ---: |
+| 256 | 77.024 ns [76.444, 77.624] | 76.687 ns [76.378, 77.030] | +0.44% |
+| 1,024 | 1.0134 us [1.0070, 1.0201] | 1.0022 us [0.99266, 1.0130] | +1.12% |
+| 4,096 | 3.9417 us [3.9127, 3.9685] | 3.9392 us [3.9016, 4.0025] | +0.06% |
+
+All confidence intervals overlap. The Hermes view/direct diagnostic reports
+56.405/55.837 ns, 158.58/158.39 ns, and 2.4103/2.4078 us at those lengths.
+AVX2 assembly gives both planar hot loops six vector loads, four stores, fused
+arithmetic, one loop branch, and no calls, probes, bounds branches, or panic
+paths. The old 3.4--6.1 flops/ns rows above remain the entry evidence that
+located the provider defect; they are not the corrected substrate result.
+
 ## Fearless SIMD audit — amendment and closure (2026-08-25) <a id="fearless-simd-amendment"></a>
 
 Two corrections to the audit below, found while implementing the increment it
@@ -195,6 +221,36 @@ Scope fit:
 - Out of scope for Hermes: replacing the sealed `SimdKernel` seam, the sparse,
   packed, AMX, tensor, or COW surfaces, or the Atlas compute boundaries.
   Fearless SIMD is a portable-lane substrate only and owns none of them.
+
+### Capability matrix
+
+| Capability family | Hermes | `fearless_simd` 0.7 | Classification |
+| --- | --- | --- | --- |
+| Runtime-dispatched capability value | `vectorize` supplies `Simd<T, A>` | `dispatch!` supplies `S: Simd` | Shared after ADR 017 |
+| Native floating vectors | Native-width f32/f64 `Vector<T, A>` | Native-width `S::f32s` / `S::f64s` | Shared |
+| Load and store | Checked standalone loads plus capability-scoped exact chunks | Slice loads/stores on selected vectors | Shared |
+| Arithmetic, FMA, and FMS | Operators, `mul_add`, alternating FMA, and `mul_sub` | Operators, `mul_add`, alternating FMA, and `mul_sub` | Shared after ADR 017 |
+| Comparisons, masks, and select | Typed masks, bitmask conversion, comparisons, blend/select | Masks, comparisons, select | Shared |
+| Min/max, sqrt, and rounding | Min/max, sqrt, floor/ceil/round/trunc | Corresponding floating operations | Shared |
+| Interleave and deinterleave | Flat-sequence interleave/deinterleave and adjacent permutes | Interleave/deinterleave and lane rearrangement | Shared |
+| Reduced precision | f16 backend surface | No corresponding audited f16 lane family | Hermes broader |
+| Irregular and predicated memory | Gather/scatter, masked memory, compress/expand, streaming stores | Portable slice/interleaved I/O | Hermes broader |
+| Aggregate operations | Reductions and scans | Portable lane reductions | Hermes broader |
+| Domain surfaces | Sparse, tensor, copy-on-write, packed, and AMX operations | None; portable lane substrate only | Hermes broader |
+| Scalable Arm route | SVE-shaped dispatch route, currently emulated under its recorded contract | No SVE level in the audited release | Hermes broader |
+| Integer and fixed-width lanes | Not part of the current dense floating consumer contract | Integer lanes and fixed-width vectors | Fearless broader; non-gap |
+| Width and conversion algebra | Current contract uses backend-native width | Combine/split, widen/narrow, and conversions | Fearless broader; non-gap |
+| Integer/lane rearrangement | Current consumers require the shared floating permutes above | Shifts, rotates, slides, and swizzles | Fearless broader; non-gap |
+| Extended interleaved I/O | Two-way interleave/deinterleave | Four-way interleaved I/O | Fearless broader; non-gap |
+| Additional floating operations | Exact reciprocal square root and existing arithmetic catalog | `copysign` and approximate reciprocal | Fearless broader; non-gap |
+| Additional targets | Scalar, AVX2, AVX-512, NEON, and the recorded SVE route | SSE2, SSE4.2, and WASM in addition to wider targets | Fearless broader; non-gap; SSE remains ADR 006's recorded decision |
+
+The accepted gaps were capability provenance and repeated per-operation probes,
+exact-width chunk proofs, over-aligned child correctness, uniform fused
+multiply-subtract, and the immutable iterator `Send` bound (`T: Sync`, not
+`T: Send`). ADR 017 resolves all five. Fearless-broader rows are not Hermes gaps
+without a current consumer contract; adding unused surface would expand the
+sealed provider without acceptance evidence.
 
 Findings:
 - [minor] Consumer target-feature entry. ADR 009 records why a lane kernel must

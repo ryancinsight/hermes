@@ -19,13 +19,13 @@ use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
 use crate::kernel::SimdKernel;
 use crate::scalar::Scalar;
-use crate::view::SimdView;
+use crate::view::SimdChunk;
 
 // ---------------------------------------------------------------------------
 // ZipChunks — paired immutable/immutable
 // ---------------------------------------------------------------------------
 
-/// Iterator over non-overlapping paired `LANE_COUNT`-wide sub-views of two `SimdView`s.
+/// Iterator over non-overlapping paired `LANE_COUNT`-wide chunks of two `SimdView`s.
 ///
 /// Advances both views in lockstep, yielding pairs of chunks until the shorter
 /// view's SIMD prefix is exhausted.  Access the tails via [`ZipChunks::remainder`].
@@ -44,8 +44,10 @@ pub struct ZipChunks<'a, 'b, T, Arch: SimdArch, Align: Alignment, Mode: Executio
     _marker: core::marker::PhantomData<(&'a T, &'b T, Arch, Align, Mode)>,
 }
 
-// SAFETY: ZipChunks borrows two `'a`/`'b` immutable slices; forwarding Send/Sync is sound.
-unsafe impl<T: Send, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode> Send
+// SAFETY: moving or sharing this iterator transfers shared access to both
+// `*const T` ranges. Either operation is sound exactly when `T: Sync`; `T:
+// Send` alone does not permit shared cross-thread access.
+unsafe impl<T: Sync, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode> Send
     for ZipChunks<'_, '_, T, Arch, Align, Mode>
 where
     T: Scalar,
@@ -122,8 +124,8 @@ impl<'a, 'b, T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: 
     Iterator for ZipChunks<'a, 'b, T, Arch, Align, Mode>
 {
     type Item = (
-        SimdView<'a, T, Arch, Align, Mode, &'a [T]>,
-        SimdView<'b, T, Arch, Align, Mode, &'b [T]>,
+        SimdChunk<'a, T, Arch, Mode, &'a [T]>,
+        SimdChunk<'b, T, Arch, Mode, &'b [T]>,
     );
 
     #[inline(always)]
@@ -131,18 +133,18 @@ impl<'a, 'b, T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: 
         if self.pos >= self.simd_end {
             return None;
         }
-        // SAFETY: pos < simd_end <= min(total_a, total_b) <= total_a and total_b.
-        let (chunk_a, chunk_b) = unsafe {
-            (
-                core::slice::from_raw_parts(self.base_a.add(self.pos), Arch::LANE_COUNT),
-                core::slice::from_raw_parts(self.base_b.add(self.pos), Arch::LANE_COUNT),
-            )
-        };
+        // SAFETY: pos < simd_end <= min(total_a, total_b), so both additions
+        // point to complete lane groups within their source views.
+        let (chunk_a, chunk_b) = unsafe { (self.base_a.add(self.pos), self.base_b.add(self.pos)) };
         self.pos += Arch::LANE_COUNT;
-        Some((
-            SimdView::new(chunk_a).expect("zip chunk_a alignment invariant violated"),
-            SimdView::new(chunk_b).expect("zip chunk_b alignment invariant violated"),
-        ))
+        // SAFETY: both parent views proved host support and both pointers are
+        // valid for one complete group for their respective lifetimes.
+        Some(unsafe {
+            (
+                SimdChunk::from_supported_ptr(chunk_a),
+                SimdChunk::from_supported_ptr(chunk_b),
+            )
+        })
     }
 
     #[inline(always)]
@@ -166,7 +168,7 @@ impl<T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: Executio
 // ZipChunksMut — paired mutable/immutable
 // ---------------------------------------------------------------------------
 
-/// Paired iterator over non-overlapping `LANE_COUNT`-wide sub-views where the first
+/// Paired iterator over non-overlapping `LANE_COUNT`-wide chunks where the first
 /// operand is **mutable** and the second is **immutable**.
 ///
 /// Enables zero-copy 2-operand in-place transforms without unsafe pointer arithmetic
@@ -175,7 +177,8 @@ impl<T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: Executio
 /// ```rust,ignore
 /// let mut chunks = view_a.zip_chunks_mut(&view_b);
 /// for (mut chunk_a, chunk_b) in &mut chunks {
-///     chunk_a.transform_in_place(&chunk_b, FmaAdd);
+///     let updated = simd.splat(scale).mul_add(chunk_b.load(), chunk_a.load());
+///     chunk_a.store(updated);
 /// }
 /// let (tail_a, tail_b) = chunks.into_remainder();
 /// ```
@@ -282,8 +285,8 @@ impl<'a, 'b, T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: 
 {
     /// Yields `(mutable chunk of A, immutable chunk of B)`.
     type Item = (
-        SimdView<'a, T, Arch, Align, Mode, &'a mut [T]>,
-        SimdView<'b, T, Arch, Align, Mode, &'b [T]>,
+        SimdChunk<'a, T, Arch, Mode, &'a mut [T]>,
+        SimdChunk<'b, T, Arch, Mode, &'b [T]>,
     );
 
     #[inline(always)]
@@ -294,17 +297,17 @@ impl<'a, 'b, T: Scalar, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: 
         let lane = Arch::LANE_COUNT;
         // SAFETY: pos < simd_end <= total <= total_a and total_b; exclusive access
         // is guaranteed by the `&'a mut [T]` lifetime held by the caller.
-        let (chunk_a, chunk_b) = unsafe {
-            (
-                core::slice::from_raw_parts_mut(self.ptr_a.add(self.pos), lane),
-                core::slice::from_raw_parts(self.ptr_b.add(self.pos), lane),
-            )
-        };
+        let (chunk_a, chunk_b) = unsafe { (self.ptr_a.add(self.pos), self.ptr_b.add(self.pos)) };
         self.pos += lane;
-        Some((
-            SimdView::new_mut(chunk_a).expect("ZipChunksMut chunk_a alignment violated"),
-            SimdView::new(chunk_b).expect("ZipChunksMut chunk_b alignment violated"),
-        ))
+        // SAFETY: both parent views proved host support; the mutable iterator
+        // yields disjoint complete groups, and both pointers remain valid for
+        // their respective lifetimes.
+        Some(unsafe {
+            (
+                SimdChunk::from_supported_ptr_mut(chunk_a),
+                SimdChunk::from_supported_ptr(chunk_b),
+            )
+        })
     }
 
     #[inline(always)]

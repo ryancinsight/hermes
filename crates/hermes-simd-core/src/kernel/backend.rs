@@ -8,7 +8,7 @@
 //!
 //! - **Load / store** — aligned, unaligned, and non-temporal (`store_streaming`,
 //!   gated on `SUPPORTS_NT_STORE` with `stream_write_barrier` for ordering).
-//! - **Dense arithmetic** — `add`, `sub`, `mul`, `div`, `fmadd`, `neg`, `abs`,
+//! - **Dense arithmetic** — `add`, `sub`, `mul`, `div`, `fmadd`, `fmsub`, `neg`, `abs`,
 //!   `min`, `max`, `sqrt`, `recip_sqrt`, and the `floor`/`ceil`/`round`/`trunc`
 //!   rounding set.
 //! - **Bitwise** — `bitand`, `bitor`, `bitxor`, `bitnot`, `popcount`.
@@ -229,6 +229,24 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn fmadd(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector;
+
+    /// Fused multiply-subtract: `(a * b) - c`.
+    ///
+    /// The default negates `c` exactly and delegates to [`Self::fmadd`],
+    /// preserving the single rounding of the multiply-accumulate operation.
+    /// Backends with a native multiply-subtract instruction override it.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn fmsub(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
+        // SAFETY: the caller established this backend's target features, and
+        // `c` is a register belonging to the same sealed backend.
+        let negated = unsafe { Self::neg(c) };
+        // SAFETY: the caller established this backend's target features, and
+        // all operands are registers belonging to the same sealed backend.
+        unsafe { Self::fmadd(a, b, negated) }
+    }
 
     /// Horizontal sum of all lanes.
     ///

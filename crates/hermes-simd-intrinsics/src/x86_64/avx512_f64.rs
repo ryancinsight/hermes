@@ -12,18 +12,19 @@
 use crate::Avx512;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::{
-    __m256i, __m512d, __mmask8, _mm512_add_pd, _mm512_and_pd, _mm512_andnot_pd,
-    _mm512_castpd_si512, _mm512_cmp_pd_mask, _mm512_cmplt_epi64_mask, _mm512_div_pd,
-    _mm512_fmadd_pd, _mm512_fmaddsub_pd, _mm512_fmsubadd_pd, _mm512_i32gather_pd,
-    _mm512_i32scatter_pd, _mm512_load_pd, _mm512_loadu_pd, _mm512_mask3_fmadd_pd,
-    _mm512_mask_add_pd, _mm512_mask_blend_pd, _mm512_mask_expand_pd, _mm512_mask_i32gather_pd,
-    _mm512_mask_i32scatter_pd, _mm512_mask_loadu_pd, _mm512_mask_mov_pd, _mm512_mask_mul_pd,
-    _mm512_mask_storeu_pd, _mm512_maskz_compress_pd, _mm512_max_pd, _mm512_min_pd,
-    _mm512_movedup_pd, _mm512_mul_pd, _mm512_or_pd, _mm512_permute_pd, _mm512_reduce_add_pd,
-    _mm512_roundscale_pd, _mm512_set1_pd, _mm512_setzero_pd, _mm512_setzero_si512, _mm512_sqrt_pd,
-    _mm512_store_pd, _mm512_storeu_pd, _mm512_stream_pd, _mm512_sub_pd, _mm512_xor_pd, _CMP_EQ_OQ,
-    _CMP_GE_OQ, _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ, _MM_FROUND_NO_EXC,
-    _MM_FROUND_TO_NEAREST_INT, _MM_FROUND_TO_NEG_INF, _MM_FROUND_TO_POS_INF, _MM_FROUND_TO_ZERO,
+    __m256i, __m512d, __mmask8, _mm512_add_pd, _mm512_and_si512, _mm512_andnot_si512,
+    _mm512_castpd_si512, _mm512_castsi512_pd, _mm512_cmp_pd_mask, _mm512_cmplt_epi64_mask,
+    _mm512_div_pd, _mm512_fmadd_pd, _mm512_fmaddsub_pd, _mm512_fmsub_pd, _mm512_fmsubadd_pd,
+    _mm512_i32gather_pd, _mm512_i32scatter_pd, _mm512_load_pd, _mm512_loadu_pd,
+    _mm512_mask3_fmadd_pd, _mm512_mask_add_pd, _mm512_mask_blend_pd, _mm512_mask_expand_pd,
+    _mm512_mask_i32gather_pd, _mm512_mask_i32scatter_pd, _mm512_mask_loadu_pd, _mm512_mask_mov_pd,
+    _mm512_mask_mul_pd, _mm512_mask_storeu_pd, _mm512_maskz_compress_pd, _mm512_max_pd,
+    _mm512_min_pd, _mm512_movedup_pd, _mm512_mul_pd, _mm512_or_si512, _mm512_permute_pd,
+    _mm512_reduce_add_pd, _mm512_roundscale_pd, _mm512_set1_pd, _mm512_setzero_pd,
+    _mm512_setzero_si512, _mm512_sqrt_pd, _mm512_store_pd, _mm512_storeu_pd, _mm512_stream_pd,
+    _mm512_sub_pd, _mm512_xor_si512, _CMP_EQ_OQ, _CMP_GE_OQ, _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ,
+    _CMP_NEQ_UQ, _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT, _MM_FROUND_TO_NEG_INF,
+    _MM_FROUND_TO_POS_INF, _MM_FROUND_TO_ZERO,
 };
 #[cfg(not(hermes_benchmark_generic_default))]
 use core::arch::x86_64::{_mm512_permutex2var_pd, _mm512_permutexvar_pd, _mm512_setr_epi64};
@@ -127,6 +128,16 @@ impl BackendKernel<f64> for Avx512 {
     #[inline]
     unsafe fn fmadd(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
         Avx512F64Vec(_mm512_fmadd_pd(a.0, b.0, c.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f`; operands
+    // are registers of this backend and require no pointer validation.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn fmsub(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
+        // SAFETY: this function enables AVX-512F, and all operands are valid
+        // registers of the matching backend.
+        Avx512F64Vec(_mm512_fmsub_pd(a.0, b.0, c.0))
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
@@ -409,29 +420,41 @@ impl BackendKernel<f64> for Avx512 {
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn bitand(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        Avx512F64Vec(_mm512_and_pd(a.0, b.0))
+        Avx512F64Vec(_mm512_castsi512_pd(_mm512_and_si512(
+            _mm512_castpd_si512(a.0),
+            _mm512_castpd_si512(b.0),
+        )))
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn bitor(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        Avx512F64Vec(_mm512_or_pd(a.0, b.0))
+        Avx512F64Vec(_mm512_castsi512_pd(_mm512_or_si512(
+            _mm512_castpd_si512(a.0),
+            _mm512_castpd_si512(b.0),
+        )))
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn bitxor(a: Self::Vector, b: Self::Vector) -> Self::Vector {
-        Avx512F64Vec(_mm512_xor_pd(a.0, b.0))
+        Avx512F64Vec(_mm512_castsi512_pd(_mm512_xor_si512(
+            _mm512_castpd_si512(a.0),
+            _mm512_castpd_si512(b.0),
+        )))
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn abs(a: Self::Vector) -> Self::Vector {
-        let sign_mask = _mm512_set1_pd(-0.0);
-        Avx512F64Vec(_mm512_andnot_pd(sign_mask, a.0))
+        let sign_mask = _mm512_castpd_si512(_mm512_set1_pd(-0.0));
+        Avx512F64Vec(_mm512_castsi512_pd(_mm512_andnot_si512(
+            sign_mask,
+            _mm512_castpd_si512(a.0),
+        )))
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.

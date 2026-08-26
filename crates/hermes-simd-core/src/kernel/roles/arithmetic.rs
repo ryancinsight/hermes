@@ -32,6 +32,12 @@ pub trait SimdArith<T: Scalar>: SimdStorage<T> + Sealed {
     /// The backend's target features must be available.
     unsafe fn fmadd(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector;
 
+    /// Computes lane-wise fused multiply-subtract.
+    ///
+    /// # Safety
+    /// The backend's target features must be available.
+    unsafe fn fmsub(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector;
+
     /// Computes masked lane-wise addition with merge semantics.
     ///
     /// # Safety
@@ -167,6 +173,12 @@ impl<T: Scalar, A: BackendKernel<T>> SimdArith<T> for A {
 
     unsafe fn fmadd(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
         <A as BackendKernel<T>>::fmadd(a, b, c)
+    }
+
+    unsafe fn fmsub(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
+        // SAFETY: this role preserves the caller's backend target-feature
+        // obligation and forwards registers without changing provenance.
+        unsafe { <A as BackendKernel<T>>::fmsub(a, b, c) }
     }
 
     unsafe fn masked_add(

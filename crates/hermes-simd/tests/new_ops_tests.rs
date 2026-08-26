@@ -12,15 +12,15 @@
 )]
 
 use hermes_simd::{
-    argmax, argmin, max, min, scale, Abs, Ceil, Clamp, Exclusive, Floor, Inclusive, Neg, Round,
-    Scalar, ScanAdd, ScanMax, ScanMin, ScanMul, SimdError, SimdView, Sqrt, Trunc, Unaligned,
-    Unmasked,
+    argmax, argmin, max, min, scale, Abs, Aligned, AlignedVec, Ceil, Clamp, Exclusive, Floor,
+    Inclusive, Neg, Round, Scalar, ScanAdd, ScanMax, ScanMin, ScanMul, SimdError, SimdStorage,
+    SimdView, Sqrt, Trunc, Unaligned, Unmasked,
 };
 // `SimdArch` is in scope only to resolve `Avx2::is_runtime_supported()` in the
 // x86-gated backend check below; importing it unconditionally is an unused
 // import on aarch64, where that block is compiled out.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use hermes_simd::SimdArch;
+use hermes_simd::{Avx2, SimdArch};
 use hermes_simd_core::ops::{Max, Min, Sum};
 use proptest::prelude::*;
 
@@ -653,6 +653,89 @@ fn test_zip_chunks_pairwise_sum() {
     // Use zip_transform which internally uses the same generic kernel.
     let result = v(&a).zip_transform(&v(&b), Add).unwrap();
     assert_eq!(result.as_slice(), expected.as_slice());
+}
+
+#[test]
+fn over_aligned_chunk_iterators_do_not_inherit_invalid_alignment() {
+    let lanes = <Scalar as SimdStorage<f64>>::LANE_COUNT;
+    let len = lanes * 3 + 1;
+    let values: Vec<f64> = (0..len).map(|index| index as f64).collect();
+    let mut data = AlignedVec::<f64, Aligned<64>>::with_capacity(len);
+    data.extend_from_slice(&values);
+
+    let view = data.view::<Scalar>();
+    let forward: Vec<f64> = view
+        .simd_chunks()
+        .flat_map(|chunk| chunk.as_slice().to_vec())
+        .collect();
+    assert_eq!(forward, values[..lanes * 3]);
+
+    let reverse_starts: Vec<f64> = view
+        .simd_chunks()
+        .rev()
+        .map(|chunk| chunk.as_slice()[0])
+        .collect();
+    assert_eq!(
+        reverse_starts,
+        [values[lanes * 2], values[lanes], values[0]]
+    );
+
+    let mut other = AlignedVec::<f64, Aligned<64>>::with_capacity(len);
+    other.extend_from_slice(&values);
+    let pairs: Vec<(f64, f64)> = data
+        .view::<Scalar>()
+        .zip_chunks(&other.view::<Scalar>())
+        .map(|(left, right)| (left.as_slice()[0], right.as_slice()[0]))
+        .collect();
+    assert_eq!(
+        pairs,
+        [
+            (values[0], values[0]),
+            (values[lanes], values[lanes]),
+            (values[lanes * 2], values[lanes * 2]),
+        ]
+    );
+
+    {
+        for mut chunk in data.view_mut::<Scalar>().simd_chunks_mut() {
+            chunk.as_slice_mut()[0] += 100.0;
+        }
+    }
+    assert_eq!(data[0], values[0] + 100.0);
+    assert_eq!(data[lanes], values[lanes] + 100.0);
+    assert_eq!(data[lanes * 2], values[lanes * 2] + 100.0);
+    assert_eq!(data[len - 1], values[len - 1]);
+
+    {
+        for (mut left, right) in data
+            .view_mut::<Scalar>()
+            .zip_chunks_mut(&other.view::<Scalar>())
+        {
+            left.as_slice_mut()[0] = right.as_slice()[0];
+        }
+    }
+    assert_eq!(data.as_slice(), values.as_slice());
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[test]
+fn avx2_second_chunk_of_over_aligned_parent_is_unaligned() {
+    if !Avx2::is_runtime_supported() {
+        return;
+    }
+
+    let lanes = <Avx2 as SimdStorage<f64>>::LANE_COUNT;
+    assert_eq!(lanes * core::mem::size_of::<f64>(), 32);
+    let values: Vec<f64> = (0..lanes * 3).map(|index| index as f64 + 0.25).collect();
+    let mut data = AlignedVec::<f64, Aligned<64>>::with_capacity(values.len());
+    data.extend_from_slice(&values);
+
+    let mut chunks = data.view::<Avx2>().simd_chunks();
+    let first = chunks.next().expect("three complete AVX2 lane groups");
+    let second = chunks.next().expect("three complete AVX2 lane groups");
+    assert_eq!((first.as_ptr() as usize) % 64, 0);
+    assert_eq!((second.as_ptr() as usize) % 64, 32);
+    assert_eq!(second.as_slice(), &values[lanes..lanes * 2]);
 }
 
 // ---------------------------------------------------------------------------

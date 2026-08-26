@@ -1,6 +1,6 @@
 //! `SimdChunks` and `SimdChunksMut` — immutable and mutable SIMD chunk iterators.
 //!
-//! These iterate non-overlapping sub-views of exactly `LANE_COUNT` elements from a
+//! These iterate non-overlapping exact-width chunks of `LANE_COUNT` elements from a
 //! `SimdView`, leaving the remainder (the scalar tail) accessible via
 //! [`SimdChunks::remainder`] / [`SimdChunksMut::into_remainder`].
 //!
@@ -20,17 +20,18 @@ use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
 use crate::kernel::SimdKernel;
 use crate::scalar::Scalar;
-use crate::view::SimdView;
+use crate::view::SimdChunk;
 use core::marker::PhantomData;
 
-/// Iterator over non-overlapping `LANE_COUNT`-wide sub-views of a `SimdView`.
+/// Iterator over non-overlapping `LANE_COUNT`-wide chunks of a `SimdView`.
 ///
 /// Created by [`SimdView::simd_chunks`]. The final partial chunk (length `< LANE_COUNT`)
 /// is NOT yielded as an `Item`; access it via [`SimdChunks::remainder`] after the loop.
 ///
 /// # Type Parameters
-/// Mirrors the parent [`SimdView`] — `T`, `Arch`, `Align`, `Mode` are all preserved so
-/// the yielded sub-views carry identical type-level guarantees.
+/// Mirrors the parent view's scalar, architecture, and execution mode. Each
+/// item is a [`SimdChunk`] with exact register-width length and no inherited
+/// alignment claim.
 pub struct SimdChunks<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode> {
     /// Base pointer of the original slice.
     base: *const T,
@@ -43,10 +44,12 @@ pub struct SimdChunks<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: Executi
     _marker: PhantomData<(&'a T, Arch, Align, Mode)>,
 }
 
-// SAFETY: SimdChunks borrows `'a` data immutably; forwarding Send/Sync is sound
-// when `T: Send` / `T: Sync`.
+// SAFETY: moving this iterator transfers shared access through `*const T` and
+// `PhantomData<&T>`, which is sound exactly when `T: Sync`. Sharing the
+// iterator has the same obligation. `T: Send` alone is insufficient because it
+// says nothing about cross-thread shared access.
 unsafe impl<
-        T: Send,
+        T: Sync,
         Arch: SimdArch + crate::kernel::SimdKernel<T>,
         Align: Alignment,
         Mode: ExecutionMode,
@@ -135,7 +138,7 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
 impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
     Iterator for SimdChunks<'a, T, Arch, Align, Mode>
 {
-    type Item = SimdView<'a, T, Arch, Align, Mode, &'a [T]>;
+    type Item = SimdChunk<'a, T, Arch, Mode, &'a [T]>;
 
     #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
@@ -145,15 +148,13 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
         // SAFETY:
         // - `base + pos` is within the original slice (pos < simd_end <= total).
         // - `pos + LANE_COUNT <= simd_end <= total`, so the sub-slice is within bounds.
-        // - `Align::ALIGNMENT` contract is preserved: the base pointer satisfies it,
-        //    and `pos * size_of::<T>()` is a multiple of LANE_COUNT*size_of::<T>(),
-        //    which is >= ALIGNMENT for all known backends.
-        let chunk_slice =
-            unsafe { core::slice::from_raw_parts(self.base.add(self.pos), Arch::LANE_COUNT) };
+        // The child is deliberately unaligned: a register-width stride need not
+        // preserve an over-aligned parent's stronger alignment.
+        let chunk_ptr = unsafe { self.base.add(self.pos) };
         self.pos += Arch::LANE_COUNT;
-        // SAFETY: alignment is guaranteed by AlignedVec contract on the parent.
-        // For Unaligned parents, `SimdView::new` with `Unaligned` never fails.
-        Some(SimdView::new(chunk_slice).expect("chunk alignment invariant violated"))
+        // SAFETY: the parent view proved host support; the pointer is valid for
+        // one complete group for `'a`, and the child carries no alignment claim.
+        Some(unsafe { SimdChunk::from_supported_ptr(chunk_ptr) })
     }
 
     #[inline(always)]
@@ -178,9 +179,10 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
         }
         self.simd_end -= Arch::LANE_COUNT;
         // SAFETY: same as `next` — `simd_end` is still within original slice bounds.
-        let chunk_slice =
-            unsafe { core::slice::from_raw_parts(self.base.add(self.simd_end), Arch::LANE_COUNT) };
-        Some(SimdView::new(chunk_slice).expect("chunk alignment invariant violated"))
+        let chunk_ptr = unsafe { self.base.add(self.simd_end) };
+        // SAFETY: the parent view proved host support; the pointer is valid for
+        // one complete group for `'a`, and the child carries no alignment claim.
+        Some(unsafe { SimdChunk::from_supported_ptr(chunk_ptr) })
     }
 }
 
@@ -193,7 +195,7 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
 // SimdChunksMut
 // ---------------------------------------------------------------------------
 
-/// Iterator over non-overlapping mutable `LANE_COUNT`-wide sub-views of a `SimdView`.
+/// Iterator over non-overlapping mutable `LANE_COUNT`-wide chunks of a `SimdView`.
 ///
 /// Created by [`SimdView::simd_chunks_mut`]. The final partial chunk (length `< LANE_COUNT`)
 /// is NOT yielded as an `Item`; access it via [`SimdChunksMut::into_remainder`] after the loop.
@@ -293,7 +295,7 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
 impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
     Iterator for SimdChunksMut<'a, T, Arch, Align, Mode>
 {
-    type Item = SimdView<'a, T, Arch, Align, Mode, &'a mut [T]>;
+    type Item = SimdChunk<'a, T, Arch, Mode, &'a mut [T]>;
 
     #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
@@ -303,13 +305,13 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
         // SAFETY:
         // - `base + pos` is within the original slice (pos < simd_end <= total).
         // - `pos + LANE_COUNT <= simd_end <= total`, so the sub-slice is within bounds.
-        // - `Align::ALIGNMENT` contract is preserved: the base pointer satisfies it.
-        let chunk_slice =
-            unsafe { core::slice::from_raw_parts_mut(self.base.add(self.pos), Arch::LANE_COUNT) };
+        // The child is deliberately unaligned because its register-width stride
+        // need not preserve the parent's stronger alignment.
+        let chunk_ptr = unsafe { self.base.add(self.pos) };
         self.pos += Arch::LANE_COUNT;
-        // SAFETY: alignment is guaranteed by AlignedVec contract on the parent.
-        // For Unaligned parents, `SimdView::new_mut` with `Unaligned` never fails.
-        Some(SimdView::new_mut(chunk_slice).expect("chunk alignment invariant violated"))
+        // SAFETY: the parent view proved host support and exclusive access; the
+        // iterator yields disjoint complete groups for `'a`.
+        Some(unsafe { SimdChunk::from_supported_ptr_mut(chunk_ptr) })
     }
 
     #[inline(always)]
@@ -334,10 +336,10 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
         }
         self.simd_end -= Arch::LANE_COUNT;
         // SAFETY: same as `next` — `simd_end` is still within original slice bounds.
-        let chunk_slice = unsafe {
-            core::slice::from_raw_parts_mut(self.base.add(self.simd_end), Arch::LANE_COUNT)
-        };
-        Some(SimdView::new_mut(chunk_slice).expect("chunk alignment invariant violated"))
+        let chunk_ptr = unsafe { self.base.add(self.simd_end) };
+        // SAFETY: the parent view proved host support and exclusive access; the
+        // reverse iterator yields disjoint complete groups for `'a`.
+        Some(unsafe { SimdChunk::from_supported_ptr_mut(chunk_ptr) })
     }
 }
 

@@ -483,6 +483,172 @@ fn check_blend_honors_canonical_mask<A: SimdKernel<f32>>(bm: u64) {
     }
 }
 
+/// Uniform fused multiply-subtract must match the scalar single-rounding
+/// contract lane for lane. Inputs stay finite and bounded, so exact bit
+/// equality is the correct oracle for every native and emulated backend.
+fn check_fmsub_matches_scalar<A: SimdKernel<f32>>(vals: &[f32]) {
+    let lanes = A::LANE_COUNT;
+    let a: Vec<f32> = (0..lanes).map(|i| vals[i % vals.len()]).collect();
+    let b: Vec<f32> = (0..lanes)
+        .map(|i| vals[(i * 5 + 1) % vals.len()] * 0.03125)
+        .collect();
+    let c: Vec<f32> = (0..lanes)
+        .map(|i| vals[(i * 7 + 2) % vals.len()] * 0.015_625)
+        .collect();
+    let mut out = vec![0.0; lanes];
+
+    // SAFETY: caller gates on the target features for `A`, and all buffers
+    // contain exactly one complete lane group.
+    unsafe {
+        let result = A::fmsub(
+            A::load_unaligned(a.as_ptr()),
+            A::load_unaligned(b.as_ptr()),
+            A::load_unaligned(c.as_ptr()),
+        );
+        A::store_unaligned(out.as_mut_ptr(), result);
+    }
+
+    for i in 0..lanes {
+        assert_eq!(
+            out[i].to_bits(),
+            a[i].mul_add(b[i], -c[i]).to_bits(),
+            "fmsub lane {i} must preserve the fused single-rounding contract"
+        );
+    }
+}
+
+/// The f64 operation used by planar FFT kernels must preserve the same fused,
+/// single-rounding contract on every backend that this host can execute.
+fn check_fmsub_f64_matches_scalar<A: SimdKernel<f64>>() {
+    let lanes = <A as hermes_simd::SimdStorage<f64>>::LANE_COUNT;
+    let seeds = [
+        -17.25_f64,
+        -0.125,
+        f64::from_bits(0x3ff0_0000_0000_0001),
+        3.75,
+        257.5,
+    ];
+    let a: Vec<f64> = (0..lanes).map(|i| seeds[i % seeds.len()]).collect();
+    let b: Vec<f64> = (0..lanes)
+        .map(|i| seeds[(i * 3 + 1) % seeds.len()] * 0.03125)
+        .collect();
+    let c: Vec<f64> = (0..lanes)
+        .map(|i| seeds[(i * 2 + 2) % seeds.len()] * 0.015_625)
+        .collect();
+    let mut out = vec![0.0; lanes];
+
+    // SAFETY: the caller invokes this helper only for backends supported by
+    // the current host, and each buffer contains one complete lane group.
+    unsafe {
+        let result = A::fmsub(
+            A::load_unaligned(a.as_ptr()),
+            A::load_unaligned(b.as_ptr()),
+            A::load_unaligned(c.as_ptr()),
+        );
+        A::store_unaligned(out.as_mut_ptr(), result);
+    }
+
+    for i in 0..lanes {
+        assert_eq!(
+            out[i].to_bits(),
+            a[i].mul_add(b[i], -c[i]).to_bits(),
+            "f64 fmsub lane {i} must preserve the fused single-rounding contract"
+        );
+    }
+}
+
+#[test]
+fn fmsub_f64_matches_scalar_on_supported_backends() {
+    check_fmsub_f64_matches_scalar::<Scalar>();
+    check_fmsub_f64_matches_scalar::<SveArch>();
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+            check_fmsub_f64_matches_scalar::<hermes_simd::Avx2>();
+        }
+        if std::is_x86_feature_detected!("avx512f") {
+            check_fmsub_f64_matches_scalar::<hermes_simd::Avx512>();
+        }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        check_fmsub_f64_matches_scalar::<hermes_simd::Neon>();
+    }
+}
+
+fn check_neg_preserves_bits_f32<A: SimdKernel<f32>>() {
+    let seeds = [
+        0.0_f32,
+        -0.0,
+        1.25,
+        -7.5,
+        f32::from_bits(0x7fc1_2345),
+        f32::INFINITY,
+    ];
+    let values: Vec<f32> = (0..A::LANE_COUNT)
+        .map(|index| seeds[index % seeds.len()])
+        .collect();
+    let mut output = vec![0.0; A::LANE_COUNT];
+    // SAFETY: the caller gates on host support, and both buffers contain one
+    // complete lane group for `A`.
+    unsafe {
+        let vector = A::load_unaligned(values.as_ptr());
+        A::store_unaligned(output.as_mut_ptr(), A::neg(vector));
+    }
+    for (actual, source) in output.iter().zip(&values) {
+        assert_eq!(actual.to_bits(), source.to_bits() ^ 0x8000_0000);
+    }
+}
+
+fn check_neg_preserves_bits_f64<A: SimdKernel<f64>>() {
+    let lanes = <A as hermes_simd::SimdStorage<f64>>::LANE_COUNT;
+    let seeds = [
+        0.0_f64,
+        -0.0,
+        1.25,
+        -7.5,
+        f64::from_bits(0x7ff8_0000_0001_2345),
+        f64::INFINITY,
+    ];
+    let values: Vec<f64> = (0..lanes).map(|index| seeds[index % seeds.len()]).collect();
+    let mut output = vec![0.0; lanes];
+    // SAFETY: the caller gates on host support, and both buffers contain one
+    // complete lane group for `A`.
+    unsafe {
+        let vector = A::load_unaligned(values.as_ptr());
+        A::store_unaligned(output.as_mut_ptr(), A::neg(vector));
+    }
+    for (actual, source) in output.iter().zip(&values) {
+        assert_eq!(actual.to_bits(), source.to_bits() ^ 0x8000_0000_0000_0000);
+    }
+}
+
+#[test]
+fn neg_preserves_sign_bit_on_supported_backends() {
+    check_neg_preserves_bits_f32::<Scalar>();
+    check_neg_preserves_bits_f32::<SveArch>();
+    check_neg_preserves_bits_f64::<Scalar>();
+    check_neg_preserves_bits_f64::<SveArch>();
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+            check_neg_preserves_bits_f32::<hermes_simd::Avx2>();
+            check_neg_preserves_bits_f64::<hermes_simd::Avx2>();
+        }
+        if std::is_x86_feature_detected!("avx512f") {
+            check_neg_preserves_bits_f32::<hermes_simd::Avx512>();
+            check_neg_preserves_bits_f64::<hermes_simd::Avx512>();
+        }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        check_neg_preserves_bits_f32::<hermes_simd::Neon>();
+        check_neg_preserves_bits_f64::<hermes_simd::Neon>();
+    }
+}
+
 /// Run every kernel-level check for one backend.
 fn check_all_kernel_invariants<A>(bm: u64, vals: &[f32])
 where
@@ -493,6 +659,7 @@ where
     check_vector_to_mask_matches_cmp::<A>(vals);
     check_cmp_ne_complements_cmp_eq::<A>(vals);
     check_blend_honors_canonical_mask::<A>(bm);
+    check_fmsub_matches_scalar::<A>(vals);
     check_compress_expand_identity::<A>(bm, vals);
     check_leading_k_masked_sum::<A>();
     check_masked_merge_ops::<A>();

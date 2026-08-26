@@ -73,6 +73,7 @@ parameter, and the backend must be a type parameter for monomorphization. This
 is the same shape `pulp` and `fearless_simd` converged on, for the same reason.
 
 The safe surface is completed rather than replaced: `Vector::mul_add`,
+`Vector::mul_sub`,
 `reverse`, `interleave`, `deinterleave`, `swap_adjacent`, `dup_even`, `dup_odd`,
 `fmaddsub`, and `fmsubadd` join the existing operators. The `BackendKernel<T>`
 facets stay `unsafe` as the implementation seam — this follows ADR 011's model
@@ -88,6 +89,12 @@ dispatcher would have been undocumented and rejected by `#![deny(missing_docs)]`
 That limitation was invisible until a public dispatcher was wanted.
 
 ## Consequences
+
+Revision 2026-08-26: ADR 017 corrects the capability wording below. A freely
+nameable `Arch` marker does not prove runtime support. `vectorize` now passes a
+zero-sized `Simd<T, Arch>` capability to `LaneKernel::call`; checked or
+explicitly unsafe `Vector`, `Mask`, and `SimdView` construction carries the same
+proof. The target-feature entry decision remains unchanged.
 
 - **Codegen, measured.** An AXPY kernel compiled through `vectorize` emits 41
   ymm-bearing instructions — `vmovups` x39, `vbroadcastss`, and a real

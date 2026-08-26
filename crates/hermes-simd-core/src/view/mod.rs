@@ -8,7 +8,9 @@ use crate::kernel::SimdKernel;
 use crate::scalar::Scalar;
 use core::marker::PhantomData;
 
+mod capability;
 mod casts;
+mod chunk;
 
 /// Vectorized indirect load (gather) operations.
 pub mod gather;
@@ -32,6 +34,8 @@ pub mod tile;
 /// Unary mapping operations on SIMD views.
 pub mod unary;
 
+pub use capability::Simd;
+pub use chunk::SimdChunk;
 pub use tile::{TileMatrixMultiply, TileView};
 
 /// Module containing the SIMD mask register wrappers.
@@ -169,6 +173,22 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
     }
 }
 
+impl<'a, T: 'a, Arch: SimdArch, Mode: ExecutionMode>
+    SimdView<'a, T, Arch, crate::align::Unaligned, Mode, &'a [T]>
+{
+    /// Construct an unaligned child view from an existing capability-bearing view.
+    ///
+    /// # Safety
+    /// The host must support `Arch`, and `data` must remain valid for `'a`.
+    #[inline(always)]
+    pub(crate) unsafe fn from_supported_slice(data: &'a [T]) -> Self {
+        Self {
+            ptr: core::ptr::from_ref(data).cast_mut(),
+            _marker: PhantomData,
+        }
+    }
+}
+
 impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
     SimdView<'a, T, Arch, Align, Mode, &'a mut [T]>
 {
@@ -209,6 +229,23 @@ impl<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode>
     pub fn downgrade(self) -> SimdView<'a, T, Arch, Align, Mode, &'a [T]> {
         SimdView {
             ptr: self.ptr,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'a, T: 'a, Arch: SimdArch, Mode: ExecutionMode>
+    SimdView<'a, T, Arch, crate::align::Unaligned, Mode, &'a mut [T]>
+{
+    /// Construct an unaligned mutable child view from an existing capability-bearing view.
+    ///
+    /// # Safety
+    /// The host must support `Arch`, `data` must remain exclusively borrowed for
+    /// `'a`, and no other live view may alias its elements mutably.
+    #[inline(always)]
+    pub(crate) unsafe fn from_supported_slice_mut(data: &'a mut [T]) -> Self {
+        Self {
+            ptr: core::ptr::from_mut(data),
             _marker: PhantomData,
         }
     }
@@ -364,7 +401,7 @@ impl<
         Ref: 'a,
     > SimdView<'a, T, Arch, Align, Mode, Ref>
 {
-    /// Return a zero-copy iterator over non-overlapping `LANE_COUNT`-wide sub-views.
+    /// Return a zero-copy iterator over non-overlapping `LANE_COUNT`-wide chunks.
     ///
     /// Each yielded item is a `SimdView<'a, T, Arch, Align, Mode, &'a [T]>` covering
     /// exactly `Arch::LANE_COUNT` elements. The scalar tail (elements that do not fill
@@ -380,7 +417,7 @@ impl<
 
     /// Return a zero-copy iterator that advances two views in lockstep.
     ///
-    /// Iterates non-overlapping `LANE_COUNT`-wide pairs of sub-views from `self` and `other`
+    /// Iterates non-overlapping `LANE_COUNT`-wide chunk pairs from `self` and `other`
     /// until the shorter SIMD prefix is exhausted. Access the tails via
     /// [`iter::ZipChunks::remainder`].
     #[inline(always)]
@@ -404,7 +441,7 @@ impl<
 impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode: ExecutionMode>
     SimdView<'a, T, Arch, Align, Mode, &'a mut [T]>
 {
-    /// Return a zero-copy mutable iterator over non-overlapping `LANE_COUNT`-wide sub-views.
+    /// Return a zero-copy mutable iterator over non-overlapping `LANE_COUNT`-wide chunks.
     ///
     /// Each yielded item is a `SimdView<'a, T, Arch, Align, Mode, &'a mut [T]>` covering
     /// exactly `Arch::LANE_COUNT` elements. The scalar tail (elements that do not fill
