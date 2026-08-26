@@ -24,6 +24,11 @@
 - **Driver:** the closed comparison establishes only f64 parity even though f32
   is a current Hermes/Apollo lane contract; precision-specific backend codegen
   makes f64 evidence insufficient for f32.
+- **Measured result:** the exact locked bounded run has overlapping 95%
+  intervals at all three f32 lengths. Hermes/reference medians are
+  32.175/32.090 ns, 169.18/161.70 ns, and 2.0452/2.0376 us. Both AVX2 hot loops
+  have six loads, four stores, six fused arithmetic instructions, one branch,
+  and no calls or bounds branches; no provider change is justified.
 
 ## HS-LANE-THROUGHPUT-2026-08-25 — Locate the gap between the lane surface and fearless_simd [arch] — complete 2026-08-26
 

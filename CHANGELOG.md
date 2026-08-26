@@ -6,6 +6,13 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch][HS-FEARLESS-F32-THROUGHPUT] Extend the same-binary planar butterfly
+  comparison to one generic f32/f64 instrument while retaining the historical
+  f64 benchmark identity. On the process-affinity-pinned f32 confirmation,
+  Hermes and `fearless_simd` 0.7 have overlapping 95% confidence intervals at
+  256, 1024, and 4096 elements; their AVX2 hot loops have the same load, store,
+  fused-arithmetic, branch, and call counts.
+
 - [patch][HS-LANE-THROUGHPUT] Resolve the lane-throughput deficit found by
   Apollo's FFT work. A capability-carrying `Simd<T, A>` value now hoists runtime
   support checks out of lane kernels, exact-width chunks carry their validity

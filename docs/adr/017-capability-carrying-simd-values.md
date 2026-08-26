@@ -140,10 +140,11 @@ claim. No compatibility alias or forwarding constructor is retained.
   is value-checked against the scalar butterfly before timing, and its median
   confidence interval is compared with the direct Hermes ceiling on the same
   host and in the same binary.
-- The same binary contains a planar f64 group performing identical arithmetic
-  through Hermes and `fearless_simd` 0.7 native-width vectors. Both paths use
-  exact chunk iterators so slice lengths are hoisted out of the timed loop; an
-  earlier offset-range version was rejected after assembly showed ten retained
+- The same binary contains planar f32 and f64 groups performing identical
+  arithmetic through Hermes and `fearless_simd` 0.7 native-width vectors. One
+  generic instrument supplies both precisions. Both paths use exact chunk
+  iterators so slice lengths are hoisted out of the timed loop; an earlier
+  offset-range version was rejected after assembly showed ten retained
   per-iteration bounds branches in only the reference path.
 - Every candidate reuses the same output allocations. Separate output vectors
   were rejected after identical hot loops produced size-dependent timing
@@ -163,6 +164,13 @@ claim. No compatibility alias or forwarding constructor is retained.
   lengths. Assembly confirms both planar AVX2 loops have six vector loads, four
   stores, fused arithmetic, one loop-control branch, and no calls, feature
   probes, bounds branches, or panic paths in the hot loop.
+- The exact locked bounded f32 run reports Hermes/reference medians
+  of 32.175/32.090 ns, 169.18/161.70 ns, and 2.0452/2.0376 us at 256, 1,024,
+  and 4,096 scalars. Every 95% confidence interval overlaps. Both emitted AVX2
+  hot loops contain six 256-bit loads, four stores, six fused arithmetic
+  instructions, one loop branch, and no calls or bounds branches. Timings are
+  compared only within one run; affinity experiments on the shared hybrid-core
+  host widened variance and are not retained as evidence.
 - AVX-512 floating bitwise operations use AVX-512F integer-domain bitwise
   instructions around zero-cost casts. The float-typed intrinsics require
   AVX-512DQ and otherwise remained outlined calls inside an AVX-512F kernel.
@@ -181,6 +189,9 @@ claim. No compatibility alias or forwarding constructor is retained.
 
 ## Revisions
 
+- 2026-08-26: Extended the accepted comparison evidence to the native f32
+  contract under `HS-FEARLESS-F32-THROUGHPUT-2026-08-26`; no provider change
+  followed because the pinned intervals and AVX2 hot-loop structures match.
 - 2026-08-26: Accepted from the `HS-LANE-THROUGHPUT-2026-08-25` measurement.
   This narrows ADR 016's statement that an architecture marker itself is a
   capability: the proof is carried by a value whose construction is checked or

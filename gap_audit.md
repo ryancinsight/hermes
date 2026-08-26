@@ -163,6 +163,29 @@ arithmetic, one loop branch, and no calls, probes, bounds branches, or panic
 paths. The old 3.4--6.1 flops/ns rows above remain the entry evidence that
 located the provider defect; they are not the corrected substrate result.
 
+### Native f32 confirmation (2026-08-26)
+
+The original comparison established only f64 parity. The instrument now has one
+generic planar implementation instantiated for both supported floating lane
+types; each pair still reuses identical inputs and output addresses and passes
+the precision-specific scalar oracle before timing. The exact locked bounded
+suite reports these medians and 95% confidence intervals:
+
+| f32 scalars | Hermes | `fearless_simd` 0.7 | median delta |
+| ---: | ---: | ---: | ---: |
+| 256 | 32.175 ns [31.842, 32.564] | 32.090 ns [31.859, 32.415] | +0.26% |
+| 1,024 | 169.18 ns [165.16, 173.71] | 161.70 ns [159.23, 165.35] | +4.63% |
+| 4,096 | 2.0452 us [2.0275, 2.0646] | 2.0376 us [2.0289, 2.0514] | +0.37% |
+
+All confidence intervals overlap. Emitted AVX2 code gives both f32 hot loops
+six 256-bit loads, four stores, six fused arithmetic instructions, one loop
+branch, and no calls or bounds branches. Their loop-control spellings differ,
+but neither retains work absent from the other. The evidence therefore exposes
+no provider-owned f32 correction. Affinity experiments on this shared hybrid-
+core host widened variance and reversed candidate order, so they are rejected
+rather than reported as stronger evidence. Only same-run substrate comparisons
+are claimed; repeated absolute timings are not treated as stable.
+
 ## Fearless SIMD audit — amendment and closure (2026-08-25) <a id="fearless-simd-amendment"></a>
 
 Two corrections to the audit below, found while implementing the increment it
