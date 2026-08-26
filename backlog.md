@@ -44,8 +44,9 @@
   context. That a *safe* abstraction reaches 32.8 also removes safety as the
   explanation.
 
-## HS-NUMA-GEN-ISOLATION-2026-08-25 — Assert the property, not the global counter [patch] — todo
+## HS-NUMA-GEN-ISOLATION-2026-08-25 — Assert the property, not the global counter [patch] — done 2026-08-26
 
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
 - **Outcome:** `test_numa_locality_caching_correctness_and_invalidation` verifies
   that allocation does not bump the NUMA allocation generation and deallocation
   does, without asserting an absolute value of a process-global counter.
@@ -62,6 +63,18 @@
   rather than becoming unfalsifiable.
 - **Risk / change class:** [patch], test-only. **Dependencies:** none.
 - **Driver:** `gap_audit.md`, NUMA generation-counter test isolation.
+- **Delivered:** The contract test now runs its assertions in a child test
+  process when invoked normally, using an environment marker to avoid recursive
+  spawning. The child preserves the exact allocation-neutrality,
+  deallocation-invalidation, manual-bump, and concurrent-cache assertions;
+  unrelated sibling tests can no longer mutate the process-global counter
+  between reads. Focused nextest execution and the complete 28-test
+  shared-process integration binary pass within the standard test budget; no
+  sleep, retry, timeout, runner, allocator, or production-cache behavior
+  changed.
+- **Acceptance:** satisfied for the focused shared-process failure mode; the
+  child-process boundary is deliberately local to this test and does not alter
+  the sanctioned nextest topology.
 
 ## HS-FEARLESS-TOKEN-2026-08-25 — Consumer target-feature entry and safe FMA/permute surface [minor] — done 2026-08-25
 
