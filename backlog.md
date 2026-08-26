@@ -1,10 +1,10 @@
 # Backlog — hermes-simd
 
-## HS-LANE-THROUGHPUT-2026-08-25 — Locate the gap between the lane surface and fearless_simd [arch] — in progress 2026-08-26
+## HS-LANE-THROUGHPUT-2026-08-25 — Locate the gap between the lane surface and fearless_simd [arch] — complete 2026-08-26
 
 - **Integrator:** Codex task `01a0253c-6013-7552-99cc-36bbbcf77f6d`.
-- **Lease:** none. The provider implementation and documentation are complete;
-  the remaining work is exact-revision consumer validation in Apollo.
+- **Lease:** none. Provider PR 68 merged as `ae4e8efa`; Apollo consumer PR 120
+  merged the exact `4abbde8f` provider pin as `e3bdd7c3`.
 
 - **Outcome:** a consumer kernel written against Hermes' lane surface reaches
   arithmetic rates comparable to `fearless_simd` on the same host and workload,
@@ -24,8 +24,11 @@
   four stores, fused arithmetic, and no calls, support probes, bounds checks, or
   panic paths. Full entry-baseline and resolved evidence is in
   `gap_audit.md#lane-throughput-2026-08-25`.
-- **Remaining:** re-run Apollo's power-of-two matrix and allocation census at
-  the committed provider revision, then close this cross-repository item.
+- **Consumer closure:** Apollo's exact-Git `cargo check --locked --offline -p
+  apollo-fft --all-targets` and all six batched analytical tests pass at
+  `e3bdd7c3`. Its corrected census keeps complex transforms at zero transient
+  allocations and localizes the remaining end-to-end gap to Apollo's
+  algorithm, layout, and pass structure rather than Hermes lane overhead.
 - **Non-goals:** adopting `fearless_simd`, which would re-fork the dimension
   Hermes owns; changing Apollo inside this provider increment. Apollo adoption
   and its remaining allocation/kernel work are the next consumer increment.

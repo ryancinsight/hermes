@@ -25,8 +25,9 @@ use core::marker::PhantomData;
 
 /// Iterator over non-overlapping `LANE_COUNT`-wide chunks of a `SimdView`.
 ///
-/// Created by [`SimdView::simd_chunks`]. The final partial chunk (length `< LANE_COUNT`)
-/// is NOT yielded as an `Item`; access it via [`SimdChunks::remainder`] after the loop.
+/// Created by [`SimdView::simd_chunks`](crate::view::SimdView::simd_chunks).
+/// The final partial chunk (length `< LANE_COUNT`) is NOT yielded as an `Item`;
+/// access it via [`SimdChunks::remainder`] after the loop.
 ///
 /// # Type Parameters
 /// Mirrors the parent view's scalar, architecture, and execution mode. Each
@@ -197,8 +198,9 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
 
 /// Iterator over non-overlapping mutable `LANE_COUNT`-wide chunks of a `SimdView`.
 ///
-/// Created by [`SimdView::simd_chunks_mut`]. The final partial chunk (length `< LANE_COUNT`)
-/// is NOT yielded as an `Item`; access it via [`SimdChunksMut::into_remainder`] after the loop.
+/// Created by [`SimdView::simd_chunks_mut`](crate::view::SimdView::simd_chunks_mut).
+/// The final partial chunk (length `< LANE_COUNT`) is NOT yielded as an `Item`;
+/// access it via [`SimdChunksMut::into_remainder`] after the loop.
 pub struct SimdChunksMut<'a, T: 'a, Arch: SimdArch, Align: Alignment, Mode: ExecutionMode> {
     /// Base pointer of the original slice.
     base: *mut T,
