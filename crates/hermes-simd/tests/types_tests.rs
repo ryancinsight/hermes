@@ -1925,6 +1925,26 @@ fn test_numa_realloc_on_node_direct() {
 
 #[test]
 fn test_numa_locality_caching_correctness_and_invalidation() {
+    // The generation is process-global, while bare `cargo test` runs sibling
+    // tests in one process. Execute this contract in a child test process so
+    // unrelated NUMA allocations cannot move the counter between its reads.
+    const ISOLATED_TEST: &str = "HERMES_NUMA_GENERATION_TEST_CHILD";
+    if std::env::var_os(ISOLATED_TEST).is_none() {
+        let status = std::process::Command::new(
+            std::env::current_exe().expect("test executable path should be available"),
+        )
+        .args([
+            "--exact",
+            "test_numa_locality_caching_correctness_and_invalidation",
+            "--nocapture",
+        ])
+        .env(ISOLATED_TEST, "1")
+        .status()
+        .expect("isolated NUMA generation test should start");
+        assert!(status.success(), "isolated NUMA generation test failed");
+        return;
+    }
+
     use hermes_simd_core::align::Unaligned;
     use hermes_simd_core::numa::locality::{
         bump_alloc_generation, get_alloc_generation, verify_numa_locality,

@@ -38,8 +38,19 @@ allocation did, not about the counter's absolute value.
 
 This is not a flake to re-run. Filed as `HS-NUMA-GEN-ISOLATION-2026-08-25`.
 Nothing in the current gate is wrong — nextest is the sanctioned runner and it
-passes — so this is latent rather than breaking, and the risk is that the
-assertion is read as verifying something it does not.
+passes — so this was latent rather than breaking, and the risk was that the
+assertion was read as verifying something it did not.
+
+**Correction delivered 2026-08-26:** the test now launches an exact child test
+process for the contract body when run normally. An environment marker makes
+the child execute the assertions directly, so no recursion or polling is
+involved. The global counter is consequently isolated from sibling tests under
+bare `cargo test`, while the test still asserts that this allocation leaves the
+counter unchanged and that dropping the allocation advances it. Focused
+nextest execution and the complete 28-test shared-process integration binary
+pass within the standard test budget; no production code, allocator behavior,
+timeout, or runner configuration changed.
+
 
 ## Lane throughput against fearless_simd (2026-08-25) <a id="lane-throughput-2026-08-25"></a>
 
