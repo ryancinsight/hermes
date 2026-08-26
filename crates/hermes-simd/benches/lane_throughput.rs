@@ -1,7 +1,8 @@
 //! Lane-boundary cost for consumer-shaped butterfly kernels.
 //!
 //! The planar group compares Hermes and `fearless_simd` at both native floating
-//! precisions. The interleaved group isolates Hermes wrapper overhead by holding
+//! precisions. The permute groups compare the shared cross-lane operation
+//! surface. The interleaved group isolates Hermes wrapper overhead by holding
 //! arithmetic and dispatch constant across checked, view/chunk, and direct
 //! backend paths.
 
@@ -13,6 +14,8 @@ use criterion::{criterion_group, criterion_main, Criterion};
 mod comparison;
 #[path = "lane_throughput/interleaved.rs"]
 mod interleaved;
+#[path = "lane_throughput/permute.rs"]
+mod permute;
 #[path = "lane_throughput/planar.rs"]
 mod planar;
 
@@ -24,6 +27,6 @@ criterion_group! {
         .warm_up_time(Duration::from_millis(20))
         .measurement_time(Duration::from_millis(200))
         .sample_size(20);
-    targets = planar::bench, interleaved::bench
+    targets = planar::bench, permute::bench, interleaved::bench
 }
 criterion_main!(benches);

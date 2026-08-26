@@ -6,8 +6,9 @@
   **Lease:** Codex `crates/hermes-simd/benches/lane_throughput/**`,
   `backlog.md`, `checklist.md`, `gap_audit.md`, `CHANGELOG.md`, and ADR 017.
 - **Outcome:** compare Hermes and `fearless_simd` 0.7 on identical f32/f64
-  reverse, interleave, and deinterleave workloads, then correct only a measured
-  provider-owned deficit.
+  interleave and deinterleave workloads, then correct only a measured
+  provider-owned deficit. Fearless exposes no direct whole-vector reverse
+  operation, so that Hermes-only operation stays in the native permute suite.
 - **Scope / non-goals:** the existing lane-throughput instrument and its
   evidence records; no unused integer, four-way-I/O, approximate-reciprocal,
   copysign, SSE, or WASM surface without a current consumer contract.

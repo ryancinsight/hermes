@@ -1,43 +1,15 @@
 //! Same-binary planar comparison against `fearless_simd`.
 
-use core::ops::Neg;
 use std::hint::black_box;
 
 use criterion::{BenchmarkId, Criterion, Throughput};
 use eunomia::FloatElement;
 use fearless_simd::prelude::{SimdBase, SimdFloat};
-use fearless_simd::{Level, Simd as FearlessSimd, SimdFloatElement};
-use hermes_simd::{vectorize, LaneKernel, LaneScalar, Simd, SimdArch, SimdKernel};
+use fearless_simd::{Level, Simd as FearlessSimd};
+use hermes_simd::{vectorize, LaneKernel, Simd, SimdArch, SimdKernel};
 
-use super::comparison::assert_within_rounding;
+use super::comparison::{assert_within_rounding, BenchmarkFloat};
 use super::SCALAR_LENGTHS;
-
-/// Floating lane precision exercised by the comparison instrument.
-trait BenchmarkFloat:
-    LaneScalar + FloatElement + SimdFloatElement + Into<f64> + Neg<Output = Self>
-{
-    /// Native-width vector selected by a `fearless_simd` capability.
-    type Fearless<S: FearlessSimd>: SimdFloat<S, Element = Self>;
-
-    /// Stable Criterion group name for this precision.
-    const GROUP: &'static str;
-    /// Machine epsilon expressed exactly in the f64 comparison domain.
-    const EPSILON: f64;
-}
-
-impl BenchmarkFloat for f32 {
-    type Fearless<S: FearlessSimd> = S::f32s;
-
-    const GROUP: &'static str = "planar_complex_butterfly_f32";
-    const EPSILON: f64 = f32::EPSILON as f64;
-}
-
-impl BenchmarkFloat for f64 {
-    type Fearless<S: FearlessSimd> = S::f64s;
-
-    const GROUP: &'static str = "planar_complex_butterfly_f64";
-    const EPSILON: f64 = f64::EPSILON;
-}
 
 struct PlanarInputs<T> {
     a_re: Vec<T>,
@@ -216,7 +188,7 @@ fn fearless_planar<T: BenchmarkFloat, S: FearlessSimd>(
 
 fn bench_precision<T: BenchmarkFloat>(c: &mut Criterion) {
     let level = Level::new();
-    let mut group = c.benchmark_group(T::GROUP);
+    let mut group = c.benchmark_group(format!("planar_complex_butterfly_{}", T::LABEL));
     for &len in SCALAR_LENGTHS {
         group.throughput(Throughput::Elements(len as u64));
         let input = PlanarInputs::<T>::new(len);

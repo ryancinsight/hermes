@@ -6,6 +6,14 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch][HS-FEARLESS-PERMUTE-THROUGHPUT] Add one generic same-address f32/f64
+  comparison for the interleave and deinterleave operations shared with
+  `fearless_simd` 0.7. Exact lane-order oracles pass for both providers. Two
+  unchanged runs on the hybrid-core host moved absolute medians by 15--55% and
+  changed candidate ordering; AVX2 inspection and Arrow Lake S `llvm-mca`
+  analysis find equivalent hot-loop instruction classes and modeled throughput,
+  so no production SIMD correction is justified.
+
 - [patch][HS-FEARLESS-F32-THROUGHPUT] Extend the same-binary planar butterfly
   comparison to one generic f32/f64 instrument while retaining the historical
   f64 benchmark identity. On the process-affinity-pinned f32 confirmation,
