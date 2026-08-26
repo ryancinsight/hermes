@@ -1,5 +1,18 @@
 # Checklist — active sprint
 
+## HS-FEARLESS-PERMUTE-THROUGHPUT-2026-08-26 [patch]
+
+- [x] Re-audit Fearless-only capability families against current Hermes
+      consumers and retain non-gaps without live contracts.
+- [ ] Add one generic f32/f64 same-address comparison for reverse, interleave,
+      and deinterleave without cloning the scalar or provider paths.
+- [ ] Assert lane-order semantics against an analytical oracle before timing.
+- [ ] Run the bounded Criterion comparison and inspect codegen for every
+      non-overlapping Hermes deficit.
+- [ ] Implement and verify any provider-owned correction justified by the
+      measurement; otherwise record the evidence limit.
+- [ ] Run the exact-diff gates, synchronize evidence, commit, publish, and merge.
+
 ## HS-FEARLESS-F32-THROUGHPUT-2026-08-26 [patch]
 
 - [x] Confirm the official `fearless_simd` release remains 0.7.0 and its main
