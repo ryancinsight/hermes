@@ -4,17 +4,12 @@
 //!
 //! Every operation here ultimately calls a `#[target_feature]`-gated
 //! [`SimdKernel`](crate::kernel::SimdKernel) method, sound only on a host that
-//! implements `Arch`. Two disciplines discharge that obligation:
-//!
-//! - **Safe methods** call `assert_runtime_supported` (or
-//!   `runtime_support_result` for the `try_*` forms) before their `unsafe`
-//!   kernel call, so the check immediately above each block is its target-feature
-//!   proof. Those blocks therefore carry a per-site `SAFETY` comment only when
-//!   they add a further obligation — a raw-pointer bound, a lane-index range, or
-//!   a `MaybeUninit` initialization.
-//! - The `pub unsafe fn` register loads/stores (`load_aligned` and friends) push
-//!   *both* the target-feature requirement and pointer validity to the caller;
-//!   each states both in its `# Safety` section.
+//! implements `Arch`. Safe constructors establish that capability once before
+//! producing a [`Vector`]; unsafe constructors require it from their caller.
+//! Because processor capabilities are process-wide, possession of a `Vector`
+//! then discharges the target-feature obligation for operations on that value.
+//! Raw-pointer loads and stores additionally require pointer validity and state
+//! both obligations in their `# Safety` sections.
 //!
 //! Lane-count and lane-index preconditions (`from_array`, `extract`, `cast`, …)
 //! are proven at compile time by the `AssertLaneCount`/`AssertLaneIndex` const
@@ -71,11 +66,10 @@ where
     T: Scalar + core::fmt::Debug,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        assert_runtime_supported::<T, Arch>();
         const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
         let lane_count = Arch::LANE_COUNT;
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        // SAFETY: target feature checked above. The store writes exactly
+        // SAFETY: constructing `self` proved host support. The store writes exactly
         // `lane_count` elements into the `MAX_SIMD_LANES`-slot buffer (bounded by
         // `LANE_BOUND_CHECK`), so the `lane_count`-length slice reads only
         // initialized elements.
@@ -94,12 +88,11 @@ where
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        assert_runtime_supported::<T, Arch>();
         const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
         let lane_count = Arch::LANE_COUNT;
         let mut buf_self = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let mut buf_other = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        // SAFETY: target feature checked above. Each store writes `lane_count`
+        // SAFETY: constructing both vectors proved host support. Each store writes `lane_count`
         // elements into its buffer, so both `lane_count`-length slices read only
         // initialized elements.
         unsafe {
@@ -125,9 +118,9 @@ where
     Arch: SimdArch + SimdKernel<T>,
     T: Scalar,
 {
-    /// Create a new Vector wrapping a raw vector register.
+    /// Wrap a raw register after the caller has established host support.
     #[inline(always)]
-    pub const fn new(raw: Arch::Vector) -> Self {
+    pub(crate) const fn new(raw: Arch::Vector) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -279,7 +272,6 @@ where
     /// elements than `Arch::LANE_COUNT`.
     #[inline(always)]
     pub fn store_unaligned_to_slice(self, out: &mut [T]) -> Result<(), SimdError> {
-        runtime_support_result::<T, Arch>()?;
         if out.len() < Arch::LANE_COUNT {
             return Err(SimdError::InsufficientOutputLength);
         }
@@ -299,7 +291,6 @@ where
     /// when the slice start is not aligned to the vector byte width.
     #[inline(always)]
     pub fn store_aligned_to_slice(self, out: &mut [T]) -> Result<(), SimdError> {
-        runtime_support_result::<T, Arch>()?;
         if out.len() < Arch::LANE_COUNT {
             return Err(SimdError::InsufficientOutputLength);
         }
@@ -320,17 +311,15 @@ where
     ///
     /// # Errors
     /// Returns [`SimdError::IndexOutOfBounds`] when an active mask lane is
-    /// outside `data`, or [`SimdError::UnsupportedTarget`] when the
-    /// architecture is not supported or enabled on this host.
+    /// outside `data`.
     #[inline]
     pub fn masked_load_from_slice(
         data: &[T],
         mask: Mask<T, Arch>,
         src: Self,
     ) -> Result<Self, SimdError> {
-        runtime_support_result::<T, Arch>()?;
         let len = data.len();
-        let bm = unsafe { mask.to_bitmask().0 };
+        let bm = mask.to_bitmask().0;
         let is_out_of_bounds = if len < u64::BITS as usize {
             (bm >> len) != 0
         } else {
@@ -376,17 +365,15 @@ where
     ///
     /// # Errors
     /// Returns [`SimdError::IndexOutOfBounds`] when an active mask lane is
-    /// outside `data`, or [`SimdError::UnsupportedTarget`] when the
-    /// architecture is not supported or enabled on this host.
+    /// outside `data`.
     #[inline]
     pub fn masked_store_to_slice(
         self,
         data: &mut [T],
         mask: Mask<T, Arch>,
     ) -> Result<(), SimdError> {
-        runtime_support_result::<T, Arch>()?;
         let len = data.len();
-        let bm = unsafe { mask.to_bitmask().0 };
+        let bm = mask.to_bitmask().0;
         let is_out_of_bounds = if len < u64::BITS as usize {
             (bm >> len) != 0
         } else {
@@ -429,7 +416,6 @@ where
     /// Horizontal sum reduction of all lanes in the Vector.
     #[inline(always)]
     pub fn sum_reduce(self) -> T {
-        assert_runtime_supported::<T, Arch>();
         unsafe { Arch::sum_reduce(self.raw) }
     }
 
@@ -437,28 +423,24 @@ where
     #[inline(always)]
     #[must_use]
     pub fn popcount(self) -> Self {
-        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::popcount(self.raw) })
     }
 
     /// Horizontal bitwise AND reduction across all lanes.
     #[inline(always)]
     pub fn horizontal_bitwise_and(self) -> T {
-        assert_runtime_supported::<T, Arch>();
         unsafe { Arch::horizontal_bitwise_and(self.raw) }
     }
 
     /// Horizontal bitwise OR reduction across all lanes.
     #[inline(always)]
     pub fn horizontal_bitwise_or(self) -> T {
-        assert_runtime_supported::<T, Arch>();
         unsafe { Arch::horizontal_bitwise_or(self.raw) }
     }
 
     /// Horizontal bitwise XOR reduction across all lanes.
     #[inline(always)]
     pub fn horizontal_bitwise_xor(self) -> T {
-        assert_runtime_supported::<T, Arch>();
         unsafe { Arch::horizontal_bitwise_xor(self.raw) }
     }
 
@@ -466,7 +448,6 @@ where
     #[inline(always)]
     #[must_use]
     pub fn abs(self) -> Self {
-        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::abs(self.raw) })
     }
 
@@ -474,7 +455,6 @@ where
     #[inline(always)]
     #[must_use]
     pub fn min(self, other: Self) -> Self {
-        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::min(self.raw, other.raw) })
     }
 
@@ -482,7 +462,6 @@ where
     #[inline(always)]
     #[must_use]
     pub fn max(self, other: Self) -> Self {
-        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::max(self.raw, other.raw) })
     }
 
@@ -490,7 +469,6 @@ where
     #[inline(always)]
     #[must_use]
     pub fn sqrt(self) -> Self {
-        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::sqrt(self.raw) })
     }
 
@@ -498,7 +476,6 @@ where
     #[inline(always)]
     #[must_use]
     pub fn cmp_eq(self, other: Self) -> Self {
-        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_eq(self.raw, other.raw) })
     }
 
@@ -506,7 +483,6 @@ where
     #[inline(always)]
     #[must_use]
     pub fn cmp_ne(self, other: Self) -> Self {
-        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_ne(self.raw, other.raw) })
     }
 
@@ -514,7 +490,6 @@ where
     #[inline(always)]
     #[must_use]
     pub fn cmp_lt(self, other: Self) -> Self {
-        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_lt(self.raw, other.raw) })
     }
 
@@ -522,7 +497,6 @@ where
     #[inline(always)]
     #[must_use]
     pub fn cmp_le(self, other: Self) -> Self {
-        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_le(self.raw, other.raw) })
     }
 
@@ -530,7 +504,6 @@ where
     #[inline(always)]
     #[must_use]
     pub fn cmp_gt(self, other: Self) -> Self {
-        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_gt(self.raw, other.raw) })
     }
 
@@ -538,7 +511,6 @@ where
     #[inline(always)]
     #[must_use]
     pub fn cmp_ge(self, other: Self) -> Self {
-        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::cmp_ge(self.raw, other.raw) })
     }
 
@@ -546,7 +518,6 @@ where
     #[inline(always)]
     #[must_use]
     pub fn blend(self, true_val: Self, false_val: Self) -> Self {
-        assert_runtime_supported::<T, Arch>();
         Self::new(unsafe { Arch::blend(self.raw, true_val.raw, false_val.raw) })
     }
 
@@ -578,7 +549,6 @@ where
     /// Convert the vector to an array of size `N`, where `N` must equal `Arch::LANE_COUNT`.
     #[inline(always)]
     pub fn to_array<const N: usize>(self) -> [T; N] {
-        assert_runtime_supported::<T, Arch>();
         let () = AssertLaneCount::<T, Arch, N>::OK;
         let mut arr = [core::mem::MaybeUninit::<T>::uninit(); N];
         // SAFETY: target feature checked above; `AssertLaneCount` proved
@@ -593,11 +563,10 @@ where
     /// Convert this vector mask representation (sign bits) into a portable `BitMask`.
     #[inline(always)]
     pub fn to_bitmask(self) -> BitMask<64> {
-        assert_runtime_supported::<T, Arch>();
         const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
         let lanes = <Arch as SimdStorage<T>>::LANE_COUNT;
-        // SAFETY: target feature checked above; the store writes `lanes` elements
+        // SAFETY: constructing `self` proved host support; the store writes `lanes` elements
         // into the `MAX_SIMD_LANES`-slot buffer (bounded by `LANE_BOUND_CHECK`),
         // so `assume_init` reads only those initialized lanes.
         unsafe {
@@ -616,48 +585,42 @@ where
     /// Elementwise equal comparison returning a native `Mask`.
     #[inline(always)]
     pub fn cmp_eq_mask(self, other: Self) -> Mask<T, Arch> {
-        // SAFETY: `from_bitmask` requires only that the host support `Arch`,
-        // which the inner `cmp_eq`/`to_bitmask` calls already assert.
+        // SAFETY: constructing `self` proved that the host supports `Arch`.
         unsafe { Mask::from_bitmask(self.cmp_eq(other).to_bitmask()) }
     }
 
     /// Elementwise not-equal comparison returning a native `Mask`.
     #[inline(always)]
     pub fn cmp_ne_mask(self, other: Self) -> Mask<T, Arch> {
-        // SAFETY: `from_bitmask` requires only that the host support `Arch`,
-        // which the inner `cmp_ne`/`to_bitmask` calls already assert.
+        // SAFETY: constructing `self` proved that the host supports `Arch`.
         unsafe { Mask::from_bitmask(self.cmp_ne(other).to_bitmask()) }
     }
 
     /// Elementwise less-than comparison returning a native `Mask`.
     #[inline(always)]
     pub fn cmp_lt_mask(self, other: Self) -> Mask<T, Arch> {
-        // SAFETY: `from_bitmask` requires only that the host support `Arch`,
-        // which the inner `cmp_lt`/`to_bitmask` calls already assert.
+        // SAFETY: constructing `self` proved that the host supports `Arch`.
         unsafe { Mask::from_bitmask(self.cmp_lt(other).to_bitmask()) }
     }
 
     /// Elementwise less-than-or-equal comparison returning a native `Mask`.
     #[inline(always)]
     pub fn cmp_le_mask(self, other: Self) -> Mask<T, Arch> {
-        // SAFETY: `from_bitmask` requires only that the host support `Arch`,
-        // which the inner `cmp_le`/`to_bitmask` calls already assert.
+        // SAFETY: constructing `self` proved that the host supports `Arch`.
         unsafe { Mask::from_bitmask(self.cmp_le(other).to_bitmask()) }
     }
 
     /// Elementwise greater-than comparison returning a native `Mask`.
     #[inline(always)]
     pub fn cmp_gt_mask(self, other: Self) -> Mask<T, Arch> {
-        // SAFETY: `from_bitmask` requires only that the host support `Arch`,
-        // which the inner `cmp_gt`/`to_bitmask` calls already assert.
+        // SAFETY: constructing `self` proved that the host supports `Arch`.
         unsafe { Mask::from_bitmask(self.cmp_gt(other).to_bitmask()) }
     }
 
     /// Elementwise greater-than-or-equal comparison returning a native `Mask`.
     #[inline(always)]
     pub fn cmp_ge_mask(self, other: Self) -> Mask<T, Arch> {
-        // SAFETY: `from_bitmask` requires only that the host support `Arch`,
-        // which the inner `cmp_ge`/`to_bitmask` calls already assert.
+        // SAFETY: constructing `self` proved that the host supports `Arch`.
         unsafe { Mask::from_bitmask(self.cmp_ge(other).to_bitmask()) }
     }
 
@@ -669,8 +632,6 @@ where
         U: Scalar,
         U: CastFrom<T>,
     {
-        assert_runtime_supported::<T, Arch>();
-        assert_runtime_supported::<U, Arch>();
         let () = AssertLaneCountSame::<T, U, Arch>::OK;
         const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
         let mut buf_t = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
@@ -694,11 +655,10 @@ where
     /// Extract a single lane element by index at compile-time.
     #[inline(always)]
     pub fn extract<const I: usize>(self) -> T {
-        assert_runtime_supported::<T, Arch>();
         let () = AssertLaneIndex::<T, Arch, I>::OK;
         const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        // SAFETY: target feature checked above; `AssertLaneIndex` proved
+        // SAFETY: constructing `self` proved host support; `AssertLaneIndex` proved
         // `I < LANE_COUNT`, and the store initializes `buf[..LANE_COUNT]`, so
         // `buf[I]` is initialized.
         unsafe {
@@ -711,11 +671,10 @@ where
     #[inline(always)]
     #[must_use]
     pub fn insert<const I: usize>(self, val: T) -> Self {
-        assert_runtime_supported::<T, Arch>();
         let () = AssertLaneIndex::<T, Arch, I>::OK;
         const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
         let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        // SAFETY: target feature checked above; `AssertLaneIndex` proved
+        // SAFETY: constructing `self` proved host support; `AssertLaneIndex` proved
         // `I < LANE_COUNT`. The store initializes `buf[..LANE_COUNT]`, `buf[I]` is
         // then overwritten, and the reload reads all `LANE_COUNT` initialized
         // lanes.
@@ -730,8 +689,7 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if the architecture is not supported or enabled on this host,
-    /// or if `chunk_idx` does not identify a complete SIMD lane group.
+    /// Panics if `chunk_idx` does not identify a complete SIMD lane group.
     #[inline(always)]
     #[must_use]
     pub fn from_view_chunk<Align, Mode, Ref>(
@@ -743,14 +701,13 @@ where
         Mode: crate::execution::ExecutionMode,
         Ref: core::ops::Deref<Target = [T]>,
     {
-        assert_runtime_supported::<T, Arch>();
         let offset = chunk_idx * Arch::LANE_COUNT;
         let slice = view.as_slice();
         assert!(
             offset + Arch::LANE_COUNT <= slice.len(),
             "Chunk index out of bounds"
         );
-        // SAFETY: target feature checked above; the assert guarantees
+        // SAFETY: constructing `view` proved host support; the assert guarantees
         // `offset + LANE_COUNT <= slice.len()`, so the load reads a full vector in
         // bounds. The aligned variant is taken only when `Align` proves the base
         // pointer is arch-aligned and `offset` is a lane-count multiple.
@@ -767,8 +724,7 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if the architecture is not supported or enabled on this host,
-    /// or if `chunk_idx` does not identify a complete SIMD lane group.
+    /// Panics if `chunk_idx` does not identify a complete SIMD lane group.
     #[inline(always)]
     pub fn store_to_view_chunk<'a, Align, Mode>(
         self,
@@ -778,7 +734,6 @@ where
         Align: crate::align::Alignment,
         Mode: crate::execution::ExecutionMode,
     {
-        assert_runtime_supported::<T, Arch>();
         let offset = chunk_idx * Arch::LANE_COUNT;
         let slice = view.as_slice_mut();
         assert!(
@@ -810,19 +765,27 @@ where
     #[inline(always)]
     #[must_use]
     pub fn mul_add(self, b: Self, c: Self) -> Self {
-        assert_runtime_supported::<T, Arch>();
-        // SAFETY: the facet's obligation is that the host executes `Arch`,
-        // which the assertion above discharges.
+        // SAFETY: constructing the operand vectors proved host support for `Arch`.
         Self::new(unsafe { Arch::fmadd(self.raw, b.raw, c.raw) })
+    }
+
+    /// Fused multiply-subtract: `self * b - c`, with one rounding.
+    ///
+    /// This is the subtracting counterpart of [`Vector::mul_add`]. Backends
+    /// use a native fused instruction where available and otherwise negate the
+    /// addend exactly before one fused multiply-add.
+    #[inline(always)]
+    #[must_use]
+    pub fn mul_sub(self, b: Self, c: Self) -> Self {
+        // SAFETY: constructing the operand vectors proved host support for `Arch`.
+        Self::new(unsafe { Arch::fmsub(self.raw, b.raw, c.raw) })
     }
 
     /// Reverses the lane order.
     #[inline(always)]
     #[must_use]
     pub fn reverse(self) -> Self {
-        assert_runtime_supported::<T, Arch>();
-        // SAFETY: the facet's obligation is that the host executes `Arch`,
-        // which the assertion above discharges.
+        // SAFETY: constructing `self` proved host support for `Arch`.
         Self::new(unsafe { Arch::reverse(self.raw) })
     }
 
@@ -834,9 +797,7 @@ where
     #[inline(always)]
     #[must_use]
     pub fn interleave(self, other: Self) -> (Self, Self) {
-        assert_runtime_supported::<T, Arch>();
-        // SAFETY: the facet's obligation is that the host executes `Arch`,
-        // which the assertion above discharges.
+        // SAFETY: constructing the operand vectors proved host support for `Arch`.
         let (lo, hi) = unsafe { Arch::interleave(self.raw, other.raw) };
         (Self::new(lo), Self::new(hi))
     }
@@ -848,9 +809,7 @@ where
     #[inline(always)]
     #[must_use]
     pub fn deinterleave(self, other: Self) -> (Self, Self) {
-        assert_runtime_supported::<T, Arch>();
-        // SAFETY: the facet's obligation is that the host executes `Arch`,
-        // which the assertion above discharges.
+        // SAFETY: constructing the operand vectors proved host support for `Arch`.
         let (even, odd) = unsafe { Arch::deinterleave(self.raw, other.raw) };
         (Self::new(even), Self::new(odd))
     }
@@ -862,9 +821,7 @@ where
     #[inline(always)]
     #[must_use]
     pub fn swap_adjacent(self) -> Self {
-        assert_runtime_supported::<T, Arch>();
-        // SAFETY: the facet's obligation is that the host executes `Arch`,
-        // which the assertion above discharges.
+        // SAFETY: constructing `self` proved host support for `Arch`.
         Self::new(unsafe { Arch::swap_adjacent(self.raw) })
     }
 
@@ -875,9 +832,7 @@ where
     #[inline(always)]
     #[must_use]
     pub fn dup_even(self) -> Self {
-        assert_runtime_supported::<T, Arch>();
-        // SAFETY: the facet's obligation is that the host executes `Arch`,
-        // which the assertion above discharges.
+        // SAFETY: constructing `self` proved host support for `Arch`.
         Self::new(unsafe { Arch::dup_even(self.raw) })
     }
 
@@ -888,9 +843,7 @@ where
     #[inline(always)]
     #[must_use]
     pub fn dup_odd(self) -> Self {
-        assert_runtime_supported::<T, Arch>();
-        // SAFETY: the facet's obligation is that the host executes `Arch`,
-        // which the assertion above discharges.
+        // SAFETY: constructing `self` proved host support for `Arch`.
         Self::new(unsafe { Arch::dup_odd(self.raw) })
     }
 
@@ -904,9 +857,7 @@ where
     #[inline(always)]
     #[must_use]
     pub fn fmaddsub(self, b: Self, c: Self) -> Self {
-        assert_runtime_supported::<T, Arch>();
-        // SAFETY: the facet's obligation is that the host executes `Arch`,
-        // which the assertion above discharges.
+        // SAFETY: constructing the operand vectors proved host support for `Arch`.
         Self::new(unsafe { Arch::fmaddsub(self.raw, b.raw, c.raw) })
     }
 
@@ -917,9 +868,7 @@ where
     #[inline(always)]
     #[must_use]
     pub fn fmsubadd(self, b: Self, c: Self) -> Self {
-        assert_runtime_supported::<T, Arch>();
-        // SAFETY: the facet's obligation is that the host executes `Arch`,
-        // which the assertion above discharges.
+        // SAFETY: constructing the operand vectors proved host support for `Arch`.
         Self::new(unsafe { Arch::fmsubadd(self.raw, b.raw, c.raw) })
     }
 }

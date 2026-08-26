@@ -13,7 +13,9 @@
 
 #![forbid(unsafe_code)]
 
-use hermes_simd::{LaneKernel, LaneScalar, SimdArch, SimdKernel, SimdStorage, TargetId, Vector};
+use hermes_simd::{
+    BitMask, LaneKernel, LaneScalar, Simd, SimdArch, SimdKernel, SimdStorage, TargetId,
+};
 
 /// Input planes for one butterfly stage.
 struct Planes {
@@ -91,10 +93,9 @@ struct ButterflyStage<'a>(&'a Planes);
 impl LaneKernel<f32> for ButterflyStage<'_> {
     type Output = Butterflies;
 
-    fn call<A: SimdArch + SimdKernel<f32>>(self) -> Self::Output {
+    fn call<A: SimdArch + SimdKernel<f32>>(self, simd: Simd<f32, A>) -> Self::Output {
         let p = self.0;
         let n = p.len();
-        let lanes = <A as SimdStorage<f32>>::LANE_COUNT;
         let mut out = Butterflies {
             o0r: vec![0.0; n],
             o0i: vec![0.0; n],
@@ -102,41 +103,49 @@ impl LaneKernel<f32> for ButterflyStage<'_> {
             o1i: vec![0.0; n],
         };
 
-        let load = |s: &[f32], r: core::ops::Range<usize>| {
-            Vector::<f32, A>::load_unaligned_from_slice(&s[r]).unwrap()
-        };
-
-        let mut i = 0;
-        while i + lanes <= n {
-            let r = i..i + lanes;
-            let a_re = load(&p.re0, r.clone());
-            let a_im = load(&p.im0, r.clone());
-            let b_re = load(&p.re1, r.clone());
-            let b_im = load(&p.im1, r.clone());
-            let w_re = load(&p.tw_re, r.clone());
-            let w_im = load(&p.tw_im, r.clone());
-
+        let mut chunks = simd.io_chunks(
+            [
+                p.re0.as_slice(),
+                p.im0.as_slice(),
+                p.re1.as_slice(),
+                p.im1.as_slice(),
+                p.tw_re.as_slice(),
+                p.tw_im.as_slice(),
+            ],
+            [
+                out.o0r.as_mut_slice(),
+                out.o0i.as_mut_slice(),
+                out.o1r.as_mut_slice(),
+                out.o1i.as_mut_slice(),
+            ],
+        );
+        for ([a_re, a_im, b_re, b_im, w_re, w_im], [mut o0r, mut o0i, mut o1r, mut o1i]) in
+            &mut chunks
+        {
+            let a_re = a_re.load();
+            let a_im = a_im.load();
+            let b_re = b_re.load();
+            let b_im = b_im.load();
+            let w_re = w_re.load();
+            let w_im = w_im.load();
             let t_re = w_re.mul_add(b_re, -(w_im * b_im));
             let t_im = w_re.mul_add(b_im, w_im * b_re);
-
-            let store = |v: Vector<f32, A>, dst: &mut [f32]| {
-                v.store_unaligned_to_slice(dst).unwrap();
-            };
-            store(a_re + t_re, &mut out.o0r[r.clone()]);
-            store(a_im + t_im, &mut out.o0i[r.clone()]);
-            store(a_re - t_re, &mut out.o1r[r.clone()]);
-            store(a_im - t_im, &mut out.o1i[r]);
-            i += lanes;
+            o0r.store(a_re + t_re);
+            o0i.store(a_im + t_im);
+            o1r.store(a_re - t_re);
+            o1i.store(a_im - t_im);
         }
 
         // Scalar tail, same arithmetic, so the comparison covers every element
         // rather than only the vectorized prefix.
-        for j in i..n {
-            let (tr, ti) = p.twiddled(j);
-            out.o0r[j] = p.re0[j] + tr;
-            out.o0i[j] = p.im0[j] + ti;
-            out.o1r[j] = p.re0[j] - tr;
-            out.o1i[j] = p.im0[j] - ti;
+        let ([re0, im0, re1, im1, tw_re, tw_im], [o0r, o0i, o1r, o1i]) = chunks.into_remainders();
+        for j in 0..re0.len() {
+            let tr = tw_re[j].mul_add(re1[j], -(tw_im[j] * im1[j]));
+            let ti = tw_re[j].mul_add(im1[j], tw_im[j] * re1[j]);
+            o0r[j] = re0[j] + tr;
+            o0i[j] = im0[j] + ti;
+            o1r[j] = re0[j] - tr;
+            o1i[j] = im0[j] - ti;
         }
         out
     }
@@ -187,17 +196,14 @@ fn dispatched_reduction_agrees_with_sequential_sum() {
     impl LaneKernel<f32> for Sum<'_> {
         type Output = f32;
 
-        fn call<A: SimdArch + SimdKernel<f32>>(self) -> f32 {
-            let lanes = <A as SimdStorage<f32>>::LANE_COUNT;
-            let mut acc = Vector::<f32, A>::zero();
-            let mut i = 0;
-            while i + lanes <= self.0.len() {
-                let chunk =
-                    Vector::<f32, A>::load_unaligned_from_slice(&self.0[i..i + lanes]).unwrap();
-                acc = acc + chunk;
-                i += lanes;
+        fn call<A: SimdArch + SimdKernel<f32>>(self, simd: Simd<f32, A>) -> f32 {
+            let mut acc = simd.zero();
+            let view = simd.view(self.0);
+            let mut chunks = view.simd_chunks();
+            for chunk in &mut chunks {
+                acc = acc + chunk.load();
             }
-            acc.sum_reduce() + self.0[i..].iter().sum::<f32>()
+            acc.sum_reduce() + chunks.remainder().iter().sum::<f32>()
         }
     }
 
@@ -214,6 +220,185 @@ fn dispatched_reduction_agrees_with_sequential_sum() {
         (dispatched - sequential).abs() <= bound,
         "dispatched sum {dispatched} differs from sequential {sequential} by more than {bound}"
     );
+}
+
+/// Token-scoped constants and masks must not force a consumer to re-enter a
+/// checked standalone constructor or use unsafe code inside its lane kernel.
+#[test]
+fn capability_constructs_constants_and_masks() {
+    struct Constructors;
+
+    impl LaneKernel<f64> for Constructors {
+        type Output = (Vec<f64>, u64);
+
+        fn call<A: SimdArch + SimdKernel<f64>>(self, simd: Simd<f64, A>) -> Self::Output {
+            let lanes = <A as SimdStorage<f64>>::LANE_COUNT;
+            let valid_bits = if lanes == 64 {
+                u64::MAX
+            } else {
+                (1_u64 << lanes) - 1
+            };
+            let expected_bits = 0xA5A5_A5A5_A5A5_A5A5 & valid_bits;
+            let actual_bits = simd
+                .mask_from_bitmask(BitMask::<64>(expected_bits))
+                .to_bitmask()
+                .0;
+
+            let mut constants = vec![0.0; lanes];
+            (simd.splat(2.0) + simd.zero())
+                .store_unaligned_to_slice(&mut constants)
+                .expect("output has exactly one complete lane group");
+            (constants, actual_bits)
+        }
+    }
+
+    let (constants, bits) = hermes_simd::vectorize(Constructors);
+    assert!(constants
+        .iter()
+        .all(|&value| value.to_bits() == 2.0_f64.to_bits()));
+    let valid_bits = if constants.len() == 64 {
+        u64::MAX
+    } else {
+        (1_u64 << constants.len()) - 1
+    };
+    assert_eq!(bits, 0xA5A5_A5A5_A5A5_A5A5 & valid_bits);
+}
+
+fn assert_pairwise_sums(actual: &[f32], left: &[f32], right: &[f32]) {
+    for ((actual, left), right) in actual.iter().zip(left).zip(right) {
+        assert_eq!(actual.to_bits(), (*left + *right).to_bits());
+    }
+}
+
+fn assert_filled_with(actual: &[f32], expected: f32) {
+    assert!(actual
+        .iter()
+        .all(|value| value.to_bits() == expected.to_bits()));
+}
+
+#[derive(Clone, Copy)]
+enum IoIteration {
+    Complete,
+    OneChunk,
+}
+
+struct IoExercise<'a> {
+    left: &'a [f32],
+    right: &'a [f32],
+    output: &'a mut [f32],
+    iteration: IoIteration,
+}
+
+impl LaneKernel<f32> for IoExercise<'_> {
+    type Output = (usize, usize, usize, [usize; 2], usize);
+
+    fn call<A: SimdArch + SimdKernel<f32>>(self, simd: Simd<f32, A>) -> Self::Output {
+        let mut chunks = simd.io_chunks([self.left, self.right], [self.output]);
+        let initial = chunks.len();
+        match self.iteration {
+            IoIteration::Complete => {
+                for ([left, right], [mut output]) in &mut chunks {
+                    output.store(left.load() + right.load());
+                }
+            }
+            IoIteration::OneChunk => {
+                if let Some(([left, right], [mut output])) = chunks.next() {
+                    output.store(left.load() + right.load());
+                }
+            }
+        }
+        let remaining = chunks.chunks_remaining();
+        let ([left, right], [output]) = chunks.into_remainders();
+        let tail_lengths = [left.len(), right.len()];
+        let output_tail_length = output.len();
+        if let IoIteration::Complete = self.iteration {
+            let common = left.len().min(right.len()).min(output.len());
+            for index in 0..common {
+                output[index] = left[index] + right[index];
+            }
+        }
+        (
+            <A as SimdStorage<f32>>::LANE_COUNT,
+            initial,
+            remaining,
+            tail_lengths,
+            output_tail_length,
+        )
+    }
+}
+
+fn exercise_io_chunks(
+    left: &[f32],
+    right: &[f32],
+    output: &mut [f32],
+    iteration: IoIteration,
+) -> (usize, usize, usize, [usize; 2], usize) {
+    hermes_simd::vectorize(IoExercise {
+        left,
+        right,
+        output,
+        iteration,
+    })
+}
+
+/// Planar I/O chunking must use one shortest-plane limit, expose exact iterator
+/// length, preserve mutable writes, and return every unprocessed suffix.
+#[test]
+fn io_chunks_preserve_unequal_planes_and_tails() {
+    let left: Vec<f32> = (0..70).map(|index| index as f32 + 0.25).collect();
+    let right: Vec<f32> = (0..67).map(|index| 2.0 * index as f32 - 0.5).collect();
+    let mut output = vec![-1_000.0; 69];
+    let (lanes, initial, remaining, tails, output_tail) =
+        exercise_io_chunks(&left, &right, &mut output, IoIteration::Complete);
+    let vectorized = (67 / lanes) * lanes;
+    assert_eq!(initial, 67 / lanes);
+    assert_eq!(remaining, 0);
+    assert_eq!(tails, [70 - vectorized, 67 - vectorized]);
+    assert_eq!(output_tail, 69 - vectorized);
+    assert_pairwise_sums(&output[..67], &left[..67], &right);
+    assert_filled_with(&output[67..], -1_000.0);
+
+    let mut zero_output = [-1_000.0; 2];
+    let zero = exercise_io_chunks(
+        &[],
+        &[2.0, 3.0, 4.0],
+        &mut zero_output,
+        IoIteration::Complete,
+    );
+    assert_eq!(zero, (lanes, 0, 0, [0, 3], 2));
+    assert_filled_with(&zero_output, -1_000.0);
+
+    let short_len = lanes.saturating_sub(1);
+    let short_left = vec![1.0; short_len];
+    let short_right = vec![2.0; short_len + 2];
+    let mut short_output = vec![-1_000.0; short_len + 1];
+    let short = exercise_io_chunks(
+        &short_left,
+        &short_right,
+        &mut short_output,
+        IoIteration::Complete,
+    );
+    assert_eq!(
+        short,
+        (lanes, 0, 0, [short_len, short_len + 2], short_len + 1)
+    );
+    assert_filled_with(&short_output[..short_len], 3.0);
+    assert_eq!(short_output[short_len].to_bits(), (-1_000.0_f32).to_bits());
+
+    let mut early_output = vec![-1_000.0; 69];
+    let early = exercise_io_chunks(&left, &right, &mut early_output, IoIteration::OneChunk);
+    assert_eq!(
+        early,
+        (
+            lanes,
+            67 / lanes,
+            67 / lanes - 1,
+            [70 - lanes, 67 - lanes],
+            69 - lanes
+        )
+    );
+    assert_pairwise_sums(&early_output[..lanes], &left[..lanes], &right[..lanes]);
+    assert_filled_with(&early_output[lanes..], -1_000.0);
 }
 
 /// A consumer kernel generic over the scalar type must reach the entry.
@@ -234,18 +419,15 @@ fn generic_consumer_kernel_compiles_and_runs() {
     {
         type Output = ();
 
-        fn call<A: SimdArch + SimdKernel<T>>(self) {
-            let lanes = <A as SimdStorage<T>>::LANE_COUNT;
-            let n = self.0.len();
-            let mut i = 0;
-            while i + lanes <= n {
-                let span = i..i + lanes;
-                let v = Vector::<T, A>::load_unaligned_from_slice(&self.0[span.clone()]).unwrap();
-                (v + v).store_unaligned_to_slice(&mut self.0[span]).unwrap();
-                i += lanes;
+        fn call<A: SimdArch + SimdKernel<T>>(self, simd: Simd<T, A>) {
+            let view = simd.view_mut(self.0);
+            let mut chunks = view.simd_chunks_mut();
+            for mut chunk in &mut chunks {
+                let vector = chunk.load();
+                chunk.store(vector + vector);
             }
-            for j in i..n {
-                self.0[j] = self.0[j] + self.0[j];
+            for value in chunks.into_remainder() {
+                *value = *value + *value;
             }
         }
     }

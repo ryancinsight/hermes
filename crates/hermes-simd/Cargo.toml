@@ -24,6 +24,7 @@ tracing = { workspace = true }
 rkyv = { version = "0.8" }
 proptest = "1.4"
 criterion = { version = "0.5", features = ["html_reports"] }
+fearless_simd = "0.7.0"
 tracing-subscriber = { version = "0.3", features = ["fmt"] }
 
 [[bench]]
@@ -40,6 +41,10 @@ harness = false
 
 [[bench]]
 name = "simd_isa_comparison"
+harness = false
+
+[[bench]]
+name = "lane_throughput"
 harness = false
 
 [features]

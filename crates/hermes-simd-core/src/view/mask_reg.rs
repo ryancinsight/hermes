@@ -1,6 +1,6 @@
 //! Monomorphized SIMD mask register wrapper.
 
-use super::vector_reg::{assert_runtime_supported, Vector};
+use super::vector_reg::Vector;
 use crate::arch::SimdArch;
 use crate::kernel::{SimdKernel, SimdStorage};
 use crate::mask::BitMask;
@@ -47,8 +47,7 @@ where
     T: Scalar,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        assert_runtime_supported::<T, Arch>();
-        let bm = unsafe { self.to_bitmask() };
+        let bm = self.to_bitmask();
         f.debug_tuple("Mask").field(&bm.to_bools()).finish()
     }
 }
@@ -60,8 +59,7 @@ where
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        assert_runtime_supported::<T, Arch>();
-        unsafe { self.to_bitmask() == other.to_bitmask() }
+        self.to_bitmask() == other.to_bitmask()
     }
 }
 
@@ -77,9 +75,9 @@ where
     Arch: SimdArch + SimdKernel<T>,
     T: Scalar,
 {
-    /// Create a new Mask wrapping a raw mask register.
+    /// Wrap a raw mask after the caller has established host support.
     #[inline(always)]
-    pub const fn new(raw: Arch::Mask) -> Self {
+    pub(crate) const fn new(raw: Arch::Mask) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -93,50 +91,47 @@ where
     #[inline(always)]
     #[must_use]
     pub unsafe fn from_bitmask(bm: BitMask<64>) -> Self {
-        Self::new(Arch::mask_from_bitmask(bm.0))
+        // SAFETY: the caller guarantees host support for `Arch`.
+        Self::new(unsafe { Arch::mask_from_bitmask(bm.0) })
     }
 
-    /// Convert the Mask to a portable `BitMask<64>`.
-    ///
-    /// # Safety
-    /// Processor must support the target feature of `Arch`.
+    /// Convert the mask to portable lane bits.
     #[inline(always)]
-    pub unsafe fn to_bitmask(self) -> BitMask<64> {
-        BitMask(Arch::mask_to_bitmask(self.raw))
+    pub fn to_bitmask(self) -> BitMask<64> {
+        // SAFETY: constructing `self` proved host support for `Arch`.
+        BitMask(unsafe { Arch::mask_to_bitmask(self.raw) })
     }
 
     /// Returns `true` if any lanes of the mask are active.
     #[inline(always)]
     pub fn any(self) -> bool {
-        assert_runtime_supported::<T, Arch>();
-        unsafe { !self.to_bitmask().is_none_active() }
+        !self.to_bitmask().is_none_active()
     }
 
     /// Returns `true` if all lanes of the mask are active.
     #[inline(always)]
     pub fn all(self) -> bool {
-        assert_runtime_supported::<T, Arch>();
         let lanes = <Arch as SimdStorage<T>>::LANE_COUNT;
         let expected = if lanes >= 64 {
             u64::MAX
         } else {
             (1u64 << lanes) - 1
         };
-        unsafe { (self.to_bitmask().0 & expected) == expected }
+        (self.to_bitmask().0 & expected) == expected
     }
 
     /// Returns `true` if no lanes of the mask are active.
     #[inline(always)]
     pub fn none(self) -> bool {
-        assert_runtime_supported::<T, Arch>();
-        unsafe { self.to_bitmask().is_none_active() }
+        self.to_bitmask().is_none_active()
     }
 
     /// Select elements from `true_val` where the mask is active, and from `false_val` otherwise.
     #[inline(always)]
     pub fn select(self, true_val: Vector<T, Arch>, false_val: Vector<T, Arch>) -> Vector<T, Arch> {
-        assert_runtime_supported::<T, Arch>();
-        let zero = Vector::<T, Arch>::zero();
+        // SAFETY: constructing `self` proved host support for `Arch`.
+        let zero = Vector::<T, Arch>::new(unsafe { Arch::zero() });
+        // SAFETY: all operands carry the same host-support proof.
         Vector::new(unsafe { Arch::masked_add(true_val.raw, zero.raw, self.raw, false_val.raw) })
     }
 }
@@ -150,7 +145,7 @@ where
     type Output = Self;
     #[inline(always)]
     fn bitand(self, rhs: Self) -> Self::Output {
-        assert_runtime_supported::<T, Arch>();
+        // SAFETY: constructing both operands proved host support for `Arch`.
         unsafe {
             let bm_self = self.to_bitmask();
             let bm_rhs = rhs.to_bitmask();
@@ -167,7 +162,7 @@ where
     type Output = Self;
     #[inline(always)]
     fn bitor(self, rhs: Self) -> Self::Output {
-        assert_runtime_supported::<T, Arch>();
+        // SAFETY: constructing both operands proved host support for `Arch`.
         unsafe {
             let bm_self = self.to_bitmask();
             let bm_rhs = rhs.to_bitmask();
@@ -184,7 +179,7 @@ where
     type Output = Self;
     #[inline(always)]
     fn bitxor(self, rhs: Self) -> Self::Output {
-        assert_runtime_supported::<T, Arch>();
+        // SAFETY: constructing both operands proved host support for `Arch`.
         unsafe {
             let bm_self = self.to_bitmask();
             let bm_rhs = rhs.to_bitmask();
@@ -201,7 +196,7 @@ where
     type Output = Self;
     #[inline(always)]
     fn not(self) -> Self::Output {
-        assert_runtime_supported::<T, Arch>();
+        // SAFETY: constructing `self` proved host support for `Arch`.
         unsafe {
             let bm = self.to_bitmask();
             let lanes = <Arch as SimdStorage<T>>::LANE_COUNT;

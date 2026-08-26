@@ -64,7 +64,7 @@ pub use bitboard::{BitBoardKernel, BitBoardView};
 pub use compute::ComputeView;
 pub use cow::{ArchivedPacked4Cow, ArchivedSimdCow, Packed4CowResolver, SimdCow, SimdCowResolver};
 pub use execution::{ExecutionMode, Masked, Unmasked};
-pub use iter::{SimdChunks, SimdChunksMut, ZipChunks};
+pub use iter::{SimdChunks, SimdChunksMut, SimdIoChunks, ZipChunks};
 pub use kernel::{
     BackendKernel, SimdArith, SimdBitwise, SimdCompare, SimdGather, SimdKernel, SimdLoadStore,
     SimdMask, SimdPermute, SimdReduce, SimdStorage,
@@ -87,4 +87,4 @@ pub use sparse::{
 pub use tensor::{ColMajor, RowMajor, TensorCow, TensorError, TensorView};
 pub use tiling::{tiled_dot, tiled_gemm, tiled_gemv, TilingPolicy, TilingStrategy};
 pub use vec::AlignedVec;
-pub use view::{Mask, SimdError, SimdView, TileMatrixMultiply, TileView, Vector};
+pub use view::{Mask, Simd, SimdChunk, SimdError, SimdView, TileMatrixMultiply, TileView, Vector};

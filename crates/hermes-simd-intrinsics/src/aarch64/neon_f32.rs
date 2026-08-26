@@ -115,6 +115,14 @@ impl BackendKernel<f32> for Neon {
         NeonF32Vec(vfmaq_f32(c.0, a.0, b.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon`; negation is
+    // exact and `vfmaq_f32` performs the multiply-subtract with one rounding.
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn fmsub(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
+        NeonF32Vec(vfmaq_f32(vnegq_f32(c.0), a.0, b.0))
+    }
+
     /// `vrev64q_f32` swaps 32-bit lanes within each 64-bit doubleword.
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]

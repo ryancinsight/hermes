@@ -38,7 +38,7 @@
 //! # Example
 //!
 //! ```
-//! use hermes_simd::{LaneKernel, SimdArch, SimdKernel, Vector, vectorize};
+//! use hermes_simd::{LaneKernel, Simd, SimdArch, SimdKernel, Vector, vectorize};
 //!
 //! /// Elementwise `a * b + c` over three equal-length slices.
 //! struct FusedMulAdd<'a> {
@@ -50,17 +50,20 @@
 //! impl LaneKernel<f32> for FusedMulAdd<'_> {
 //!     type Output = Vec<f32>;
 //!
-//!     fn call<A: SimdArch + SimdKernel<f32>>(self) -> Vec<f32> {
+//!     fn call<A: SimdArch + SimdKernel<f32>>(self, simd: Simd<f32, A>) -> Vec<f32> {
 //!         let lanes = <A as hermes_simd::SimdStorage<f32>>::LANE_COUNT;
 //!         let mut out = vec![0.0; self.a.len()];
+//!         let a = simd.view(self.a);
+//!         let b = simd.view(self.b);
+//!         let c = simd.view(self.c);
+//!         let mut out_view = simd.view_mut(&mut out);
 //!         let mut i = 0;
 //!         while i + lanes <= self.a.len() {
-//!             let va = Vector::<f32, A>::load_unaligned_from_slice(&self.a[i..i + lanes]).unwrap();
-//!             let vb = Vector::<f32, A>::load_unaligned_from_slice(&self.b[i..i + lanes]).unwrap();
-//!             let vc = Vector::<f32, A>::load_unaligned_from_slice(&self.c[i..i + lanes]).unwrap();
+//!             let va = Vector::from_view_chunk(&a, i / lanes);
+//!             let vb = Vector::from_view_chunk(&b, i / lanes);
+//!             let vc = Vector::from_view_chunk(&c, i / lanes);
 //!             va.mul_add(vb, vc)
-//!                 .store_unaligned_to_slice(&mut out[i..i + lanes])
-//!                 .unwrap();
+//!                 .store_to_view_chunk(&mut out_view, i / lanes);
 //!             i += lanes;
 //!         }
 //!         for j in i..self.a.len() {
@@ -79,7 +82,7 @@
 //! );
 //! ```
 
-use hermes_simd_core::{arch::SimdArch, kernel::SimdKernel, scalar::Scalar};
+use hermes_simd_core::{arch::SimdArch, kernel::SimdKernel, scalar::Scalar, Simd};
 use hermes_simd_macros::runtime_dispatch;
 
 /// A lane kernel written once and monomorphized to every backend.
@@ -101,8 +104,10 @@ pub trait LaneKernel<T: Scalar> {
     /// Runs the kernel against one backend.
     ///
     /// Called exactly once, from inside that backend's `#[target_feature]`
-    /// scope. Which backend is chosen is [`vectorize`]'s decision.
-    fn call<A: SimdArch + SimdKernel<T>>(self) -> Self::Output;
+    /// scope. Which backend is chosen is [`vectorize`]'s decision. `simd`
+    /// proves that the host supports `A` and constructs views without another
+    /// runtime feature probe.
+    fn call<A: SimdArch + SimdKernel<T>>(self, simd: Simd<T, A>) -> Self::Output;
 }
 
 /// A scalar type every Hermes backend can operate on.
@@ -167,5 +172,8 @@ where
     K: LaneKernel<T>,
     A: SimdArch + SimdKernel<T>,
 {
-    kernel.call::<A>()
+    // SAFETY: `#[runtime_dispatch]` invokes this specialization only after its
+    // generated dispatcher proves host support for `A` and enters `A`'s
+    // target-feature scope.
+    kernel.call::<A>(unsafe { Simd::assume_supported() })
 }

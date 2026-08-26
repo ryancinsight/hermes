@@ -63,7 +63,7 @@ pub use hermes_simd_core::{
     current_numa_node,
     execution::{ExecutionMode, Masked, Unmasked},
     // Chunk iterators
-    iter::{SimdChunks, SimdChunksMut, ZipChunks, ZipChunksMut},
+    iter::{SimdChunks, SimdChunksMut, SimdIoChunks, ZipChunks, ZipChunksMut},
     kernel::{
         SimdArith, SimdBitwise, SimdCompare, SimdGather, SimdKernel, SimdLoadStore, SimdMask,
         SimdPermute, SimdReduce, SimdStorage,
@@ -73,7 +73,7 @@ pub use hermes_simd_core::{
     scalar::{CastFrom, CastTo, FloatElement, Scalar as SimdScalar},
     vec::AlignedVec,
     verify_numa_locality,
-    view::{Mask, SimdError, SimdView, TileMatrixMultiply, TileView, Vector},
+    view::{Mask, Simd, SimdChunk, SimdError, SimdView, TileMatrixMultiply, TileView, Vector},
     // Unary strategy ZSTs
     Abs,
     Add,

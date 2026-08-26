@@ -845,7 +845,7 @@ fn test_new_vector_features() {
     let b = Vector::<f32, Scalar>::from_array([1.0f32, 5.0, 3.0, 6.0]);
 
     let eq_mask = a.cmp_eq_mask(b);
-    assert_eq!(unsafe { eq_mask.to_bitmask().0 }, 0b0101); // lane 0 and 2 are equal (1.0 == 1.0, 3.0 == 3.0)
+    assert_eq!(eq_mask.to_bitmask().0, 0b0101); // lane 0 and 2 are equal (1.0 == 1.0, 3.0 == 3.0)
 
     assert!(eq_mask.any());
     assert!(!eq_mask.all());
@@ -858,7 +858,7 @@ fn test_new_vector_features() {
 
     // Bitwise mask ops
     let ne_mask = a.cmp_ne_mask(b); // lane 1 and 3 are unequal (0b1010)
-    assert_eq!(unsafe { ne_mask.to_bitmask().0 }, 0b1010);
+    assert_eq!(ne_mask.to_bitmask().0, 0b1010);
 
     let and_mask = eq_mask & ne_mask;
     assert!(and_mask.none()); // mutually exclusive
@@ -867,7 +867,7 @@ fn test_new_vector_features() {
     assert!(or_mask.all()); // covers all lanes
 
     let not_mask = !eq_mask;
-    assert_eq!(unsafe { not_mask.to_bitmask().0 }, 0b1010);
+    assert_eq!(not_mask.to_bitmask().0, 0b1010);
 
     // 5. Vector-View Integration (from_view_chunk / store_to_view_chunk)
     let view_data = [10.0f32, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0];

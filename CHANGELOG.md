@@ -6,13 +6,16 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
-- [patch] Record a lane-throughput finding from Apollo's FFT work: seven kernel
-  variants written against this crate's lane surface all landed between 3.4 and
-  6.1 flops/ns where RustFFT reached 38.5 and PhastFT — built on
-  `fearless_simd` — reached 32.8, in the same binary with the same flags. Build
-  configuration, bandwidth, pass count, allocation, and layout are excluded by
-  measurement. The checked slice wrappers account for about 45% of it; the
-  remainder is unlocated. Filed as `HS-LANE-THROUGHPUT-2026-08-25`.
+- [patch][HS-LANE-THROUGHPUT] Resolve the lane-throughput deficit found by
+  Apollo's FFT work. A capability-carrying `Simd<T, A>` value now hoists runtime
+  support checks out of lane kernels, exact-width chunks carry their validity
+  proof, and existing vectors and masks no longer re-probe support. In the
+  corrected same-binary, same-address planar butterfly comparison, Hermes and
+  `fearless_simd` 0.7 have overlapping 95% confidence intervals at 256, 1024,
+  and 4096 elements: Hermes medians are 77.024 ns, 1.0134 us, and 3.9417 us;
+  Fearless medians are 76.687 ns, 1.0022 us, and 3.9392 us. AVX2 code generation
+  has one hot-loop branch, six loads, four stores, fused arithmetic, and no
+  calls, support probes, bounds checks, or panic paths for either substrate.
 
 - [minor][HS-FEARLESS-TOKEN] Add `hermes_simd::vectorize` and the
   `LaneKernel<T>` trait: a consumer outside this crate writes one generic lane
@@ -59,6 +62,17 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   repository root contains only sanctioned manifest artifacts.
 
 ### Breaking
+
+- [major][HS-LANE-THROUGHPUT] `LaneKernel::call` now accepts
+  `self, Simd<T, A>` so kernels construct vectors, masks, views, and chunks from
+  the already-proven capability. Migrate implementations to accept `simd` and
+  use its constructors, or use the existing checked or explicitly unsafe entry
+  boundaries outside `vectorize`. Raw `Vector` and `Mask` constructors are no
+  longer public. `SimdChunks`, `SimdChunksMut`, `ZipChunks`, and `ZipChunksMut`
+  now yield exact-width `SimdChunk` values instead of `SimdView`; migrate loop
+  bodies to `chunk.load()` / `chunk.store(vector)` or the chunk's slice access.
+  Chunks intentionally carry no inherited alignment claim because a
+  register-width stride need not preserve an over-aligned parent.
 
 - [major][HS-438] The AMX `raw` tile wrappers in `hermes-simd-intrinsics`
   (`tilezero`/`tileloadd`/`tilestored`/`tdpbf16ps`/`tdpbssd`) take their tile

@@ -10,7 +10,7 @@ use crate::Avx2;
 use core::arch::x86_64::{
     __m128i, __m256d, _mm256_add_pd, _mm256_and_pd, _mm256_andnot_pd, _mm256_blendv_pd,
     _mm256_castpd256_pd128, _mm256_castpd_si256, _mm256_ceil_pd, _mm256_cmp_pd, _mm256_div_pd,
-    _mm256_extractf128_pd, _mm256_floor_pd, _mm256_fmadd_pd, _mm256_fmaddsub_pd,
+    _mm256_extractf128_pd, _mm256_floor_pd, _mm256_fmadd_pd, _mm256_fmaddsub_pd, _mm256_fmsub_pd,
     _mm256_fmsubadd_pd, _mm256_i32gather_pd, _mm256_load_pd, _mm256_loadu_pd,
     _mm256_mask_i32gather_pd, _mm256_maskstore_pd, _mm256_max_pd, _mm256_min_pd, _mm256_movedup_pd,
     _mm256_movemask_pd, _mm256_mul_pd, _mm256_or_pd, _mm256_permute4x64_pd, _mm256_permute_pd,
@@ -143,6 +143,16 @@ impl BackendKernel<f64> for Avx2 {
     #[inline]
     unsafe fn fmadd(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
         Avx2F64Vec(_mm256_fmadd_pd(a.0, b.0, c.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2,fma`; operands
+    // are registers of this backend and require no pointer validation.
+    #[target_feature(enable = "avx2,fma")]
+    #[inline]
+    unsafe fn fmsub(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
+        // SAFETY: this function enables AVX2 and FMA, and all operands are
+        // valid registers of the matching backend.
+        Avx2F64Vec(_mm256_fmsub_pd(a.0, b.0, c.0))
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.

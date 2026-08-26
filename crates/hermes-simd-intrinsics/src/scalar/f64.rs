@@ -55,6 +55,11 @@ impl BackendKernel<f64> for Scalar {
     }
 
     #[inline(always)]
+    unsafe fn fmsub(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
+        [a[0].mul_add(b[0], -c[0]), a[1].mul_add(b[1], -c[1])]
+    }
+
+    #[inline(always)]
     unsafe fn sum_reduce(v: Self::Vector) -> f64 {
         v[0] + v[1]
     }
