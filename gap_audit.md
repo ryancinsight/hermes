@@ -41,6 +41,91 @@ Nothing in the current gate is wrong — nextest is the sanctioned runner and it
 passes — so this is latent rather than breaking, and the risk is that the
 assertion is read as verifying something it does not.
 
+## Lane throughput against fearless_simd (2026-08-25) <a id="lane-throughput-2026-08-25"></a>
+
+Evidence tier: measured in a consumer's build, seven kernel variants, all
+engines interleaved in one process, every variant correctness-gated before its
+timing was read. No claim here is drawn from a cross-run comparison.
+
+Apollo set out to close a 7x-10x FFT throughput gap against RustFFT and PhastFT
+and eliminated every algorithmic cause it could find. What remained points here.
+
+### The measurement
+
+Power-of-two complex f64 FFT, arithmetic rate as `5 N log2 N` flops over elapsed
+time, at N=2^10 where the whole 16 KB array is L1-resident:
+
+| kernel | flops/ns |
+| --- | --- |
+| planar radix-2, plain loops left to autovectorization | 4.6 |
+| planar, first three stages fused | ~4.6 |
+| planar, cache-oblivious recursion to a 1024-element block | ~4.6 |
+| planar, Hermes `Vector` ops through `vectorize` | ~4.5 |
+| interleaved, Hermes `dup_even`/`dup_odd`/`swap_adjacent`/`fmaddsub` | 4.2 |
+| the same, per-call slice validation hoisted to raw loads | 6.1 |
+| Apollo's own hand-written AVX Stockham | 3.4-4.3 |
+| **RustFFT** | **38.5** |
+| **PhastFT, built on `fearless_simd`** | **32.8** |
+
+A scalar f64 pipeline on this host is roughly 6 flops/ns; AVX2 is roughly 48.
+The external engines reach 68-80% of peak. Everything routed through Hermes'
+lane surface, or through Apollo's own AVX code, sits near or below the scalar
+pipeline rate.
+
+RustFFT and PhastFT run **inside the same test binary**, compiled with the same
+profile and the same flags, which excludes build configuration. The data is
+L1-resident, which excludes bandwidth. Apollo's fused pass count is four passes
+for ten radix-2 stages — fewer than RustFFT's radix-4 needs — which excludes
+pass count. Its complex path allocates zero per call, measured with a counting
+allocator, which excludes allocation.
+
+The interleaved row is the sharpest comparison available: it uses the exact
+primitive sequence RustFFT's AVX path uses for a complex multiply —
+`fmaddsub(dup_even(w), b, dup_odd(w) * swap_adjacent(b))`, one shuffle pair and
+one fused instruction — against the same interleaved layout, and still lands at
+4.2.
+
+### One mechanism, partially identified
+
+Replacing `Vector::load_unaligned_from_slice(..).unwrap()` with the raw
+`load_unaligned` pointer form moved that kernel from 4.2 to 6.1 flops/ns. The
+per-call length and alignment validation costs about **45%** in a kernel that
+issues six loads and stores per two complex elements.
+
+This is not an argument against the checked wrappers, which exist because the
+Highway audit correctly identified their absence as a gap. It is an argument
+that a consumer currently has to choose between the safe surface and throughput,
+and that the safe surface should not cost 45% when the bounds are loop-invariant.
+
+Hermes already has the machinery to hoist those checks — `SimdView` typestates
+carry alignment and length as type parameters, and `SimdChunks`/`ZipChunks`
+iterate pre-validated blocks. The prototypes did not use them, so the remaining
+question is open rather than answered: does the existing chunk-iterator surface
+close the distance, and if it does, why did the first consumer to write a
+fine-grained kernel not reach for it?
+
+### Why this is filed here and not in Apollo
+
+Apollo eliminated layout, stage fusion, cache blocking, primitive selection, and
+validation strategy across seven variants spanning 3.4 to 6.1 flops/ns. Whatever
+separates that band from 33-38 is not reachable from a consumer's algorithm
+choices. It is a property of the lane operations themselves, which is Hermes'
+bounded context.
+
+`fearless_simd` is the reference that makes the gap legible: PhastFT is an
+`#![forbid(unsafe_code)]` FFT that reaches 32.8 flops/ns on this host through a
+safe SIMD abstraction. Whatever it does at the lane level, Hermes should be able
+to match — and the fact that a safe abstraction achieves it removes safety as
+the explanation.
+
+### Scope note
+
+This does not claim a defect in any specific Hermes operation. It reports that
+seven independent attempts to reach competitive lane throughput through this
+substrate all failed within a narrow band, that the checked-load overhead
+accounts for part of it, and that the remainder is unlocated. Locating it is
+`HS-LANE-THROUGHPUT-2026-08-25`.
+
 ## Fearless SIMD audit — amendment and closure (2026-08-25) <a id="fearless-simd-amendment"></a>
 
 Two corrections to the audit below, found while implementing the increment it

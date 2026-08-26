@@ -1,5 +1,47 @@
 # Backlog — hermes-simd
 
+## HS-LANE-THROUGHPUT-2026-08-25 — Locate the gap between the lane surface and fearless_simd [arch] — todo
+
+- **Outcome:** a consumer kernel written against Hermes' lane surface reaches
+  arithmetic rates comparable to `fearless_simd` on the same host and workload,
+  or the reason it cannot is understood and recorded.
+- **Finding:** Apollo built seven power-of-two FFT kernel variants — planar and
+  interleaved, with and without stage fusion, with and without cache blocking,
+  using autovectorization, `Vector` ops through `vectorize`, and the exact
+  `dup_even`/`dup_odd`/`swap_adjacent`/`fmaddsub` complex-multiply sequence
+  RustFFT's AVX path uses. Every one landed between **3.4 and 6.1 flops/ns**.
+  RustFFT reached **38.5** and PhastFT — an `#![forbid(unsafe_code)]` FFT built
+  on `fearless_simd` — reached **32.8**, in the same test binary with the same
+  profile and flags. Scalar f64 on that host is ~6 flops/ns and AVX2 ~48. Full
+  measurement in `gap_audit.md#lane-throughput-2026-08-25`.
+- **Excluded by measurement, not assumption:** build configuration (the fast
+  engines are in the same binary), bandwidth (L1-resident at 2^10), pass count
+  (Apollo runs four passes for ten radix-2 stages, fewer than RustFFT's radix-4),
+  transient allocation (zero per call, counted with a global allocator), and
+  layout (planar measured no better than interleaved).
+- **Located so far:** the checked slice wrappers cost about 45% in a
+  fine-grained kernel — swapping `load_unaligned_from_slice(..).unwrap()` for the
+  raw pointer form moved one variant from 4.2 to 6.1 flops/ns. Real, actionable,
+  and not the whole gap.
+- **First step:** re-run the interleaved variant using `SimdView` typestates and
+  the `SimdChunks`/`ZipChunks` iterators, which exist to hoist exactly those
+  checks and which the prototypes did not use. If they close the distance, the
+  finding is a discoverability defect and the fix is guidance plus an example.
+  If they do not, the remainder is in the lane operations and the next step is
+  codegen comparison against `fearless_simd` on one butterfly.
+- **Non-goals:** adopting `fearless_simd`, which would re-fork the dimension
+  Hermes owns; changing Apollo, which has exhausted its algorithmic levers here.
+- **Acceptance oracle:** a consumer-shaped kernel in this repository reaching a
+  recorded arithmetic rate within a stated factor of `fearless_simd` on the same
+  host, or a recorded explanation of the residual with codegen evidence.
+- **Risk / change class:** [arch]; likely touches the load/store surface or its
+  guidance. **Dependencies:** none.
+- **Why this is Hermes' item:** the consumer eliminated every lever available to
+  it. What separates 3.4-6.1 from 33-38 is not reachable from an algorithm
+  choice; it is a property of the lane operations, which is this crate's bounded
+  context. That a *safe* abstraction reaches 32.8 also removes safety as the
+  explanation.
+
 ## HS-NUMA-GEN-ISOLATION-2026-08-25 — Assert the property, not the global counter [patch] — todo
 
 - **Outcome:** `test_numa_locality_caching_correctness_and_invalidation` verifies

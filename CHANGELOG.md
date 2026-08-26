@@ -6,6 +6,14 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch] Record a lane-throughput finding from Apollo's FFT work: seven kernel
+  variants written against this crate's lane surface all landed between 3.4 and
+  6.1 flops/ns where RustFFT reached 38.5 and PhastFT — built on
+  `fearless_simd` — reached 32.8, in the same binary with the same flags. Build
+  configuration, bandwidth, pass count, allocation, and layout are excluded by
+  measurement. The checked slice wrappers account for about 45% of it; the
+  remainder is unlocated. Filed as `HS-LANE-THROUGHPUT-2026-08-25`.
+
 - [minor][HS-FEARLESS-TOKEN] Add `hermes_simd::vectorize` and the
   `LaneKernel<T>` trait: a consumer outside this crate writes one generic lane
   kernel and Hermes runs it inside the `#[target_feature]` scope of the widest
