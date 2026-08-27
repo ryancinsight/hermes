@@ -1057,3 +1057,45 @@ fn test_sellp_elementwise_rejects_flat_index_beyond_i32() {
     let mut out = [0.0f32; 4];
     view.elementwise_mul_dense(&dense, &mut out);
 }
+
+#[cfg(target_pointer_width = "64")]
+#[test]
+#[should_panic(expected = "BlockedCoo elementwise_mul_dense: nrows * ncols overflows usize")]
+fn test_blocked_coo_elementwise_rejects_dimension_product_overflow() {
+    let block = [1.0f32; 4];
+    let block_row = [0i32];
+    let block_col = [0i32];
+    // 2^32 x 2^32 wraps the dense-extent product to zero in release builds; an
+    // unchecked guard would then accept any dense buffer and the per-block
+    // extent checks would pass against the huge (unwrapped) dimensions.
+    let huge = 1usize << 32;
+    let data =
+        BlockedCooData::<f32, 2, 2>::new(&block, &block_row, &block_col, 1, huge, huge);
+    let view = SparseView::<f32, BlockedCoo<2, 2>, Scalar>::from_blocked_coo(data);
+    let dense = [1.0f32; 4];
+    let mut out = [0.0f32; 4];
+    view.elementwise_mul_dense(&dense, &mut out);
+}
+
+#[test]
+fn test_blocked_coo_validate_rejects_block_count_overflow() {
+    // `nblocks * BM * BN` wraps `usize`. Pre-fix, `validate` panicked on the
+    // overflow in debug builds and compared against the wrapped product in
+    // release builds; its contract is a typed error in both.
+    let block = [1.0f32; 4];
+    let block_row = [0i32];
+    let block_col = [0i32];
+    let data = BlockedCooData::<f32, 2, 2>::new(
+        &block,
+        &block_row,
+        &block_col,
+        usize::MAX / 2,
+        4,
+        4,
+    );
+    assert_eq!(
+        hermes_simd_core::sparse::types::SparseValidate::validate(&data),
+        Err(SimdError::LengthMismatch)
+    );
+}
+

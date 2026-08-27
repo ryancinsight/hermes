@@ -499,7 +499,15 @@ impl<T, const C: usize, V: AsRef<[T]>, I: AsRef<[i32]>> SparseValidate for SellP
             if col_count < 0 {
                 return Err(crate::SimdError::IndexOutOfBounds);
             }
-            if start as usize + col_count as usize * C > values.len() {
+            // Checked slice extent: on 32-bit targets `col_count * C` can wrap
+            // `usize`, which would make this guard pass vacuously.
+            let Some(slice_end) = (col_count as usize)
+                .checked_mul(C)
+                .and_then(|elems| elems.checked_add(start as usize))
+            else {
+                return Err(crate::SimdError::LengthMismatch);
+            };
+            if slice_end > values.len() {
                 return Err(crate::SimdError::LengthMismatch);
             }
         }
@@ -523,7 +531,17 @@ impl<T, const BM: usize, const BN: usize, V: AsRef<[T]>, I: AsRef<[i32]>> Sparse
         let block_row = self.block_row.as_ref();
         let block_col = self.block_col.as_ref();
 
-        if blocks.len() < self.nblocks * BM * BN {
+        // Checked product (mirroring `DenseWithMask::checked_logical_len`): a
+        // wrapped `nblocks * BM * BN` would make this guard pass vacuously for
+        // pathological descriptors.
+        let Some(block_elems) = self
+            .nblocks
+            .checked_mul(BM)
+            .and_then(|blocks| blocks.checked_mul(BN))
+        else {
+            return Err(crate::SimdError::LengthMismatch);
+        };
+        if blocks.len() < block_elems {
             return Err(crate::SimdError::LengthMismatch);
         }
         if block_row.len() < self.nblocks {

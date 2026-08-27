@@ -268,10 +268,22 @@ where
         // Bounds for the unchecked SIMD loads/stores below: the dense matrix and
         // the block/output buffers must be large enough, and every block must lie
         // within the `nrows x ncols` dense extent so each `dense[(br+i)*ncols+bc
-        // .. +BN]` read stays in bounds. O(nblocks), once per call.
-        let block_elems = d.nblocks * BM * BN;
+        // .. +BN]` read stays in bounds. O(nblocks), once per call. Both
+        // products are checked (mirroring `DenseWithMask::checked_logical_len`):
+        // an unchecked multiply wraps in release builds, so a pathological
+        // descriptor (`nrows = ncols = 2^32`) would pass a wrapped guard
+        // vacuously and let the unchecked loads read out of bounds.
+        let block_elems = d
+            .nblocks
+            .checked_mul(BM)
+            .and_then(|blocks| blocks.checked_mul(BN))
+            .expect("BlockedCoo elementwise_mul_dense: nblocks * BM * BN overflows usize");
+        let logical_len = d
+            .nrows
+            .checked_mul(d.ncols)
+            .expect("BlockedCoo elementwise_mul_dense: nrows * ncols overflows usize");
         assert!(
-            dense.len() >= d.nrows * d.ncols,
+            dense.len() >= logical_len,
             "dense buffer {} too small for {}x{}",
             dense.len(),
             d.nrows,
