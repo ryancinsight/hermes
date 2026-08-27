@@ -1,5 +1,30 @@
 # Backlog — hermes-simd
 
+## HS-SPARSE-SAFETY-2026-08-27 — Sparse OOB guards, F-only AVX-512, mask contract [patch] — in-progress
+
+- **Integrator:** claude-fable session 03d80d33 subagent.
+  **Lease:** `crates/hermes-simd-core/src/sparse/{ops.rs,types.rs}`,
+  `crates/hermes-simd-core/src/view/{gather.rs,scatter.rs,vector_reg.rs}`,
+  `crates/hermes-simd-core/src/kernel_helpers.rs`,
+  `crates/hermes-simd-core/src/kernel/backend.rs` (mask_from_bitmask +
+  transpose_square default only),
+  `crates/hermes-simd-intrinsics/src/x86_64/avx512_f32.rs`,
+  `crates/hermes-simd-intrinsics/src/aarch64/{neon_f32.rs,neon_f64.rs}`, this
+  entry.
+- **Outcome:** close two safe-code OOB holes in sparse dense-operand guards
+  (SELL-P missing dense-length assert; BlockedCoo wrapping dimension product),
+  replace the AVX512DQ intrinsic in the F-only `avx512_f32` popcount, define
+  the mask-active contract as sign-bit once across generic/NEON
+  blend/to_bitmask/compress paths, make `alternating_fma` genuinely fused in
+  the generic helper, saturate i32 gather/scatter bounds instead of
+  truncating, add backend `mask_from_bitmask` overrides matching the
+  documented single-instruction expansion, and shrink the transpose_square
+  default's stack frame to lane-count size.
+- **Risk / change class:** [patch] — no public signature changes; behavioral
+  changes are panic-on-invalid (documented contract), mask-contract
+  unification, and tighter FMA rounding.
+  **Last update:** 2026-08-27.
+
 ## HS-EXACT-LANE-DISPATCH-2026-08-27 — Dispatch consumer kernels by exact lane count [minor] [arch] — review
 
 - **Integrator:** Codex task `01a0253c-6013-7552-99cc-36bbbcf77f6d`.
