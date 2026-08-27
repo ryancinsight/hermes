@@ -1174,11 +1174,15 @@ order (correctness → architecture → tests → docs → PM).
   same packed precise-conversion sequence, including Rust-compatible positive
   overflow, NaN, and infinity correction; boundary and arbitrary-bit tests
   match scalar `as`. The corrected whole-output checksum instrument reports
-  8.5–11.3x finite in-range public-path gains across 256–4096 elements; the
+  6.9–11.4x finite in-range public-path gains across 256–4096 elements; the
   provider-to-provider rows remain host-load-sensitive, so no parity claim is
-  attached to this result (`HS-NATIVE-CAST-THROUGHPUT-2026-08-27`).
-  Lane-count-changing conversion
-  remains outside the current `Vector::cast` contract.
+  attached to this result. Provider `18da238` merged through PR #86 as
+  `5734b85`; PR #87 fixed target-test imports as `4f6a1eb`, and hosted run
+  `33120584552` is green. AVX2 intrinsics cannot execute under Miri; targeted
+  host property tests and exact code generation cover this path. Local ASan
+  remained unavailable because the MSVC toolchain lacks
+  `clang_rt.asan_dynamic_runtime_thunk-x86_64.lib`. Lane-count-changing
+  conversion remains outside the current `Vector::cast` contract.
 - **[RESOLVED 2026-08-27] AArch64 all-target warning escape.** PR #86's local
   AArch64 evidence compiled library targets only, while hosted CI compiled test
   targets and rejected three host-conditional imports under `-D warnings`. The

@@ -27,7 +27,7 @@
       generation; implement only if the deficit and stack mechanism repeat.
 - [x] Preserve finite, boundary, NaN, and infinity semantics across affected
       backends without changing the public API or allocating.
-- [ ] Run exact-diff and affected full gates, synchronize evidence, obtain an
+- [x] Run exact-diff and affected full gates, synchronize evidence, obtain an
       independent judge verdict, commit, publish, collect hosted verification,
       merge, and continue.
 
