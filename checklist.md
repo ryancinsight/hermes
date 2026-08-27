@@ -1,5 +1,16 @@
 # Checklist — active sprint
 
+## HS-EXACT-LANE-DISPATCH-2026-08-27 [minor] [arch]
+
+- [x] Reconcile Apollo's four-lane contract with ADRs 016/017, current backend
+      lane counts, forced-target helpers, and the generated widest dispatcher.
+- [ ] Record ADR 018 and implement one exact-lane entry without changing
+      widest-native dispatch or adding fixed-vector aliases.
+- [ ] Add host-independent value and no-call tests plus x86/AArch64 selection
+      coverage under `#![forbid(unsafe_code)]`.
+- [ ] Inspect optimized codegen, run focused/full/cross-target/SemVer gates,
+      synchronize audit and changelog evidence, then publish and collect CI.
+
 ## HS-NATIVE-CAST-THROUGHPUT-2026-08-27 [minor]
 
 - [x] Reconcile the public equal-lane cast contract, Eunomia `CastFrom`
