@@ -1,5 +1,36 @@
 # Checklist — active sprint
 
+## HS-EXACT-LANE-DISPATCH-2026-08-27 [minor] [arch]
+
+- [x] Reconcile Apollo's four-lane contract with ADRs 016/017, current backend
+      lane counts, forced-target helpers, and the generated widest dispatcher.
+- [x] Record ADR 018 and implement one exact-lane entry without changing
+      widest-native dispatch or adding fixed-vector aliases.
+- [x] Add host-independent value and no-call tests plus x86/AArch64 selection
+      coverage under `#![forbid(unsafe_code)]`.
+- [x] Inspect optimized codegen, run focused/full/cross-target/SemVer gates,
+      and synchronize audit and changelog evidence.
+- [x] Obtain an independent judge verdict covering exact-width filtering,
+      absence semantics, widest-dispatch preservation, and target-feature
+      safety.
+- [ ] Commit, publish, and collect hosted verification before consumer
+      migration.
+
+## HS-NATIVE-CAST-THROUGHPUT-2026-08-27 [minor]
+
+- [x] Reconcile the public equal-lane cast contract, Eunomia `CastFrom`
+      semantics, current stack/scalar mechanism, and native Fearless SIMD 0.7
+      conversion surface.
+- [x] Add an input-sensitive f32/i32 same-binary comparison for public Hermes,
+      a backend-native route, and precise Fearless SIMD at equal native widths.
+- [x] Run two unchanged bounded measurements and inspect exact AVX2 code
+      generation; implement only if the deficit and stack mechanism repeat.
+- [x] Preserve finite, boundary, NaN, and infinity semantics across affected
+      backends without changing the public API or allocating.
+- [ ] Run exact-diff and affected full gates, synchronize evidence, obtain an
+      independent judge verdict, commit, publish, collect hosted verification,
+      merge, and continue.
+
 ## HS-PACKED-MASK-SHAPE-SAFETY-2026-08-27 [patch]
 
 - [x] Reconcile the merged packed-mask representation, public extraction

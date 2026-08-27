@@ -163,6 +163,28 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
     /// `ptr` must be valid for writes.
     unsafe fn store_unaligned(ptr: *mut T, val: Self::Vector);
 
+    /// Attempts a backend-native equal-lane numeric conversion into `destination`.
+    ///
+    /// The default reports that no native route exists, so callers retain the
+    /// canonical scalar [`crate::scalar::CastFrom`] fallback. Backends override
+    /// this only for type pairs whose native instruction preserves that exact
+    /// conversion contract.
+    ///
+    /// # Safety
+    ///
+    /// The processor must support this backend's target features. `destination`
+    /// must be valid for writes of [`Self::LANE_COUNT`] `U` elements, and the
+    /// source and destination lane counts must be equal. A `true` result
+    /// guarantees that every destination lane was initialized.
+    #[must_use]
+    #[inline(always)]
+    unsafe fn try_cast<U>(_value: <Self as BackendKernel<T>>::Vector, _destination: *mut U) -> bool
+    where
+        U: crate::scalar::Scalar + crate::scalar::CastFrom<T>,
+    {
+        false
+    }
+
     /// Whether this backend provides a *non-temporal* (cache-bypassing) store
     /// via [`store_streaming`](Self::store_streaming). Backends leaving this
     /// `false` keep the regular store default; callers gate the streaming path

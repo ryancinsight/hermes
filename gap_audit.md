@@ -286,6 +286,17 @@ multiply-subtract, and the immutable iterator `Send` bound (`T: Sync`, not
 without a current consumer contract; adding unused surface would expand the
 sealed provider without acceptance evidence.
 
+Apollo subsequently supplied one narrower width contract: its register-resident
+128-point and planar row kernels require exactly four scalar lanes, while
+widest-native dispatch selects eight f64 lanes on AVX-512. ADR 018 resolves that
+selection gap with `vectorize_lanes::<LANES, T, K>`: one operation-boundary
+dispatch selects the widest supported backend at the exact count and returns
+`None` without calling the kernel when none exists. This does not add Fearless's
+fixed-width storage/arithmetic family; that broader algebra remains a non-gap
+without a consumer requiring it. Host value tests, AArch64 Windows std/no-std
+strict-warning builds, and optimized x86 codegen establish the dispatch
+contract; native AArch64 execution remains hosted-CI evidence.
+
 ### Cross-lane throughput confirmation — 2026-08-26
 
 The same-binary lane instrument now compares the shared f32/f64 interleave and
@@ -1156,10 +1167,19 @@ order (correctness → architecture → tests → docs → PM).
   comparison-mask methods now convert the backend comparison register directly
   to its native mask. Two unchanged f32/f64 measurements and exact AVX2
   disassembly identified and then removed the store, lane-wise scalar scan, and
-  mask reconstruction (`HS-NATIVE-COMPARISON-MASK-2026-08-27`). **[open]
-  Cross-type `cast` stack round-trip with a 64-iteration scalar loop (MED)** —
-  requires a measured native conversion design across differing lane counts.
-  **argmin/argmax two-pass (LOW-MED)** — bandwidth-bound-only win; a correct
+  mask reconstruction (`HS-NATIVE-COMPARISON-MASK-2026-08-27`).
+- **[RESOLVED 2026-08-27] AVX2 `f32` to `i32` cast scalarization.** Two unchanged
+  measurements and exact disassembly found eight scalar conversions per public
+  vector versus one packed conversion in Fearless SIMD. Hermes now emits the
+  same packed precise-conversion sequence, including Rust-compatible positive
+  overflow, NaN, and infinity correction; boundary and arbitrary-bit tests
+  match scalar `as`. The corrected whole-output checksum instrument reports
+  8.5–11.3x finite in-range public-path gains across 256–4096 elements; the
+  provider-to-provider rows remain host-load-sensitive, so no parity claim is
+  attached to this result (`HS-NATIVE-CAST-THROUGHPUT-2026-08-27`).
+  Lane-count-changing conversion
+  remains outside the current `Vector::cast` contract.
+- **argmin/argmax two-pass (LOW-MED)** — bandwidth-bound-only win; a correct
   single-pass needs SIMD index-vector tracking with first-occurrence
   tie-breaking (non-trivial). All `[patch]`/`[minor]`.
 - **[RESOLVED 2026-07-04] `compress` per-chunk buffer zero-init.** The hot

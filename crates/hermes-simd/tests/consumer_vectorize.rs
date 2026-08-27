@@ -17,6 +17,9 @@ use hermes_simd::{
     BitMask, LaneKernel, LaneScalar, Simd, SimdArch, SimdKernel, SimdStorage, TargetId,
 };
 
+#[path = "consumer_vectorize/exact_lanes.rs"]
+mod exact_lanes;
+
 /// Input planes for one butterfly stage.
 struct Planes {
     re0: Vec<f32>,

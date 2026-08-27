@@ -1,12 +1,80 @@
 # Backlog — hermes-simd
 
-## HS-PACKED-MASK-SHAPE-SAFETY-2026-08-27 — Enforce packed-mask and matrix shape bounds [patch] — in progress
+## HS-EXACT-LANE-DISPATCH-2026-08-27 — Dispatch consumer kernels by exact lane count [minor] [arch] — review
+
+- **Integrator:** Codex task `01a0253c-6013-7552-99cc-36bbbcf77f6d`.
+  **Lease:** discharged by the delivery commit.
+- **Outcome:** add one const-generic consumer entry that selects the widest
+  host-supported backend whose scalar lane count equals the requested count,
+  enters that backend's target-feature scope once, and returns `None` without
+  invoking or mutating the kernel when no backend matches. Existing
+  widest-native `vectorize` behavior remains unchanged.
+- **Driver:** Apollo's verified 128-point base requires four scalar lanes. Its
+  f64 path must select AVX2 even on an AVX-512 host; its f32 path selects NEON
+  or the portable packed backend at the same width. Apollo commit `c6f4b639`
+  records the consumer evidence and corrected timing.
+- **Acceptance oracle:** consumer code under `#![forbid(unsafe_code)]` observes
+  the exact requested count, a non-matching count never calls the kernel, the
+  portable fallback's actual packed widths remain available, widest dispatch
+  is unchanged, host and cross-target gates pass, and codegen contains one
+  operation-boundary dispatch with no feature probes inside the kernel.
+- **Risk / change class:** additive public [minor] and dispatch-policy [arch].
+  ADR 018 owns selection order, absence semantics, safety obligations, and the
+  rejection of a new fixed-vector type family. Host all-feature Clippy and
+  435/435 nextest tests pass; docs/doctests, 196 SemVer checks, and AArch64
+  Windows std/no-std strict-warning builds pass. Optimized x86 codegen retains
+  one boundary probe and a call/probe/branch-free specialized kernel body.
+  **Last update:** 2026-08-27.
+
+## HS-NATIVE-CAST-THROUGHPUT-2026-08-27 — Remove supported cross-type cast stack round-trip [minor] — in progress
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** Codex — `crates/hermes-simd-core/src/mask.rs`,
-  `crates/hermes-simd-core/src/sparse/{types.rs,ops.rs,spmv.rs}`,
-  `crates/hermes-simd/tests/sparse_tests.rs`, the existing sparse benchmark,
-  this item and its checklist, `gap_audit.md`, and affected Rustdoc/changelog.
+  **Lease:** none. Benchmark instrument commit `ff93be1`; provider code and
+  semantic-test commit `18da238`.
+- **Outcome:** measure the public equal-lane `Vector::cast` path against a
+  backend-native conversion and Fearless SIMD 0.7, then eliminate the current
+  register-to-stack scalar loop only when repeated measurements and exact code
+  generation establish a material deficit and its mechanism.
+- **Scope / non-goals:** start with the supported, native-width `f32` to `i32`
+  and `i32` to `f32` conversions under Rust `as` semantics. Preserve the
+  public `Vector::cast` signature and the scalar default for other type pairs.
+  One generic default backend hook may carry the native specialization. Do not
+  add a benchmark dependency already rejected by Hermes dependency policy or
+  conflate this increment with lane-count-changing conversions.
+- **Acceptance oracle:** an input-sensitive same-binary instrument uses equal
+  native widths, returns an accumulated value to defeat elision, and proves
+  every provider against a scalar oracle before timing. Two unchanged bounded
+  runs and exact AVX2 inspection must agree on a repeatable public/direct
+  deficit before production changes. Any correction preserves finite,
+  boundary, NaN, and infinity cast semantics on every affected backend, adds no
+  allocation, and passes the focused release and workspace gates.
+- **Risk / change class:** [minor], hot register conversion with special-value
+  semantics; one additive default method on the public-but-hidden backend seam,
+  with the consumer-facing API unchanged. **Dependencies:** the comparison-mask
+  native-route seam merged in PR #84 (`6efa67b`) supplies the measurement
+  pattern only; this item owns a distinct conversion mechanism.
+- **Measurement decision:** the corrected instrument returns a fixed-width
+  checksum accumulated from every output lane. Two unchanged AVX2 runs at
+  `ff93be1` keep finite in-range f32-to-i32 Hermes near 2.2 Gelem/s while the
+  native and precise Fearless routes remain an order of magnitude faster.
+  Exact pre-change assembly identifies the cause: eight scalar `vcvttss2si`
+  instructions per Hermes register versus one packed `vcvttps2dq`. The
+  i32-to-f32 rows already compile to `vcvtdq2ps` and remain load-sensitive, so
+  they do not justify a second specialization.
+- **Implementation evidence:** the AVX2 specialization uses packed truncation,
+  a fast all-in-range branch, and vector corrections for positive overflow,
+  NaN, and infinity. Boundary cases plus arbitrary `f32` bit patterns match
+  Rust `as`. A same-lane comparison of `18da238` against `ff93be1` reports
+  8.5–11.3x Hermes gains across 256–4096 finite in-range elements; at 4096,
+  Hermes measures 205.6–207.4 ns and the raw native ceiling 210.8–213.2 ns.
+  Provider-to-provider rows varied with host load, so this run makes no
+  Hermes/Fearless parity claim. Other type/backend pairs retain the default
+  scalar conversion. Exact final gates and independent review remain pending.
+
+## HS-PACKED-MASK-SHAPE-SAFETY-2026-08-27 — Enforce packed-mask and matrix shape bounds [patch] — done 2026-08-27 (PR #85, merge 7e342cd)
+
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+  **Lease:** none.
 - **Outcome:** make public `PackedMask` extraction reject every out-of-range
   request in release builds, make `DenseWithMask` validation reject arithmetic
   overflow and every non-exact logical shape, and keep validated sparse kernels
@@ -39,7 +107,11 @@
   change (407.11 us median; change interval -4.32% to +3.55%, p=0.83). An
   old-versus-old control moved 3.9%, so the timing claim is limited to excluding
   a stable regression on this variable-load host; code generation supplies the
-  mechanism evidence.
+  mechanism evidence. Provider commit `af73e6a`; PR #85 merged as `7e342cd`.
+  Hosted x86, Miri, AArch64 NEON, AVX-512 best-effort, Intel SDE, bounded
+  benchmark, dependency-policy, lock-integrity, and review gates are green.
+  RecurseML reports only an external analysis-service error and produced no
+  code diagnostic.
 
 ## HS-NATIVE-COMPARISON-MASK-2026-08-27 — Remove comparison-mask stack round-trip [patch] — done 2026-08-27 (PR #84, merge 6efa67b)
 
