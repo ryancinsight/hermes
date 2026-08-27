@@ -1,5 +1,19 @@
 # Checklist — active sprint
 
+## HS-CAPABILITY-LOAD-THROUGHPUT-2026-08-27 [minor]
+
+- [x] Reconcile the accepted capability model, the existing checked/view/direct
+      diagnostic, Fearless SIMD 0.7's capability-bound slice load, and current
+      first-party consumer call sites.
+- [ ] Add the minimal capability-scoped checked load and backend-generic value,
+      short-input, and unsupported-construction coverage.
+- [ ] Extend the existing diagnostic without changing its inputs, timed region,
+      or reference oracle; inspect exact AVX2 codegen before reading timing.
+- [ ] Run two bounded same-binary measurements and retain the API only if its
+      interval and loop structure match the direct/view ceiling.
+- [ ] Synchronize ADR 017, the README, gap audit, changelog, and item state; run
+      exact-diff gates, publish, collect hosted verification, and merge.
+
 ## HS-FEARLESS-COMPLEX-REG-THROUGHPUT-2026-08-27 [patch]
 
 - [x] Reconcile current main, open PRs, hosted gates, governing ADRs, and the
