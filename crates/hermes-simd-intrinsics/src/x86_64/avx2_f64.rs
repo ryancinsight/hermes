@@ -15,9 +15,10 @@ use core::arch::x86_64::{
     _mm256_mask_i32gather_pd, _mm256_maskstore_pd, _mm256_max_pd, _mm256_min_pd, _mm256_movedup_pd,
     _mm256_movemask_pd, _mm256_mul_pd, _mm256_or_pd, _mm256_permute2f128_pd, _mm256_permute4x64_pd,
     _mm256_permute_pd, _mm256_round_pd, _mm256_set1_pd, _mm256_setzero_pd, _mm256_sqrt_pd,
-    _mm256_store_pd, _mm256_storeu_pd, _mm256_stream_pd, _mm256_sub_pd, _mm256_xor_pd, _mm_add_pd,
-    _mm_cvtsd_f64, _mm_unpackhi_pd, _CMP_EQ_OQ, _CMP_GE_OQ, _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ,
-    _CMP_NEQ_UQ, _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT, _MM_FROUND_TO_ZERO,
+    _mm256_store_pd, _mm256_storeu_pd, _mm256_stream_pd, _mm256_sub_pd, _mm256_unpackhi_pd,
+    _mm256_unpacklo_pd, _mm256_xor_pd, _mm_add_pd, _mm_cvtsd_f64, _mm_unpackhi_pd, _CMP_EQ_OQ,
+    _CMP_GE_OQ, _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ, _MM_FROUND_NO_EXC,
+    _MM_FROUND_TO_NEAREST_INT, _MM_FROUND_TO_ZERO,
 };
 use hermes_simd_core::kernel::BackendKernel;
 
@@ -194,6 +195,38 @@ impl BackendKernel<f64> for Avx2 {
     #[inline]
     unsafe fn dup_odd(v: Self::Vector) -> Self::Vector {
         Avx2F64Vec(_mm256_permute_pd(v.0, 0b1111))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn interleave(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
+        // `unpacklo/hi_pd` weave within 128-bit halves, so pre-permute each
+        // source to [0, 2, 1, 3] order; the unpacks then produce the flat
+        // interleave of the 8-lane sequence.
+        let ta = _mm256_permute4x64_pd::<0b11_01_10_00>(a.0);
+        let tb = _mm256_permute4x64_pd::<0b11_01_10_00>(b.0);
+        (
+            Avx2F64Vec(_mm256_unpacklo_pd(ta, tb)),
+            Avx2F64Vec(_mm256_unpackhi_pd(ta, tb)),
+        )
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn deinterleave(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
+        // `unpacklo/hi_pd` split evens/odds within 128-bit halves in
+        // [a, b | a, b] block order; the closing [0, 2, 1, 3] permute
+        // restores flat lane order.
+        let t0 = _mm256_unpacklo_pd(a.0, b.0);
+        let t1 = _mm256_unpackhi_pd(a.0, b.0);
+        (
+            Avx2F64Vec(_mm256_permute4x64_pd::<0b11_01_10_00>(t0)),
+            Avx2F64Vec(_mm256_permute4x64_pd::<0b11_01_10_00>(t1)),
+        )
     }
 
     /// Alternating FMA requires `avx2` + `fma` target features.
