@@ -31,6 +31,17 @@
       independent judge verdict, commit, publish, collect hosted verification,
       merge, and continue.
 
+## HS-CI-RUNNER-CLASS-SELECTION-2026-08-27 [patch]
+
+- [x] Reproduce the escaped generic-default configuration failure independently
+      of AVX-512 runner capability.
+- [x] Compile the generic-default SIMD configuration on every x86 verification
+      runner without executing unsupported instructions.
+- [x] Prove the gate fails when the escaped import defect is reintroduced and
+      passes on the corrected tree.
+- [ ] Validate workflow syntax, run the exact local gate, publish, merge, and
+      collect hosted verification.
+
 ## HS-PACKED-MASK-SHAPE-SAFETY-2026-08-27 [patch]
 
 - [x] Reconcile the merged packed-mask representation, public extraction
