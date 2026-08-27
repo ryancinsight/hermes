@@ -3,8 +3,10 @@
 ## HS-FEARLESS-COMPLEX-REG-THROUGHPUT-2026-08-27 — Measure interleaved complex-register parity [patch] — in-progress
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** Codex — `crates/hermes-simd/benches/lane_throughput/{interleaved,comparison}.rs`,
-  this item, its checklist section, `gap_audit.md`, ADR 017, and `CHANGELOG.md`.
+  **Lease:** Codex — `crates/hermes-simd/benches/lane_throughput.rs`,
+  `lane_throughput/{comparison,interleaved,permute}.rs`,
+  `lane_throughput/interleaved/provider.rs`, this item, its checklist section,
+  `gap_audit.md`, ADR 017, and `CHANGELOG.md`.
 - **Outcome:** compare the new `ComplexReg` f32/f64 interleaved butterfly with
   the raw Hermes recipe and `fearless_simd` 0.7's best public
   deinterleave/planar/reinterleave route at identical input/output addresses.

@@ -4,14 +4,14 @@
 
 - [x] Reconcile current main, open PRs, hosted gates, governing ADRs, and the
       Fearless 0.7 public operation surface.
-- [ ] Generalize the interleaved butterfly instrument over f32/f64 without
+- [x] Generalize the interleaved butterfly instrument over f32/f64 without
       cloning the scalar, provider, or benchmark paths.
-- [ ] Compare `ComplexReg`, the raw Hermes vector recipe, and Fearless's
+- [x] Compare `ComplexReg`, the raw Hermes vector recipe, and Fearless's
       deinterleave/planar/reinterleave route at equal native width, workload,
       and addresses; assert scalar semantics before timing.
-- [ ] Run two bounded Criterion measurements and inspect exact AVX2 codegen;
+- [x] Run two bounded Criterion measurements and inspect exact AVX2 codegen;
       model a non-obvious loop when instruction counts do not settle it.
-- [ ] Implement only a stable provider-owned correction, or record why the
+- [x] Implement only a stable provider-owned correction, or record why the
       measurement rejects one.
 - [ ] Run exact-diff gates, synchronize documentation, commit, publish, enqueue,
       collect hosted verification, and close the branch lifecycle.

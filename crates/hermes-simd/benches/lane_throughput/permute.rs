@@ -6,9 +6,9 @@ use std::hint::black_box;
 use criterion::{BenchmarkId, Criterion, Throughput};
 use fearless_simd::prelude::SimdBase;
 use fearless_simd::{Level, Simd as FearlessSimd};
-use hermes_simd::{vectorize, LaneKernel, Simd, SimdArch, SimdKernel, SimdStorage, Vector};
+use hermes_simd::{vectorize, LaneKernel, Simd, SimdArch, SimdKernel, Vector};
 
-use super::comparison::BenchmarkFloat;
+use super::comparison::{fearless_lane_count, hermes_lane_count, BenchmarkFloat};
 use super::SCALAR_LENGTHS;
 
 trait PermuteOperation {
@@ -138,20 +138,6 @@ fn fearless_permute<T: BenchmarkFloat, O: PermuteOperation, S: FearlessSimd>(
     }
 }
 
-struct HermesLaneCount<T>(PhantomData<T>);
-
-impl<T: BenchmarkFloat> LaneKernel<T> for HermesLaneCount<T> {
-    type Output = usize;
-
-    fn call<A: SimdArch + SimdKernel<T>>(self, _simd: Simd<T, A>) -> Self::Output {
-        <A as SimdStorage<T>>::LANE_COUNT
-    }
-}
-
-fn fearless_lane_count<T: BenchmarkFloat, S: FearlessSimd>(_simd: S) -> usize {
-    T::Fearless::<S>::N
-}
-
 fn reference<T: BenchmarkFloat, O: PermuteOperation>(
     a: &[T],
     b: &[T],
@@ -196,7 +182,7 @@ fn bench_operation<T: BenchmarkFloat, O: PermuteOperation>(c: &mut Criterion) {
         let mut expected_a = vec![T::ZERO; len];
         let mut expected_b = vec![T::ZERO; len];
 
-        let hermes_lanes = vectorize(HermesLaneCount::<T>(PhantomData));
+        let hermes_lanes = hermes_lane_count::<T>();
         let fearless_lanes =
             fearless_simd::dispatch!(level, simd => fearless_lane_count::<T, _>(simd));
         assert_eq!(

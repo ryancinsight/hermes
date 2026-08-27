@@ -2,9 +2,10 @@
 //!
 //! The planar group compares Hermes and `fearless_simd` at both native floating
 //! precisions. The permute groups compare the shared cross-lane operation
-//! surface. The interleaved group isolates Hermes wrapper overhead by holding
-//! arithmetic and dispatch constant across checked, view/chunk, and direct
-//! backend paths.
+//! surface. The interleaved group isolates Hermes wrapper overhead across
+//! checked, view/chunk, and direct backend paths, then compares `ComplexReg`
+//! with the raw Hermes recipe and Fearless SIMD's public
+//! deinterleave/planar/reinterleave composition.
 
 use core::time::Duration;
 

@@ -344,6 +344,58 @@ explain the disjoint intervals. The evidence therefore rejects a production
 SIMD correction and records that wall-clock ordering on this host is not stable
 enough to distinguish equivalent cross-lane loops.
 
+### Interleaved complex-register throughput — 2026-08-27
+
+The interleaved instrument now compares the raw Hermes vector recipe,
+`ComplexReg`, and Fearless SIMD 0.7's public
+deinterleave/planar/reinterleave composition for f32 and f64. Each provider
+reads the same three input allocations, writes the same two output allocations,
+uses the same native AVX2 width, and processes two registers per loop. A scalar
+reference checks lane order and fused-rounding semantics before every timed row.
+
+The first draft exposed an instrument defect rather than a provider defect:
+calling standalone checked vector loads inside the timed loop retained six
+`std_detect` runtime-support probes per two-register iteration. The corrected
+instrument uses the existing capability-bearing `Simd::io_chunks` boundary,
+which hoists the support and complete-lane proofs before the loop. This is the
+public hot-path contract established by ADR 017.
+
+The first corrected exact locked run reported these medians and 95% confidence
+intervals (all values in ns):
+
+| Type | Scalars | Hermes vector | Hermes `ComplexReg` | `fearless_simd` |
+| --- | ---: | ---: | ---: | ---: |
+| f32 | 256 | 24.752 [24.658, 24.850] | 24.978 [24.910, 25.034] | 37.434 [37.350, 37.532] |
+| f32 | 1,024 | 89.301 [88.554, 90.228] | 88.315 [88.072, 88.591] | 147.65 [146.72, 148.81] |
+| f32 | 4,096 | 653.88 [650.54, 658.35] | 648.76 [644.35, 653.13] | 1,167.5 [1,109.5, 1,264.0] |
+| f64 | 256 | 39.177 [38.318, 41.096] | 38.345 [38.111, 38.646] | 147.84 [111.64, 184.18] |
+| f64 | 1,024 | 177.30 [171.07, 188.83] | 190.60 [176.44, 215.13] | 353.63 [325.08, 387.46] |
+| f64 | 4,096 | 1,186.6 [1,179.1, 1,195.4] | 1,193.6 [1,180.4, 1,208.7] | 1,985.3 [1,590.6, 2,375.1] |
+
+An unchanged confirmation run reported:
+
+| Type | Scalars | Hermes vector | Hermes `ComplexReg` | `fearless_simd` |
+| --- | ---: | ---: | ---: | ---: |
+| f32 | 256 | 21.936 [21.890, 21.988] | 21.971 [21.907, 22.071] | 36.415 [36.275, 36.547] |
+| f32 | 1,024 | 74.923 [73.815, 76.490] | 73.992 [73.266, 74.967] | 147.60 [146.91, 148.32] |
+| f32 | 4,096 | 670.25 [661.53, 680.09] | 634.91 [626.88, 645.30] | 994.88 [908.25, 1,091.8] |
+| f64 | 256 | 62.991 [60.949, 65.318] | 65.783 [63.303, 68.142] | 85.482 [83.371, 88.845] |
+| f64 | 1,024 | 324.11 [268.89, 369.12] | 277.29 [240.97, 317.89] | 530.07 [440.90, 647.94] |
+| f64 | 4,096 | 1,490.4 [1,377.3, 1,610.9] | 1,523.9 [1,414.5, 1,632.3] | 2,802.5 [2,541.8, 3,062.3] |
+
+Absolute f64 timings remain noisy on the shared hybrid-core host, but every
+Hermes-versus-Fearless confidence interval is disjoint in Hermes' favor in both
+runs. Exact AVX2 code generation supplies the mechanism: each Hermes loop has
+six loads, six layout shuffles or duplications, two multiplies, two alternating
+fused multiply-adds, four additions/subtractions, four stores, no calls, and no
+support probes. Fearless retains the same memory and arithmetic instruction
+counts but requires 20 layout shuffles for f32 and 24 for f64. LLVM emits one
+Hermes provider function for the raw and `ComplexReg` recipes, so the newtype is
+instruction-identical to the raw recipe. The evidence rejects a production
+kernel correction. It covers AVX2 on one shared Windows host; other ISAs retain
+compile and value-semantic coverage rather than local timing, and a future
+direct interleaved Fearless operation would require a new comparison.
+
 Findings:
 - [minor] Consumer target-feature entry. ADR 009 records why a lane kernel must
   be monomorphized inside a `#[target_feature]` scope: without it the annotated

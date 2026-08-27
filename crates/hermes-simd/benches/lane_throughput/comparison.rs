@@ -1,11 +1,12 @@
-//! Scalar and numerical contracts shared by the benchmark families.
+//! Scalar, numerical, and native-width contracts shared by the benchmarks.
 
+use core::marker::PhantomData;
 use core::ops::Neg;
 
 use eunomia::FloatElement;
-use fearless_simd::prelude::SimdFloat;
+use fearless_simd::prelude::{SimdBase, SimdFloat};
 use fearless_simd::{Simd as FearlessSimd, SimdFloatElement};
-use hermes_simd::LaneScalar;
+use hermes_simd::{vectorize, LaneKernel, LaneScalar, Simd, SimdArch, SimdKernel, SimdStorage};
 
 /// Floating lane precision exercised by the comparison instruments.
 pub(super) trait BenchmarkFloat:
@@ -32,6 +33,26 @@ impl BenchmarkFloat for f64 {
 
     const LABEL: &'static str = "f64";
     const EPSILON: f64 = f64::EPSILON;
+}
+
+struct HermesLaneCount<T>(PhantomData<T>);
+
+impl<T: BenchmarkFloat> LaneKernel<T> for HermesLaneCount<T> {
+    type Output = usize;
+
+    fn call<A: SimdArch + SimdKernel<T>>(self, _simd: Simd<T, A>) -> Self::Output {
+        <A as SimdStorage<T>>::LANE_COUNT
+    }
+}
+
+/// Native Hermes lane count selected on this host.
+pub(super) fn hermes_lane_count<T: BenchmarkFloat>() -> usize {
+    vectorize(HermesLaneCount::<T>(PhantomData))
+}
+
+/// Native Fearless lane count selected by one capability token.
+pub(super) fn fearless_lane_count<T: BenchmarkFloat, S: FearlessSimd>(_simd: S) -> usize {
+    T::Fearless::<S>::N
 }
 
 /// Assert a butterfly result against its scalar reference.
