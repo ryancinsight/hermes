@@ -1,5 +1,27 @@
 # Backlog — hermes-simd
 
+## HS-VECTORIZE-LARGE-KERNEL-2026-08-28 — Large kernel bodies fall out of the target-feature frame [patch] — fixed 2026-08-28
+
+- **Integrator:** Claude session d791281c. **Defect (asm-evidenced from
+  apollo's register-resident FFT reproducer):** the `#[runtime_dispatch]`
+  expansion kept the annotated inner fn with no inline attribute. The
+  generated `#[target_feature]` helper is the only feature-carrying frame,
+  and a large kernel body (a fully unrolled 32-sample FFT row pass) makes
+  LLVM decline the helper → inner inline: the body codegens in the inner
+  symbol at baseline — zero FMA, per-operation feature detection — and runs
+  ~30x slow. `#[inline(always)]` on the consumer's `LaneKernel::call` cannot
+  cure it because `call` inlines into the unattributed inner fn. Small
+  kernels always inlined, which is why ADR 009/016 evidence never hit this.
+- **Fix:** the macro now emits the retained inner fn with `#[inline(always)]`
+  (LLVM `alwaysinline`, honored regardless of body size) unless the author
+  wrote an inline attribute; expansion tests pin both behaviors.
+  `LaneKernel` docs now state the consumer half: mark large `call` bodies
+  `#[inline(always)]` — the same contract pulp documents for
+  `WithSimd::with_simd`.
+- **Acceptance oracle:** apollo's resident reproducer regains FMA codegen and
+  its row passes drop from ~5000 to register-resident cost; re-measured by
+  apollo's pinned four-engine probe.
+
 ## HS-CAPABILITY-LOAD-THROUGHPUT-2026-08-27 — Hoist support probes from strided lane loads [patch] — in review (PR #77)
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.

@@ -6,6 +6,15 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch][HS-VECTORIZE-LARGE-KERNEL] Fix `#[runtime_dispatch]` compiling
+  large kernel bodies at baseline codegen: the retained inner fn is now
+  emitted `#[inline(always)]` so it always inlines into the generated
+  `#[target_feature]` helper. Previously a body past LLVM's inline budget
+  was outlined without target features — zero FMA, per-operation feature
+  detection, ~30x slow — while small kernels were unaffected. An
+  author-written inline attribute is respected. `LaneKernel` docs now
+  require `#[inline(always)]` on large `call` bodies.
+
 - [patch][HS-FEARLESS-COMPLEX-REG-THROUGHPUT] Add one generic f32/f64
   same-address comparison for interleaved complex butterflies. The instrument
   uses capability-bearing `Simd::io_chunks`, eliminating six repeated support
