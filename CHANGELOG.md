@@ -6,6 +6,13 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [minor][HS-TRANSPOSE-SQUARE] Add `transpose_square` — in-register
+  `LANE_COUNT x LANE_COUNT` tile transpose on the backend seam, the
+  `SimdPermute` facet, and the safe `Vector` surface. AVX2 f64 uses the
+  eight-shuffle unpack/cross-half network, NEON f64 `trn1`/`trn2`;
+  a stack-capture default covers the rest. Index-coded reference and
+  involution laws run per backend.
+
 - [minor][HS-DENSEMASK-BITPACK] **Breaking:** `DenseWithMask` stores its
   structural mask bit-packed. New arbitrary-length `PackedMask` (canonical
   `mask` module, runtime-length counterpart of `BitMask<N>`) replaces the
