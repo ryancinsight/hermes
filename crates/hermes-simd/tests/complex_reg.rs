@@ -6,20 +6,20 @@
 //!
 //! ## Oracles
 //!
-//! Two tiers, because the backends differ in one legitimate way. The
-//! alternating-FMA combining step is fused on hardware backends and may round
-//! twice in the scalar fallback, so:
+//! Two tiers:
 //!
 //! - **Exact tier:** inputs chosen so every intermediate is exactly
 //!   representable (small integers scaled by powers of two). Products, sums,
 //!   and differences of such values round to nothing on any backend, so the
-//!   assertion is `assert_eq!` on bits — fused and unfused paths must agree
-//!   exactly. Layout defects (a swapped lane, a wrong pair) cannot hide in a
-//!   tolerance that does not exist.
+//!   assertion is `assert_eq!` on bits. Layout defects (a swapped lane, a
+//!   wrong pair) cannot hide in a tolerance that does not exist.
 //! - **Rounded tier:** irrational-ish inputs against a scalar reference
-//!   written with `mul_add` in the same even/odd shape, bounded at 2 ULP —
-//!   one for the reference-versus-fused difference and one for the scalar
-//!   fallback's extra rounding.
+//!   written with `mul_add` in the same even/odd shape. The alternating-FMA
+//!   combining step is fused (one rounding) on every backend — hardware
+//!   `vfmaddsub` on x86, `scalar_fmadd` in the generic default — so the
+//!   2 ULP bound is a conservative ceiling for any residual
+//!   evaluation-shape difference, not an allowance for a twice-rounding
+//!   fallback.
 //!
 //! `mul_i`, `mul_neg_i`, `swap_samples`, `splat`, and `butterfly` are pure
 //! sign flips and permutations, exact on every backend, so they use only the

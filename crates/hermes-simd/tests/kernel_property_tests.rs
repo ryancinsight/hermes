@@ -635,6 +635,52 @@ fn check_fmsub_matches_scalar<A: SimdKernel<f32>>(vals: &[f32]) {
     }
 }
 
+/// `fmaddsub`/`fmsubadd` must preserve the fused single-rounding contract
+/// lane for lane: `a*b ∓ c` with one rounding and an exactly negated addend,
+/// per lane parity. A multiply-then-add default would round twice and
+/// diverge from the hardware `vfmaddsub` backends on rounding-sensitive
+/// inputs like these.
+fn check_alternating_fma_fused<A: SimdKernel<f32>>(vals: &[f32]) {
+    let lanes = A::LANE_COUNT;
+    let a: Vec<f32> = (0..lanes).map(|i| vals[i % vals.len()]).collect();
+    let b: Vec<f32> = (0..lanes)
+        .map(|i| vals[(i * 5 + 1) % vals.len()] * 0.03125)
+        .collect();
+    let c: Vec<f32> = (0..lanes)
+        .map(|i| vals[(i * 7 + 2) % vals.len()] * 0.015_625)
+        .collect();
+    let mut maddsub = vec![0.0; lanes];
+    let mut msubadd = vec![0.0; lanes];
+
+    // SAFETY: caller gates on the target features for `A`, and all buffers
+    // contain exactly one complete lane group.
+    unsafe {
+        let av = A::load_unaligned(a.as_ptr());
+        let bv = A::load_unaligned(b.as_ptr());
+        let cv = A::load_unaligned(c.as_ptr());
+        A::store_unaligned(maddsub.as_mut_ptr(), A::fmaddsub(av, bv, cv));
+        A::store_unaligned(msubadd.as_mut_ptr(), A::fmsubadd(av, bv, cv));
+    }
+
+    for i in 0..lanes {
+        let (want_maddsub, want_msubadd) = if i % 2 == 0 {
+            (a[i].mul_add(b[i], -c[i]), a[i].mul_add(b[i], c[i]))
+        } else {
+            (a[i].mul_add(b[i], c[i]), a[i].mul_add(b[i], -c[i]))
+        };
+        assert_eq!(
+            maddsub[i].to_bits(),
+            want_maddsub.to_bits(),
+            "fmaddsub lane {i} must be fused with an exactly negated addend"
+        );
+        assert_eq!(
+            msubadd[i].to_bits(),
+            want_msubadd.to_bits(),
+            "fmsubadd lane {i} must be fused with an exactly negated addend"
+        );
+    }
+}
+
 /// The f64 operation used by planar FFT kernels must preserve the same fused,
 /// single-rounding contract on every backend that this host can execute.
 fn check_fmsub_f64_matches_scalar<A: SimdKernel<f64>>() {
@@ -807,6 +853,7 @@ where
     check_cmp_ne_complements_cmp_eq::<A>(vals);
     check_blend_honors_canonical_mask::<A>(bm);
     check_fmsub_matches_scalar::<A>(vals);
+    check_alternating_fma_fused::<A>(vals);
     check_compress_expand_identity::<A>(bm, vals);
     check_leading_k_masked_sum::<A>();
     check_masked_merge_ops::<A>();
