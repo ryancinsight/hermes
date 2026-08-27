@@ -388,11 +388,12 @@ impl BackendKernel<f32> for Neon {
         true_val: Self::Vector,
         false_val: Self::Vector,
     ) -> Self::Vector {
-        NeonF32Vec(vbslq_f32(
-            vreinterpretq_u32_f32(mask.0),
-            true_val.0,
-            false_val.0,
-        ))
+        // Selection is on the mask lane's sign bit, but `vbsl` is a *bitwise*
+        // select that would splice the operands bit-by-bit on a non-canonical
+        // mask. Broadcast each lane's sign across the lane first (arithmetic
+        // shift right by 31), so `vbsl` sees all-ones or all-zeros per lane.
+        let sign = vreinterpretq_u32_s32(vshrq_n_s32::<31>(vreinterpretq_s32_f32(mask.0)));
+        NeonF32Vec(vbslq_f32(sign, true_val.0, false_val.0))
     }
 
     // -----------------------------------------------------------------------
@@ -641,8 +642,14 @@ impl BackendKernel<f32> for Neon {
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn vector_to_mask(v: Self::Vector) -> Self::Mask {
-        // Bit-preserving reinterpretation, so lane sign bits survive into the
-        // `vgetq_lane_u32::<_>(..) >> 31` extraction performed by `mask_to_bitmask`.
-        NeonF32Mask(vreinterpretq_u32_f32(v.0))
+        // Canonicalize on entry: broadcast each lane's sign bit (the documented
+        // active criterion) across the lane with an arithmetic shift right by
+        // 31, so every `Mask` consumer — the bitwise `vbsl` merges included —
+        // sees all-ones or all-zeros per lane regardless of the mask vector's
+        // remaining bits. A bare reinterpretation kept non-canonical bits and
+        // let `vbsl`-based masked ops splice operands bit-by-bit.
+        NeonF32Mask(vreinterpretq_u32_s32(vshrq_n_s32::<31>(
+            vreinterpretq_s32_f32(v.0),
+        )))
     }
 }

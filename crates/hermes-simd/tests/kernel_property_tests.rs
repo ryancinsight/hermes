@@ -527,6 +527,80 @@ fn check_blend_honors_canonical_mask<A: SimdKernel<f32>>(bm: u64) {
     }
 }
 
+/// Adversarial *non-canonical* mask lane patterns: values whose sign bit and
+/// whose nonzero-ness disagree, so a backend testing "differs from zero" (or
+/// bit-splicing the raw mask, as NEON `vbsl` would) diverges from the
+/// documented sign-bit selection.
+const NON_CANONICAL_MASK_PATTERNS: [f32; 8] = [
+    2.0,                          // nonzero, sign clear → inactive
+    -0.0,                         // zero, sign set → active
+    0.0,                          // zero, sign clear → inactive
+    f32::from_bits(0x7fc0_0000),  // positive NaN → inactive
+    f32::from_bits(0xffc0_0000),  // negative NaN → active
+    -3.5,                         // ordinary negative (not all-ones) → active
+    f32::from_bits(!0),           // canonical ALL_ONES → active
+    f32::from_bits(0x0000_0001),  // positive subnormal → inactive
+];
+
+/// `blend` must select by the mask lane's *sign bit* alone — the documented
+/// contract — even when the mask is non-canonical. A nonzero-or-NaN test
+/// (scalar emulation) or a bitwise splice (NEON `vbsl` on the raw mask)
+/// diverges on every pattern above whose sign and nonzero-ness disagree.
+fn check_blend_sign_bit_semantics<A: SimdKernel<f32>>() {
+    let lanes = A::LANE_COUNT;
+    let mask_vals: Vec<f32> = (0..lanes)
+        .map(|i| NON_CANONICAL_MASK_PATTERNS[i % NON_CANONICAL_MASK_PATTERNS.len()])
+        .collect();
+    let true_vals: Vec<f32> = (0..lanes).map(|i| (i + 1) as f32).collect();
+    let false_vals: Vec<f32> = (0..lanes).map(|i| -((i + 1) as f32)).collect();
+    let mut out = vec![0.0f32; lanes];
+
+    // SAFETY: every buffer holds exactly `LANE_COUNT` elements; caller gates on
+    // the required target features for `A`.
+    unsafe {
+        let mask = A::load_unaligned(mask_vals.as_ptr());
+        let selected = A::load_unaligned(true_vals.as_ptr());
+        let rejected = A::load_unaligned(false_vals.as_ptr());
+        A::store_unaligned(out.as_mut_ptr(), A::blend(mask, selected, rejected));
+    }
+
+    for (i, &got) in out.iter().enumerate() {
+        let want = if mask_vals[i].is_sign_negative() {
+            true_vals[i]
+        } else {
+            false_vals[i]
+        };
+        assert_eq!(
+            got, want,
+            "blend lane {i} must select by sign bit (mask {:#010x})",
+            mask_vals[i].to_bits()
+        );
+    }
+}
+
+/// `Vector::to_bitmask` documents "(sign bits)": each bit must equal the
+/// mask lane's sign bit, non-canonical lanes included.
+fn check_vector_to_bitmask_sign_bit<A>()
+where
+    A: hermes_simd_core::arch::SimdArch + SimdKernel<f32>,
+{
+    let lanes = A::LANE_COUNT;
+    let mask_vals: Vec<f32> = (0..lanes)
+        .map(|i| NON_CANONICAL_MASK_PATTERNS[i % NON_CANONICAL_MASK_PATTERNS.len()])
+        .collect();
+    let vector = hermes_simd::Vector::<f32, A>::load_unaligned_from_slice(&mask_vals)
+        .expect("mask buffer holds one register");
+    let bm = vector.to_bitmask().0;
+    for (i, &val) in mask_vals.iter().enumerate() {
+        assert_eq!(
+            (bm >> i) & 1 == 1,
+            val.is_sign_negative(),
+            "to_bitmask lane {i} must report the sign bit (value {:#010x})",
+            val.to_bits()
+        );
+    }
+}
+
 /// Uniform fused multiply-subtract must match the scalar single-rounding
 /// contract lane for lane. Inputs stay finite and bounded, so exact bit
 /// equality is the correct oracle for every native and emulated backend.
@@ -690,6 +764,35 @@ fn neg_preserves_sign_bit_on_supported_backends() {
     {
         check_neg_preserves_bits_f32::<hermes_simd::Neon>();
         check_neg_preserves_bits_f64::<hermes_simd::Neon>();
+    }
+}
+
+/// Deterministic adversarial run of the sign-bit mask-contract checks on
+/// every backend the host can execute: the mask-active criterion is defined
+/// once (sign bit), so scalar-emulated and native backends must agree on the
+/// non-canonical patterns.
+#[test]
+fn blend_and_to_bitmask_honor_sign_bit_on_supported_backends() {
+    check_blend_sign_bit_semantics::<Scalar>();
+    check_blend_sign_bit_semantics::<SveArch>();
+    check_vector_to_bitmask_sign_bit::<Scalar>();
+    check_vector_to_bitmask_sign_bit::<SveArch>();
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+            check_blend_sign_bit_semantics::<hermes_simd::Avx2>();
+            check_vector_to_bitmask_sign_bit::<hermes_simd::Avx2>();
+        }
+        if std::is_x86_feature_detected!("avx512f") {
+            check_blend_sign_bit_semantics::<hermes_simd::Avx512>();
+            check_vector_to_bitmask_sign_bit::<hermes_simd::Avx512>();
+        }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        check_blend_sign_bit_semantics::<hermes_simd::Neon>();
+        check_vector_to_bitmask_sign_bit::<hermes_simd::Neon>();
     }
 }
 

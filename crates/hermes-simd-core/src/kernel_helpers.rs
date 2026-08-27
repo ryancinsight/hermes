@@ -191,6 +191,10 @@ where
     Arch::load_unaligned(buf.as_ptr().cast::<T>())
 }
 
+/// Scalar lane-by-lane blend default: lane `i` takes `true_val` exactly when
+/// the sign bit of `mask` lane `i` is set, matching the
+/// [`BackendKernel::blend`] contract and the hardware sign-bit selects
+/// (`vblendvps` and friends) the native backends dispatch to.
 #[inline(always)]
 pub unsafe fn generic_blend<T, Arch>(
     mask: Arch::Vector,
@@ -210,7 +214,10 @@ where
     Arch::store_unaligned(buf_false.as_mut_ptr().cast::<T>(), false_val);
     for i in 0..Arch::LANE_COUNT {
         let mask_val = buf_mask[i].assume_init();
-        let is_true = mask_val.is_nan() || mask_val.to_f64() != 0.0;
+        // Selection is on the lane's sign bit, tested bit-level: a
+        // nonzero-or-NaN test would diverge from the hardware sign-bit
+        // selects on non-canonical masks (`+2.0` active, `-0.0` inactive).
+        let is_true = mask_val.bitand(T::SIGN_MASK).count_ones() != 0;
         let val = if is_true {
             buf_true[i].assume_init()
         } else {
