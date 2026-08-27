@@ -1,31 +1,50 @@
-//! Hermes checked/view/direct lane-boundary diagnostics.
+//! Interleaved complex diagnostics and provider comparison.
 
 use std::hint::black_box;
 
 use criterion::{BenchmarkId, Criterion, Throughput};
+use eunomia::FloatElement;
 use hermes_simd::{vectorize, LaneKernel, Simd, SimdArch, SimdKernel, SimdStorage, Vector};
 
-use super::comparison::assert_within_rounding;
+use super::comparison::{assert_within_rounding, BenchmarkFloat};
 use super::SCALAR_LENGTHS;
 
-fn inputs(len: usize) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+#[path = "interleaved/provider.rs"]
+mod provider;
+
+fn inputs<T: BenchmarkFloat>(len: usize) -> (Vec<T>, Vec<T>, Vec<T>) {
     let a = (0..len)
-        .map(|index| ((index % 29) as f64).mul_add(0.03125, -0.375))
+        .map(|index| {
+            T::from_f64(f64::from(
+                u32::try_from(index % 29).expect("benchmark residue fits u32"),
+            ))
+            .scalar_fmadd(T::from_f64(0.03125), T::from_f64(-0.375))
+        })
         .collect();
     let b = (0..len)
-        .map(|index| ((index % 31) as f64).mul_add(-0.015_625, 0.625))
+        .map(|index| {
+            T::from_f64(f64::from(
+                u32::try_from(index % 31).expect("benchmark residue fits u32"),
+            ))
+            .scalar_fmadd(T::from_f64(-0.015_625), T::from_f64(0.625))
+        })
         .collect();
     let twiddle = (0..len / 2)
         .flat_map(|index| {
-            let theta = -core::f64::consts::TAU * index as f64 / (len / 2) as f64;
-            let (sin, cos) = theta.sin_cos();
-            [cos, sin]
+            let index = T::from_f64(f64::from(
+                u32::try_from(index).expect("benchmark length fits u32"),
+            ));
+            let sample_count = T::from_f64(f64::from(
+                u32::try_from(len / 2).expect("benchmark length fits u32"),
+            ));
+            let theta = -T::from_f64(core::f64::consts::TAU) * index / sample_count;
+            [FloatElement::cos(theta), FloatElement::sin(theta)]
         })
         .collect();
     (a, b, twiddle)
 }
 
-fn scalar_reference(a: &[f64], b: &[f64], twiddle: &[f64]) -> (Vec<f64>, Vec<f64>) {
+fn scalar_reference<T: BenchmarkFloat>(a: &[T], b: &[T], twiddle: &[T]) -> (Vec<T>, Vec<T>) {
     let mut sum = Vec::with_capacity(a.len());
     let mut difference = Vec::with_capacity(a.len());
     for ((a_pair, b_pair), twiddle_pair) in a
@@ -33,8 +52,9 @@ fn scalar_reference(a: &[f64], b: &[f64], twiddle: &[f64]) -> (Vec<f64>, Vec<f64
         .zip(b.chunks_exact(2))
         .zip(twiddle.chunks_exact(2))
     {
-        let product_real = twiddle_pair[0].mul_add(b_pair[0], -(twiddle_pair[1] * b_pair[1]));
-        let product_imaginary = twiddle_pair[0].mul_add(b_pair[1], twiddle_pair[1] * b_pair[0]);
+        let product_real = twiddle_pair[0].scalar_fmadd(b_pair[0], -(twiddle_pair[1] * b_pair[1]));
+        let product_imaginary =
+            twiddle_pair[0].scalar_fmadd(b_pair[1], twiddle_pair[1] * b_pair[0]);
         sum.extend([a_pair[0] + product_real, a_pair[1] + product_imaginary]);
         difference.extend([a_pair[0] - product_real, a_pair[1] - product_imaginary]);
     }
@@ -163,7 +183,7 @@ pub(super) fn bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("interleaved_complex_butterfly_f64");
     for &len in SCALAR_LENGTHS {
         group.throughput(Throughput::Elements((len / 2) as u64));
-        let (a, b, twiddle) = inputs(len);
+        let (a, b, twiddle) = inputs::<f64>(len);
         let (expected_sum, expected_difference) = scalar_reference(&a, &b, &twiddle);
         // Reusing one pair keeps address and cache-set placement identical for
         // the diagnostic variants.
@@ -233,4 +253,7 @@ pub(super) fn bench(c: &mut Criterion) {
         }
     }
     group.finish();
+
+    provider::bench::<f32>(c);
+    provider::bench::<f64>(c);
 }

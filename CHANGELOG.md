@@ -6,6 +6,14 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch][HS-FEARLESS-COMPLEX-REG-THROUGHPUT] Add one generic f32/f64
+  same-address comparison for interleaved complex butterflies. The instrument
+  uses capability-bearing `Simd::io_chunks`, eliminating six repeated support
+  probes retained by standalone checked loads. `ComplexReg` and the raw vector
+  recipe fold to the same AVX2 function; Hermes uses 6 layout shuffles versus
+  Fearless SIMD's 20 for f32 and 24 for f64. Both bounded runs favor Hermes, so
+  no production kernel correction follows.
+
 - [patch][HS-FEARLESS-PERMUTE-THROUGHPUT] Add one generic same-address f32/f64
   comparison for the interleave and deinterleave operations shared with
   `fearless_simd` 0.7. Exact lane-order oracles pass for both providers. Two

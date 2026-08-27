@@ -180,6 +180,15 @@ claim. No compatibility alias or forwarding constructor is retained.
   Arrow Lake S. No production change follows from unstable wall-clock ordering
   with equivalent hot-loop structure; the full intervals remain in
   `gap_audit.md`.
+- The interleaved complex-register comparison routes Hermes through
+  capability-bearing `Simd::io_chunks`; standalone checked loads retained six
+  support probes per paired iteration and therefore did not measure the
+  accepted hot-path contract. The raw vector and `ComplexReg` recipes fold to
+  one AVX2 function with six layout shuffles, while Fearless SIMD's public
+  deinterleave/planar/reinterleave composition needs 20 for f32 and 24 for f64.
+  Both bounded runs have disjoint Hermes-versus-Fearless intervals in Hermes'
+  favor. No production correction follows; full intervals and host limits are
+  recorded in `gap_audit.md`.
 - AVX-512 floating bitwise operations use AVX-512F integer-domain bitwise
   instructions around zero-cost casts. The float-typed intrinsics require
   AVX-512DQ and otherwise remained outlined calls inside an AVX-512F kernel.
@@ -198,6 +207,9 @@ claim. No compatibility alias or forwarding constructor is retained.
 
 ## Revisions
 
+- 2026-08-27: Added interleaved `ComplexReg` f32/f64 comparison evidence under
+  `HS-FEARLESS-COMPLEX-REG-THROUGHPUT-2026-08-27`; corrected the instrument to
+  the capability-bearing chunk boundary and rejected a production correction.
 - 2026-08-26: Added shared cross-lane f32/f64 comparison evidence under
   `HS-FEARLESS-PERMUTE-THROUGHPUT-2026-08-26`; exact codegen and modeled
   throughput reject a provider correction despite unstable wall-clock ordering.
