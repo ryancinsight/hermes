@@ -252,6 +252,11 @@ pub fn spmv_bcoo<T: SimdOps, const BM: usize, const BN: usize>(
 }
 
 /// Computes sparse `SpMV` using Dense-with-Mask.
+///
+/// # Panics
+/// Panics if `x.len() < ncols`, `y.len() < nrows`, the matrix dimensions
+/// overflow, or the value and packed-mask lengths do not exactly match
+/// `nrows * ncols`.
 #[inline(always)]
 pub fn spmv_dense_masked<T: SimdOps>(data: DenseWithMaskData<'_, T>, x: &[T], y: &mut [T]) {
     T::spmv_dense_masked(data, x, y);

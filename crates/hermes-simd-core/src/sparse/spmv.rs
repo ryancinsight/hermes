@@ -21,7 +21,8 @@ pub trait SparseSpMv<T> {
     /// Perform matrix-vector multiplication: `y += A * x`.
     ///
     /// # Panics
-    /// Panics if the dimensions of `x` or `y` are incompatible with the matrix.
+    /// Panics if the dimensions of `x` or `y` are incompatible with the matrix,
+    /// or if a raw storage representation is structurally invalid.
     fn spmv(&self, x: &[T], y: &mut [T]);
 }
 
@@ -195,12 +196,8 @@ where
     fn spmv(&self, x: &[T], y: &mut [T]) {
         let data = &self.data;
         validate_spmv_sizes(x.len(), y.len(), data.ncols, data.nrows, "DenseWithMask");
-        assert!(
-            data.mask.len() >= data.nrows * data.ncols,
-            "DenseWithMask spmv: mask covers {} elements, matrix has {}",
-            data.mask.len(),
-            data.nrows * data.ncols
-        );
+        let matrix_len = data.assert_valid_shape("spmv");
+        debug_assert_eq!(matrix_len, data.values.len());
 
         let lane_count = Arch::LANE_COUNT;
 
@@ -215,9 +212,9 @@ where
             // span of `vals`/`x` at offset `j < simd_len`; `vals` holds `ncols`
             // elements and `x.len() >= ncols` was asserted, so
             // `simd_len <= ncols` keeps each `load` and `masked_load_unaligned`
-            // in bounds. `mask.lane_bits` is a safe, self-bounds-checked packed
-            // read feeding `mask_from_bitmask`. `zero_vec` — the masked-off
-            // fill — is loop-invariant and hoisted here.
+            // in bounds. The entry shape check proves every
+            // `mask.lane_bits_in_bounds` window valid; `zero_vec` — the
+            // masked-off fill — is loop-invariant and hoisted here.
             let acc_vec = unsafe {
                 let zero_vec = Arch::zero();
                 let mut acc_vec0 = zero_vec;
@@ -228,7 +225,9 @@ where
                 let unroll_len = (data.ncols / (lane_count * 4)) * (lane_count * 4);
                 let mut j = 0usize;
                 while j < unroll_len {
-                    let msk0 = Arch::mask_from_bitmask(mask.lane_bits(row_offset + j, lane_count));
+                    let msk0 = Arch::mask_from_bitmask(
+                        mask.lane_bits_in_bounds(row_offset + j, lane_count),
+                    );
                     acc_vec0 = Arch::masked_fmadd(
                         Arch::masked_load_unaligned(vals[j..].as_ptr(), msk0, zero_vec),
                         Arch::load_unaligned(x[j..].as_ptr()),
@@ -237,7 +236,7 @@ where
                     );
 
                     let msk1 = Arch::mask_from_bitmask(
-                        mask.lane_bits(row_offset + j + lane_count, lane_count),
+                        mask.lane_bits_in_bounds(row_offset + j + lane_count, lane_count),
                     );
                     acc_vec1 = Arch::masked_fmadd(
                         Arch::masked_load_unaligned(
@@ -251,7 +250,7 @@ where
                     );
 
                     let msk2 = Arch::mask_from_bitmask(
-                        mask.lane_bits(row_offset + j + lane_count * 2, lane_count),
+                        mask.lane_bits_in_bounds(row_offset + j + lane_count * 2, lane_count),
                     );
                     acc_vec2 = Arch::masked_fmadd(
                         Arch::masked_load_unaligned(
@@ -265,7 +264,7 @@ where
                     );
 
                     let msk3 = Arch::mask_from_bitmask(
-                        mask.lane_bits(row_offset + j + lane_count * 3, lane_count),
+                        mask.lane_bits_in_bounds(row_offset + j + lane_count * 3, lane_count),
                     );
                     acc_vec3 = Arch::masked_fmadd(
                         Arch::masked_load_unaligned(
@@ -285,7 +284,9 @@ where
                     Arch::add(Arch::add(acc_vec0, acc_vec1), Arch::add(acc_vec2, acc_vec3));
 
                 while j < simd_len {
-                    let msk = Arch::mask_from_bitmask(mask.lane_bits(row_offset + j, lane_count));
+                    let msk = Arch::mask_from_bitmask(
+                        mask.lane_bits_in_bounds(row_offset + j, lane_count),
+                    );
                     acc_vec = Arch::masked_fmadd(
                         Arch::masked_load_unaligned(vals[j..].as_ptr(), msk, zero_vec),
                         Arch::load_unaligned(x[j..].as_ptr()),
@@ -302,7 +303,7 @@ where
 
             let mut j = simd_len;
             while j < data.ncols {
-                if mask.bit(row_offset + j) {
+                if mask.bit_in_bounds(row_offset + j) {
                     acc += vals[j] * x[j];
                 }
                 j += 1;

@@ -277,19 +277,30 @@ impl<T, V, M> DenseWithMaskMatrix<T, V, M> {
 
 impl<T, V: AsRef<[T]>, W: AsRef<[u64]>> DenseWithMaskMatrix<T, V, PackedMask<W>> {
     /// Count of structurally non-zero entries.
+    ///
+    /// # Panics
+    /// Panics if the value count, mask length, and matrix dimensions do not
+    /// describe exactly the same logical matrix shape.
+    #[track_caller]
     #[inline]
     pub fn nnz(&self) -> usize {
+        self.assert_valid_shape("nnz");
         self.mask.popcount()
     }
 
     /// Structural sparsity.
+    ///
+    /// # Panics
+    /// Panics if the value count, mask length, and matrix dimensions do not
+    /// describe exactly the same logical matrix shape.
+    #[track_caller]
     #[inline]
     pub fn sparsity(&self) -> f64 {
-        let total = self.nrows * self.ncols;
+        let total = self.assert_valid_shape("sparsity");
         if total == 0 {
             return 0.0;
         }
-        1.0 - (self.nnz() as f64 / total as f64)
+        1.0 - (self.mask.popcount() as f64 / total as f64)
     }
 
     /// Return a borrowed representation of this Dense-with-Mask data.
@@ -302,6 +313,31 @@ impl<T, V: AsRef<[T]>, W: AsRef<[u64]>> DenseWithMaskMatrix<T, V, PackedMask<W>>
             ncols: self.ncols,
             _marker: PhantomData,
         }
+    }
+
+    #[inline]
+    pub(crate) fn checked_logical_len(&self) -> Result<usize, crate::SimdError> {
+        let Some(required) = self.nrows.checked_mul(self.ncols) else {
+            return Err(crate::SimdError::LengthMismatch);
+        };
+        if self.values.as_ref().len() != required || self.mask.len() != required {
+            return Err(crate::SimdError::LengthMismatch);
+        }
+        Ok(required)
+    }
+
+    #[track_caller]
+    #[inline]
+    pub(crate) fn assert_valid_shape(&self, operation: &str) -> usize {
+        self.checked_logical_len().unwrap_or_else(|_| {
+            panic!(
+                "DenseWithMask {operation}: values {}, mask {}, and shape {}x{} must have the same logical length",
+                self.values.as_ref().len(),
+                self.mask.len(),
+                self.nrows,
+                self.ncols
+            )
+        })
     }
 }
 
@@ -508,15 +544,7 @@ impl<T, V: AsRef<[T]>, W: AsRef<[u64]>> SparseValidate
     for DenseWithMaskMatrix<T, V, PackedMask<W>>
 {
     fn validate(&self) -> Result<(), crate::SimdError> {
-        let values = self.values.as_ref();
-
-        let req_len = self.nrows * self.ncols;
-        if values.len() < req_len {
-            return Err(crate::SimdError::LengthMismatch);
-        }
-        if self.mask.len() < values.len() {
-            return Err(crate::SimdError::LengthMismatch);
-        }
+        self.checked_logical_len()?;
         Ok(())
     }
 }

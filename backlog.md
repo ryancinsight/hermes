@@ -26,6 +26,20 @@
 - **Risk / change class:** [patch], malformed-input correctness on a hot sparse
   path; no public API change. **Dependencies:** the packed representation merged
   in PR #81 (`e1bd5e0`).
+- **Evidence:** the exact final code passes 498/498 workspace tests and 117/117
+  focused all-feature release tests, including release-mode extraction and
+  independently isolated exact-shape rejection. Workspace Clippy with
+  `-D warnings`, doctests, warning-clean docs, no-default-features, the sparse
+  benchmark smoke, and 223/223 semver checks per affected public crate pass.
+  The independent static judge is GREEN after its diagnostic-overflow and
+  test-isolation findings were resolved. Exact AVX2
+  inspection shows the added checked multiplication and two length comparisons
+  before the row loop while the packed vector loop is unchanged. A fresh
+  exact-source run against the unchanged pre-change baseline reports no detected
+  change (407.11 us median; change interval -4.32% to +3.55%, p=0.83). An
+  old-versus-old control moved 3.9%, so the timing claim is limited to excluding
+  a stable regression on this variable-load host; code generation supplies the
+  mechanism evidence.
 
 ## HS-NATIVE-COMPARISON-MASK-2026-08-27 — Remove comparison-mask stack round-trip [patch] — done 2026-08-27 (PR #84, merge 6efa67b)
 

@@ -5,12 +5,12 @@
 - [x] Reconcile the merged packed-mask representation, public extraction
       contracts, raw DenseWithMask operation boundaries, logical shape, and
       current sparse value-semantic coverage.
-- [ ] Record the unchanged sparse benchmark baseline and exact AVX2 loop before
+- [x] Record the unchanged sparse benchmark baseline and exact AVX2 loop before
       changing production code.
-- [ ] Enforce release-safe public extraction and exact overflow-safe matrix
+- [x] Enforce release-safe public extraction and exact overflow-safe matrix
       validation, with one pre-loop validation boundary and private
       prevalidated loop extraction.
-- [ ] Add debug/release boundary, adversarial shape, and dense-reference tests;
+- [x] Add debug/release boundary, adversarial shape, and dense-reference tests;
       re-run the unchanged benchmark and inspect exact code generation.
 - [ ] Run exact-diff and affected full gates, synchronize evidence, obtain an
       independent judge verdict, commit, publish, collect hosted verification,

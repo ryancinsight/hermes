@@ -6,6 +6,12 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch][HS-PACKED-MASK-SHAPE-SAFETY] Reject out-of-range `PackedMask`
+  extraction in debug and release builds, including overflowing windows, and
+  require `DenseWithMask` values, mask, and checked `nrows * ncols` to match
+  exactly. Dense-with-mask accessors and kernels validate at their operation
+  boundary; vector loops use prevalidated extraction.
+
 - [patch][HS-NATIVE-COMPARISON-MASK] Route all six `Vector::cmp_*_mask`
   operations directly through each backend's native vector-to-mask conversion.
   This removes the prior register-to-stack store, lane-wise scalar scan, and
