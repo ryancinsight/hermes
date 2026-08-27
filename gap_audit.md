@@ -437,6 +437,70 @@ consumers partition their disjoint rows once with standard slice APIs and then
 use the existing capability-backed view/chunk iterators; Hermes does not clone
 that general slice-partitioning operation into a SIMD-specific API.
 
+### Stable Rust SIMD ecosystem refresh and Pulp parity — 2026-08-27 <a id="stable-rust-simd-2026-08-27"></a>
+
+The reference set was refreshed against the current published documentation,
+not selected from recalled crate surfaces:
+
+| Substrate | Stable same-binary dispatch | Relevant contract | Treatment |
+| --- | --- | --- | --- |
+| [`fearless_simd` 0.7.0](https://github.com/linebender/fearless_simd/releases/tag/v0.7.0) | Yes | Cached `Level` selection and a safe native-width token; 0.7 adds SSE2, generic widen/narrow, and four-way interleaved I/O | Existing Hermes comparator |
+| [`pulp` 0.22.3](https://docs.rs/pulp/0.22.3/pulp/) | Yes | `Arch::dispatch` invokes one `WithSimd` body over native f32/f64 vectors and exact vector/tail slice splits | Measured in a rejected local experiment; its `paste` dependency fails advisory policy |
+| [`macerator` 0.3.4](https://docs.rs/macerator/0.3.4/macerator/) | Capability-vectorized | Sealed `Simd`, `WithSimd`, generic `Vector`, and per-operation acceleration queries | Source-audited; the same `paste` advisory and no distinct live consumer contract reject another timing row |
+| [`wide`](https://github.com/Lokathor/wide) | No | Fixed vector types selected by build-time target features; its documentation states runtime feature detection does not work | Excluded from a portable same-binary comparison |
+| [`std::simd`](https://doc.rust-lang.org/beta/std/simd/) | Not on stable | Portable const-width vectors under the experimental `portable_simd` feature | Excluded by Hermes' stable-toolchain contract |
+
+Pulp was selected for a bounded experiment because it is stable, selects the
+host ISA at runtime, and can execute the same native-width f32/f64 operation
+without changing the binary or the workload. The temporary dev dependency
+enabled only `std`, `x86-v3`, and `x86-v4`, preserving Hermes' AVX2/AVX-512
+width ladder while its unrelated relaxed-WASM feature stayed disabled. Pulp's
+published manifest and current upstream main both require `paste = "1"`, which
+resolves to unmaintained 1.0.15
+([RUSTSEC-2024-0436](https://rustsec.org/advisories/RUSTSEC-2024-0436)); Macerator
+0.3.4 has the same dependency. `cargo deny` therefore rejects both closures.
+Neither dependency nor comparator row is retained.
+
+The rejected Pulp row was one generic f32/f64 `WithSimd` kernel. Hermes,
+Fearless SIMD, and Pulp read the same six input allocations, wrote the same four
+output allocations, asserted equal native width, and passed the existing
+precision-specific scalar fused-rounding oracle before timing. The first exact
+locked run reported:
+
+| Type | Scalars | Hermes | `fearless_simd` | Pulp |
+| --- | ---: | ---: | ---: | ---: |
+| f32 | 256 | 31.649 ns [31.548, 31.755] | 31.958 ns [31.760, 32.243] | 32.121 ns [31.930, 32.451] |
+| f32 | 1,024 | 160.50 ns [155.40, 169.25] | 158.04 ns [157.43, 158.94] | 156.85 ns [155.52, 158.39] |
+| f32 | 4,096 | 2.0260 us [1.8581, 2.1751] | 2.8262 us [2.6766, 2.9625] | 2.2984 us [2.1051, 2.4984] |
+| f64 | 256 | 87.831 ns [80.115, 95.090] | 76.937 ns [73.049, 82.778] | 73.986 ns [70.012, 80.406] |
+| f64 | 1,024 | 781.87 ns [727.86, 821.24] | 851.89 ns [810.18, 873.68] | 876.80 ns [874.42, 878.99] |
+| f64 | 4,096 | 3.3352 us [2.9980, 3.5414] | 3.6106 us [3.4801, 3.6783] | 2.7030 us [2.4894, 2.9587] |
+
+An unchanged confirmation run reported:
+
+| Type | Scalars | Hermes | `fearless_simd` | Pulp |
+| --- | ---: | ---: | ---: | ---: |
+| f32 | 256 | 32.050 ns [31.315, 33.372] | 31.357 ns [31.257, 31.464] | 31.668 ns [31.551, 31.790] |
+| f32 | 1,024 | 180.71 ns [140.54, 261.53] | 126.36 ns [124.25, 130.24] | 123.87 ns [123.35, 124.70] |
+| f32 | 4,096 | 1.8708 us [1.8649, 1.8770] | 1.8799 us [1.8761, 1.8852] | 1.8694 us [1.8672, 1.8726] |
+| f64 | 256 | 69.377 ns [64.544, 77.541] | 87.823 ns [78.191, 96.915] | 61.728 ns [61.643, 61.859] |
+| f64 | 1,024 | 907.31 ns [904.30, 910.90] | 902.40 ns [898.63, 904.86] | 814.09 ns [779.39, 844.76] |
+| f64 | 4,096 | 2.7448 us [2.4990, 3.0895] | 2.7166 us [2.5421, 2.8935] | 3.2215 us [2.9976, 3.4218] |
+
+No Pulp advantage has a disjoint interval in both runs. Several regimes reverse
+ordering or change between overlapping and disjoint intervals, and absolute
+large-size timing remains unstable on the shared host. Exact AVX2 assembly
+explains the absence of a provider deficit: Hermes and Pulp each emit
+six 256-bit loads, four stores, six fused arithmetic instructions, one loop
+branch, and no calls, bounds branches, support probes, or panic paths for both
+precisions. Their loop controls are equivalent `add/cmp/jb` and `add/dec/jne`
+spellings. Pulp performs more minimum-length setup before its loop; that cold
+work does not establish a Hermes deficit. The audit retains the measurements
+but removes the Pulp row and dependency, and makes no production-kernel change.
+Timing evidence is limited to AVX2 on this shared Windows Arrow Lake S host;
+AVX-512 received compile and value-semantic coverage only in the removed
+experiment, not retained regression coverage.
+
 Findings:
 - [minor] Consumer target-feature entry. ADR 009 records why a lane kernel must
   be monomorphized inside a `#[target_feature]` scope: without it the annotated

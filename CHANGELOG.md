@@ -17,6 +17,11 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   and packs once at that construction boundary. The unused
   `DenseWithMaskBitMaskData` partial variant is deleted.
 
+- [patch][HS-AVX2-INTERLEAVE-OVERRIDES] Add native AVX2 f64/f32
+  `interleave`/`deinterleave` overrides (unpack + cross-half permute, four
+  shuffles per pair) replacing the portable stack-bounce default on that
+  backend. Verified by the existing flat-sequence conformance oracles.
+
 - [patch][HS-VECTORIZE-LARGE-KERNEL] Fix `#[runtime_dispatch]` compiling
   large kernel bodies at baseline codegen: the retained inner fn is now
   emitted `#[inline(always)]` so it always inlines into the generated
