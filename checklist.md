@@ -30,8 +30,8 @@
       model a non-obvious loop when instruction counts do not settle it.
 - [x] Implement only a stable provider-owned correction, or record why the
       measurement rejects one.
-- [ ] Run exact-diff gates, synchronize documentation, commit, publish, enqueue,
-      collect hosted verification, and close the branch lifecycle.
+- [x] Run exact-diff gates, synchronize documentation, commit, publish, collect
+      the full hosted matrix, and merge PR #76 as `ba32b8c`.
 
 ## HS-FEARLESS-PERMUTE-THROUGHPUT-2026-08-26 [patch]
 
