@@ -63,6 +63,14 @@
   authorized. **Dependencies:** Pulp parity PR #79 merged as `3c548015`; AVX2
   interleave PR #80 merged as `2fa126a` and is outside this item's production
   scope.
+- **Decision:** retain the dispatch-only regression instrument and make no
+  production cache change. Exact release assembly confirms Hermes performs
+  three standard-library cache loads/tests while Fearless dispatches from a
+  cached `Level`, but two unchanged runs do not show a Hermes disadvantage with
+  disjoint 95% confidence intervals for both precisions. The public-entry cost
+  is 0.97–2.17 ns for Hermes and 0.96–2.06 ns for `Level::new` in run one;
+  1.34–1.43 ns and 1.51–1.76 ns respectively in run two. The evidence therefore
+  rejects added atomics or indirect calls under the predeclared oracle.
 
 ## HS-PULP-LANE-THROUGHPUT-2026-08-27 — Measure Pulp lane parity [patch] — done 2026-08-27 (PR #79, merge 3c548015)
 

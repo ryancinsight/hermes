@@ -1,6 +1,7 @@
-//! Lane-boundary cost for consumer-shaped butterfly kernels.
+//! Lane and dispatch-boundary cost for consumer-shaped kernels.
 //!
-//! The planar group compares Hermes and `fearless_simd` at both native floating
+//! The dispatch group isolates public entry cost from kernel throughput. The
+//! planar group compares Hermes and `fearless_simd` at both native floating
 //! precisions. The permute groups compare the shared cross-lane operation
 //! surface. The interleaved group isolates Hermes wrapper overhead across
 //! checked, view/chunk, and direct backend paths, then compares `ComplexReg`

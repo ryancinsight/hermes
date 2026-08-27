@@ -7,11 +7,12 @@
       simply_simd dispatch/cache designs from authoritative sources.
 - [x] Add one input-sensitive f32/f64 dispatch-only group without changing any
       established workload, timed region, or dependency.
-- [ ] Assert equal selected lane counts, then run two unchanged bounded
+- [x] Assert equal selected lane counts, then run two unchanged bounded
       Criterion measurements and inspect exact emitted dispatch code.
-- [ ] Implement an internal correction only for a repeatable Hermes-owned
-      deficit; reject atomics and indirect calls that do not improve the same
-      instrument.
+- [x] Reject a production correction: exact assembly exposes three Hermes
+      feature-cache loads, but neither precision has a repeatable disjoint
+      deficit across both runs, so an added atomic or indirect call fails the
+      acceptance oracle.
 - [ ] Run exact-diff and affected full gates, synchronize evidence, commit,
       publish, collect hosted verification, and merge.
 
