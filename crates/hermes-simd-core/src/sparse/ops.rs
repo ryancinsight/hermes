@@ -23,10 +23,17 @@ use crate::sparse::spmv::build_index_vector;
 /// Unified trait for elementwise and reduction operations on sparse matrices.
 pub trait SparseOps<T> {
     /// Compute the sum of all elements stored in the sparse matrix.
+    ///
+    /// # Panics
+    /// Panics if a raw storage representation is structurally invalid.
     fn sum_values(&self) -> T;
 
     /// Elementwise multiply the sparse matrix values by corresponding entries
     /// in a dense matrix, writing the results to `out_values`.
+    ///
+    /// # Panics
+    /// Panics if the dense input or output is too short, or if a raw storage
+    /// representation is structurally invalid.
     fn elementwise_mul_dense(&self, dense: &[T], out_values: &mut [T]);
 }
 
@@ -336,25 +343,20 @@ where
     #[inline]
     fn sum_values(&self) -> T {
         let lane_count = Arch::LANE_COUNT;
-        let len = self.data.values.len();
+        let len = self.data.assert_valid_shape("sum_values");
         let simd_len = (len / lane_count) * lane_count;
-        assert!(
-            self.data.mask.len() >= len,
-            "DenseWithMask sum_values: mask covers {} elements, values has {}",
-            self.data.mask.len(),
-            len
-        );
 
         // SAFETY: `Arch::*` are target-feature kernels (module invariant). Every
         // masked load reads `values[i..i+LANE_COUNT]` for `i < simd_len <= len`,
-        // which stays within `values`; `mask.lane_bits` is a safe,
-        // self-bounds-checked packed read feeding `mask_from_bitmask`.
+        // which stays within `values`; the entry shape check proves each
+        // `mask.lane_bits_in_bounds` window valid.
         let mut i = 0usize;
         let acc_vec = unsafe {
             let zero_vec = Arch::zero();
             let mut acc_vec = zero_vec;
             while i < simd_len {
-                let msk = Arch::mask_from_bitmask(self.data.mask.lane_bits(i, lane_count));
+                let msk =
+                    Arch::mask_from_bitmask(self.data.mask.lane_bits_in_bounds(i, lane_count));
                 let v_vec =
                     Arch::masked_load_unaligned(self.data.values[i..].as_ptr(), msk, zero_vec);
                 acc_vec = Arch::add(acc_vec, v_vec);
@@ -365,7 +367,7 @@ where
         // SAFETY: target-feature kernel, covered by the module invariant.
         let mut s = unsafe { Arch::sum_reduce(acc_vec) };
         while i < len {
-            if self.data.mask.bit(i) {
+            if self.data.mask.bit_in_bounds(i) {
                 s += self.data.values[i];
             }
             i += 1;
@@ -376,7 +378,7 @@ where
     #[inline]
     fn elementwise_mul_dense(&self, dense: &[T], out_values: &mut [T]) {
         let d = &self.data;
-        let len = d.values.len();
+        let len = d.assert_valid_shape("elementwise_mul_dense");
         let lane_count = Arch::LANE_COUNT;
         let simd_len = (len / lane_count) * lane_count;
 
@@ -386,23 +388,22 @@ where
         // `dense` and the output are elementwise-shaped, so require them at
         // least as long as `values`.
         assert!(
-            dense.len() >= len && out_values.len() >= len && d.mask.len() >= len,
-            "DenseWithMask elementwise_mul_dense: dense {} / out {} / mask {} shorter than values {}",
+            dense.len() >= len && out_values.len() >= len,
+            "DenseWithMask elementwise_mul_dense: dense {} / out {} shorter than matrix length {}",
             dense.len(),
             out_values.len(),
-            d.mask.len(),
             len
         );
 
         // SAFETY: `Arch::*` are target-feature kernels (module invariant). The
         // assert above gives every windowed load/store `[i, i+LANE_COUNT)` room
         // within `dense`, `out_values`, and `values` for `i < simd_len`;
-        // `mask.lane_bits` is a safe, self-bounds-checked packed read.
+        // the entry shape check proves each packed-mask window valid.
         let mut i = 0usize;
         unsafe {
             let zero_vec = Arch::zero();
             while i < simd_len {
-                let msk = Arch::mask_from_bitmask(d.mask.lane_bits(i, lane_count));
+                let msk = Arch::mask_from_bitmask(d.mask.lane_bits_in_bounds(i, lane_count));
                 let res_vec = Arch::masked_mul(
                     Arch::load_unaligned(d.values[i..].as_ptr()),
                     Arch::load_unaligned(dense[i..].as_ptr()),
@@ -414,7 +415,7 @@ where
             }
         }
         while i < len {
-            if d.mask.bit(i) {
+            if d.mask.bit_in_bounds(i) {
                 out_values[i] = d.values[i] * dense[i];
             } else {
                 out_values[i] = T::ZERO;

@@ -1,14 +1,50 @@
 # Backlog — hermes-simd
 
-## HS-NATIVE-COMPARISON-MASK-2026-08-27 — Remove comparison-mask stack round-trip [patch] — in progress
+## HS-PACKED-MASK-SHAPE-SAFETY-2026-08-27 — Enforce packed-mask and matrix shape bounds [patch] — in progress
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** Codex — `crates/hermes-simd/benches/lane_throughput.rs`, new
-  `crates/hermes-simd/benches/lane_throughput/comparison_mask.rs`,
-  `crates/hermes-simd-core/src/view/vector_reg.rs`, comparison-mask coverage in
-  `crates/hermes-simd/tests/types_tests.rs`, this item and its checklist,
-  `gap_audit.md`, and the affected changelog/Rustdoc only after measurement
-  admits the correction.
+  **Lease:** Codex — `crates/hermes-simd-core/src/mask.rs`,
+  `crates/hermes-simd-core/src/sparse/{types.rs,ops.rs,spmv.rs}`,
+  `crates/hermes-simd/tests/sparse_tests.rs`, the existing sparse benchmark,
+  this item and its checklist, `gap_audit.md`, and affected Rustdoc/changelog.
+- **Outcome:** make public `PackedMask` extraction reject every out-of-range
+  request in release builds, make `DenseWithMask` validation reject arithmetic
+  overflow and every non-exact logical shape, and keep validated sparse kernels
+  free of repeated public bounds checks.
+- **Scope / non-goals:** preserve the public storage and sparse-operation
+  signatures; validate once at each raw sparse operation boundary and use a
+  crate-private prevalidated extraction path inside loops. Do not introduce a
+  compatibility layer or expand this patch into a breaking `ValidatedData`
+  migration.
+- **Acceptance oracle:** release and debug tests cover `bit(len)`, windows over
+  64 bits, offsets beyond `len`, overflow-sized offsets, and the allowed empty
+  window at `len`; exact, short, oversized, and overflowed `DenseWithMask`
+  shapes produce value-semantic results or the specified `LengthMismatch`.
+  Existing sparse dense-reference laws remain green. An unchanged bounded
+  before/after sparse measurement plus exact AVX2 inspection must show that the
+  public contract checks did not enter the vector loop.
+- **Risk / change class:** [patch], malformed-input correctness on a hot sparse
+  path; no public API change. **Dependencies:** the packed representation merged
+  in PR #81 (`e1bd5e0`).
+- **Evidence:** the exact final code passes 498/498 workspace tests and 117/117
+  focused all-feature release tests, including release-mode extraction and
+  independently isolated exact-shape rejection. Workspace Clippy with
+  `-D warnings`, doctests, warning-clean docs, no-default-features, the sparse
+  benchmark smoke, and 223/223 semver checks per affected public crate pass.
+  The independent static judge is GREEN after its diagnostic-overflow and
+  test-isolation findings were resolved. Exact AVX2
+  inspection shows the added checked multiplication and two length comparisons
+  before the row loop while the packed vector loop is unchanged. A fresh
+  exact-source run against the unchanged pre-change baseline reports no detected
+  change (407.11 us median; change interval -4.32% to +3.55%, p=0.83). An
+  old-versus-old control moved 3.9%, so the timing claim is limited to excluding
+  a stable regression on this variable-load host; code generation supplies the
+  mechanism evidence.
+
+## HS-NATIVE-COMPARISON-MASK-2026-08-27 — Remove comparison-mask stack round-trip [patch] — done 2026-08-27 (PR #84, merge 6efa67b)
+
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+  **Lease:** none.
 - **Outcome:** route the six `Vector::cmp_*_mask` methods directly from the
   backend comparison result through `vector_to_mask`, eliminating the current
   register-to-stack scalar scan and mask reconstruction when the measured
@@ -36,6 +72,10 @@
   stack storage, lane-wise scalar tests, and mask reconstruction; the direct
   route is `vcmpeq*` → `vmovmsk*` → `popcnt`. The production path now uses the
   native backend conversion for all six comparisons.
+- **Delivery:** provider commit `f45062d`; exact integrated head `47380dd`;
+  PR #84 merged as `6efa67b`. The hosted matrix passed x86, AArch64 NEON,
+  AVX-512/AMX under SDE, Miri, docs, dependency policy, lock integrity, and the
+  12m30s bounded benchmark gate.
 
 ## HS-CI-RUNNER-CLASS-SELECTION-2026-08-27 — Best-effort AVX-512 step skips on incapable runners, letting defects land [patch] — todo
 

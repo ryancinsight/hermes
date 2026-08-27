@@ -1143,6 +1143,15 @@ order (correctness → architecture → tests → docs → PM).
   `mask_from_bitmask` instead of the per-chunk per-call bool-conversion loop.
   Unused `DenseWithMaskBitMaskData` partial variant deleted. PR #81,
   backlog `HS-DENSEMASK-BITPACK-2026-08-27`.
+- **[RESOLVED 2026-08-27] Packed-mask and dense logical-shape bounds.** Public
+  `PackedMask` extraction now rejects every out-of-range bit or window in debug
+  and release builds without offset arithmetic overflow. `DenseWithMask`
+  validation requires exact values and mask lengths against checked
+  `nrows * ncols`; its accessors and kernels validate at their operation
+  boundaries, while vector loops use crate-private prevalidated extraction. Release
+  adversarial tests cover the boundary and overflow cases. Exact AVX2 inspection
+  shows only pre-loop validation added, and an unchanged bounded comparison
+  detects no stable throughput change (`HS-PACKED-MASK-SHAPE-SAFETY-2026-08-27`).
 - **[RESOLVED 2026-08-27] `cmp_*_mask` stack round-trip.** The six public
   comparison-mask methods now convert the backend comparison register directly
   to its native mask. Two unchanged f32/f64 measurements and exact AVX2

@@ -91,6 +91,121 @@ fn test_spmv_dense_masked_word_boundary_rows() {
 }
 
 #[test]
+fn test_dense_masked_validation_requires_exact_logical_shape() {
+    let exact_values = [1.0f32, 2.0, 3.0, 4.0];
+    let exact_mask = PackedMask::from_bools(&[true, false, true, false]);
+    let exact = ValidatedData::new(DenseWithMaskData::new(
+        &exact_values,
+        exact_mask.as_view(),
+        2,
+        2,
+    ))
+    .expect("exact DenseWithMask shape must validate");
+    assert_eq!(exact.storage().values, exact_values);
+    assert_eq!(exact.storage().mask.len(), 4);
+
+    let short_values = [1.0f32, 2.0, 3.0];
+    assert_eq!(
+        ValidatedData::new(DenseWithMaskData::new(
+            &short_values,
+            exact_mask.as_view(),
+            2,
+            2,
+        ))
+        .err(),
+        Some(SimdError::LengthMismatch)
+    );
+
+    let long_values = [1.0f32, 2.0, 3.0, 4.0, 5.0];
+    let long_mask = PackedMask::from_bools(&[true, false, true, false, true]);
+    assert_eq!(
+        ValidatedData::new(DenseWithMaskData::new(
+            &long_values,
+            exact_mask.as_view(),
+            2,
+            2,
+        ))
+        .err(),
+        Some(SimdError::LengthMismatch)
+    );
+
+    let short_mask = PackedMask::from_bools(&[true, false, true]);
+    assert_eq!(
+        ValidatedData::new(DenseWithMaskData::new(
+            &exact_values,
+            short_mask.as_view(),
+            2,
+            2,
+        ))
+        .err(),
+        Some(SimdError::LengthMismatch)
+    );
+    assert_eq!(
+        ValidatedData::new(DenseWithMaskData::new(
+            &exact_values,
+            long_mask.as_view(),
+            2,
+            2,
+        ))
+        .err(),
+        Some(SimdError::LengthMismatch)
+    );
+
+    let empty_values: [f32; 0] = [];
+    let empty_mask = PackedMask::from_bools(&[]);
+    assert_eq!(
+        ValidatedData::new(DenseWithMaskData::new(
+            &empty_values,
+            empty_mask.as_view(),
+            usize::MAX,
+            2,
+        ))
+        .err(),
+        Some(SimdError::LengthMismatch)
+    );
+}
+
+#[test]
+#[should_panic(expected = "DenseWithMask spmv: values 5, mask 5, and shape 2x2")]
+fn test_spmv_dense_masked_rejects_oversized_storage() {
+    let values = [1.0f32; 5];
+    let mask = PackedMask::from_bools(&[true; 5]);
+    let data = DenseWithMaskData::new(&values, mask.as_view(), 2, 2);
+    let mut y = [0.0f32; 2];
+    spmv_dense_masked(data, &[1.0; 2], &mut y);
+}
+
+#[test]
+#[should_panic(expected = "DenseWithMask nnz: values 5, mask 5, and shape 2x2")]
+fn test_dense_masked_nnz_rejects_oversized_storage() {
+    let values = [1.0f32; 5];
+    let mask = PackedMask::from_bools(&[true; 5]);
+    let data = DenseWithMaskData::new(&values, mask.as_view(), 2, 2);
+    let _ = data.nnz();
+}
+
+#[test]
+#[should_panic(expected = "DenseWithMask sum_values: values 5, mask 5, and shape 2x2")]
+fn test_dense_masked_sum_rejects_oversized_storage() {
+    let values = [1.0f32; 5];
+    let mask = PackedMask::from_bools(&[true; 5]);
+    let data = DenseWithMaskData::new(&values, mask.as_view(), 2, 2);
+    let cow: SparseCow<f32, DenseWithMask, Scalar> = SparseCow::borrowed(data);
+    let _ = cow.sum_values();
+}
+
+#[test]
+#[should_panic(expected = "DenseWithMask elementwise_mul_dense: values 5, mask 5, and shape 2x2")]
+fn test_dense_masked_elementwise_rejects_oversized_storage() {
+    let values = [1.0f32; 5];
+    let mask = PackedMask::from_bools(&[true; 5]);
+    let data = DenseWithMaskData::new(&values, mask.as_view(), 2, 2);
+    let cow: SparseCow<f32, DenseWithMask, Scalar> = SparseCow::borrowed(data);
+    let mut out = [0.0f32; 5];
+    cow.elementwise_mul_dense(&[1.0; 5], &mut out);
+}
+
+#[test]
 fn test_blocked_coo_4x4_spmv() {
     // 4x4 identity matrix as one 4x4 block
     let block: Vec<f32> = vec![

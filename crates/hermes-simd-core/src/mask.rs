@@ -429,11 +429,27 @@ impl<W: AsRef<[u64]>> PackedMask<W> {
     /// Returns `true` if element `i` is active.
     ///
     /// # Panics
-    /// Panics in debug mode if `i >= self.len()`.
+    /// Panics if `i >= self.len()`.
+    #[track_caller]
     #[inline(always)]
     #[must_use]
     pub fn bit(&self, i: usize) -> bool {
-        debug_assert!(i < self.len, "PackedMask::bit: index out of range");
+        assert!(
+            i < self.len,
+            "PackedMask::bit: index {i} outside mask length {}",
+            self.len
+        );
+        self.bit_inner(i)
+    }
+
+    #[inline(always)]
+    pub(crate) fn bit_in_bounds(&self, i: usize) -> bool {
+        debug_assert!(i < self.len, "PackedMask::bit_in_bounds: invalid proof");
+        self.bit_inner(i)
+    }
+
+    #[inline(always)]
+    fn bit_inner(&self, i: usize) -> bool {
         (self.words.as_ref()[i / WORD_BITS] >> (i % WORD_BITS)) & 1 == 1
     }
 
@@ -445,7 +461,8 @@ impl<W: AsRef<[u64]>> PackedMask<W> {
     /// to obtain the native lane mask.
     ///
     /// # Panics
-    /// Panics in debug mode if `count > 64` or `offset + count > self.len()`.
+    /// Panics if `count > 64`, `offset > self.len()`, or the requested window
+    /// extends beyond `self.len()`.
     ///
     /// # Examples
     /// ```
@@ -458,14 +475,38 @@ impl<W: AsRef<[u64]>> PackedMask<W> {
     /// let mask = PackedMask::from_bools(&bits);
     /// assert_eq!(mask.lane_bits(61, 4), 0b0010);
     /// ```
+    #[track_caller]
     #[inline(always)]
     #[must_use]
     pub fn lane_bits(&self, offset: usize, count: usize) -> u64 {
-        debug_assert!(count <= WORD_BITS, "PackedMask::lane_bits: count > 64");
-        debug_assert!(
-            offset + count <= self.len,
-            "PackedMask::lane_bits: window out of range"
+        assert!(
+            count <= WORD_BITS,
+            "PackedMask::lane_bits: count {count} exceeds 64"
         );
+        assert!(
+            offset <= self.len,
+            "PackedMask::lane_bits: offset {offset} outside mask length {}",
+            self.len
+        );
+        assert!(
+            count <= self.len - offset,
+            "PackedMask::lane_bits: offset {offset} with count {count} exceeds mask length {}",
+            self.len
+        );
+        self.lane_bits_inner(offset, count)
+    }
+
+    #[inline(always)]
+    pub(crate) fn lane_bits_in_bounds(&self, offset: usize, count: usize) -> u64 {
+        debug_assert!(
+            count <= WORD_BITS && offset <= self.len && count <= self.len - offset,
+            "PackedMask::lane_bits_in_bounds: invalid proof"
+        );
+        self.lane_bits_inner(offset, count)
+    }
+
+    #[inline(always)]
+    fn lane_bits_inner(&self, offset: usize, count: usize) -> u64 {
         if count == 0 {
             return 0;
         }
@@ -542,6 +583,48 @@ mod packed_mask_tests {
         assert!(mask.is_empty());
         assert_eq!(mask.popcount(), 0);
         assert_eq!(mask.lane_bits(0, 0), 0);
+    }
+
+    #[test]
+    fn empty_window_at_logical_end_is_valid() {
+        let mask = PackedMask::from_bools(&[true, false, true]);
+        assert_eq!(mask.lane_bits(mask.len(), 0), 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "outside mask length")]
+    fn bit_rejects_logical_end() {
+        let _ = PackedMask::from_bools(&[true, false, true]).bit(3);
+    }
+
+    #[test]
+    #[should_panic(expected = "count 65 exceeds 64")]
+    fn lane_bits_rejects_more_than_one_word() {
+        let _ = PackedMask::from_bools(&[true; 65]).lane_bits(0, 65);
+    }
+
+    #[test]
+    #[should_panic(expected = "outside mask length")]
+    fn lane_bits_rejects_overflow_sized_offset() {
+        let _ = PackedMask::from_bools(&[true]).lane_bits(usize::MAX, 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "offset 2 with count 2 exceeds mask length 3")]
+    fn lane_bits_rejects_window_past_logical_end() {
+        let _ = PackedMask::from_bools(&[true, false, true]).lane_bits(2, 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "with count 2 exceeds mask length")]
+    fn lane_bits_rejects_near_maximum_window_without_overflow() {
+        // The guard rejects the window before storage is observed; constructing
+        // this private boundary fixture avoids an impossible usize::MAX-bit allocation.
+        let mask = PackedMask {
+            words: &[] as &[u64],
+            len: usize::MAX,
+        };
+        let _ = mask.lane_bits(usize::MAX - 1, 2);
     }
 
     #[test]
