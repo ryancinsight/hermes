@@ -33,11 +33,11 @@
 
 ## HS-CI-RUNNER-CLASS-SELECTION-2026-08-27 [patch]
 
-- [ ] Reproduce the escaped generic-default configuration failure independently
+- [x] Reproduce the escaped generic-default configuration failure independently
       of AVX-512 runner capability.
-- [ ] Compile the generic-default SIMD configuration on every x86 verification
+- [x] Compile the generic-default SIMD configuration on every x86 verification
       runner without executing unsupported instructions.
-- [ ] Prove the gate fails when the escaped import defect is reintroduced and
+- [x] Prove the gate fails when the escaped import defect is reintroduced and
       passes on the corrected tree.
 - [ ] Validate workflow syntax, run the exact local gate, publish, merge, and
       collect hosted verification.

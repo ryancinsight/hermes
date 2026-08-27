@@ -48,6 +48,16 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
+      # Compile the benchmark-only generic-default configuration on every x86
+      # runner. Runtime capability still gates the native AVX-512 comparison,
+      # but cfg/import correctness must not depend on runner-class lottery.
+      - name: Compile generic-default SIMD configuration
+        env:
+          RUSTFLAGS: >-
+            -D warnings
+            --check-cfg=cfg(hermes_benchmark_generic_default)
+            --cfg hermes_benchmark_generic_default
+        run: cargo check --locked -p hermes-simd --bench permute
       - uses: taiki-e/install-action@ea4c0b50b0d394ee91c5bb68a6a295b0556feb8e
       # nextest applies the committed .config/nextest.toml timeout instrument
       # (30s slow / 60s terminate) — bare `cargo test` bypasses it. Doctests are
@@ -268,8 +278,9 @@ jobs:
         run: |
           echo "This hosted runner has no AVX-512 silicon, so the native AVX-512"
           echo "benchmark is skipped. Coverage on this host is visible as NOT"
-          echo "COVERED in the identification report above; deterministic"
-          echo "semantic coverage stays under the SDE job."
+          echo "COVERED in the identification report above. The main x86 gate"
+          echo "still compiles the generic-default cfg; deterministic semantic"
+          echo "coverage stays under the SDE job."
       # HS-429 acceptance: a criterion baseline captured on real silicon when
       # the host provides it. The permute A/B also executes HS-430's still-open
       # AVX-512 measurement, the x86 analog of the aarch64 job's neon-native

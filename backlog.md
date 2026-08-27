@@ -152,8 +152,7 @@
 ## HS-CI-RUNNER-CLASS-SELECTION-2026-08-27 — Best-effort AVX-512 step skips on incapable runners, letting defects land [patch] — in progress
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** `.github/workflows/ci.yml`, this item block, and the matching
-  checklist section through the next verified commit.
+  **Lease:** none.
 
 - **Evidence:** PR #80's AVX2 interleave intrinsic imports broke `-D warnings`
   under `--cfg hermes_benchmark_generic_default`, but only on AVX-512-capable
@@ -166,8 +165,14 @@
   (build without running where the ISA is absent), or pin the step to the SDE
   job that already guarantees the capability.
 - **Acceptance oracle:** a change red under the gated cfg fails CI on every
-  runner class; demonstrated by reverting `6b32676` locally and observing the
-  gate.
+  runner class; demonstrated by reintroducing the defect fixed by `6b32676`
+  locally and observing the gate.
+- **Local verification:** the ordinary x86 job now compiles the `permute`
+  benchmark with `hermes_benchmark_generic_default` and `-D warnings` before
+  runtime capability selection. Removing the two import guards fixed by
+  `6b32676` reproduces the escaped defect: the gate rejects both AVX2 f32 and
+  f64 interleave imports as unused. The unchanged tree passes the same command;
+  workflow YAML parses successfully. Hosted verification remains pending.
 - **Risk / change class:** [patch], CI-only.
 ## HS-TRANSPOSE-SQUARE-2026-08-27 — In-register square-tile transpose [patch] — done 2026-08-27
 
