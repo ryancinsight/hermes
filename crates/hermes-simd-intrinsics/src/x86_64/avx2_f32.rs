@@ -9,17 +9,18 @@ use crate::Avx2;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::{
     __m256, __m256i, _mm256_add_epi8, _mm256_add_ps, _mm256_and_ps, _mm256_and_si256,
-    _mm256_andnot_ps, _mm256_blendv_ps, _mm256_castps256_ps128, _mm256_castps_si256,
-    _mm256_ceil_ps, _mm256_cmp_ps, _mm256_cvtepi32_ps, _mm256_div_ps, _mm256_extractf128_ps,
-    _mm256_floor_ps, _mm256_fmadd_ps, _mm256_fmaddsub_ps, _mm256_fmsub_ps, _mm256_fmsubadd_ps,
-    _mm256_fnmadd_ps, _mm256_i32gather_ps, _mm256_load_ps, _mm256_loadu_ps, _mm256_madd_epi16,
-    _mm256_maddubs_epi16, _mm256_mask_i32gather_ps, _mm256_maskstore_ps, _mm256_max_ps,
-    _mm256_min_ps, _mm256_movehdup_ps, _mm256_moveldup_ps, _mm256_movemask_ps, _mm256_mul_ps,
-    _mm256_or_ps, _mm256_permute_ps, _mm256_permutevar8x32_ps, _mm256_round_ps, _mm256_rsqrt_ps,
-    _mm256_set1_epi16, _mm256_set1_epi8, _mm256_set1_ps, _mm256_setr_epi32, _mm256_setr_epi8,
-    _mm256_setzero_ps, _mm256_shuffle_epi8, _mm256_sqrt_ps, _mm256_srli_epi16, _mm256_store_ps,
-    _mm256_storeu_ps, _mm256_stream_ps, _mm256_sub_ps, _mm256_xor_ps, _mm_add_ps, _mm_cvtss_f32,
-    _mm_shuffle_ps, _CMP_EQ_OQ, _CMP_GE_OQ, _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ,
+    _mm256_andnot_ps, _mm256_blendv_epi8, _mm256_blendv_ps, _mm256_castps256_ps128,
+    _mm256_castps_si256, _mm256_ceil_ps, _mm256_cmp_ps, _mm256_cvtepi32_ps, _mm256_cvttps_epi32,
+    _mm256_div_ps, _mm256_extractf128_ps, _mm256_floor_ps, _mm256_fmadd_ps, _mm256_fmaddsub_ps,
+    _mm256_fmsub_ps, _mm256_fmsubadd_ps, _mm256_fnmadd_ps, _mm256_i32gather_ps, _mm256_load_ps,
+    _mm256_loadu_ps, _mm256_madd_epi16, _mm256_maddubs_epi16, _mm256_mask_i32gather_ps,
+    _mm256_maskstore_ps, _mm256_max_ps, _mm256_min_ps, _mm256_movehdup_ps, _mm256_moveldup_ps,
+    _mm256_movemask_ps, _mm256_mul_ps, _mm256_or_ps, _mm256_permute_ps, _mm256_permutevar8x32_ps,
+    _mm256_round_ps, _mm256_rsqrt_ps, _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set1_epi8,
+    _mm256_set1_ps, _mm256_setr_epi32, _mm256_setr_epi8, _mm256_setzero_ps, _mm256_shuffle_epi8,
+    _mm256_sqrt_ps, _mm256_srli_epi16, _mm256_store_ps, _mm256_storeu_ps, _mm256_storeu_si256,
+    _mm256_stream_ps, _mm256_sub_ps, _mm256_xor_ps, _mm_add_ps, _mm_cvtss_f32, _mm_shuffle_ps,
+    _CMP_EQ_OQ, _CMP_GE_OQ, _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ, _CMP_ORD_Q,
     _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT, _MM_FROUND_TO_ZERO,
 };
 #[cfg(all(
@@ -105,6 +106,34 @@ impl BackendKernel<f32> for Avx2 {
     #[inline]
     unsafe fn store_unaligned(ptr: *mut f32, val: Self::Vector) {
         _mm256_storeu_ps(ptr, val.0);
+    }
+
+    // SAFETY: caller must ensure AVX2 support and a valid equal-lane
+    // destination. The TypeId proof makes the destination exactly eight i32
+    // lanes before the pointer is reinterpreted for the unaligned vector store.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn try_cast<U>(value: <Self as BackendKernel<f32>>::Vector, destination: *mut U) -> bool
+    where
+        U: hermes_simd_core::scalar::Scalar + hermes_simd_core::scalar::CastFrom<f32>,
+    {
+        if core::any::TypeId::of::<U>() != core::any::TypeId::of::<i32>() {
+            return false;
+        }
+        let input = value.0;
+        let mut converted = _mm256_cvttps_epi32(input);
+        let in_range = _mm256_cmp_ps(input, _mm256_set1_ps(2_147_483_648.0), _CMP_LT_OQ);
+        if _mm256_movemask_ps(in_range) != 0xff {
+            converted = _mm256_blendv_epi8(
+                _mm256_set1_epi32(i32::MAX),
+                converted,
+                _mm256_castps_si256(in_range),
+            );
+            let ordered = _mm256_castps_si256(_mm256_cmp_ps(input, input, _CMP_ORD_Q));
+            converted = _mm256_and_si256(converted, ordered);
+        }
+        _mm256_storeu_si256(destination.cast::<__m256i>(), converted);
+        true
     }
 
     const SUPPORTS_NT_STORE: bool = true;

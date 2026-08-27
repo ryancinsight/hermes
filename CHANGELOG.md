@@ -6,6 +6,10 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [minor][HS-NATIVE-CAST-THROUGHPUT] Route AVX2 `f32` to `i32` `Vector::cast`
+  through one packed precise conversion with Rust-compatible saturation and NaN
+  handling. Other type and backend pairs retain the scalar conversion default.
+
 - [patch][HS-PACKED-MASK-SHAPE-SAFETY] Reject out-of-range `PackedMask`
   extraction in debug and release builds, including overflowing windows, and
   require `DenseWithMask` values, mask, and checked `nrows * ncols` to match

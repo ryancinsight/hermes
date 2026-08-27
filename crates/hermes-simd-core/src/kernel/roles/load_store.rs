@@ -2,12 +2,33 @@
 
 use crate::kernel::BackendKernel;
 use crate::private::Sealed;
-use crate::scalar::Scalar;
+use crate::scalar::{CastFrom, Scalar};
 
 use super::storage::SimdStorage;
 
 /// Backend capability for aligned, unaligned, masked, and streaming memory access.
 pub trait SimdLoadStore<T: Scalar>: SimdStorage<T> + Sealed {
+    /// Attempts an equal-lane numeric conversion into `destination`.
+    ///
+    /// The default preserves the canonical scalar [`CastFrom`] route. Sealed
+    /// backend implementations override this when their native instruction has
+    /// the same conversion contract.
+    ///
+    /// # Safety
+    ///
+    /// The processor must support this backend's target features. The source
+    /// and destination lane counts must be equal, and `destination` must be
+    /// valid for that many `U` writes. A `true` result guarantees that every
+    /// destination lane was initialized.
+    #[must_use]
+    #[inline(always)]
+    unsafe fn try_cast<U>(_value: Self::Vector, _destination: *mut U) -> bool
+    where
+        U: Scalar + CastFrom<T>,
+    {
+        false
+    }
+
     /// Loads one register from an aligned pointer.
     ///
     /// # Safety
@@ -61,6 +82,14 @@ pub trait SimdLoadStore<T: Scalar>: SimdStorage<T> + Sealed {
 }
 
 impl<T: Scalar, A: BackendKernel<T>> SimdLoadStore<T> for A {
+    #[inline(always)]
+    unsafe fn try_cast<U>(value: Self::Vector, destination: *mut U) -> bool
+    where
+        U: Scalar + CastFrom<T>,
+    {
+        <A as BackendKernel<T>>::try_cast(value, destination)
+    }
+
     unsafe fn load_aligned(ptr: *const T) -> Self::Vector {
         <A as BackendKernel<T>>::load_aligned(ptr)
     }

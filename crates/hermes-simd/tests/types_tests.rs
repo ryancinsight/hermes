@@ -12,7 +12,8 @@
     reason = "The type conformance harness keeps compile-time dimensions beside the exercised case"
 )]
 use hermes_simd::*;
-use hermes_simd_core::scalar::NumericElement;
+use hermes_simd_core::kernel::SimdKernel;
+use hermes_simd_core::scalar::{CastFrom, NumericElement, Scalar as ScalarElement};
 
 macro_rules! assert_comparison_masks {
     ($t:ty, $arch:ident, $lanes:expr, $lhs:ident, $rhs:ident, $nan:expr) => {{
@@ -1007,6 +1008,77 @@ fn test_new_vector_features() {
     ]));
     cow.transform_vectors(|v| v * Vector::splat(2.0));
     assert_eq!(&*cow, &[2.0, 4.0, 6.0, 8.0, 10.0, 12.0]);
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+fn cast_with_public_bounds<T, U, Arch>(value: Vector<T, Arch>) -> Vector<U, Arch>
+where
+    T: ScalarElement,
+    U: ScalarElement + CastFrom<T>,
+    Arch: SimdArch + SimdKernel<T> + SimdKernel<U>,
+{
+    value.cast()
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[test]
+fn avx2_float_to_int_cast_matches_rust_semantics() {
+    if !Avx2::is_runtime_supported() {
+        return;
+    }
+
+    let cases = [
+        [
+            0.0,
+            -0.0,
+            1.75,
+            -1.75,
+            f32::NAN,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+            2_147_483_648.0,
+        ],
+        [
+            -2_147_483_648.0,
+            2_147_483_520.0,
+            -2_147_483_904.0,
+            f32::MAX,
+            f32::MIN,
+            0.999,
+            -0.999,
+            42.0,
+        ],
+    ];
+
+    for input in cases {
+        let expected = input.map(|value| value as i32);
+        let actual =
+            cast_with_public_bounds::<f32, i32, Avx2>(Vector::<f32, Avx2>::from_array(input))
+                .to_array();
+        assert_eq!(actual, expected);
+    }
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+mod cast_properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn avx2_float_to_int_cast_matches_rust_for_arbitrary_bits(
+            bits in prop::array::uniform8(any::<u32>()),
+        ) {
+            if Avx2::is_runtime_supported() {
+                let input = bits.map(f32::from_bits);
+                let expected = input.map(|value| value as i32);
+                let actual = Vector::<f32, Avx2>::from_array(input)
+                    .cast::<i32>()
+                    .to_array();
+                prop_assert_eq!(actual, expected);
+            }
+        }
+    }
 }
 
 #[test]
