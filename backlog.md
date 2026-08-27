@@ -26,50 +26,21 @@
   one boundary probe and a call/probe/branch-free specialized kernel body.
   **Last update:** 2026-08-27.
 
-## HS-NATIVE-CAST-THROUGHPUT-2026-08-27 — Remove supported cross-type cast stack round-trip [minor] — in progress
+## HS-NATIVE-CAST-THROUGHPUT-2026-08-27 — Remove supported cross-type cast stack round-trip [minor] — done 2026-08-27 (PR #86, merge 5734b85; fix-forward PR #87, merge 4f6a1eb)
 
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** none. Benchmark instrument commit `ff93be1`; provider code and
-  semantic-test commit `18da238`.
-- **Outcome:** measure the public equal-lane `Vector::cast` path against a
-  backend-native conversion and Fearless SIMD 0.7, then eliminate the current
-  register-to-stack scalar loop only when repeated measurements and exact code
-  generation establish a material deficit and its mechanism.
-- **Scope / non-goals:** start with the supported, native-width `f32` to `i32`
-  and `i32` to `f32` conversions under Rust `as` semantics. Preserve the
-  public `Vector::cast` signature and the scalar default for other type pairs.
-  One generic default backend hook may carry the native specialization. Do not
-  add a benchmark dependency already rejected by Hermes dependency policy or
-  conflate this increment with lane-count-changing conversions.
-- **Acceptance oracle:** an input-sensitive same-binary instrument uses equal
-  native widths, returns an accumulated value to defeat elision, and proves
-  every provider against a scalar oracle before timing. Two unchanged bounded
-  runs and exact AVX2 inspection must agree on a repeatable public/direct
-  deficit before production changes. Any correction preserves finite,
-  boundary, NaN, and infinity cast semantics on every affected backend, adds no
-  allocation, and passes the focused release and workspace gates.
-- **Risk / change class:** [minor], hot register conversion with special-value
-  semantics; one additive default method on the public-but-hidden backend seam,
-  with the consumer-facing API unchanged. **Dependencies:** the comparison-mask
-  native-route seam merged in PR #84 (`6efa67b`) supplies the measurement
-  pattern only; this item owns a distinct conversion mechanism.
-- **Measurement decision:** the corrected instrument returns a fixed-width
-  checksum accumulated from every output lane. Two unchanged AVX2 runs at
-  `ff93be1` keep finite in-range f32-to-i32 Hermes near 2.2 Gelem/s while the
-  native and precise Fearless routes remain an order of magnitude faster.
-  Exact pre-change assembly identifies the cause: eight scalar `vcvttss2si`
-  instructions per Hermes register versus one packed `vcvttps2dq`. The
-  i32-to-f32 rows already compile to `vcvtdq2ps` and remain load-sensitive, so
-  they do not justify a second specialization.
-- **Implementation evidence:** the AVX2 specialization uses packed truncation,
-  a fast all-in-range branch, and vector corrections for positive overflow,
-  NaN, and infinity. Boundary cases plus arbitrary `f32` bit patterns match
-  Rust `as`. A same-lane comparison of `18da238` against `ff93be1` reports
-  8.5–11.3x Hermes gains across 256–4096 finite in-range elements; at 4096,
-  Hermes measures 205.6–207.4 ns and the raw native ceiling 210.8–213.2 ns.
-  Provider-to-provider rows varied with host load, so this run makes no
-  Hermes/Fearless parity claim. Other type/backend pairs retain the default
-  scalar conversion. Exact final gates and independent review remain pending.
+- **Outcome:** AVX2 `f32` to `i32` now uses one packed `vcvttps2dq` plus vector
+  boundary corrections; the public signature and scalar default for every
+  other type/backend pair are unchanged.
+- **Evidence:** boundary and arbitrary-bit tests exactly match Rust `as`, and
+  final disassembly contains the packed conversion without scalar
+  `vcvttss2si`. Repeated same-source measurements from `ff93be1` to provider
+  `18da238` report 6.9–11.4x public-path gains across 256–4096 elements. Host
+  load prevents a Hermes/Fearless parity claim.
+- **Delivery:** local debug/release 500/500 tests, Clippy, docs, doctests,
+  no-default, benchmark smoke, SemVer, AArch64, and independent review pass.
+  Hosted fix-forward run `33120584552` is green across x86, AArch64, Miri
+  boundary checks, SDE, dependency policy, and bounded benchmarks; the AVX2
+  sanitizer limit is recorded in `gap_audit.md`.
 
 ## HS-PACKED-MASK-SHAPE-SAFETY-2026-08-27 — Enforce packed-mask and matrix shape bounds [patch] — done 2026-08-27 (PR #85, merge 7e342cd)
 
