@@ -1,9 +1,12 @@
 # Backlog — hermes-simd
 
-## HS-SPARSE-SAFETY-2026-08-27 — Sparse OOB guards, F-only AVX-512, mask contract [patch] — review
+## HS-SPARSE-SAFETY-2026-08-27 — Sparse OOB guards, F-only AVX-512, mask contract [patch] — done 2026-08-27
 
-- **Integrator:** claude-fable session 03d80d33 subagent.
-  **Lease:** discharged (all increments committed).
+- **Delivered:** PR #92 merged (12 commits, tip `50256f9`); integrator review
+  confirmed the hoisted two-arm guard (exact `i32::MAX + 1` bound) and the
+  F-only `vinsertf64x4` replacement. Post-merge: aarch64 NEON runtime job and
+  miri green; SDE AVX-512 conclusion collected by the atlas sweep.
+- **Integrator:** claude-fable session 03d80d33.
 - **Outcome:** closed two safe-code OOB holes in sparse dense-operand guards
   (SELL-P missing dense-extent assert plus i32 flat-index bound; BlockedCoo
   wrapping dimension products, checked in the elementwise guard and both
