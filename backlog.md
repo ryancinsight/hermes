@@ -1,31 +1,81 @@
 # Backlog — hermes-simd
 
-## HS-SPARSE-SAFETY-2026-08-27 — Sparse OOB guards, F-only AVX-512, mask contract [patch] — in-progress
+## HS-SPARSE-SAFETY-2026-08-27 — Sparse OOB guards, F-only AVX-512, mask contract [patch] — review
 
 - **Integrator:** claude-fable session 03d80d33 subagent.
-  **Lease:** `crates/hermes-simd-core/src/sparse/{ops.rs,types.rs}`,
-  `crates/hermes-simd-core/src/view/{gather.rs,scatter.rs,vector_reg.rs}`,
-  `crates/hermes-simd-core/src/kernel_helpers.rs`,
-  `crates/hermes-simd-core/src/kernel/backend.rs` (mask_from_bitmask +
-  transpose_square default only),
-  `crates/hermes-simd-intrinsics/src/x86_64/{avx512_f32.rs,avx512_f64.rs,avx2_f32.rs,avx2_f64.rs}`
-  (mask_from_bitmask overrides span the native-mask x86 backends),
-  `crates/hermes-simd-intrinsics/src/aarch64/{neon_f32.rs,neon_f64.rs}`,
-  `crates/hermes-simd/src/dispatch/complex.rs` (scalar tail fused to match
-  the vector shape), accompanying tests, this entry.
-- **Outcome:** close two safe-code OOB holes in sparse dense-operand guards
-  (SELL-P missing dense-length assert; BlockedCoo wrapping dimension product),
-  replace the AVX512DQ intrinsic in the F-only `avx512_f32` popcount, define
-  the mask-active contract as sign-bit once across generic/NEON
-  blend/to_bitmask/compress paths, make `alternating_fma` genuinely fused in
-  the generic helper, saturate i32 gather/scatter bounds instead of
-  truncating, add backend `mask_from_bitmask` overrides matching the
-  documented single-instruction expansion, and shrink the transpose_square
-  default's stack frame to lane-count size.
+  **Lease:** discharged (all increments committed).
+- **Outcome:** closed two safe-code OOB holes in sparse dense-operand guards
+  (SELL-P missing dense-extent assert plus i32 flat-index bound; BlockedCoo
+  wrapping dimension products, checked in the elementwise guard and both
+  validators); replaced the AVX512DQ `_mm512_insertf32x8` in the F-only
+  `avx512_f32` popcount with an F-only `vinsertf64x4` merge; defined
+  mask-active = sign bit once (generic blend, `Vector::to_bitmask`, NEON
+  blend/vector_to_mask canonicalization, NEON compress/expand/gather_masked
+  keyed on bit 31/63); fused `generic_alternating_fma` and the interleaved
+  complex scalar tail to the vector evaluation shape (single rounding, exact
+  negation); made gather/scatter and column validators bound i32 indices in
+  the usize domain (exact for 2^31+ lengths); added register-only
+  `mask_from_bitmask` overrides (AVX-512 k-register truncation, AVX2
+  broadcast+cmpeq, NEON vtst) with construction-equivalence property tests;
+  shrank the transpose_square default frame from `MAX_SIMD_LANES²` (16–32
+  KiB) to two lane-sized row buffers.
+- **Evidence:** host (AVX2+FMA+F16C; no AVX-512) all-target Clippy clean,
+  nextest 511/511, doctests 22 pass / 0 fail, aarch64-unknown-linux-gnu
+  all-target check clean (CI-mirror). AVX-512 and NEON changes are
+  compile-verified locally; hosted SDE and aarch64 jobs execute them on the
+  PR. New regression tests: SELL-P short-dense / dimension-overflow /
+  i32-range panics, BlockedCoo overflow panic and validator rejection,
+  sign-bit blend/to_bitmask conformance on non-canonical masks, fused
+  fmaddsub/fmsubadd bit-exactness, bitmask-vs-bools mask construction
+  equivalence.
 - **Risk / change class:** [patch] — no public signature changes; behavioral
   changes are panic-on-invalid (documented contract), mask-contract
-  unification, and tighter FMA rounding.
+  unification on non-canonical masks, and tighter (fused) alternating-FMA
+  rounding.
   **Last update:** 2026-08-27.
+
+## HS-TRANSPOSE-NETWORKS-2026-08-27 — In-register transpose_square permute networks [minor] — todo
+
+- **Outcome:** add unpack/permute `transpose_square` networks for AVX2 f32
+  (8x8), AVX-512 f64 (8x8), AVX-512 f32 (16x16), and NEON f32 (`vtrn`/`vzip`
+  4x4). Only AVX2 f64 and NEON f64 have native networks today; every other
+  backend/type pair takes the scalar store/swap/load default
+  (`kernel/backend.rs`, `transpose_square`).
+- **Acceptance oracle:** the existing per-backend index-coded reference and
+  involution property (`check_transpose_square`) extended to f32; codegen
+  inspection shows no scalar bounce; criterion baseline against the default.
+
+## HS-F16-DISPATCH-PROBE-HOIST-2026-08-27 — Hoist F16 f16c probe to the dispatch boundary [patch] — todo
+
+- **Outcome:** `avx2_f16.rs:180-209` re-probes `f16c_fma_available()` and
+  calls a non-inlinable `#[target_feature(avx,f16c)]` helper on every lane op
+  because the dispatch boundary enables only `avx2,fma`. Hoist the f16c
+  decision to the dispatch boundary — a per-(backend, scalar) support hook or
+  folding `f16c` into the f16 entry's target-feature frame — the ADR 009
+  structure (dispatch at kernel granularity: no in-loop capability checks).
+- **Acceptance oracle:** optimized codegen shows one boundary probe and
+  probe-free lane-op bodies; existing F16 differential suites stay green.
+
+## HS-MASKED-TAIL-PARTIAL-LOAD-2026-08-27 — Partial masked load/store seam for dispatch tails [minor] — todo
+
+- **Outcome:** dispatch tail helpers (`dispatch/axpy.rs:22-53` and siblings)
+  zero-fill 0.5–1.5 KiB stack buffers per tail because
+  `masked_load/store_unaligned` demand full-`LANE_COUNT` validity for AVX2's
+  blend emulation. Add a `masked_load_partial`/`masked_store_partial` seam
+  (contract: inactive lanes never dereferenced; default = buffer bounce) and
+  route tails through it.
+- **Acceptance oracle:** criterion evidence on short-tail workloads; masked
+  conformance suites instantiate the new seam across backends.
+
+## HS-SPMV-SHORT-ROW-MASKED-2026-08-27 — Masked single-vector body for short SpMV rows [patch] — todo
+
+- **Outcome:** CSR and DenseWithMask SpMV rows with `row_nnz < LANE_COUNT`
+  fall to the pure scalar loop (`sparse/spmv.rs:170,302`), so narrow-band
+  matrices never engage the vector path. A `leading_k_mask` + `masked_fmadd`
+  single-vector body is a small increment on the PackedMask machinery.
+- **Acceptance oracle:** differential equality with the scalar reference on
+  narrow-band fixtures (reduction-order-exact inputs); criterion evidence on
+  banded matrices.
 
 ## HS-EXACT-LANE-DISPATCH-2026-08-27 — Dispatch consumer kernels by exact lane count [minor] [arch] — review
 
