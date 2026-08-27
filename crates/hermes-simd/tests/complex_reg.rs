@@ -211,7 +211,7 @@ impl LaneKernel<f64> for SplatButterfly {
 
     fn call<A: SimdArch + SimdKernel<f64>>(self, _simd: Simd<f64, A>) -> Self::Output {
         let lanes = <A as SimdStorage<f64>>::LANE_COUNT;
-        let tw = ComplexReg::<f64, A>::splat(3.0, -0.5);
+        let tw = ComplexReg::<f64, A>::splat(eunomia::Complex64::new(3.0, -0.5));
 
         let a: Vec<f64> = (0..lanes).map(|i| f64::from(i as u32) + 1.0).collect();
         let b: Vec<f64> = (0..lanes)
