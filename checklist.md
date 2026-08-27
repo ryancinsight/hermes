@@ -118,7 +118,7 @@
 - [x] Synchronize ADR 017, the README, and gap audit; confirm the changelog is
       unaffected because no production or benchmark change survives.
 - [x] Run exact-diff formatting and whitespace gates and publish draft PR #77.
-- [ ] Collect hosted verification and merge.
+- [x] Collect hosted verification and merge PR #77 as `c3d1b67`.
 
 ## HS-FEARLESS-COMPLEX-REG-THROUGHPUT-2026-08-27 [patch]
 

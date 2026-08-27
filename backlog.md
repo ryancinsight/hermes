@@ -274,46 +274,17 @@
   `paste = "1"`, which resolves to unmaintained 1.0.15
   (RUSTSEC-2024-0436) and fails `cargo deny`.
 
-## HS-CAPABILITY-LOAD-THROUGHPUT-2026-08-27 — Hoist support probes from strided lane loads [patch] — in review (PR #77)
+## HS-CAPABILITY-LOAD-THROUGHPUT-2026-08-27 — Hoist support probes from strided lane loads [patch] — done 2026-08-27 (PR #77, merge c3d1b67)
 
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** Codex — `crates/hermes-simd-core/src/view/capability.rs`,
-  capability-load tests, `crates/hermes-simd/benches/lane_throughput/interleaved.rs`,
-  this item, its checklist section, `gap_audit.md`, ADR 017, `README.md`, and
-  `CHANGELOG.md`.
-- **Outcome:** a `LaneKernel` holding `Simd<T, A>` can perform a checked
-  one-register load at an irregular or strided slice position without repeating
-  `A`'s runtime-support probe. Preserve the standalone `Vector` constructor for
-  callers that hold no capability, and retain only an API whose measured loop
-  matches the direct provider path.
-- **Driver:** Apollo's current interleaved batched kernels receive `Simd<T, A>`
-  but cannot express their four-row strided loads through `Simd::io_chunks`;
-  they use `Vector::load_unaligned_from_slice` inside the fused stage loop.
-  Hermes' retained diagnostic shows that construction route keeps runtime
-  support probes in the hot loop, while Fearless SIMD 0.7 binds `from_slice` to
-  its capability value.
-- **Scope / non-goals:** capability-scoped one-register slice loading, its
-  negative and backend-generic value tests, the existing checked/view/direct
-  diagnostic, exact AVX2 codegen, and consumer guidance. Do not migrate Apollo,
-  remove standalone checked constructors, add unused operation families, or
-  change stores whose existing vector value already proves host support.
-- **Acceptance oracle:** insufficient input returns the existing typed error;
-  every supported backend loads the exact lane values; the AVX2 inner loop has
-  no support probe, call, or panic branch attributable to the new load; and two
-  bounded same-binary runs place its interval with the direct/view ceiling or
-  reject the API without weakening the instrument.
-- **Risk / change class:** [patch]. The rejected candidate would have added one
-  safe method to the existing capability value; no production or benchmark
-  change survives. Verification: exact-diff formatting and whitespace gates,
-  plus hosted workspace, Miri, AArch64, SDE, and benchmark-budget coverage.
-- **Decision:** reject the candidate method. It removed every support probe and
-  improved the checked path in both runs, but its safe slice boundary retained
-  five per-iteration bounds/panic branches. Its 256-element interval remained
-  disjoint from the view/direct ceiling in both runs, so it failed the stated
-  acceptance oracle. Existing `SimdView`/`SimdChunk` composition is the
-  authoritative probe-free and bounds-free route; strided in-place consumers
-  must partition disjoint rows once before constructing chunk iterators.
-  Delivery: PR #77.
+- **Outcome:** reject the capability-scoped checked-load candidate; it removed
+  support probes but retained five bounds/panic branches and missed the
+  `SimdView`/direct ceiling in the short-loop regime.
+- **Evidence:** two bounded measurements and exact AVX2 code generation keep
+  `SimdView`/`SimdChunk` as the authoritative probe-free, bounds-free route. No
+  production or benchmark change survives.
+- **Delivery:** PR #77 merged as `c3d1b67`; hosted run `33095471221` is green
+  across x86, AArch64, Miri, SDE, dependency policy, lock integrity, and
+  bounded benchmarks.
 
 ## HS-FEARLESS-COMPLEX-REG-THROUGHPUT-2026-08-27 — Measure interleaved complex-register parity [patch] — done 2026-08-27 (PR #76, merge ba32b8c)
 
