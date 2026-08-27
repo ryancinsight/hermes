@@ -73,7 +73,10 @@ pub use hermes_simd_core::{
     scalar::{CastFrom, CastTo, FloatElement, Scalar as SimdScalar},
     vec::AlignedVec,
     verify_numa_locality,
-    view::{Mask, Simd, SimdChunk, SimdError, SimdView, TileMatrixMultiply, TileView, Vector},
+    view::{
+        ComplexReg, Mask, Simd, SimdChunk, SimdError, SimdView, TileMatrixMultiply, TileView,
+        Vector,
+    },
     // Unary strategy ZSTs
     Abs,
     Add,

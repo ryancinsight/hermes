@@ -150,6 +150,15 @@ impl BackendKernel<f32> for Avx512 {
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]
+    unsafe fn swap_pairs(v: Self::Vector) -> Self::Vector {
+        // Each 128-bit block holds two f32 pairs; `0b0100_1110` exchanges the
+        // two 64-bit pairs within every block.
+        Avx512F32Vec(_mm512_permute_ps::<0b0100_1110>(v.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
     unsafe fn dup_even(v: Self::Vector) -> Self::Vector {
         Avx512F32Vec(_mm512_moveldup_ps(v.0))
     }

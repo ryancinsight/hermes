@@ -42,6 +42,13 @@ pub trait SimdPermute<T: Scalar>: SimdStorage<T> + Sealed {
     /// The backend's target features must be available.
     unsafe fn swap_adjacent(v: Self::Vector) -> Self::Vector;
 
+    /// Swaps each adjacent lane *pair* with its neighbouring pair; a trailing
+    /// pair with no neighbour passes through unchanged.
+    ///
+    /// # Safety
+    /// The backend's target features must be available.
+    unsafe fn swap_pairs(v: Self::Vector) -> Self::Vector;
+
     /// Duplicates each even lane into its adjacent odd lane.
     ///
     /// # Safety
@@ -89,6 +96,10 @@ impl<T: Scalar, A: BackendKernel<T>> SimdPermute<T> for A {
 
     unsafe fn swap_adjacent(v: Self::Vector) -> Self::Vector {
         <A as BackendKernel<T>>::swap_adjacent(v)
+    }
+
+    unsafe fn swap_pairs(v: Self::Vector) -> Self::Vector {
+        <A as BackendKernel<T>>::swap_pairs(v)
     }
 
     unsafe fn dup_even(v: Self::Vector) -> Self::Vector {

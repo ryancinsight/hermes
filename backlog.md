@@ -1,5 +1,30 @@
 # Backlog — hermes-simd
 
+## HS-COMPLEX-REG-2026-08-27 — Interleaved complex register vocabulary [minor] — done 2026-08-27
+
+- **Outcome:** `ComplexReg<T, Arch>` in `hermes-simd-core::view`, re-exported
+  from the facade: a `#[repr(transparent)]` newtype over `Vector` whose lanes
+  carry `[re, im, ...]`, with sample-wise complex `Mul`, `mul_conj`, `mul_i`,
+  `mul_neg_i`, `splat`, `swap_samples`, `butterfly`, and `Add`/`Sub`. Every
+  method composes the existing adjacent-pair shuffle and alternating-FMA
+  primitives, so the type is vocabulary, not new codegen — the multiply is
+  three shuffles and one multiply feeding one alternating FMA.
+- **One new backend primitive:** `swap_pairs` (adjacent lane-pair exchange, the
+  operand pairing of a distance-one butterfly held in registers) — scalar
+  default plus AVX2/AVX-512/NEON-f32 overrides; a lone trailing pair passes
+  through unchanged, extending the documented lone-lane convention. NEON f64's
+  two-lane register takes the default and is identity by that rule.
+- **Driver:** Apollo's small-N gap. Its planar kernels pay double register
+  pressure (separate re/im registers), which caps them at radix-4 where
+  RustFFT's interleaved kernels run radix-8 with six stages in two memory
+  passes. This vocabulary is the substrate for interleaved register-resident
+  codelets; the codelets themselves are transform logic and land in Apollo.
+- **Verification:** consumer-shaped conformance under `forbid(unsafe_code)`
+  through `vectorize`, two oracle tiers — bitwise on exactly-representable
+  inputs (a layout defect cannot hide in a tolerance that does not exist) and
+  2-ULP against a fused-shape scalar reference on rounded inputs; permutations
+  and sign flips asserted bitwise always. 34 workspace suites, 0 failures.
+
 ## HS-FEARLESS-PERMUTE-THROUGHPUT-2026-08-26 — Measure shared cross-lane parity [patch] — complete 2026-08-26
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`. **Lease:** none. Implementation `4ef5145`.

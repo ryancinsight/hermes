@@ -131,6 +131,14 @@ impl BackendKernel<f32> for Neon {
         NeonF32Vec(vrev64q_f32(v.0))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus runtime feature selection in the hermes-simd dispatcher); operands are valid 4-lane vectors.
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn swap_pairs(v: Self::Vector) -> Self::Vector {
+        // Four f32 lanes hold two pairs; rotating by two lanes exchanges them.
+        NeonF32Vec(vextq_f32::<2>(v.0, v.0))
+    }
+
     // -----------------------------------------------------------------------
     // Cross-lane permutes (native `rev64` + `ext`, `zip`, `uzp`)
     // -----------------------------------------------------------------------
