@@ -52,6 +52,43 @@ fn check_bitmask_roundtrip<A: SimdKernel<f32>>(bm: u64) {
     );
 }
 
+/// `mask_from_bitmask` (overridden with register-only expansions on the
+/// native backends) must construct exactly the mask `mask_from_bools` (the
+/// generic default's substrate) builds from the same bits: identical bitmask
+/// round-trip and identical canonical all-ones/all-zero vector lanes.
+fn check_mask_from_bitmask_matches_bools<A: SimdKernel<f32>>(bm: u64) {
+    let lanes = A::LANE_COUNT;
+    let bm = lane_bits::<A>(bm);
+    let bools: Vec<bool> = (0..lanes).map(|i| (bm >> i) & 1 == 1).collect();
+    let mut from_bitmask = vec![0.0f32; lanes];
+    let mut from_bools = vec![0.0f32; lanes];
+    // SAFETY: caller gates on the required target features for `A`; both
+    // output buffers hold exactly `LANE_COUNT` elements.
+    let (bm_bitmask, bm_bools) = unsafe {
+        let a = A::mask_from_bitmask(bm);
+        let b = A::mask_from_bools(&bools);
+        A::store_unaligned(from_bitmask.as_mut_ptr(), A::mask_to_vector(a));
+        A::store_unaligned(from_bools.as_mut_ptr(), A::mask_to_vector(b));
+        (A::mask_to_bitmask(a), A::mask_to_bitmask(b))
+    };
+    assert_eq!(
+        lane_bits::<A>(bm_bitmask),
+        bm,
+        "mask_from_bitmask round-trip diverged for {bm:#b}"
+    );
+    assert_eq!(
+        bm_bitmask, bm_bools,
+        "mask_from_bitmask and mask_from_bools disagree for {bm:#b}"
+    );
+    for i in 0..lanes {
+        assert_eq!(
+            from_bitmask[i].to_bits(),
+            from_bools[i].to_bits(),
+            "mask_to_vector lane {i} diverged between bitmask and bools construction ({bm:#b})"
+        );
+    }
+}
+
 /// `expand(compress(v, m), m, fill)` must restore active lanes of `v` and put
 /// `fill` in inactive lanes (compress packs active lanes low; expand scatters
 /// them back to the same positions).
@@ -848,6 +885,7 @@ where
     A: hermes_simd_core::arch::SimdArch + SimdKernel<f32>,
 {
     check_bitmask_roundtrip::<A>(bm);
+    check_mask_from_bitmask_matches_bools::<A>(bm);
     check_vector_to_mask_roundtrip::<A>(bm);
     check_vector_to_mask_matches_cmp::<A>(vals);
     check_cmp_ne_complements_cmp_eq::<A>(vals);

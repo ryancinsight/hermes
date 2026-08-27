@@ -13,7 +13,8 @@ use core::arch::x86_64::{
     _mm256_castps_si256, _mm256_ceil_ps, _mm256_cmp_ps, _mm256_cvtepi32_ps, _mm256_cvttps_epi32,
     _mm256_div_ps, _mm256_extractf128_ps, _mm256_floor_ps, _mm256_fmadd_ps, _mm256_fmaddsub_ps,
     _mm256_fmsub_ps, _mm256_fmsubadd_ps, _mm256_fnmadd_ps, _mm256_i32gather_ps, _mm256_load_ps,
-    _mm256_loadu_ps, _mm256_madd_epi16, _mm256_maddubs_epi16, _mm256_mask_i32gather_ps,
+    _mm256_castsi256_ps, _mm256_cmpeq_epi32, _mm256_loadu_ps, _mm256_madd_epi16,
+    _mm256_maddubs_epi16, _mm256_mask_i32gather_ps,
     _mm256_maskstore_ps, _mm256_max_ps, _mm256_min_ps, _mm256_movehdup_ps, _mm256_moveldup_ps,
     _mm256_movemask_ps, _mm256_mul_ps, _mm256_or_ps, _mm256_permute_ps, _mm256_permutevar8x32_ps,
     _mm256_round_ps, _mm256_rsqrt_ps, _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set1_epi8,
@@ -458,6 +459,19 @@ impl BackendKernel<f32> for Avx2 {
         let vals: [f32; 8] =
             core::array::from_fn(|i| if i < k { <f32>::from_bits(!0) } else { 0.0 });
         Avx2F32Mask(_mm256_loadu_ps(vals.as_ptr()))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); this is a register-only expansion with no memory operands.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn mask_from_bitmask(bm: u64) -> Self::Mask {
+        // Register-only expansion replacing the generic bool-array bounce:
+        // broadcast the low bits, isolate each lane's bit, and compare-equal
+        // to produce canonical all-ones/all-zero lanes (bits 8.. are ignored
+        // because only bits 0..8 appear in `lane_bits`).
+        let lane_bits = _mm256_setr_epi32(1, 2, 4, 8, 16, 32, 64, 128);
+        let selected = _mm256_and_si256(_mm256_set1_epi32(bm as i32), lane_bits);
+        Avx2F32Mask(_mm256_castsi256_ps(_mm256_cmpeq_epi32(selected, lane_bits)))
     }
 
     // -----------------------------------------------------------------------

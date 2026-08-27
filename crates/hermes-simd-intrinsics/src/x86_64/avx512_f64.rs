@@ -400,6 +400,16 @@ impl BackendKernel<f64> for Avx512 {
         }
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); this is a pure integer truncation with no memory operands.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn mask_from_bitmask(bm: u64) -> Self::Mask {
+        // The k-register mask type IS the bitmask: truncating to the low 8
+        // bits (one KMOV at the use site) replaces the generic bool-array
+        // expansion.
+        bm as Self::Mask
+    }
+
     // -----------------------------------------------------------------------
     // Broadcast / zero
     // -----------------------------------------------------------------------

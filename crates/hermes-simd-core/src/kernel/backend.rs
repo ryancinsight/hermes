@@ -486,7 +486,14 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
 
     /// Convert a raw `u64` bitmask to the architecture-native mask type.
     ///
-    /// Default: expands to a boolean array then calls `mask_from_bools`.
+    /// Bits at and above `LANE_COUNT` are ignored. Default: expands to a
+    /// boolean array then calls `mask_from_bools` — the natural form for the
+    /// `[bool; N]`-masked emulated backends. Native-mask backends override
+    /// register-only: AVX-512 truncates the bitmask into the k-register
+    /// directly (the mask type *is* the bitmask), AVX2 broadcasts and
+    /// compare-equals against per-lane bit constants, and NEON `vtst`s
+    /// against a lane-bit table — the bit-packed sparse kernels call this
+    /// once per vector, so the expansion is on their hot path.
     ///
     /// # Safety
     /// Processor must support the required target feature.

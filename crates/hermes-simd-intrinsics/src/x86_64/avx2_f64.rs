@@ -8,13 +8,16 @@
 use crate::Avx2;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::{
-    __m128i, __m256d, _mm256_add_pd, _mm256_and_pd, _mm256_andnot_pd, _mm256_blendv_pd,
-    _mm256_castpd256_pd128, _mm256_castpd_si256, _mm256_ceil_pd, _mm256_cmp_pd, _mm256_div_pd,
+    __m128i, __m256d, _mm256_add_pd, _mm256_and_pd, _mm256_and_si256, _mm256_andnot_pd,
+    _mm256_blendv_pd,
+    _mm256_castpd256_pd128, _mm256_castpd_si256, _mm256_castsi256_pd, _mm256_ceil_pd,
+    _mm256_cmp_pd, _mm256_cmpeq_epi64, _mm256_div_pd,
     _mm256_extractf128_pd, _mm256_floor_pd, _mm256_fmadd_pd, _mm256_fmaddsub_pd, _mm256_fmsub_pd,
     _mm256_fmsubadd_pd, _mm256_i32gather_pd, _mm256_load_pd, _mm256_loadu_pd,
     _mm256_mask_i32gather_pd, _mm256_maskstore_pd, _mm256_max_pd, _mm256_min_pd, _mm256_movedup_pd,
     _mm256_movemask_pd, _mm256_mul_pd, _mm256_or_pd, _mm256_permute2f128_pd, _mm256_permute4x64_pd,
-    _mm256_permute_pd, _mm256_round_pd, _mm256_set1_pd, _mm256_setzero_pd, _mm256_sqrt_pd,
+    _mm256_permute_pd, _mm256_round_pd, _mm256_set1_epi64x, _mm256_set1_pd, _mm256_setr_epi64x,
+    _mm256_setzero_pd, _mm256_sqrt_pd,
     _mm256_store_pd, _mm256_storeu_pd, _mm256_stream_pd, _mm256_sub_pd, _mm256_xor_pd, _mm_add_pd,
     _mm_cvtsd_f64, _mm_unpackhi_pd, _CMP_EQ_OQ, _CMP_GE_OQ, _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ,
     _CMP_NEQ_UQ, _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT, _MM_FROUND_TO_ZERO,
@@ -441,6 +444,19 @@ impl BackendKernel<f64> for Avx2 {
         let vals: [f64; 4] =
             core::array::from_fn(|i| if i < k { <f64>::from_bits(!0) } else { 0.0 });
         Avx2F64Mask(_mm256_loadu_pd(vals.as_ptr()))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); this is a register-only expansion with no memory operands.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn mask_from_bitmask(bm: u64) -> Self::Mask {
+        // Register-only expansion replacing the generic bool-array bounce:
+        // broadcast the low bits, isolate each lane's bit, and compare-equal
+        // to produce canonical all-ones/all-zero lanes (bits 4.. are ignored
+        // because only bits 0..4 appear in `lane_bits`).
+        let lane_bits = _mm256_setr_epi64x(1, 2, 4, 8);
+        let selected = _mm256_and_si256(_mm256_set1_epi64x(bm as i64), lane_bits);
+        Avx2F64Mask(_mm256_castsi256_pd(_mm256_cmpeq_epi64(selected, lane_bits)))
     }
 
     // -----------------------------------------------------------------------

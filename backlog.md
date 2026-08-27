@@ -8,9 +8,11 @@
   `crates/hermes-simd-core/src/kernel_helpers.rs`,
   `crates/hermes-simd-core/src/kernel/backend.rs` (mask_from_bitmask +
   transpose_square default only),
-  `crates/hermes-simd-intrinsics/src/x86_64/avx512_f32.rs`,
-  `crates/hermes-simd-intrinsics/src/aarch64/{neon_f32.rs,neon_f64.rs}`, this
-  entry.
+  `crates/hermes-simd-intrinsics/src/x86_64/{avx512_f32.rs,avx512_f64.rs,avx2_f32.rs,avx2_f64.rs}`
+  (mask_from_bitmask overrides span the native-mask x86 backends),
+  `crates/hermes-simd-intrinsics/src/aarch64/{neon_f32.rs,neon_f64.rs}`,
+  `crates/hermes-simd/src/dispatch/complex.rs` (scalar tail fused to match
+  the vector shape), accompanying tests, this entry.
 - **Outcome:** close two safe-code OOB holes in sparse dense-operand guards
   (SELL-P missing dense-length assert; BlockedCoo wrapping dimension product),
   replace the AVX512DQ intrinsic in the F-only `avx512_f32` popcount, define

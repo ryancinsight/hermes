@@ -604,6 +604,19 @@ impl BackendKernel<f32> for Neon {
         NeonF32Mask(vld1q_u32(vals.as_ptr()))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); the only memory operand is the constant lane-bit table.
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn mask_from_bitmask(bm: u64) -> Self::Mask {
+        // `vtst` sets a lane to all-ones where `(bits & lane_bit) != 0` —
+        // canonical expansion in one test instruction, replacing the generic
+        // bool-array bounce (bits 4.. are ignored because only bits 0..4
+        // appear in the table).
+        let lane_bits: [u32; 4] = [1, 2, 4, 8];
+        let bits = vdupq_n_u32(bm as u32);
+        NeonF32Mask(vtstq_u32(bits, vld1q_u32(lane_bits.as_ptr())))
+    }
+
     // -----------------------------------------------------------------------
     // Broadcast / zero
     // -----------------------------------------------------------------------
