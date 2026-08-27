@@ -542,7 +542,8 @@ mod tests {
                     }
                 }
             }
-            let data = DenseWithMaskData::new(&values[..], &mask[..], nrows, ncols);
+            let packed = hermes_simd_core::mask::PackedMask::from_bools(&mask);
+            let data = DenseWithMaskData::new(&values[..], packed.as_view(), nrows, ncols);
             let view = SparseView::<f32, _, Scalar>::from_dense_with_mask(data);
 
             let mut y = vec![0.0_f32; nrows];
@@ -670,7 +671,8 @@ mod tests {
             let mask: Vec<bool> = (0..len).map(|i| i % 3 != 0).collect();
             let dense: Vec<f32> = (0..len).map(|i| (i as f32) * 0.5 - 1.0).collect();
 
-            let data = DenseWithMaskData::new(&values[..], &mask[..], 1, len);
+            let packed = hermes_simd_core::mask::PackedMask::from_bools(&mask);
+            let data = DenseWithMaskData::new(&values[..], packed.as_view(), 1, len);
             let view = SparseView::<f32, _, Scalar>::from_dense_with_mask(data);
 
             let mut out = vec![-1.0f32; len];

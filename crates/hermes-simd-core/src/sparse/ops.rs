@@ -338,17 +338,23 @@ where
         let lane_count = Arch::LANE_COUNT;
         let len = self.data.values.len();
         let simd_len = (len / lane_count) * lane_count;
+        assert!(
+            self.data.mask.len() >= len,
+            "DenseWithMask sum_values: mask covers {} elements, values has {}",
+            self.data.mask.len(),
+            len
+        );
 
         // SAFETY: `Arch::*` are target-feature kernels (module invariant). Every
-        // masked load reads `values[i..i+LANE_COUNT]` and `mask[i..i+LANE_COUNT]`
-        // for `i < simd_len <= len`, which stay within the equal-length `values`
-        // and `mask` buffers.
+        // masked load reads `values[i..i+LANE_COUNT]` for `i < simd_len <= len`,
+        // which stays within `values`; `mask.lane_bits` is a safe,
+        // self-bounds-checked packed read feeding `mask_from_bitmask`.
         let mut i = 0usize;
         let acc_vec = unsafe {
             let zero_vec = Arch::zero();
             let mut acc_vec = zero_vec;
             while i < simd_len {
-                let msk = Arch::mask_from_bools(&self.data.mask[i..i + lane_count]);
+                let msk = Arch::mask_from_bitmask(self.data.mask.lane_bits(i, lane_count));
                 let v_vec =
                     Arch::masked_load_unaligned(self.data.values[i..].as_ptr(), msk, zero_vec);
                 acc_vec = Arch::add(acc_vec, v_vec);
@@ -359,7 +365,7 @@ where
         // SAFETY: target-feature kernel, covered by the module invariant.
         let mut s = unsafe { Arch::sum_reduce(acc_vec) };
         while i < len {
-            if self.data.mask[i] {
+            if self.data.mask.bit(i) {
                 s += self.data.values[i];
             }
             i += 1;
@@ -376,24 +382,27 @@ where
 
         // Bounds for the unchecked loads/stores: a `LANE_COUNT` window at
         // `i < simd_len <= len` must stay within `dense` and `out_values` as
-        // well as `values`/`mask`. `dense` and the output are elementwise-shaped,
-        // so require them at least as long as `values`.
+        // well as `values`, and the packed mask must cover every element.
+        // `dense` and the output are elementwise-shaped, so require them at
+        // least as long as `values`.
         assert!(
-            dense.len() >= len && out_values.len() >= len,
-            "DenseWithMask elementwise_mul_dense: dense {} / out {} shorter than values {}",
+            dense.len() >= len && out_values.len() >= len && d.mask.len() >= len,
+            "DenseWithMask elementwise_mul_dense: dense {} / out {} / mask {} shorter than values {}",
             dense.len(),
             out_values.len(),
+            d.mask.len(),
             len
         );
 
         // SAFETY: `Arch::*` are target-feature kernels (module invariant). The
         // assert above gives every windowed load/store `[i, i+LANE_COUNT)` room
-        // within `dense`, `out_values`, `values`, and `mask` for `i < simd_len`.
+        // within `dense`, `out_values`, and `values` for `i < simd_len`;
+        // `mask.lane_bits` is a safe, self-bounds-checked packed read.
         let mut i = 0usize;
         unsafe {
             let zero_vec = Arch::zero();
             while i < simd_len {
-                let msk = Arch::mask_from_bools(&d.mask[i..i + lane_count]);
+                let msk = Arch::mask_from_bitmask(d.mask.lane_bits(i, lane_count));
                 let res_vec = Arch::masked_mul(
                     Arch::load_unaligned(d.values[i..].as_ptr()),
                     Arch::load_unaligned(dense[i..].as_ptr()),
@@ -405,7 +414,7 @@ where
             }
         }
         while i < len {
-            if d.mask[i] {
+            if d.mask.bit(i) {
                 out_values[i] = d.values[i] * dense[i];
             } else {
                 out_values[i] = T::ZERO;

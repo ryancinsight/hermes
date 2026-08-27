@@ -26,9 +26,11 @@ vectors:
 - `BlockedCooData<BM, BN>` — Blocked COO: stores dense `BM×BN` tiles. Each
   tile multiplies as a dense register block, so the kernel is a normal dense
   GEMV over tiles — no gather at all.
-- `DenseWithMaskData` — a dense rectangular matrix plus a per-element
-  mask. The kernel uses masked loads (Chapter 6), not gathers, keeping the
-  memory access pattern uniform.
+- `DenseWithMaskData` — a dense rectangular matrix plus a bit-packed
+  per-element mask (`PackedMask`, one bit per element — packed once at
+  construction). The kernel uses masked loads (Chapter 6), not gathers,
+  keeping the memory access pattern uniform; each lane window's mask bits are
+  read straight out of the packed words, never converted from bools per call.
 
 The types are split so the shape and the storage are explicit: `SparseShape`
 carries the logical dimensions, the `*Data` types carry the raw arrays, and

@@ -6,6 +6,17 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [minor][HS-DENSEMASK-BITPACK] **Breaking:** `DenseWithMask` stores its
+  structural mask bit-packed. New arbitrary-length `PackedMask` (canonical
+  `mask` module, runtime-length counterpart of `BitMask<N>`) replaces the
+  `[bool]` mask in `DenseWithMaskData` and `OwnedDenseWithMask` — 8× smaller
+  mask footprint (1 bit vs 1 byte per element) — and the SpMV / sum /
+  elementwise kernels read packed lane windows via `mask_from_bitmask`
+  instead of running a per-chunk per-call bool-conversion loop.
+  `SparseCow::<_, DenseWithMask, _>::from_slices` still accepts `&[bool]`
+  and packs once at that construction boundary. The unused
+  `DenseWithMaskBitMaskData` partial variant is deleted.
+
 - [patch][HS-VECTORIZE-LARGE-KERNEL] Fix `#[runtime_dispatch]` compiling
   large kernel bodies at baseline codegen: the retained inner fn is now
   emitted `#[inline(always)]` so it always inlines into the generated
