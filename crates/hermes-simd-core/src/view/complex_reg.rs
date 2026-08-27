@@ -28,17 +28,22 @@
 //! each producing the real part on even lanes and the imaginary part on odd
 //! lanes with one rounding on the combining operation.
 //!
-//! # Scalar type, not a complex type
+//! # Eunomia owns the number, this type owns the register
 //!
-//! The element type stays the scalar `T`; the complex structure is a layout
-//! contract, not a lane type. Callers holding `Complex<T>` slices reinterpret
-//! them as `[T]` at the boundary (safe for any `repr(C)` complex layout) and
-//! keep their own type-level bookkeeping.
+//! [`eunomia::Complex`] is the complex number: the single value type, the
+//! arithmetic contract, the thing held in memory. `ComplexReg` is not a second
+//! complex type — its element type stays the scalar `T`, and the complex
+//! structure is a lane-layout contract over a register. Where a single sample
+//! crosses the boundary it does so as `Complex<T>`; slices of `Complex<T>`
+//! reinterpret as `[T]` at the load/store boundary (safe for its `repr(C)`
+//! layout) because a register load wants contiguous scalars, not an element
+//! type.
 
 use super::vector_reg::Vector;
 use crate::arch::SimdArch;
 use crate::kernel::{SimdKernel, SimdStorage};
 use crate::scalar::Scalar;
+use eunomia::Complex;
 
 /// A SIMD register of interleaved complex samples: even lanes are real parts,
 /// odd lanes imaginary parts.
@@ -85,12 +90,15 @@ where
 
     /// Broadcasts one complex value across every sample — the form a twiddle
     /// factor takes when one factor multiplies a whole register.
+    ///
+    /// Takes [`eunomia::Complex`] rather than a bare `(re, im)` pair: eunomia
+    /// owns the complex number, and this crate consumes it.
     #[inline(always)]
     #[must_use]
-    pub fn splat(re: T, im: T) -> Self {
+    pub fn splat(sample: Complex<T>) -> Self {
         // Interleaving [re, re, ...] with [im, im, ...] yields
         // [re, im, re, im, ...] in the low output; the high output repeats it.
-        let (lo, _) = Vector::splat(re).interleave(Vector::splat(im));
+        let (lo, _) = Vector::splat(sample.re).interleave(Vector::splat(sample.im));
         Self(lo)
     }
 
