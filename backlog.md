@@ -27,12 +27,8 @@
 ## HS-NATIVE-CAST-THROUGHPUT-2026-08-27 — Remove supported cross-type cast stack round-trip [minor] — in progress
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** Codex — `crates/hermes-simd-core/src/kernel/backend.rs`,
-  `crates/hermes-simd-core/src/view/vector_reg.rs`,
-  `crates/hermes-simd-intrinsics/src/x86_64/avx2_f32.rs`,
-  `crates/hermes-simd/benches/lane_throughput{.rs,/cast.rs}`,
-  `crates/hermes-simd/tests/types_tests.rs`, this item and its checklist,
-  `gap_audit.md`, and affected Rustdoc/changelog.
+  **Lease:** none. Benchmark instrument commit `ff93be1`; provider code and
+  semantic-test commit `18da238`.
 - **Outcome:** measure the public equal-lane `Vector::cast` path against a
   backend-native conversion and Fearless SIMD 0.7, then eliminate the current
   register-to-stack scalar loop only when repeated measurements and exact code
@@ -55,14 +51,25 @@
   with the consumer-facing API unchanged. **Dependencies:** the comparison-mask
   native-route seam merged in PR #84 (`6efa67b`) supplies the measurement
   pattern only; this item owns a distinct conversion mechanism.
-- **Measurement decision:** in two unchanged AVX2 runs, f32-to-i32 Hermes holds
-  near 2.2 Gelem/s while the precise Fearless route spans 19.0–27.1 Gelem/s.
-  The i32-to-f32 rows are load-sensitive and already compile to `vcvtdq2ps`, so
-  they do not admit a specialization. Exact pre-change assembly identifies the
-  f32-to-i32 cause: eight scalar `vcvttss2si` instructions per register versus
-  one `vcvttps2dq` in the native and Fearless paths.
+- **Measurement decision:** the corrected instrument returns a fixed-width
+  checksum accumulated from every output lane. Two unchanged AVX2 runs at
+  `ff93be1` keep finite in-range f32-to-i32 Hermes near 2.2 Gelem/s while the
+  native and precise Fearless routes remain an order of magnitude faster.
+  Exact pre-change assembly identifies the cause: eight scalar `vcvttss2si`
+  instructions per Hermes register versus one packed `vcvttps2dq`. The
+  i32-to-f32 rows already compile to `vcvtdq2ps` and remain load-sensitive, so
+  they do not justify a second specialization.
+- **Implementation evidence:** the AVX2 specialization uses packed truncation,
+  a fast all-in-range branch, and vector corrections for positive overflow,
+  NaN, and infinity. Boundary cases plus arbitrary `f32` bit patterns match
+  Rust `as`. A same-lane comparison of `18da238` against `ff93be1` reports
+  8.5–11.3x Hermes gains across 256–4096 finite in-range elements; at 4096,
+  Hermes measures 205.6–207.4 ns and the raw native ceiling 210.8–213.2 ns.
+  Provider-to-provider rows varied with host load, so this run makes no
+  Hermes/Fearless parity claim. Other type/backend pairs retain the default
+  scalar conversion. Exact final gates and independent review remain pending.
 
-## HS-PACKED-MASK-SHAPE-SAFETY-2026-08-27 — Enforce packed-mask and matrix shape bounds [patch] — merged; hosted matrix pending (PR #85, merge 7e342cd)
+## HS-PACKED-MASK-SHAPE-SAFETY-2026-08-27 — Enforce packed-mask and matrix shape bounds [patch] — done 2026-08-27 (PR #85, merge 7e342cd)
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
   **Lease:** none.
@@ -99,10 +106,10 @@
   old-versus-old control moved 3.9%, so the timing claim is limited to excluding
   a stable regression on this variable-load host; code generation supplies the
   mechanism evidence. Provider commit `af73e6a`; PR #85 merged as `7e342cd`.
-  Hosted x86, Miri, AArch64 NEON, AVX-512 best-effort, dependency-policy,
-  lock-integrity, and review gates are green; the bounded benchmark and Intel
-  SDE jobs remain pending. RecurseML reports only an external analysis-service
-  error and produced no code diagnostic.
+  Hosted x86, Miri, AArch64 NEON, AVX-512 best-effort, Intel SDE, bounded
+  benchmark, dependency-policy, lock-integrity, and review gates are green.
+  RecurseML reports only an external analysis-service error and produced no
+  code diagnostic.
 
 ## HS-NATIVE-COMPARISON-MASK-2026-08-27 — Remove comparison-mask stack round-trip [patch] — done 2026-08-27 (PR #84, merge 6efa67b)
 

@@ -1156,12 +1156,19 @@ order (correctness → architecture → tests → docs → PM).
   comparison-mask methods now convert the backend comparison register directly
   to its native mask. Two unchanged f32/f64 measurements and exact AVX2
   disassembly identified and then removed the store, lane-wise scalar scan, and
-  mask reconstruction (`HS-NATIVE-COMPARISON-MASK-2026-08-27`). **[in progress]
-  Cross-type `cast` stack round-trip with a 64-iteration scalar loop (MED)** —
-  `HS-NATIVE-CAST-THROUGHPUT-2026-08-27` first measures the supported
-  equal-native-width f32/i32 conversions; lane-count-changing conversion is a
-  separate contract and is not part of `Vector::cast` today.
-  **argmin/argmax two-pass (LOW-MED)** — bandwidth-bound-only win; a correct
+  mask reconstruction (`HS-NATIVE-COMPARISON-MASK-2026-08-27`).
+- **[RESOLVED 2026-08-27] AVX2 `f32` to `i32` cast scalarization.** Two unchanged
+  measurements and exact disassembly found eight scalar conversions per public
+  vector versus one packed conversion in Fearless SIMD. Hermes now emits the
+  same packed precise-conversion sequence, including Rust-compatible positive
+  overflow, NaN, and infinity correction; boundary and arbitrary-bit tests
+  match scalar `as`. The corrected whole-output checksum instrument reports
+  8.5–11.3x finite in-range public-path gains across 256–4096 elements; the
+  provider-to-provider rows remain host-load-sensitive, so no parity claim is
+  attached to this result (`HS-NATIVE-CAST-THROUGHPUT-2026-08-27`).
+  Lane-count-changing conversion
+  remains outside the current `Vector::cast` contract.
+- **argmin/argmax two-pass (LOW-MED)** — bandwidth-bound-only win; a correct
   single-pass needs SIMD index-vector tracking with first-occurrence
   tie-breaking (non-trivial). All `[patch]`/`[minor]`.
 - **[RESOLVED 2026-07-04] `compress` per-chunk buffer zero-init.** The hot
