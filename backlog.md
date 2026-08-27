@@ -1,5 +1,22 @@
 # Backlog — hermes-simd
 
+## HS-CI-RUNNER-CLASS-SELECTION-2026-08-27 — Best-effort AVX-512 step skips on incapable runners, letting defects land [patch] — todo
+
+- **Evidence:** PR #80's AVX2 interleave intrinsic imports broke `-D warnings`
+  under `--cfg hermes_benchmark_generic_default`, but only on AVX-512-capable
+  hosted runners; main's own run drew an incapable runner, the best-effort
+  step skipped, and the defect landed. Found and fixed forward during
+  `HS-DENSEMASK-BITPACK-2026-08-27` (`923cd7b`; main independently converged
+  at `6b32676`).
+- **Outcome:** compile coverage of runner-capability-gated steps stops
+  depending on runner-class lottery — compile the gated cfg unconditionally
+  (build without running where the ISA is absent), or pin the step to the SDE
+  job that already guarantees the capability.
+- **Acceptance oracle:** a change red under the gated cfg fails CI on every
+  runner class; demonstrated by reverting `6b32676` locally and observing the
+  gate.
+- **Risk / change class:** [patch], CI-only.
+
 ## HS-DENSEMASK-BITPACK-2026-08-27 — Bit-pack the DenseWithMask lane mask [minor] — in review (PR #81)
 
 - **Integrator:** Claude session 5050c72a-sub. **Lease:**
