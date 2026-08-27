@@ -12,8 +12,11 @@
     reason = "The type conformance harness keeps compile-time dimensions beside the exercised case"
 )]
 use hermes_simd::*;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use hermes_simd_core::kernel::SimdKernel;
-use hermes_simd_core::scalar::{CastFrom, NumericElement, Scalar as ScalarElement};
+use hermes_simd_core::scalar::CastFrom;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+use hermes_simd_core::scalar::Scalar as ScalarElement;
 
 macro_rules! assert_comparison_masks {
     ($t:ty, $arch:ident, $lanes:expr, $lhs:ident, $rhs:ident, $nan:expr) => {{

@@ -3,9 +3,7 @@
 ## HS-EXACT-LANE-DISPATCH-2026-08-27 — Dispatch consumer kernels by exact lane count [minor] [arch] — review
 
 - **Integrator:** Codex task `01a0253c-6013-7552-99cc-36bbbcf77f6d`.
-  **Lease:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`
-  `crates/hermes-simd/tests/consumer_vectorize/exact_lanes.rs` through the
-  AArch64 warning fix commit.
+  **Lease:** discharged by the AArch64 warning fix commit.
 - **Outcome:** add one const-generic consumer entry that selects the widest
   host-supported backend whose scalar lane count equals the requested count,
   enters that backend's target-feature scope once, and returns `None` without
@@ -31,10 +29,8 @@
 ## HS-NATIVE-CAST-THROUGHPUT-2026-08-27 — Remove supported cross-type cast stack round-trip [minor] — in progress
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`
-  `crates/hermes-simd/tests/types_tests.rs` through the AArch64 warning fix
-  commit. Benchmark instrument commit `ff93be1`; provider code and semantic-test
-  commit `18da238`.
+  **Lease:** none. Benchmark instrument commit `ff93be1`; provider code and
+  semantic-test commit `18da238`.
 - **Outcome:** measure the public equal-lane `Vector::cast` path against a
   backend-native conversion and Fearless SIMD 0.7, then eliminate the current
   register-to-stack scalar loop only when repeated measurements and exact code
