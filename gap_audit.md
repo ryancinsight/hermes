@@ -396,6 +396,47 @@ kernel correction. It covers AVX2 on one shared Windows host; other ISAs retain
 compile and value-semantic coverage rather than local timing, and a future
 direct interleaved Fearless operation would require a new comparison.
 
+### Capability-scoped single-register load — rejected 2026-08-27
+
+Apollo's strided batched kernels receive `Simd<T, A>` but call the standalone
+checked slice loader inside their fused stage loops. A candidate
+`Simd::load_unaligned_from_slice` tested whether binding that load to the
+existing capability could close the cost without changing the consumer's
+access shape. The benchmark inputs, scalar oracle, output allocations, timed
+region, sizes, and checked/view/direct variants remained unchanged; only the
+candidate row was added while measuring it.
+
+Exact AVX2 assembly showed the candidate removed every `std_detect` cache read
+and initialization call. It still retained five slice-failure edges per loop:
+one for the controlling input range and four for the remaining input/output
+ranges. The existing `SimdView`/`SimdChunk` route retained no bounds or panic
+edge in its hot loop.
+
+The first exact locked run reported medians and 95% confidence intervals:
+
+| f64 scalars | checked | capability candidate | view | direct |
+| ---: | ---: | ---: | ---: | ---: |
+| 256 | 83.078 ns [82.545, 83.597] | 45.628 ns [45.066, 46.289] | 37.912 ns [37.507, 38.567] | 37.220 ns [37.063, 37.400] |
+| 1,024 | 321.47 ns [318.44, 325.06] | 216.32 ns [197.33, 234.17] | 174.28 ns [167.05, 183.03] | 154.75 ns [150.81, 159.28] |
+| 4,096 | 2.1486 us [2.1271, 2.1693] | 1.7985 us [1.7488, 1.8426] | 1.8613 us [1.8430, 1.8794] | 1.8482 us [1.8103, 1.8706] |
+
+An unchanged confirmation run reported:
+
+| f64 scalars | checked | capability candidate | view | direct |
+| ---: | ---: | ---: | ---: | ---: |
+| 256 | 83.789 ns [83.134, 84.203] | 45.839 ns [45.291, 46.496] | 40.260 ns [38.861, 42.868] | 39.051 ns [38.748, 39.433] |
+| 1,024 | 331.08 ns [327.55, 334.85] | 209.91 ns [207.58, 212.94] | 201.29 ns [198.91, 203.68] | 203.36 ns [198.77, 208.71] |
+| 4,096 | 1.4869 us [1.4500, 1.5274] | 1.3893 us [1.3813, 1.3972] | 1.4027 us [1.3959, 1.4092] | 1.3965 us [1.3801, 1.4181] |
+
+The candidate materially improved the checked route, but its 256-element
+interval remained disjoint from both ceilings in both runs, and the generated
+loop retained the exact branches the accepted chunk contract removes. The
+predeclared acceptance oracle therefore rejects the public method. No
+production source or benchmark-instrument change remains. Strided in-place
+consumers partition their disjoint rows once with standard slice APIs and then
+use the existing capability-backed view/chunk iterators; Hermes does not clone
+that general slice-partitioning operation into a SIMD-specific API.
+
 Findings:
 - [minor] Consumer target-feature entry. ADR 009 records why a lane kernel must
   be monomorphized inside a `#[target_feature]` scope: without it the annotated

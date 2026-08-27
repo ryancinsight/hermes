@@ -1,6 +1,6 @@
 # Backlog — hermes-simd
 
-## HS-CAPABILITY-LOAD-THROUGHPUT-2026-08-27 — Hoist support probes from strided lane loads [minor] — in-progress
+## HS-CAPABILITY-LOAD-THROUGHPUT-2026-08-27 — Hoist support probes from strided lane loads [patch] — in review (PR #77)
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
   **Lease:** Codex — `crates/hermes-simd-core/src/view/capability.rs`,
@@ -28,11 +28,18 @@
   no support probe, call, or panic branch attributable to the new load; and two
   bounded same-binary runs place its interval with the direct/view ceiling or
   reject the API without weakening the instrument.
-- **Risk / change class:** [minor]. The public surface gains one safe method on
-  the existing capability value; no existing contract changes. Verification:
-  workspace Clippy, Nextest, doctests, Rustdoc, no-default-features, examples,
-  benchmark smoke and bounded timing, exact AVX2 assembly, SemVer check, and
-  hosted Miri/AArch64/SDE coverage.
+- **Risk / change class:** [patch]. The rejected candidate would have added one
+  safe method to the existing capability value; no production or benchmark
+  change survives. Verification: exact-diff formatting and whitespace gates,
+  plus hosted workspace, Miri, AArch64, SDE, and benchmark-budget coverage.
+- **Decision:** reject the candidate method. It removed every support probe and
+  improved the checked path in both runs, but its safe slice boundary retained
+  five per-iteration bounds/panic branches. Its 256-element interval remained
+  disjoint from the view/direct ceiling in both runs, so it failed the stated
+  acceptance oracle. Existing `SimdView`/`SimdChunk` composition is the
+  authoritative probe-free and bounds-free route; strided in-place consumers
+  must partition disjoint rows once before constructing chunk iterators.
+  Delivery: PR #77.
 
 ## HS-FEARLESS-COMPLEX-REG-THROUGHPUT-2026-08-27 — Measure interleaved complex-register parity [patch] — in-progress
 
