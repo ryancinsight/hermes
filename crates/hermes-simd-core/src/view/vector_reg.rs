@@ -839,6 +839,34 @@ where
         Self::new(unsafe { Arch::swap_pairs(self.raw) })
     }
 
+    /// Transposes a square tile of `LANE_COUNT` vectors in place: lane `c`
+    /// of row `r` moves to lane `r` of row `c`.
+    ///
+    /// This is the in-register granularity for blocked matrix transposes:
+    /// load a `LANE_COUNT x LANE_COUNT` block as rows, transpose here, store
+    /// the rows to the exchanged block.
+    ///
+    /// # Panics
+    /// Panics if `tile` does not hold exactly `LANE_COUNT` vectors.
+    #[inline(always)]
+    pub fn transpose_square(tile: &mut [Self]) {
+        assert_eq!(
+            tile.len(),
+            Arch::LANE_COUNT,
+            "tile must hold LANE_COUNT rows"
+        );
+        // SAFETY: `Vector` is `#[repr(transparent)]` over `Arch::Vector`, so
+        // the slice cast preserves layout, and constructing the vectors
+        // proved host support for `Arch`.
+        unsafe {
+            let raw = core::slice::from_raw_parts_mut(
+                tile.as_mut_ptr().cast::<Arch::Vector>(),
+                tile.len(),
+            );
+            Arch::transpose_square(raw);
+        }
+    }
+
     /// Duplicates each even-indexed lane over its odd neighbour:
     /// `[a, b, c, d]` becomes `[a, a, c, c]`.
     ///

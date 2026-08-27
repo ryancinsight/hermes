@@ -49,6 +49,14 @@ pub trait SimdPermute<T: Scalar>: SimdStorage<T> + Sealed {
     /// The backend's target features must be available.
     unsafe fn swap_pairs(v: Self::Vector) -> Self::Vector;
 
+    /// Transposes a square tile of `LANE_COUNT` vectors in place: lane `c`
+    /// of row `r` moves to lane `r` of row `c`.
+    ///
+    /// # Safety
+    /// The backend's target features must be available; `tile` must hold
+    /// exactly `LANE_COUNT` vectors.
+    unsafe fn transpose_square(tile: &mut [Self::Vector]);
+
     /// Duplicates each even lane into its adjacent odd lane.
     ///
     /// # Safety
@@ -100,6 +108,10 @@ impl<T: Scalar, A: BackendKernel<T>> SimdPermute<T> for A {
 
     unsafe fn swap_pairs(v: Self::Vector) -> Self::Vector {
         <A as BackendKernel<T>>::swap_pairs(v)
+    }
+
+    unsafe fn transpose_square(tile: &mut [Self::Vector]) {
+        <A as BackendKernel<T>>::transpose_square(tile);
     }
 
     unsafe fn dup_even(v: Self::Vector) -> Self::Vector {

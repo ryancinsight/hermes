@@ -53,6 +53,19 @@
   runner class; demonstrated by reverting `6b32676` locally and observing the
   gate.
 - **Risk / change class:** [patch], CI-only.
+## HS-TRANSPOSE-SQUARE-2026-08-27 — In-register square-tile transpose [patch] — done 2026-08-27
+
+- **Delivered:** `transpose_square` on the backend seam and the
+  `SimdPermute` facet, with the safe `Vector::transpose_square(&mut [Self])`
+  surface: transposes a `LANE_COUNT x LANE_COUNT` tile in registers.
+  Overrides: AVX2 f64 (the canonical eight-shuffle unpack + cross-half
+  permute network) and NEON f64 (`trn1`/`trn2`); stack-capture default
+  elsewhere. Verified by a new index-coded flat-reference law plus the
+  involution identity, per backend. Driver: apollo's batched movement
+  burn-down (`ATLAS-APOLLO-BASE-BUTTERFLY-128`) — its plane transpose is
+  1659 TSC at N = 1024 pinned, and the flat-interleave composition costs
+  16 shuffles per 4x4 tile where this network costs 8. Integrator: Claude
+  session d791281c.
 
 ## HS-DENSEMASK-BITPACK-2026-08-27 — Bit-pack the DenseWithMask lane mask [minor] — in review (PR #81)
 
