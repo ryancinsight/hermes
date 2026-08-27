@@ -458,7 +458,10 @@ impl<T, V: AsRef<[T]>, I: AsRef<[i32]>> SparseValidate for CsrMatrix<T, V, I> {
             }
         }
         for &col in col_indices {
-            if col < 0 || col >= self.ncols as i32 {
+            // Compare in `usize` after the sign check: an `i32` bound
+            // (`ncols as i32`) would truncate for 2^31 or more columns and
+            // misreport valid indices.
+            if col < 0 || col as usize >= self.ncols {
                 return Err(crate::SimdError::IndexOutOfBounds);
             }
         }
@@ -501,7 +504,10 @@ impl<T, const C: usize, V: AsRef<[T]>, I: AsRef<[i32]>> SparseValidate for SellP
             }
         }
         for &col in col_indices {
-            if col < 0 || col >= self.ncols as i32 {
+            // Compare in `usize` after the sign check: an `i32` bound
+            // (`ncols as i32`) would truncate for 2^31 or more columns and
+            // misreport valid indices.
+            if col < 0 || col as usize >= self.ncols {
                 return Err(crate::SimdError::IndexOutOfBounds);
             }
         }

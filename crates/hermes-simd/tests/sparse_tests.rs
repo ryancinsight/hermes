@@ -982,3 +982,19 @@ mod sparse_validated_properties {
         }
     }
 }
+
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn test_validators_accept_columns_beyond_i32_range() {
+    // Exact `usize`-side column validation: with 2^32 + 5 columns the old
+    // `ncols as i32` bound wrapped to 5 and misreported the (valid) column 6.
+    let ncols = (1usize << 32) + 5;
+    let values = [1.0f32; 4];
+    let col_indices = [6i32, 1, 2, 3];
+    let row_ptr = [0i32, 4];
+    let data = CsrData::new(&values[..], &col_indices[..], &row_ptr[..], 1, ncols);
+    assert_eq!(
+        hermes_simd_core::sparse::types::SparseValidate::validate(&data),
+        Ok(())
+    );
+}

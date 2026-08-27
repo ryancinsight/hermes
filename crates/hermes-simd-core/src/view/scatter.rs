@@ -48,11 +48,13 @@ where
             return Err(SimdError::InsufficientInputLength);
         }
         let len = self.len();
-        let max_idx = len as i32;
         // Validate every index first: no element is written unless all are in
-        // range, which is what makes the `Err` path non-destructive.
+        // range, which is what makes the `Err` path non-destructive. Compare in
+        // `usize` after the sign check: an `i32` bound (`len as i32`) would
+        // truncate for views of 2^31 elements or more and misclassify valid
+        // indices.
         for &idx in indices {
-            if idx < 0 || idx >= max_idx {
+            if idx < 0 || idx as usize >= len {
                 return Err(SimdError::IndexOutOfBounds);
             }
         }
