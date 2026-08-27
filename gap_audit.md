@@ -1156,9 +1156,11 @@ order (correctness → architecture → tests → docs → PM).
   comparison-mask methods now convert the backend comparison register directly
   to its native mask. Two unchanged f32/f64 measurements and exact AVX2
   disassembly identified and then removed the store, lane-wise scalar scan, and
-  mask reconstruction (`HS-NATIVE-COMPARISON-MASK-2026-08-27`). **[open]
+  mask reconstruction (`HS-NATIVE-COMPARISON-MASK-2026-08-27`). **[in progress]
   Cross-type `cast` stack round-trip with a 64-iteration scalar loop (MED)** —
-  requires a measured native conversion design across differing lane counts.
+  `HS-NATIVE-CAST-THROUGHPUT-2026-08-27` first measures the supported
+  equal-native-width f32/i32 conversions; lane-count-changing conversion is a
+  separate contract and is not part of `Vector::cast` today.
   **argmin/argmax two-pass (LOW-MED)** — bandwidth-bound-only win; a correct
   single-pass needs SIMD index-vector tracking with first-occurrence
   tie-breaking (non-trivial). All `[patch]`/`[minor]`.

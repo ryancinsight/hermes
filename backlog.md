@@ -1,12 +1,36 @@
 # Backlog — hermes-simd
 
-## HS-PACKED-MASK-SHAPE-SAFETY-2026-08-27 — Enforce packed-mask and matrix shape bounds [patch] — in progress
+## HS-NATIVE-CAST-THROUGHPUT-2026-08-27 — Remove supported cross-type cast stack round-trip [patch] — in progress
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** Codex — `crates/hermes-simd-core/src/mask.rs`,
-  `crates/hermes-simd-core/src/sparse/{types.rs,ops.rs,spmv.rs}`,
-  `crates/hermes-simd/tests/sparse_tests.rs`, the existing sparse benchmark,
-  this item and its checklist, `gap_audit.md`, and affected Rustdoc/changelog.
+  **Lease:** Codex — `crates/hermes-simd/benches/lane_throughput.rs`,
+  `crates/hermes-simd/benches/lane_throughput/cast.rs`, this item and its
+  checklist, and the cast entry in `gap_audit.md`.
+- **Outcome:** measure the public equal-lane `Vector::cast` path against a
+  backend-native conversion and Fearless SIMD 0.7, then eliminate the current
+  register-to-stack scalar loop only when repeated measurements and exact code
+  generation establish a material deficit and its mechanism.
+- **Scope / non-goals:** start with the supported, native-width `f32` to `i32`
+  and `i32` to `f32` conversions under Rust `as` semantics. Preserve the
+  generic public signature and the scalar default for other type pairs. Do not
+  add a benchmark dependency already rejected by Hermes dependency policy or
+  conflate this increment with lane-count-changing conversions.
+- **Acceptance oracle:** an input-sensitive same-binary instrument uses equal
+  native widths, returns an accumulated value to defeat elision, and proves
+  every provider against a scalar oracle before timing. Two unchanged bounded
+  runs and exact AVX2 inspection must agree on a repeatable public/direct
+  deficit before production changes. Any correction preserves finite,
+  boundary, NaN, and infinity cast semantics on every affected backend, adds no
+  allocation or public API, and passes the focused release and workspace gates.
+- **Risk / change class:** [patch], hot register conversion with special-value
+  semantics; no public contract change. **Dependencies:** the comparison-mask
+  native-route seam merged in PR #84 (`6efa67b`) supplies the measurement
+  pattern only; this item owns a distinct conversion mechanism.
+
+## HS-PACKED-MASK-SHAPE-SAFETY-2026-08-27 — Enforce packed-mask and matrix shape bounds [patch] — merged; hosted matrix pending (PR #85, merge 7e342cd)
+
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+  **Lease:** none.
 - **Outcome:** make public `PackedMask` extraction reject every out-of-range
   request in release builds, make `DenseWithMask` validation reject arithmetic
   overflow and every non-exact logical shape, and keep validated sparse kernels
@@ -39,7 +63,11 @@
   change (407.11 us median; change interval -4.32% to +3.55%, p=0.83). An
   old-versus-old control moved 3.9%, so the timing claim is limited to excluding
   a stable regression on this variable-load host; code generation supplies the
-  mechanism evidence.
+  mechanism evidence. Provider commit `af73e6a`; PR #85 merged as `7e342cd`.
+  Hosted x86, Miri, AArch64 NEON, AVX-512 best-effort, dependency-policy,
+  lock-integrity, and review gates are green; the bounded benchmark and Intel
+  SDE jobs remain pending. RecurseML reports only an external analysis-service
+  error and produced no code diagnostic.
 
 ## HS-NATIVE-COMPARISON-MASK-2026-08-27 — Remove comparison-mask stack round-trip [patch] — done 2026-08-27 (PR #84, merge 6efa67b)
 
