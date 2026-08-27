@@ -1134,9 +1134,16 @@ order (correctness → architecture → tests → docs → PM).
 
 ### Memory / zero-copy
 
-- **[open] `DenseWithMask` stores `[bool]` mask, converts per-chunk per-call
-  (MED-HIGH)** — 8× footprint; bit-pack once at the boundary (a `BitMask` type
-  already exists). **`cmp_*_mask`/`cast` round-trip through stack buffers with
+- **[RESOLVED 2026-08-27] `DenseWithMask` `[bool]` mask bit-packed
+  (was MED-HIGH).** New arbitrary-length `PackedMask` (canonical `mask`
+  module) replaces the byte-per-element `[bool]` in `DenseWithMaskData` /
+  `OwnedDenseWithMask` in place — 8× mask footprint reduction, packed once at
+  the construction boundary — and the SpMV / `sum_values` /
+  `elementwise_mul_dense` kernels read packed lane windows via
+  `mask_from_bitmask` instead of the per-chunk per-call bool-conversion loop.
+  Unused `DenseWithMaskBitMaskData` partial variant deleted. PR #81,
+  backlog `HS-DENSEMASK-BITPACK-2026-08-27`.
+- **[open] `cmp_*_mask`/`cast` round-trip through stack buffers with
   64-iter scalar loops (MED)** — route through native backend mask ops.
   **argmin/argmax two-pass (LOW-MED)** — bandwidth-bound-only win; a correct
   single-pass needs SIMD index-vector tracking with first-occurrence

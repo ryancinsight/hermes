@@ -1,6 +1,6 @@
 //! Concrete data structures for sparse matrix formats.
 
-use crate::mask::BitMask;
+use crate::mask::PackedMask;
 use core::marker::PhantomData;
 
 /// Trait providing uniform row/column dimension access for sparse data structs.
@@ -246,12 +246,13 @@ impl<T, const BM: usize, const BN: usize, V: AsRef<[T]>, I: AsRef<[i32]>>
 pub type BlockedCooData<'a, T, const BM: usize, const BN: usize> =
     BlockedCooMatrix<T, BM, BN, &'a [T], &'a [i32]>;
 
-/// Generic Dense matrix with a boolean non-zero mask.
+/// Generic Dense matrix with a bit-packed structural non-zero mask.
 #[derive(Clone)]
 pub struct DenseWithMaskMatrix<T, V, M> {
     /// Dense value array, row-major.
     pub values: V,
-    /// Boolean non-zero mask.
+    /// Bit-packed non-zero mask ([`PackedMask`]): one bit per element in
+    /// row-major element order.
     pub mask: M,
     /// Number of matrix rows.
     pub nrows: usize,
@@ -274,11 +275,11 @@ impl<T, V, M> DenseWithMaskMatrix<T, V, M> {
     }
 }
 
-impl<T, V: AsRef<[T]>, M: AsRef<[bool]>> DenseWithMaskMatrix<T, V, M> {
+impl<T, V: AsRef<[T]>, W: AsRef<[u64]>> DenseWithMaskMatrix<T, V, PackedMask<W>> {
     /// Count of structurally non-zero entries.
     #[inline]
     pub fn nnz(&self) -> usize {
-        self.mask.as_ref().iter().filter(|&&b| b).count()
+        self.mask.popcount()
     }
 
     /// Structural sparsity.
@@ -290,15 +291,13 @@ impl<T, V: AsRef<[T]>, M: AsRef<[bool]>> DenseWithMaskMatrix<T, V, M> {
         }
         1.0 - (self.nnz() as f64 / total as f64)
     }
-}
 
-impl<T, V: AsRef<[T]>, const N: usize> DenseWithMaskMatrix<T, V, BitMask<N>> {
     /// Return a borrowed representation of this Dense-with-Mask data.
     #[inline]
-    pub fn as_borrowed_bitmask(&self) -> DenseWithMaskMatrix<T, &[T], BitMask<N>> {
+    pub fn as_borrowed(&self) -> DenseWithMaskMatrix<T, &[T], PackedMask<&[u64]>> {
         DenseWithMaskMatrix {
             values: self.values.as_ref(),
-            mask: self.mask,
+            mask: self.mask.as_view(),
             nrows: self.nrows,
             ncols: self.ncols,
             _marker: PhantomData,
@@ -317,25 +316,8 @@ impl<T, V, M> SparseShape for DenseWithMaskMatrix<T, V, M> {
     }
 }
 
-impl<T, V: AsRef<[T]>, M: AsRef<[bool]>> DenseWithMaskMatrix<T, V, M> {
-    /// Return a borrowed representation of this Dense-with-Mask data.
-    #[inline]
-    pub fn as_borrowed(&self) -> DenseWithMaskMatrix<T, &[T], &[bool]> {
-        DenseWithMaskMatrix {
-            values: self.values.as_ref(),
-            mask: self.mask.as_ref(),
-            nrows: self.nrows,
-            ncols: self.ncols,
-            _marker: PhantomData,
-        }
-    }
-}
-
-/// Backward-compatible type alias.
-pub type DenseWithMaskData<'a, T> = DenseWithMaskMatrix<T, &'a [T], &'a [bool]>;
-/// Borrowed dense-with-mask storage using bit-packed masks.
-pub type DenseWithMaskBitMaskData<'a, T, const N: usize> =
-    DenseWithMaskMatrix<T, &'a [T], BitMask<N>>;
+/// Borrowed dense-with-mask storage: dense values plus a bit-packed mask view.
+pub type DenseWithMaskData<'a, T> = DenseWithMaskMatrix<T, &'a [T], PackedMask<&'a [u64]>>;
 
 /// Sparse storage whose structural invariants have been checked once at
 /// construction.
@@ -522,30 +504,17 @@ impl<T, const BM: usize, const BN: usize, V: AsRef<[T]>, I: AsRef<[i32]>> Sparse
     }
 }
 
-impl<T, V: AsRef<[T]>, const N: usize> SparseValidate for DenseWithMaskMatrix<T, V, BitMask<N>> {
+impl<T, V: AsRef<[T]>, W: AsRef<[u64]>> SparseValidate
+    for DenseWithMaskMatrix<T, V, PackedMask<W>>
+{
     fn validate(&self) -> Result<(), crate::SimdError> {
         let values = self.values.as_ref();
-        let req_len = self.nrows * self.ncols;
-        if values.len() < req_len {
-            return Err(crate::SimdError::LengthMismatch);
-        }
-        if N < req_len {
-            return Err(crate::SimdError::LengthMismatch);
-        }
-        Ok(())
-    }
-}
-
-impl<T, V: AsRef<[T]>, M: AsRef<[bool]>> SparseValidate for DenseWithMaskMatrix<T, V, M> {
-    fn validate(&self) -> Result<(), crate::SimdError> {
-        let values = self.values.as_ref();
-        let mask = self.mask.as_ref();
 
         let req_len = self.nrows * self.ncols;
         if values.len() < req_len {
             return Err(crate::SimdError::LengthMismatch);
         }
-        if mask.len() < values.len() {
+        if self.mask.len() < values.len() {
             return Err(crate::SimdError::LengthMismatch);
         }
         Ok(())

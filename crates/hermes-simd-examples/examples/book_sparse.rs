@@ -12,7 +12,7 @@
 extern crate hermes_simd;
 
 use hermes_simd::{
-    spmv_csr, spmv_dense_masked, CsrData, DenseWithMaskData, SimdError, ValidatedData,
+    spmv_csr, spmv_dense_masked, CsrData, DenseWithMaskData, PackedMask, SimdError, ValidatedData,
 };
 
 fn main() {
@@ -41,13 +41,11 @@ fn main() {
 
     // ── Dense-with-mask: 2×2 identity ──
     // Dense rectangular storage has no structural index hazard, so the facade
-    // takes `DenseWithMaskData` directly (no `ValidatedData` wrapper).
-    let dense = DenseWithMaskData::new(
-        &[1.0f32, 0.0, 0.0, 1.0][..],
-        &[true, false, false, true][..],
-        2,
-        2,
-    );
+    // takes `DenseWithMaskData` directly (no `ValidatedData` wrapper). The
+    // structural mask is bit-packed once here; the kernel reads packed lane
+    // windows, never a byte-per-element bool buffer.
+    let mask = PackedMask::from_bools(&[true, false, false, true]);
+    let dense = DenseWithMaskData::new(&[1.0f32, 0.0, 0.0, 1.0][..], mask.as_view(), 2, 2);
     let mut y2 = [0.0f32; 2];
     spmv_dense_masked::<f32>(dense, &[6.0f32, 9.0], &mut y2);
     assert_eq!(y2, [6.0, 9.0]);

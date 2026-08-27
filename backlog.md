@@ -1,5 +1,36 @@
 # Backlog — hermes-simd
 
+## HS-DENSEMASK-BITPACK-2026-08-27 — Bit-pack the DenseWithMask lane mask [minor] — in review (PR #81)
+
+- **Integrator:** Claude session 5050c72a-sub. **Lease:**
+  `crates/hermes-simd-core/src/mask.rs`,
+  `crates/hermes-simd-core/src/sparse/{types.rs,mod.rs,spmv.rs,ops.rs,cow/mod.rs,cow/owned.rs}`,
+  `crates/hermes-simd-core/src/lib.rs`, `crates/hermes-simd/src/lib.rs`,
+  `crates/hermes-simd/tests/sparse_tests.rs`,
+  `crates/hermes-simd-intrinsics/src/scalar/f32.rs` (sparse test modules),
+  `crates/hermes-simd-benches/benches/sparse_bench.rs`,
+  `crates/hermes-simd-examples/examples/book_sparse.rs`,
+  `docs/book/sparse.md`, `CHANGELOG.md`, this item, and the `gap_audit.md`
+  "Memory / zero-copy" status line.
+- **Outcome:** `DenseWithMask` stores its structural mask bit-packed (one bit
+  per element) instead of `[bool]` (one byte per element) — 8× mask footprint
+  reduction — and kernels consume packed lane windows through
+  `mask_from_bitmask` instead of a per-chunk per-call bool-conversion loop.
+- **Driver:** `gap_audit.md` "Memory / zero-copy" open item (~line 1090,
+  MED-HIGH): "`DenseWithMask` stores `[bool]` mask, converts per-chunk
+  per-call".
+- **Scope / non-goals:** arbitrary-length `PackedMask` in the canonical mask
+  module; `DenseWithMaskData`/`OwnedDenseWithMask` storage swap in place (no
+  parallel variant, no compat shim); all call sites (kernels, cow, tests,
+  bench, example, book) updated; the superseded `[bool]` representation and
+  the unused `DenseWithMaskBitMaskData` partial variant deleted. Non-goals:
+  the `cmp_*_mask`/`cast` stack round-trip debt and the argmin/argmax
+  two-pass item (both remain recorded separately in `gap_audit.md`).
+- **Acceptance oracle:** existing sparse suites pass unchanged (dense-ref
+  differential oracles); new value-semantic tests cover mask round-trip,
+  word-boundary lanes at non-multiple-of-64 lengths, empty, all-set/all-clear,
+  and validating-construction rejections; fmt/clippy/nextest/doc gates green.
+
 ## HS-AVX2-INTERLEAVE-OVERRIDES-2026-08-27 — Native AVX2 interleave/deinterleave [patch] — done 2026-08-27
 
 - **Delivered:** AVX2 f64 and f32 `interleave`/`deinterleave` overrides

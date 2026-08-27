@@ -1,7 +1,10 @@
-//! Bit-packed lane mask for SIMD predicated operations.
+//! Bit-packed predicate masks for SIMD operations.
 //!
 //! `BitMask<N>` stores a predicate for up to 64 SIMD lanes in the bits of a `u64`.
 //! Bit `i` of the inner value corresponds to lane `i`; bits `[N..]` are always zero.
+//! [`PackedMask`] is its runtime-length counterpart: one bit per element of an
+//! arbitrarily long buffer, packed into words, with `<= 64`-lane windows
+//! extractable as raw bitmasks for the backends.
 //!
 //! # Design rationale
 //!
@@ -326,6 +329,269 @@ impl<const N: usize> core::ops::Not for BitMask<N> {
     #[inline(always)]
     fn not(self) -> Self {
         Self(!self.0 & Self::ALL_ACTIVE.0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PackedMask — arbitrary-length bit-packed element mask
+// ---------------------------------------------------------------------------
+
+/// Number of mask bits stored per word.
+const WORD_BITS: usize = 64;
+
+/// Bit-packed predicate mask over an arbitrary number of elements.
+///
+/// The runtime-length counterpart of [`BitMask`]: where `BitMask<N>` packs one
+/// SIMD register's lane predicate (`N <= 64`) into a single word, `PackedMask`
+/// packs one bit per element of an arbitrarily long buffer into a word slice —
+/// 8× smaller than the byte-per-element `[bool]` representation it replaces,
+/// and directly consumable by the SIMD backends: [`PackedMask::lane_bits`]
+/// extracts any `<= 64`-lane window as the raw bitmask
+/// [`SimdMask::mask_from_bitmask`](crate::kernel::SimdMask::mask_from_bitmask)
+/// expands to a native mask, with no per-lane conversion loop.
+///
+/// Bit `i % 64` of word `i / 64` corresponds to element `i`.
+///
+/// # Invariants
+/// - `words.len() == len.div_ceil(64)` (exact word count).
+/// - Bits at positions `>= len` in the final word are zero, so
+///   [`PackedMask::popcount`] needs no tail masking.
+///
+/// Both are established by the validating constructors and preserved by field
+/// privacy.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct PackedMask<W> {
+    words: W,
+    len: usize,
+}
+
+impl PackedMask<Box<[u64]>> {
+    /// Bit-pack a `bool` slice: the construction boundary at which the 8×
+    /// footprint reduction happens, once.
+    ///
+    /// # Examples
+    /// ```
+    /// use hermes_simd_core::mask::PackedMask;
+    ///
+    /// let mask = PackedMask::from_bools(&[true, false, true]);
+    /// assert_eq!(mask.len(), 3);
+    /// assert_eq!(mask.popcount(), 2);
+    /// assert!(mask.bit(0) && !mask.bit(1) && mask.bit(2));
+    /// ```
+    #[must_use]
+    pub fn from_bools(bits: &[bool]) -> Self {
+        let mut words = vec![0u64; bits.len().div_ceil(WORD_BITS)].into_boxed_slice();
+        for (i, &b) in bits.iter().enumerate() {
+            words[i / WORD_BITS] |= u64::from(b) << (i % WORD_BITS);
+        }
+        Self {
+            words,
+            len: bits.len(),
+        }
+    }
+}
+
+impl<W: AsRef<[u64]>> PackedMask<W> {
+    /// Wrap pre-packed words as a mask over `len` elements, validating the
+    /// representation invariants.
+    ///
+    /// # Errors
+    /// [`SimdError::LengthMismatch`](crate::SimdError::LengthMismatch) when the
+    /// word count is not exactly `len.div_ceil(64)`;
+    /// [`SimdError::IndexOutOfBounds`](crate::SimdError::IndexOutOfBounds) when
+    /// a bit at position `>= len` is set in the final word.
+    pub fn new(words: W, len: usize) -> Result<Self, crate::SimdError> {
+        let slice = words.as_ref();
+        if slice.len() != len.div_ceil(WORD_BITS) {
+            return Err(crate::SimdError::LengthMismatch);
+        }
+        let tail = len % WORD_BITS;
+        if tail != 0 && slice[slice.len() - 1] >> tail != 0 {
+            return Err(crate::SimdError::IndexOutOfBounds);
+        }
+        Ok(Self { words, len })
+    }
+
+    /// Number of elements the mask covers.
+    #[inline(always)]
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Returns `true` if the mask covers no elements.
+    #[inline(always)]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    /// Returns `true` if element `i` is active.
+    ///
+    /// # Panics
+    /// Panics in debug mode if `i >= self.len()`.
+    #[inline(always)]
+    #[must_use]
+    pub fn bit(&self, i: usize) -> bool {
+        debug_assert!(i < self.len, "PackedMask::bit: index out of range");
+        (self.words.as_ref()[i / WORD_BITS] >> (i % WORD_BITS)) & 1 == 1
+    }
+
+    /// Extract `count <= 64` mask bits starting at element `offset` as a raw
+    /// bitmask (bit `k` = element `offset + k`), combining at most two words.
+    ///
+    /// This is the per-chunk kernel entry point: feed the result to
+    /// [`SimdMask::mask_from_bitmask`](crate::kernel::SimdMask::mask_from_bitmask)
+    /// to obtain the native lane mask.
+    ///
+    /// # Panics
+    /// Panics in debug mode if `count > 64` or `offset + count > self.len()`.
+    ///
+    /// # Examples
+    /// ```
+    /// use hermes_simd_core::mask::PackedMask;
+    ///
+    /// // Element 62 is active; a 4-lane window at offset 61 crosses the
+    /// // word boundary and sees it in lane 1.
+    /// let mut bits = vec![false; 70];
+    /// bits[62] = true;
+    /// let mask = PackedMask::from_bools(&bits);
+    /// assert_eq!(mask.lane_bits(61, 4), 0b0010);
+    /// ```
+    #[inline(always)]
+    #[must_use]
+    pub fn lane_bits(&self, offset: usize, count: usize) -> u64 {
+        debug_assert!(count <= WORD_BITS, "PackedMask::lane_bits: count > 64");
+        debug_assert!(
+            offset + count <= self.len,
+            "PackedMask::lane_bits: window out of range"
+        );
+        if count == 0 {
+            return 0;
+        }
+        let words = self.words.as_ref();
+        let word = offset / WORD_BITS;
+        let bit = offset % WORD_BITS;
+        let mut bits = words[word] >> bit;
+        if bit != 0 && bit + count > WORD_BITS {
+            bits |= words[word + 1] << (WORD_BITS - bit);
+        }
+        if count == WORD_BITS {
+            bits
+        } else {
+            bits & (1u64 << count).wrapping_sub(1)
+        }
+    }
+
+    /// Number of active elements.
+    ///
+    /// Exact without tail masking because bits `>= len` are zero by invariant.
+    #[inline]
+    #[must_use]
+    pub fn popcount(&self) -> usize {
+        self.words
+            .as_ref()
+            .iter()
+            .map(|w| w.count_ones() as usize)
+            .sum()
+    }
+
+    /// Borrow this mask as a word-slice-backed view (zero-copy).
+    #[inline(always)]
+    #[must_use]
+    pub fn as_view(&self) -> PackedMask<&[u64]> {
+        PackedMask {
+            words: self.words.as_ref(),
+            len: self.len,
+        }
+    }
+}
+
+impl<W: AsRef<[u64]>> From<&PackedMask<W>> for PackedMask<Box<[u64]>> {
+    /// Clone the packed words into owned storage.
+    #[inline]
+    fn from(mask: &PackedMask<W>) -> Self {
+        Self {
+            words: mask.words.as_ref().into(),
+            len: mask.len,
+        }
+    }
+}
+
+#[cfg(test)]
+mod packed_mask_tests {
+    use super::*;
+    use crate::SimdError;
+
+    #[test]
+    fn from_bools_round_trips_every_bit() {
+        // 70 elements spans two words with a 6-bit tail.
+        let bits: Vec<bool> = (0..70).map(|i| i % 3 == 0).collect();
+        let mask = PackedMask::from_bools(&bits);
+        assert_eq!(mask.len(), 70);
+        for (i, &b) in bits.iter().enumerate() {
+            assert_eq!(mask.bit(i), b, "bit {i}");
+        }
+        assert_eq!(mask.popcount(), bits.iter().filter(|&&b| b).count());
+    }
+
+    #[test]
+    fn empty_mask() {
+        let mask = PackedMask::from_bools(&[]);
+        assert_eq!(mask.len(), 0);
+        assert!(mask.is_empty());
+        assert_eq!(mask.popcount(), 0);
+        assert_eq!(mask.lane_bits(0, 0), 0);
+    }
+
+    #[test]
+    fn all_set_and_all_clear() {
+        let set = PackedMask::from_bools(&[true; 130]);
+        assert_eq!(set.popcount(), 130);
+        assert_eq!(set.lane_bits(120, 10), 0x3FF);
+        let clear = PackedMask::from_bools(&[false; 130]);
+        assert_eq!(clear.popcount(), 0);
+        assert_eq!(clear.lane_bits(0, 64), 0);
+    }
+
+    #[test]
+    fn lane_bits_crosses_word_boundary() {
+        let mut bits = vec![false; 128];
+        for i in [60, 63, 64, 67] {
+            bits[i] = true;
+        }
+        let mask = PackedMask::from_bools(&bits);
+        // 8-lane window at 60: elements 60..68 -> lanes 0, 3, 4, 7 active.
+        assert_eq!(mask.lane_bits(60, 8), 0b1001_1001);
+        // Full-word window aligned at 64: elements 64 and 67 -> bits 0 and 3.
+        assert_eq!(mask.lane_bits(64, 64), 0b1001);
+    }
+
+    #[test]
+    fn new_validates_word_count_and_tail() {
+        // Exact word count with a clear tail is accepted.
+        let mask = PackedMask::new([0b101u64].as_slice(), 3).expect("valid");
+        assert_eq!(mask.popcount(), 2);
+        // Wrong word count.
+        assert_eq!(
+            PackedMask::new([0u64; 2].as_slice(), 3).unwrap_err(),
+            SimdError::LengthMismatch
+        );
+        // Set bit beyond `len` in the final word.
+        assert_eq!(
+            PackedMask::new([0b1000u64].as_slice(), 3).unwrap_err(),
+            SimdError::IndexOutOfBounds
+        );
+    }
+
+    #[test]
+    fn view_and_owned_conversion_preserve_value() {
+        let mask = PackedMask::from_bools(&[true, false, true, true, false]);
+        let view = mask.as_view();
+        assert_eq!(view.len(), mask.len());
+        assert_eq!(view.popcount(), mask.popcount());
+        let owned = PackedMask::from(&view);
+        assert_eq!(owned, mask);
     }
 }
 

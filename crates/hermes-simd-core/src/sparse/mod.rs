@@ -8,10 +8,10 @@
 //! - Blocked COO is suited to locally dense block structure; const block
 //!   dimensions monomorphize the inner block loops without a runtime format
 //!   switch.
-//! - Dense-with-mask keeps dense row-major values plus a boolean structural
-//!   mask; it is useful when the dense layout is already required by a caller,
-//!   but it is memory-bound for low non-zero densities because it stores every
-//!   value and mask bit.
+//! - Dense-with-mask keeps dense row-major values plus a bit-packed structural
+//!   mask ([`crate::mask::PackedMask`], one bit per element); it is useful when
+//!   the dense layout is already required by a caller, but it is memory-bound
+//!   for low non-zero densities because it stores every value and mask bit.
 //!
 //! `crates/hermes-simd-benches/benches/sparse_bench.rs` records the empirical
 //! crossover data. Its scalability sweep varies row count and structural
@@ -58,7 +58,7 @@ pub struct SellP<const C: usize>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BlockedCoo<const BM: usize, const BN: usize>;
 
-/// Dense storage with a boolean mask indicating non-zero elements.
+/// Dense storage with a bit-packed mask indicating non-zero elements.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DenseWithMask;
 

@@ -69,7 +69,7 @@ pub use kernel::{
     BackendKernel, SimdArith, SimdBitwise, SimdCompare, SimdGather, SimdKernel, SimdLoadStore,
     SimdMask, SimdPermute, SimdReduce, SimdStorage,
 };
-pub use mask::BitMask;
+pub use mask::{BitMask, PackedMask};
 pub use numa::{
     current_numa_node, refresh_numa_node, verify_numa_locality, MnemosyneNumaAllocator,
     NumaAllocator, NumaBinding,

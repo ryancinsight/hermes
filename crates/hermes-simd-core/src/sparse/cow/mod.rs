@@ -13,6 +13,7 @@ use super::{
     BlockedCoo, Csr, DenseWithMask, SellP, SparseFormat, SparseView, Validated, ValidatedData,
 };
 use crate::arch::SimdArch;
+use crate::mask::PackedMask;
 use crate::scalar::Scalar;
 use crate::vec::AlignedVec;
 
@@ -125,7 +126,7 @@ impl CowFormat for DenseWithMask {
     ) -> OwnedDenseWithMask<T> {
         OwnedDenseWithMask::new(
             AlignedVec::from_slice_clone(d.values),
-            AlignedVec::from_slice(d.mask),
+            PackedMask::from(&d.mask),
             d.nrows,
             d.ncols,
         )
@@ -443,12 +444,13 @@ impl<T: Send + Sync + Clone, const BM: usize, const BN: usize, Arch: SimdArch>
 }
 
 impl<T: Send + Sync + Clone, Arch: SimdArch> SparseCow<'_, T, DenseWithMask, Arch> {
-    /// Build an owned `DenseWithMask` Cow from slices.
+    /// Build an owned `DenseWithMask` Cow from slices, bit-packing the mask
+    /// once at this construction boundary.
     #[inline]
     pub fn from_slices(values: &[T], mask: &[bool], nrows: usize, ncols: usize) -> Self {
         Self::Owned(OwnedDenseWithMask::new(
             AlignedVec::from_slice_clone(values),
-            AlignedVec::from_slice(mask),
+            PackedMask::from_bools(mask),
             nrows,
             ncols,
         ))

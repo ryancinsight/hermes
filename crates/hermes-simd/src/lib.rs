@@ -68,7 +68,7 @@ pub use hermes_simd_core::{
         SimdArith, SimdBitwise, SimdCompare, SimdGather, SimdKernel, SimdLoadStore, SimdMask,
         SimdPermute, SimdReduce, SimdStorage,
     },
-    mask::BitMask,
+    mask::{BitMask, PackedMask},
     refresh_numa_node,
     scalar::{CastFrom, CastTo, FloatElement, Scalar as SimdScalar},
     vec::AlignedVec,
