@@ -120,31 +120,17 @@
   AVX-512/AMX under SDE, Miri, docs, dependency policy, lock integrity, and the
   12m30s bounded benchmark gate.
 
-## HS-CI-RUNNER-CLASS-SELECTION-2026-08-27 — Best-effort AVX-512 step skips on incapable runners, letting defects land [patch] — in progress
+## HS-CI-RUNNER-CLASS-SELECTION-2026-08-27 — Compile capability-gated configurations on every runner [patch] — done 2026-08-27 (PR #88, merge 07a88ec)
 
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** none.
-
-- **Evidence:** PR #80's AVX2 interleave intrinsic imports broke `-D warnings`
-  under `--cfg hermes_benchmark_generic_default`, but only on AVX-512-capable
-  hosted runners; main's own run drew an incapable runner, the best-effort
-  step skipped, and the defect landed. Found and fixed forward during
-  `HS-DENSEMASK-BITPACK-2026-08-27` (`923cd7b`; main independently converged
-  at `6b32676`).
-- **Outcome:** compile coverage of runner-capability-gated steps stops
-  depending on runner-class lottery — compile the gated cfg unconditionally
-  (build without running where the ISA is absent), or pin the step to the SDE
-  job that already guarantees the capability.
-- **Acceptance oracle:** a change red under the gated cfg fails CI on every
-  runner class; demonstrated by reintroducing the defect fixed by `6b32676`
-  locally and observing the gate.
-- **Local verification:** the ordinary x86 job now compiles the `permute`
-  benchmark with `hermes_benchmark_generic_default` and `-D warnings` before
-  runtime capability selection. Removing the two import guards fixed by
-  `6b32676` reproduces the escaped defect: the gate rejects both AVX2 f32 and
-  f64 interleave imports as unused. The unchanged tree passes the same command;
-  workflow YAML parses successfully. Hosted verification remains pending.
-- **Risk / change class:** [patch], CI-only.
+- **Outcome:** the ordinary x86 job compiles the generic-default SIMD
+  configuration with warnings denied before any runtime AVX-512 selection.
+- **Evidence:** reintroducing the two import-guard defects fixed by `6b32676`
+  fails the new gate for AVX2 f32 and f64; the corrected tree passes. Hosted
+  run `33121349588` passed the new step on a runner whose AVX-512 benchmark
+  skipped, proving configuration coverage no longer depends on runner class.
+- **Delivery:** provider `8a48825`; PR #88 merged as `07a88ec`. The same hosted
+  run is green across x86, AArch64, Miri, SDE, dependency policy, lock
+  integrity, and bounded benchmarks.
 ## HS-TRANSPOSE-SQUARE-2026-08-27 — In-register square-tile transpose [patch] — done 2026-08-27
 
 - **Delivered:** `transpose_square` on the backend seam and the

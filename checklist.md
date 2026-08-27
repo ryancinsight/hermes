@@ -39,7 +39,7 @@
       runner without executing unsupported instructions.
 - [x] Prove the gate fails when the escaped import defect is reintroduced and
       passes on the corrected tree.
-- [ ] Validate workflow syntax, run the exact local gate, publish, merge, and
+- [x] Validate workflow syntax, run the exact local gate, publish, merge, and
       collect hosted verification.
 
 ## HS-PACKED-MASK-SHAPE-SAFETY-2026-08-27 [patch]
