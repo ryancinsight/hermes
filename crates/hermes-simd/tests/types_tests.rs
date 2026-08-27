@@ -14,6 +14,119 @@
 use hermes_simd::*;
 use hermes_simd_core::scalar::NumericElement;
 
+macro_rules! assert_comparison_masks {
+    ($t:ty, $arch:ident, $lanes:expr, $lhs:ident, $rhs:ident, $nan:expr) => {{
+        let mut comparison_lhs = $lhs;
+        let mut comparison_rhs = $rhs;
+        for lane in 0..$lanes {
+            match lane % 3 {
+                0 => {
+                    comparison_lhs[lane] = -1.0;
+                    comparison_rhs[lane] = 0.0;
+                }
+                1 => {
+                    comparison_lhs[lane] = 0.0;
+                    comparison_rhs[lane] = 0.0;
+                }
+                _ => {
+                    comparison_lhs[lane] = 1.0;
+                    comparison_rhs[lane] = 0.0;
+                }
+            }
+        }
+        // SAFETY: each test buffer contains exactly one vector for `$arch`.
+        let comparison_a = unsafe { Vector::<$t, $arch>::load_unaligned(comparison_lhs.as_ptr()) };
+        // SAFETY: each test buffer contains exactly one vector for `$arch`.
+        let comparison_b = unsafe { Vector::<$t, $arch>::load_unaligned(comparison_rhs.as_ptr()) };
+        let expected_bits = |predicate: fn($t, $t) -> bool| {
+            (0..$lanes).fold(0u64, |bits, lane| {
+                bits | (u64::from(predicate(comparison_lhs[lane], comparison_rhs[lane])) << lane)
+            })
+        };
+
+        assert_eq!(
+            comparison_a.cmp_eq_mask(comparison_b).to_bitmask().0,
+            expected_bits(|lhs, rhs| lhs == rhs),
+            "CmpEq mask failed for {}",
+            stringify!($arch)
+        );
+        assert_eq!(
+            comparison_a.cmp_ne_mask(comparison_b).to_bitmask().0,
+            expected_bits(|lhs, rhs| lhs != rhs),
+            "CmpNe mask failed for {}",
+            stringify!($arch)
+        );
+        assert_eq!(
+            comparison_a.cmp_lt_mask(comparison_b).to_bitmask().0,
+            expected_bits(|lhs, rhs| lhs < rhs),
+            "CmpLt mask failed for {}",
+            stringify!($arch)
+        );
+        assert_eq!(
+            comparison_a.cmp_le_mask(comparison_b).to_bitmask().0,
+            expected_bits(|lhs, rhs| lhs <= rhs),
+            "CmpLe mask failed for {}",
+            stringify!($arch)
+        );
+        assert_eq!(
+            comparison_a.cmp_gt_mask(comparison_b).to_bitmask().0,
+            expected_bits(|lhs, rhs| lhs > rhs),
+            "CmpGt mask failed for {}",
+            stringify!($arch)
+        );
+        assert_eq!(
+            comparison_a.cmp_ge_mask(comparison_b).to_bitmask().0,
+            expected_bits(|lhs, rhs| lhs >= rhs),
+            "CmpGe mask failed for {}",
+            stringify!($arch)
+        );
+
+        let active_bits = if $lanes == 64 {
+            u64::MAX
+        } else {
+            (1u64 << $lanes) - 1
+        };
+        let greater = Vector::<$t, $arch>::splat(1.0);
+        let zero = Vector::<$t, $arch>::splat(0.0);
+        assert_eq!(greater.cmp_eq_mask(zero).to_bitmask().0, 0);
+        assert_eq!(greater.cmp_ne_mask(zero).to_bitmask().0, active_bits);
+        assert_eq!(greater.cmp_lt_mask(zero).to_bitmask().0, 0);
+        assert_eq!(greater.cmp_le_mask(zero).to_bitmask().0, 0);
+        assert_eq!(greater.cmp_gt_mask(zero).to_bitmask().0, active_bits);
+        assert_eq!(greater.cmp_ge_mask(zero).to_bitmask().0, active_bits);
+
+        let mut nan_lhs = comparison_lhs;
+        nan_lhs[0] = $nan;
+        // SAFETY: each test buffer contains exactly one vector for `$arch`.
+        let nan_a = unsafe { Vector::<$t, $arch>::load_unaligned(nan_lhs.as_ptr()) };
+        let lane_zero = 1u64;
+        assert_eq!(
+            nan_a.cmp_eq_mask(comparison_b).to_bitmask().0 & lane_zero,
+            0
+        );
+        assert_eq!(
+            nan_a.cmp_ne_mask(comparison_b).to_bitmask().0 & lane_zero,
+            lane_zero
+        );
+        assert_eq!(
+            nan_a.cmp_lt_mask(comparison_b).to_bitmask().0 & lane_zero,
+            0
+        );
+        assert_eq!(
+            nan_a.cmp_le_mask(comparison_b).to_bitmask().0 & lane_zero,
+            0
+        );
+        assert_eq!(
+            nan_a.cmp_gt_mask(comparison_b).to_bitmask().0 & lane_zero,
+            0
+        );
+        assert_eq!(
+            nan_a.cmp_ge_mask(comparison_b).to_bitmask().0 & lane_zero,
+            0
+        );
+    }};
+}
+
 // Helper macro to run f32 tests for a given architecture
 macro_rules! test_f32_ops_for_arch {
     ($arch:ident, $lanes:expr) => {
@@ -274,6 +387,8 @@ macro_rules! test_f32_ops_for_arch {
                 stringify!($arch)
             );
         }
+
+        assert_comparison_masks!(f32, $arch, $lanes, buf_a, buf_b, f32::NAN);
 
         // 5. Blend
         // Blend true_val and false_val using gt_res as the mask
@@ -558,6 +673,8 @@ macro_rules! test_f64_ops_for_arch {
                 stringify!($arch)
             );
         }
+
+        assert_comparison_masks!(f64, $arch, $lanes, buf_a, buf_b, f64::NAN);
 
         // 5. Blend
         let true_val = Vector::<f64, $arch>::splat(100.0);

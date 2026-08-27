@@ -27,8 +27,16 @@
   API change or allocation.
 - **Risk / change class:** [patch], hot register path; no public contract
   change. **Dependencies:** `HS-DISPATCH-CACHE-THROUGHPUT-2026-08-27` is merged
-  at `99910ad` with its final hosted benchmark-budget check still collecting;
-  this item advances under the depth-one verification pipeline.
+  at `99910ad`; its complete hosted matrix is green.
+- **Evidence / decision:** two unchanged pre-change runs separate the public
+  and direct 95% confidence intervals at 1024 elements: f32 421.09–429.05 ns
+  versus 66.353–67.094 ns, then 423.57–441.54 ns versus 66.666–70.173 ns;
+  f64 167.53–182.82 ns versus 125.37–139.88 ns, then 205.66–239.44 ns versus
+  126.48–140.47 ns. Exact AVX2 disassembly attributes the public deficit to
+  stack storage, lane-wise scalar tests, and mask reconstruction; the direct
+  route is `vcmpeq*` → `vmovmsk*` → `popcnt`. The production path now uses the
+  native backend conversion for all six comparisons.
+
 ## HS-CI-RUNNER-CLASS-SELECTION-2026-08-27 — Best-effort AVX-512 step skips on incapable runners, letting defects land [patch] — todo
 
 - **Evidence:** PR #80's AVX2 interleave intrinsic imports broke `-D warnings`
@@ -110,13 +118,10 @@
   its row passes drop from ~5000 to register-resident cost; re-measured by
   apollo's pinned four-engine probe.
 
-## HS-DISPATCH-CACHE-THROUGHPUT-2026-08-27 — Measure cached dispatch boundary [patch] — in progress
+## HS-DISPATCH-CACHE-THROUGHPUT-2026-08-27 — Measure cached dispatch boundary [patch] — done 2026-08-27 (PR #82, merge 99910ad)
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** Codex — `crates/hermes-simd/benches/lane_throughput.rs`, a new
-  dispatch-boundary leaf under that benchmark, this item, its checklist
-  section, `gap_audit.md`, and affected dispatch documentation or source only
-  if the measurement admits a correction.
+  **Lease:** none.
 - **Outcome:** determine whether Hermes' per-operation runtime feature ladder
   has a stable measurable deficit against Fearless SIMD 0.7's cached `Level`,
   using Archmage 0.9.28 and simd-abstraction 0.7.1 as independent cached-design
