@@ -1,18 +1,22 @@
 # Backlog — hermes-simd
 
-## HS-NATIVE-CAST-THROUGHPUT-2026-08-27 — Remove supported cross-type cast stack round-trip [patch] — in progress
+## HS-NATIVE-CAST-THROUGHPUT-2026-08-27 — Remove supported cross-type cast stack round-trip [minor] — in progress
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** Codex — `crates/hermes-simd/benches/lane_throughput.rs`,
-  `crates/hermes-simd/benches/lane_throughput/cast.rs`, this item and its
-  checklist, and the cast entry in `gap_audit.md`.
+  **Lease:** Codex — `crates/hermes-simd-core/src/kernel/backend.rs`,
+  `crates/hermes-simd-core/src/view/vector_reg.rs`,
+  `crates/hermes-simd-intrinsics/src/x86_64/avx2_f32.rs`,
+  `crates/hermes-simd/benches/lane_throughput{.rs,/cast.rs}`,
+  `crates/hermes-simd/tests/types_tests.rs`, this item and its checklist,
+  `gap_audit.md`, and affected Rustdoc/changelog.
 - **Outcome:** measure the public equal-lane `Vector::cast` path against a
   backend-native conversion and Fearless SIMD 0.7, then eliminate the current
   register-to-stack scalar loop only when repeated measurements and exact code
   generation establish a material deficit and its mechanism.
 - **Scope / non-goals:** start with the supported, native-width `f32` to `i32`
   and `i32` to `f32` conversions under Rust `as` semantics. Preserve the
-  generic public signature and the scalar default for other type pairs. Do not
+  public `Vector::cast` signature and the scalar default for other type pairs.
+  One generic default backend hook may carry the native specialization. Do not
   add a benchmark dependency already rejected by Hermes dependency policy or
   conflate this increment with lane-count-changing conversions.
 - **Acceptance oracle:** an input-sensitive same-binary instrument uses equal
@@ -21,11 +25,18 @@
   runs and exact AVX2 inspection must agree on a repeatable public/direct
   deficit before production changes. Any correction preserves finite,
   boundary, NaN, and infinity cast semantics on every affected backend, adds no
-  allocation or public API, and passes the focused release and workspace gates.
-- **Risk / change class:** [patch], hot register conversion with special-value
-  semantics; no public contract change. **Dependencies:** the comparison-mask
+  allocation, and passes the focused release and workspace gates.
+- **Risk / change class:** [minor], hot register conversion with special-value
+  semantics; one additive default method on the public-but-hidden backend seam,
+  with the consumer-facing API unchanged. **Dependencies:** the comparison-mask
   native-route seam merged in PR #84 (`6efa67b`) supplies the measurement
   pattern only; this item owns a distinct conversion mechanism.
+- **Measurement decision:** in two unchanged AVX2 runs, f32-to-i32 Hermes holds
+  near 2.2 Gelem/s while the precise Fearless route spans 19.0–27.1 Gelem/s.
+  The i32-to-f32 rows are load-sensitive and already compile to `vcvtdq2ps`, so
+  they do not admit a specialization. Exact pre-change assembly identifies the
+  f32-to-i32 cause: eight scalar `vcvttss2si` instructions per register versus
+  one `vcvttps2dq` in the native and Fearless paths.
 
 ## HS-PACKED-MASK-SHAPE-SAFETY-2026-08-27 — Enforce packed-mask and matrix shape bounds [patch] — merged; hosted matrix pending (PR #85, merge 7e342cd)
 

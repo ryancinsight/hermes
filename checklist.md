@@ -1,13 +1,13 @@
 # Checklist — active sprint
 
-## HS-NATIVE-CAST-THROUGHPUT-2026-08-27 [patch]
+## HS-NATIVE-CAST-THROUGHPUT-2026-08-27 [minor]
 
 - [x] Reconcile the public equal-lane cast contract, Eunomia `CastFrom`
       semantics, current stack/scalar mechanism, and native Fearless SIMD 0.7
       conversion surface.
-- [ ] Add an input-sensitive f32/i32 same-binary comparison for public Hermes,
+- [x] Add an input-sensitive f32/i32 same-binary comparison for public Hermes,
       a backend-native route, and precise Fearless SIMD at equal native widths.
-- [ ] Run two unchanged bounded measurements and inspect exact AVX2 code
+- [x] Run two unchanged bounded measurements and inspect exact AVX2 code
       generation; implement only if the deficit and stack mechanism repeat.
 - [ ] Preserve finite, boundary, NaN, and infinity semantics across affected
       backends without changing the public API or allocating.
