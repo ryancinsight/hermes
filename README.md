@@ -143,6 +143,13 @@ Safe one-vector slice wrappers are available on `Vector<T, Arch>` as
 slice length and vector-width alignment before calling the raw
 `SimdLoadStore` load/store primitives.
 
+Those wrappers are checked standalone boundaries, not the loop-throughput
+surface. A `LaneKernel` uses its `Simd<T, A>` capability to construct views and
+iterate exact-width `SimdChunk` values, which carry host support and complete
+lane width without per-item checks. An in-place strided kernel first partitions
+its disjoint mutable ranges with the standard slice APIs, then constructs one
+chunk iterator per range.
+
 Dense target conformance is covered by host-capability tests that force every
 supported `TargetId` and compare sum, dot, elementwise arithmetic, gather, and
 select against the scalar target. Scatter is covered by per-backend property

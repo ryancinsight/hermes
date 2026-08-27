@@ -1,5 +1,22 @@
 # Checklist — active sprint
 
+## HS-CAPABILITY-LOAD-THROUGHPUT-2026-08-27 [minor]
+
+- [x] Reconcile the accepted capability model, the existing checked/view/direct
+      diagnostic, Fearless SIMD 0.7's capability-bound slice load, and current
+      first-party consumer call sites.
+- [x] Add the minimal capability-scoped checked load and backend-generic value,
+      short-input, and unsupported-construction coverage.
+- [x] Extend the existing diagnostic without changing its inputs, timed region,
+      or reference oracle; inspect exact AVX2 codegen before reading timing.
+- [x] Run two bounded same-binary measurements. Reject the API unchanged: it
+      removes support probes but retains five bounds/panic branches and misses
+      the direct/view ceiling for the short-loop regime.
+- [x] Synchronize ADR 017, the README, and gap audit; confirm the changelog is
+      unaffected because no production or benchmark change survives.
+- [x] Run exact-diff formatting and whitespace gates and publish draft PR #77.
+- [ ] Collect hosted verification and merge.
+
 ## HS-FEARLESS-COMPLEX-REG-THROUGHPUT-2026-08-27 [patch]
 
 - [x] Reconcile current main, open PRs, hosted gates, governing ADRs, and the
@@ -13,8 +30,8 @@
       model a non-obvious loop when instruction counts do not settle it.
 - [x] Implement only a stable provider-owned correction, or record why the
       measurement rejects one.
-- [ ] Run exact-diff gates, synchronize documentation, commit, publish, enqueue,
-      collect hosted verification, and close the branch lifecycle.
+- [x] Run exact-diff gates, synchronize documentation, commit, publish, collect
+      the full hosted matrix, and merge PR #76 as `ba32b8c`.
 
 ## HS-FEARLESS-PERMUTE-THROUGHPUT-2026-08-26 [patch]
 

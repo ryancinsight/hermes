@@ -126,6 +126,15 @@ claim. No compatibility alias or forwarding constructor is retained.
 4. **Move the correction into Apollo.** Raw pointers would avoid the checks but
    would reproduce Hermes' safety boundary and leave every other consumer with
    the same cost and alignment defect.
+5. **Add a capability-scoped checked one-register slice load.** A candidate on
+   `Simd<T, A>` removed the repeated host probes, but each call still had to
+   validate the slice. Exact AVX2 code generation retained five hot-loop
+   bounds/panic branches across three inputs and two outputs. Two unchanged
+   timings improved over standalone checked loads but missed the view/direct
+   ceiling at 256 elements, so the candidate failed its predeclared acceptance
+   oracle and was removed. Irregular in-place kernels partition disjoint ranges
+   once, then construct existing views and exact-width chunks; duplicating the
+   standard slice-partitioning proof inside Hermes would add no SIMD contract.
 
 ## Consequences
 
@@ -189,6 +198,13 @@ claim. No compatibility alias or forwarding constructor is retained.
   Both bounded runs have disjoint Hermes-versus-Fearless intervals in Hermes'
   favor. No production correction follows; full intervals and host limits are
   recorded in `gap_audit.md`.
+- A follow-up candidate bound a checked one-register load to `Simd<T, A>` for
+  strided consumers. It removed every host probe and reduced the checked
+  diagnostic by 45%, 33--37%, and 4--16% at 256, 1,024, and 4,096 elements
+  across two runs. The remaining slice checks kept five cold panic edges in the
+  loop, however, and the 256-element confidence interval did not overlap the
+  existing view/direct ceiling in either run. The candidate was removed; the
+  existing view/chunk proof remains the only public throughput boundary.
 - AVX-512 floating bitwise operations use AVX-512F integer-domain bitwise
   instructions around zero-cost casts. The float-typed intrinsics require
   AVX-512DQ and otherwise remained outlined calls inside an AVX-512F kernel.
@@ -207,6 +223,10 @@ claim. No compatibility alias or forwarding constructor is retained.
 
 ## Revisions
 
+- 2026-08-27: Rejected a capability-scoped checked one-register load under
+  `HS-CAPABILITY-LOAD-THROUGHPUT-2026-08-27`. It removed support probes but
+  retained five slice bounds/panic branches and failed the predeclared
+  view/direct ceiling at short sizes; `SimdView`/`SimdChunk` remains canonical.
 - 2026-08-27: Added interleaved `ComplexReg` f32/f64 comparison evidence under
   `HS-FEARLESS-COMPLEX-REG-THROUGHPUT-2026-08-27`; corrected the instrument to
   the capability-bearing chunk boundary and rejected a production correction.
