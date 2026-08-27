@@ -93,10 +93,16 @@ use hermes_simd_macros::runtime_dispatch;
 /// the reason both use it: the backend must be a *type* parameter for
 /// monomorphization, and only a trait method can bind one.
 ///
-/// Implementations should stay small enough to inline. The whole point of the
-/// target-feature scope is that the backend operations fold into the kernel
-/// body, which cannot happen across a call boundary the optimizer declines to
-/// cross.
+/// Mark [`LaneKernel::call`] `#[inline(always)]` on any kernel with a large
+/// body. The whole point of the target-feature scope is that the backend
+/// operations fold into the kernel body, and the body reaches that scope by
+/// inlining into the generated `#[target_feature]` helper. The dispatch
+/// machinery forces its own frames in (`alwaysinline`, honored regardless of
+/// size), but `call` is the consumer's function: a large body under the plain
+/// inline heuristic gets outlined to baseline codegen — zero FMA, an order of
+/// magnitude slow — which small-kernel measurements never show. `pulp`
+/// documents the same requirement on `WithSimd::with_simd` for the same
+/// reason.
 pub trait LaneKernel<T: Scalar> {
     /// What the kernel produces.
     type Output;

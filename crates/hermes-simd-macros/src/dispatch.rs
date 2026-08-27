@@ -329,7 +329,21 @@ pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
     };
 
     // Parse the annotated function
-    let inner_fn: ItemFn = syn::parse2(item)?;
+    let mut inner_fn: ItemFn = syn::parse2(item)?;
+
+    // The generated `#[target_feature]` helper is the only feature-carrying
+    // frame; the annotated function and the consumer's kernel body reach that
+    // scope by inlining into it. A plain `#[inline]` hint is not enough: a
+    // large kernel body (a fully unrolled FFT row pass) makes LLVM decline
+    // the helper -> inner inline, the body codegens in the inner symbol at
+    // baseline -- zero FMA, per-operation feature detection -- and runs an
+    // order of magnitude slow. `#[inline(always)]` maps to LLVM `alwaysinline`,
+    // which is honored regardless of body size, so the body always lands
+    // inside the target-feature frame. (`#[target_feature]` itself cannot be
+    // put on the inner fn: it is also called from the scalar fallback arm.)
+    if !inner_fn.attrs.iter().any(|a| a.path().is_ident("inline")) {
+        inner_fn.attrs.push(syn::parse_quote!(#[inline(always)]));
+    }
     let inner_name = &inner_fn.sig.ident;
     let inner_args = &inner_fn.sig.inputs;
     let inner_ret = &inner_fn.sig.output;
