@@ -1,5 +1,29 @@
 # Backlog — hermes-simd
 
+## HS-FEARLESS-COMPLEX-REG-THROUGHPUT-2026-08-27 — Measure interleaved complex-register parity [patch] — in-progress
+
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+  **Lease:** Codex — `crates/hermes-simd/benches/lane_throughput/{interleaved,comparison}.rs`,
+  this item, its checklist section, `gap_audit.md`, ADR 017, and `CHANGELOG.md`.
+- **Outcome:** compare the new `ComplexReg` f32/f64 interleaved butterfly with
+  the raw Hermes recipe and `fearless_simd` 0.7's best public
+  deinterleave/planar/reinterleave route at identical input/output addresses.
+  Preserve only a production correction supported by repeated timing and exact
+  codegen evidence.
+- **Acceptance:** exact scalar lane-order and fused-rounding oracles pass;
+  Hermes and Fearless use equal native widths and identical scalar workloads;
+  `ComplexReg` adds no instructions over the raw Hermes recipe; bounded
+  Criterion runs report medians and 95% confidence intervals; every stable
+  Hermes deficit is explained and corrected, or rejected with assembly/model
+  evidence; exact workspace gates pass before merge.
+- **Scope / non-goals:** the existing lane-throughput instrument and synchronized
+  evidence only, plus a measured Hermes kernel correction if required. Do not
+  add a second benchmark binary, adopt Fearless, change Apollo transform logic,
+  or add Fearless-only capabilities without a current consumer contract.
+- **Risk / class:** [patch], benchmark-first; production code remains unchanged
+  unless the measurement falsifies the zero-cost/parity hypotheses.
+  **Dependencies:** merged `ComplexReg` PRs 73–74 and Fearless 0.7.0.
+
 ## HS-COMPLEX-REG-2026-08-27 — Interleaved complex register vocabulary [minor] — done 2026-08-27
 
 - **Outcome:** `ComplexReg<T, Arch>` in `hermes-simd-core::view`, re-exported
