@@ -65,12 +65,48 @@
   its row passes drop from ~5000 to register-resident cost; re-measured by
   apollo's pinned four-engine probe.
 
-## HS-PULP-LANE-THROUGHPUT-2026-08-27 — Measure Pulp lane parity [patch] — in review
+## HS-DISPATCH-CACHE-THROUGHPUT-2026-08-27 — Measure cached dispatch boundary [patch] — in progress
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** Codex — `crates/hermes-simd/Cargo.toml`, `Cargo.lock`, the
-  `lane_throughput` comparison and planar modules, this item, its checklist
-  section, `gap_audit.md`, ADR 017, `README.md`, and `CHANGELOG.md`.
+  **Lease:** Codex — `crates/hermes-simd/benches/lane_throughput.rs`, a new
+  dispatch-boundary leaf under that benchmark, this item, its checklist
+  section, `gap_audit.md`, and affected dispatch documentation or source only
+  if the measurement admits a correction.
+- **Outcome:** determine whether Hermes' per-operation runtime feature ladder
+  has a stable measurable deficit against Fearless SIMD 0.7's cached `Level`,
+  using Archmage 0.9.28 and simd-abstraction 0.7.1 as independent cached-design
+  references. Implement only a provider-owned correction identified by timing
+  and exact code generation.
+- **Scope / non-goals:** add an input-sensitive f32/f64 dispatch-only group to
+  the existing bounded instrument. Compare `vectorize`, `Level::new` plus
+  dispatch, caller-reused `Level` plus dispatch, and a direct control without
+  changing existing workloads or retaining another dependency. Do not add a
+  process cache, atomic, or indirect function call before evidence identifies
+  the dispatch ladder as the binding cost.
+- **Acceptance oracle:** each provider returns the black-boxed input and the
+  same native lane count; two unchanged Criterion runs must show a repeatable
+  disjoint 95% confidence interval, and emitted code must identify the exact
+  extra load, branch, or call. A correction survives only if the same
+  instrument removes that mechanism without adding hot-path indirection and
+  all backend/value gates remain green.
+- **Risk / change class:** [patch], measurement-only unless the evidence
+  requires an internal dispatch correction. No public contract change is
+  authorized. **Dependencies:** Pulp parity PR #79 merged as `3c548015`; AVX2
+  interleave PR #80 merged as `2fa126a` and is outside this item's production
+  scope.
+- **Decision:** retain the dispatch-only regression instrument and make no
+  production cache change. Exact release assembly confirms Hermes performs
+  three standard-library cache loads/tests while Fearless dispatches from a
+  cached `Level`, but two unchanged runs do not show a Hermes disadvantage with
+  disjoint 95% confidence intervals for both precisions. The public-entry cost
+  is 0.97–2.17 ns for Hermes and 0.96–2.06 ns for `Level::new` in run one;
+  1.34–1.43 ns and 1.51–1.76 ns respectively in run two. The evidence therefore
+  rejects added atomics or indirect calls under the predeclared oracle.
+
+## HS-PULP-LANE-THROUGHPUT-2026-08-27 — Measure Pulp lane parity [patch] — done 2026-08-27 (PR #79, merge 3c548015)
+
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+  **Lease:** none.
 - **Outcome:** compare Hermes' capability-bearing planar butterfly with Pulp
   0.22.3's runtime-dispatched native-width path at identical input/output
   addresses for f32 and f64. Preserve only a provider-owned correction whose

@@ -105,7 +105,7 @@ they do not own task scheduling or GPU resource lifetimes.
 ## External SIMD Reference Baseline
 
 Hermes tracks external SIMD libraries as coverage references, not as API
-authorities. Three measured or source-audited references are current:
+authorities. Three primary measured or source-audited references are current:
 
 - [`NikoMalik/highway`](https://github.com/NikoMalik/highway) at commit
   `0984271e74db124cf5e200de542e745348eb0b9e` — operation-family and
@@ -135,11 +135,19 @@ so adopting a third-party portable-SIMD substrate would re-fork the dimension
 Hermes exists to own.
 
 The same refresh source-audits
-[`macerator`](https://docs.rs/macerator/0.3.4/macerator/) 0.3.4 but does not add
-a benchmark row: its published manifest has the same `paste = "1"` dependency,
-and its sealed `Simd`/`WithSimd` model does not expose a distinct live consumer
-contract beyond the measured references. [`wide`](https://github.com/Lokathor/wide)
-is excluded from this same-binary runtime-dispatch instrument because its own
+[`macerator`](https://docs.rs/macerator/0.3.4/macerator/) 0.3.4,
+[`archmage`](https://docs.rs/archmage/0.9.28/archmage/) 0.9.28,
+[`simd-abstraction`](https://docs.rs/crate/simd-abstraction/0.7.1/source/) 0.7.1,
+[`simdeez`](https://docs.rs/crate/simdeez/3.0.1) 3.0.1, and
+[`simply_simd`](https://docs.rs/simply-simd/0.1.0/simply_simd/) 0.1.0. Hermes'
+retained dispatch-boundary instrument compares its feature ladder with
+Fearless SIMD's cached `Level`; two unchanged runs expose no repeatable Hermes
+deficit, so no extra atomic or function-pointer cache is added. See the
+[`gap_audit.md` evidence](gap_audit.md#cached-dispatch-2026-08-27).
+The source audit adds no dependency: Macerator and Simdeez carry the same
+`paste` advisory, while the other references have no distinct live consumer
+contract requiring adoption. [`wide`](https://github.com/Lokathor/wide) is
+excluded from this same-binary runtime-dispatch instrument because its own
 documentation requires build-time x86 target features and states that runtime
 feature detection does not work.
 [`std::simd`](https://doc.rust-lang.org/beta/std/simd/) remains a nightly-only

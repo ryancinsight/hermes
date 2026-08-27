@@ -22,8 +22,6 @@ use core::arch::x86_64::{
     _mm_shuffle_ps, _CMP_EQ_OQ, _CMP_GE_OQ, _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ,
     _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT, _MM_FROUND_TO_ZERO,
 };
-// Used only by the native interleave/deinterleave overrides, which the
-// generic-default benchmark cfg compiles out.
 #[cfg(all(
     any(target_arch = "x86", target_arch = "x86_64"),
     not(hermes_benchmark_generic_default)

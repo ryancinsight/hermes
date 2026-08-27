@@ -447,6 +447,10 @@ not selected from recalled crate surfaces:
 | [`fearless_simd` 0.7.0](https://github.com/linebender/fearless_simd/releases/tag/v0.7.0) | Yes | Cached `Level` selection and a safe native-width token; 0.7 adds SSE2, generic widen/narrow, and four-way interleaved I/O | Existing Hermes comparator |
 | [`pulp` 0.22.3](https://docs.rs/pulp/0.22.3/pulp/) | Yes | `Arch::dispatch` invokes one `WithSimd` body over native f32/f64 vectors and exact vector/tail slice splits | Measured in a rejected local experiment; its `paste` dependency fails advisory policy |
 | [`macerator` 0.3.4](https://docs.rs/macerator/0.3.4/macerator/) | Capability-vectorized | Sealed `Simd`, `WithSimd`, generic `Vector`, and per-operation acceleration queries | Source-audited; the same `paste` advisory and no distinct live consumer contract reject another timing row |
+| [`archmage` 0.9.28](https://docs.rs/archmage/0.9.28/archmage/) | Yes | Capability tokens cache availability in per-tier `AtomicU8` values; its source includes a summon-overhead instrument and exhaustive fallback-tier permutation support | Source-audited as an independent cache and fallback-test design; no dependency retained |
+| [`simd-abstraction` 0.7.1](https://docs.rs/crate/simd-abstraction/0.7.1/source/) | Yes | `simd_dispatch!` resolves each operation once and stores its selected function in an `AtomicPtr` | Source-audited; a permanent indirect call is rejected without a measured Hermes deficit |
+| [`simdeez` 3.0.1](https://docs.rs/crate/simdeez/3.0.1) | Yes | Scalar, SSE2, SSE4.1, AVX2, AVX-512, NEON, and WebAssembly SIMD behind one abstract operation trait | Source-audited for target and operation coverage; its exact `paste = 1.0.15` dependency fails advisory policy |
+| [`simply_simd` 0.1.0](https://docs.rs/simply-simd/0.1.0/simply_simd/) | Yes | Macro-generated target dispatch with explicit guidance to enter once outside hot loops and preserve the target-feature frame | Source-audited; Hermes already shares that scope contract through `vectorize` and `#[runtime_dispatch]` |
 | [`wide`](https://github.com/Lokathor/wide) | No | Fixed vector types selected by build-time target features; its documentation states runtime feature detection does not work | Excluded from a portable same-binary comparison |
 | [`std::simd`](https://doc.rust-lang.org/beta/std/simd/) | Not on stable | Portable const-width vectors under the experimental `portable_simd` feature | Excluded by Hermes' stable-toolchain contract |
 
@@ -500,6 +504,46 @@ but removes the Pulp row and dependency, and makes no production-kernel change.
 Timing evidence is limited to AVX2 on this shared Windows Arrow Lake S host;
 AVX-512 received compile and value-semantic coverage only in the removed
 experiment, not retained regression coverage.
+
+### Cached dispatch boundary — 2026-08-27 <a id="cached-dispatch-2026-08-27"></a>
+
+Archmage's per-token atomic cache, simd-abstraction's resolved function pointer,
+and Fearless SIMD 0.7's cached `Level` make Hermes' repeated standard-library
+feature checks a falsifiable performance hypothesis. The retained
+`dispatch_boundary` group at instrument revision `9489556a` compares four equal
+`#[inline(never)]` entry frames for f32 and f64: a direct tuple-return control,
+Hermes `vectorize`, `Level::new` plus Fearless dispatch, and caller-reused
+`Level` plus Fearless dispatch. Every provider returns the black-boxed input
+canary and its selected lane count; the pre-timing assertion requires Hermes and
+Fearless to select the same native width.
+
+The first valid unchanged run reported:
+
+| Precision | Direct control | Hermes | Fearless `Level::new` | Fearless reused `Level` |
+| --- | ---: | ---: | ---: | ---: |
+| f32 | 0.7527 ns [0.7495, 0.7577] | 0.9815 ns [0.9702, 0.9933] | 0.9686 ns [0.9634, 0.9752] | 0.9787 ns [0.9678, 0.9895] |
+| f64 | 0.7515 ns [0.7501, 0.7530] | 1.9766 ns [1.7523, 2.1688] | 1.8583 ns [1.6121, 2.0635] | 1.6619 ns [1.6468, 1.6830] |
+
+The second valid unchanged run reported:
+
+| Precision | Direct control | Hermes | Fearless `Level::new` | Fearless reused `Level` |
+| --- | ---: | ---: | ---: | ---: |
+| f32 | 0.7082 ns [0.7049, 0.7123] | 1.3613 ns [1.3398, 1.3861] | 1.5094 ns [1.5067, 1.5129] | 0.9970 ns [0.9800, 1.0207] |
+| f64 | 0.7249 ns [0.7173, 0.7319] | 1.3854 ns [1.3441, 1.4287] | 1.7404 ns [1.7212, 1.7571] | 1.3053 ns [1.2051, 1.4127] |
+
+Exact release assembly confirms that the instrument retains each boundary.
+The direct control is one move and return. Hermes loads the standard detection
+cache three times and tests AVX-512F, AVX2, and FMA before calling the selected
+target-feature helper. `Level::new` tests the Fearless `LazyLock` state, loads
+the cached level, and dispatches through a jump table; the caller-reused row
+starts at that jump table. The first f32 run overlaps all provider intervals;
+the first f64 run separates Hermes only from reused `Level`. The second run
+separates Hermes from reused `Level` only for f32, while the f64 intervals
+overlap. No Hermes disadvantage is therefore disjoint for both precisions in
+both runs. The audit retains the regression instrument but rejects another
+cache, atomic, or function-pointer indirection. Evidence is AVX2 timing and
+x86-64 release code generation on one shared Windows Arrow Lake S host; hosted
+AArch64 and AVX-512 runs provide compile/value coverage, not timing portability.
 
 Findings:
 - [minor] Consumer target-feature entry. ADR 009 records why a lane kernel must
@@ -1067,8 +1111,11 @@ order (correctness → architecture → tests → docs → PM).
   for out-of-LLC writes (MED); `Aligned` typestate dead at the dispatch facade —
   every op uses unaligned loads and NT stores are blocked on it (LOW-MED);
   uniform `UNROLL_FACTOR=4` under-fills the FMA pipeline for cache-resident
-  reductions (LOW-MED); per-call detection branch chain, no cached dispatch
-  decision (LOW-MED).** Each `[patch]`/`[minor]`, all measurement-gated.
+  reductions (LOW-MED).** The per-call detection-cache hypothesis is resolved:
+  the retained f32/f64 dispatch-boundary instrument exposes the extra feature
+  loads but rejects another cache because no Hermes deficit repeats across two
+  unchanged runs. Remaining entries are `[patch]`/`[minor]` and
+  measurement-gated.
 - **[RESOLVED 2026-07-02] Integer/half emulated-kernel throughput — measured,
   split verdict (host-capability sweep, criterion).** (a) *Integer dense ops*:
   LLVM fully auto-vectorizes the emulated `[i32; 8]` kernels inside the
