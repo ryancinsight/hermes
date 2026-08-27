@@ -998,3 +998,62 @@ fn test_validators_accept_columns_beyond_i32_range() {
         Ok(())
     );
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// elementwise_mul_dense dense-operand guards
+//
+// `SparseView::from_sellp` is safe and `SellPData`/`BlockedCooData` fields are
+// `pub`, so these guards are the only barrier between a malformed descriptor
+// and the unchecked SIMD loads/gathers inside the kernels. The pathological
+// dimension descriptors below use tiny real buffers on purpose: the defect
+// they pin is a *wrapped* dimension product passing a vacuous guard, not a
+// large allocation.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// One-slice SELL-P fixture: `C = 4`, one stored column, 4x4 logical shape.
+fn sellp_unit_fixture() -> ([f32; 4], [i32; 4], [i32; 2], [i32; 1]) {
+    ([1.0f32, 2.0, 3.0, 4.0], [0i32, 1, 2, 3], [0i32, 4], [1i32])
+}
+
+#[test]
+#[should_panic(expected = "SELL-p elementwise_mul_dense: dense len 15 < nrows * ncols = 16")]
+fn test_sellp_elementwise_rejects_short_dense() {
+    let (values, col_indices, slice_ptr, slice_col_count) = sellp_unit_fixture();
+    let data = SellPData::new(&values, &col_indices, &slice_ptr, &slice_col_count, 4, 4);
+    let view = SparseView::<f32, SellP<4>, Scalar>::from_sellp(data);
+    let dense = [1.0f32; 15]; // one element short of nrows * ncols
+    let mut out = [0.0f32; 4];
+    view.elementwise_mul_dense(&dense, &mut out);
+}
+
+#[cfg(target_pointer_width = "64")]
+#[test]
+#[should_panic(expected = "SELL-p elementwise_mul_dense: nrows * ncols overflows usize")]
+fn test_sellp_elementwise_rejects_dimension_product_overflow() {
+    let (values, col_indices, slice_ptr, slice_col_count) = sellp_unit_fixture();
+    // 4 * (2^62 + 1) wraps `usize`: an unchecked guard would compare the dense
+    // length against the wrapped product (4) and pass vacuously.
+    let ncols = (1usize << 62) + 1;
+    let data = SellPData::new(&values, &col_indices, &slice_ptr, &slice_col_count, 4, ncols);
+    let view = SparseView::<f32, SellP<4>, Scalar>::from_sellp(data);
+    let dense = [1.0f32; 4];
+    let mut out = [0.0f32; 4];
+    view.elementwise_mul_dense(&dense, &mut out);
+}
+
+#[cfg(target_pointer_width = "64")]
+#[test]
+#[should_panic(expected = "exceeds i32 gather indices")]
+fn test_sellp_elementwise_rejects_flat_index_beyond_i32() {
+    let (values, col_indices, slice_ptr, slice_col_count) = sellp_unit_fixture();
+    // 1 x (2^32 + 5): the product does not overflow `usize`, but flat element
+    // indices no longer fit the `i32` gather-index lanes, so `as i32`
+    // narrowing would wrap them into arbitrary (possibly negative) offsets.
+    let ncols = (1usize << 32) + 5;
+    let data = SellPData::new(&values, &col_indices, &slice_ptr, &slice_col_count, 1, ncols);
+    let view = SparseView::<f32, SellP<4>, Scalar>::from_sellp(data);
+    let dense = [1.0f32; 4];
+    let mut out = [0.0f32; 4];
+    view.elementwise_mul_dense(&dense, &mut out);
+}
