@@ -179,6 +179,24 @@ impl BackendKernel<f64> for Avx2 {
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx2")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn transpose_square(tile: &mut [Self::Vector]) {
+        debug_assert_eq!(tile.len(), 4, "tile must hold LANE_COUNT rows");
+        // The canonical eight-shuffle 4x4 network: unpacks weave within
+        // 128-bit halves, the cross-half permutes assemble whole columns.
+        let t0 = _mm256_unpacklo_pd(tile[0].0, tile[1].0);
+        let t1 = _mm256_unpackhi_pd(tile[0].0, tile[1].0);
+        let t2 = _mm256_unpacklo_pd(tile[2].0, tile[3].0);
+        let t3 = _mm256_unpackhi_pd(tile[2].0, tile[3].0);
+        tile[0] = Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(t0, t2));
+        tile[1] = Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(t1, t3));
+        tile[2] = Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(t0, t2));
+        tile[3] = Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(t1, t3));
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx2")]
+    #[inline]
     unsafe fn reverse(v: Self::Vector) -> Self::Vector {
         // `vpermpd` with an immediate selector crosses the 128-bit halves, so
         // one instruction expresses the flat reversal. Each 2-bit field of the

@@ -1121,6 +1121,39 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         Self::load_unaligned(buf.as_ptr().cast::<T>())
     }
 
+    /// Transposes a square tile of `LANE_COUNT` vectors in place: lane `c`
+    /// of row `r` moves to lane `r` of row `c` — the natural in-register
+    /// granularity for blocked matrix transposes, where each
+    /// `LANE_COUNT x LANE_COUNT` block loads, transposes in registers, and
+    /// stores without touching memory in between.
+    ///
+    /// Default: scalar emulation through a stack capture of the whole tile
+    /// (the buffer is `MAX_SIMD_LANES` squared because associated consts
+    /// cannot size arrays on stable; overriding backends never pay it).
+    /// x86 backends override with unpack/cross-half permute networks; NEON
+    /// f64 with `trn1`/`trn2`.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature. `tile` must hold
+    /// exactly `LANE_COUNT` vectors.
+    #[inline(always)]
+    unsafe fn transpose_square(tile: &mut [Self::Vector]) {
+        const { Self::LANE_BOUND_CHECK };
+        let lanes = Self::LANE_COUNT;
+        debug_assert_eq!(tile.len(), lanes, "tile must hold LANE_COUNT rows");
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES * MAX_SIMD_LANES];
+        for (r, row) in tile.iter().enumerate() {
+            Self::store_unaligned(buf.as_mut_ptr().cast::<T>().add(r * lanes), *row);
+        }
+        let mut col = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        for (c, row) in tile.iter_mut().enumerate() {
+            for r in 0..lanes {
+                col[r] = buf[r * lanes + c];
+            }
+            *row = Self::load_unaligned(col.as_ptr().cast::<T>());
+        }
+    }
+
     /// Duplicate even lanes into odd lanes: `[a0, a1, a2, a3, ...] -> [a0, a0, a2, a2, ...]`.
     ///
     /// Default: scalar emulation. x86 backends override with `moveldup_ps` /
