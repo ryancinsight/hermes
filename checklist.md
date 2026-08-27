@@ -1,5 +1,21 @@
 # Checklist — active sprint
 
+## HS-NATIVE-COMPARISON-MASK-2026-08-27 [patch]
+
+- [x] Reconcile the recorded stack round-trip, current `Vector`/`Mask` public
+      surface, native backend conversion seam, existing comparison conformance,
+      and Fearless SIMD 0.7 mask route.
+- [ ] Add one generic input-sensitive f32/f64 equality-mask comparison for the
+      current public route, direct backend route, and Fearless SIMD without
+      changing existing benchmark groups.
+- [ ] Run two unchanged bounded measurements and inspect exact code generation;
+      implement only if the current/direct deficit is repeatable and the stack
+      mechanism is visible.
+- [ ] Route all six public comparison-mask methods natively and extend generic
+      backend coverage, including NaN behavior, without changing the API.
+- [ ] Run exact-diff and affected full gates, synchronize evidence, commit,
+      publish, collect hosted verification, merge, and continue.
+
 ## HS-DISPATCH-CACHE-THROUGHPUT-2026-08-27 [patch]
 
 - [x] Reconcile current main, PR #80's disjoint AVX2 interleave change, and the

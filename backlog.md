@@ -1,5 +1,35 @@
 # Backlog — hermes-simd
 
+## HS-NATIVE-COMPARISON-MASK-2026-08-27 — Remove comparison-mask stack round-trip [patch] — in progress
+
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+  **Lease:** Codex — `crates/hermes-simd/benches/lane_throughput.rs`, new
+  `crates/hermes-simd/benches/lane_throughput/comparison_mask.rs`,
+  `crates/hermes-simd-core/src/view/vector_reg.rs`, comparison-mask coverage in
+  `crates/hermes-simd/tests/types_tests.rs`, this item and its checklist,
+  `gap_audit.md`, and the affected changelog/Rustdoc only after measurement
+  admits the correction.
+- **Outcome:** route the six `Vector::cmp_*_mask` methods directly from the
+  backend comparison result through `vector_to_mask`, eliminating the current
+  register-to-stack scalar scan and mask reconstruction when the measured
+  comparison confirms that mechanism is material.
+- **Scope / non-goals:** add one input-sensitive f32/f64 equality-mask group to
+  the existing bounded same-binary instrument. Compare current public Hermes,
+  the direct backend route, and Fearless SIMD 0.7 at equal native widths and
+  exact lane outcomes. Do not change `Vector::to_bitmask` or the separately
+  recorded cross-type `cast` implementation in this increment.
+- **Acceptance oracle:** scalar equality supplies the value oracle; every
+  provider returns the same accumulated mask bits. Two unchanged Criterion
+  runs must show a repeatable current-versus-direct deficit and exact emitted
+  code must identify the stack/scalar mechanism before production changes.
+  The correction must remove that mechanism for all six comparisons, preserve
+  f32/f64 and NaN semantics on every shipped backend, and introduce no public
+  API change or allocation.
+- **Risk / change class:** [patch], hot register path; no public contract
+  change. **Dependencies:** `HS-DISPATCH-CACHE-THROUGHPUT-2026-08-27` is merged
+  at `99910ad` with its final hosted benchmark-budget check still collecting;
+  this item advances under the depth-one verification pipeline.
+
 ## HS-AVX2-INTERLEAVE-OVERRIDES-2026-08-27 — Native AVX2 interleave/deinterleave [patch] — done 2026-08-27
 
 - **Delivered:** AVX2 f64 and f32 `interleave`/`deinterleave` overrides
