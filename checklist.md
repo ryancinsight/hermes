@@ -1,6 +1,19 @@
 # Checklist — active sprint
 
-## HS-CAPABILITY-LOAD-THROUGHPUT-2026-08-27 [minor]
+## HS-PULP-LANE-THROUGHPUT-2026-08-27 [patch]
+
+- [x] Verify the current Pulp, Fearless SIMD, `wide`, Macerator, and
+      `std::simd` capability/dispatch constraints from their authoritative
+      documentation and select only same-binary comparators.
+- [x] Evaluate one generic Pulp row in the unchanged planar f32/f64 instrument,
+      assert native-width and scalar-oracle parity before timing, and remove the
+      row when dependency policy rejects its transitive closure.
+- [x] Run exact AVX2 code generation plus two bounded unchanged measurements;
+      implement only a stable provider-owned correction.
+- [ ] Synchronize the gap audit, README, ADR 017, changelog, and item state;
+      run exact gates, publish, collect hosted verification, and merge.
+
+## HS-CAPABILITY-LOAD-THROUGHPUT-2026-08-27 [patch]
 
 - [x] Reconcile the accepted capability model, the existing checked/view/direct
       diagnostic, Fearless SIMD 0.7's capability-bound slice load, and current

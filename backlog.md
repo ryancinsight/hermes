@@ -34,6 +34,38 @@
   its row passes drop from ~5000 to register-resident cost; re-measured by
   apollo's pinned four-engine probe.
 
+## HS-PULP-LANE-THROUGHPUT-2026-08-27 — Measure Pulp lane parity [patch] — in review
+
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+  **Lease:** Codex — `crates/hermes-simd/Cargo.toml`, `Cargo.lock`, the
+  `lane_throughput` comparison and planar modules, this item, its checklist
+  section, `gap_audit.md`, ADR 017, `README.md`, and `CHANGELOG.md`.
+- **Outcome:** compare Hermes' capability-bearing planar butterfly with Pulp
+  0.22.3's runtime-dispatched native-width path at identical input/output
+  addresses for f32 and f64. Preserve only a provider-owned correction whose
+  repeated timing and exact code generation identify a Hermes deficit.
+- **Scope / non-goals:** one temporary dev-only Pulp baseline in the existing
+  bounded instrument, generic f32/f64 value semantics, two unchanged timing
+  runs, exact AVX2 inspection, and dependency-policy review before retention.
+  Do not add Pulp to production, add a build-time-only `wide` row, admit
+  nightly `std::simd`, or alter benchmark inputs and timing.
+- **Acceptance oracle:** all providers use the same native width and addresses;
+  each output satisfies the existing derived butterfly bound before timing;
+  two bounded runs plus AVX2 inspection either identify one stable Hermes
+  mechanism and correction or record parity without production mutation.
+- **Risk / change class:** [patch], measurement-only unless evidence requires a
+  production correction. A Pulp dependency is retainable only if dependency
+  and benchmark-budget gates remain green. **Dependency:** capability-load
+  evidence merged in PR #77 at `c3d1b676`; this branch rebases onto that merge
+  before publication.
+- **Decision:** record parity but remove the Pulp row and dependency. No Pulp
+  advantage has a disjoint 95% confidence interval in both runs. Exact AVX2
+  hot loops match at six loads, four stores, six fused instructions, one
+  branch, and zero calls or bounds/panic branches; the differing counter
+  spellings are equivalent. Pulp 0.22.3 and Macerator 0.3.4 both require
+  `paste = "1"`, which resolves to unmaintained 1.0.15
+  (RUSTSEC-2024-0436) and fails `cargo deny`.
+
 ## HS-CAPABILITY-LOAD-THROUGHPUT-2026-08-27 — Hoist support probes from strided lane loads [patch] — in review (PR #77)
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
