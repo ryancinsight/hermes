@@ -1,5 +1,42 @@
 # Backlog — hermes-simd
 
+## HS-NATIVE-COMPARISON-MASK-2026-08-27 — Remove comparison-mask stack round-trip [patch] — in progress
+
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+  **Lease:** Codex — `crates/hermes-simd/benches/lane_throughput.rs`, new
+  `crates/hermes-simd/benches/lane_throughput/comparison_mask.rs`,
+  `crates/hermes-simd-core/src/view/vector_reg.rs`, comparison-mask coverage in
+  `crates/hermes-simd/tests/types_tests.rs`, this item and its checklist,
+  `gap_audit.md`, and the affected changelog/Rustdoc only after measurement
+  admits the correction.
+- **Outcome:** route the six `Vector::cmp_*_mask` methods directly from the
+  backend comparison result through `vector_to_mask`, eliminating the current
+  register-to-stack scalar scan and mask reconstruction when the measured
+  comparison confirms that mechanism is material.
+- **Scope / non-goals:** add one input-sensitive f32/f64 equality-mask group to
+  the existing bounded same-binary instrument. Compare current public Hermes,
+  the direct backend route, and Fearless SIMD 0.7 at equal native widths and
+  exact lane outcomes. Do not change `Vector::to_bitmask` or the separately
+  recorded cross-type `cast` implementation in this increment.
+- **Acceptance oracle:** scalar equality supplies the value oracle; every
+  provider returns the same accumulated mask bits. Two unchanged Criterion
+  runs must show a repeatable current-versus-direct deficit and exact emitted
+  code must identify the stack/scalar mechanism before production changes.
+  The correction must remove that mechanism for all six comparisons, preserve
+  f32/f64 and NaN semantics on every shipped backend, and introduce no public
+  API change or allocation.
+- **Risk / change class:** [patch], hot register path; no public contract
+  change. **Dependencies:** `HS-DISPATCH-CACHE-THROUGHPUT-2026-08-27` is merged
+  at `99910ad`; its complete hosted matrix is green.
+- **Evidence / decision:** two unchanged pre-change runs separate the public
+  and direct 95% confidence intervals at 1024 elements: f32 421.09–429.05 ns
+  versus 66.353–67.094 ns, then 423.57–441.54 ns versus 66.666–70.173 ns;
+  f64 167.53–182.82 ns versus 125.37–139.88 ns, then 205.66–239.44 ns versus
+  126.48–140.47 ns. Exact AVX2 disassembly attributes the public deficit to
+  stack storage, lane-wise scalar tests, and mask reconstruction; the direct
+  route is `vcmpeq*` → `vmovmsk*` → `popcnt`. The production path now uses the
+  native backend conversion for all six comparisons.
+
 ## HS-CI-RUNNER-CLASS-SELECTION-2026-08-27 — Best-effort AVX-512 step skips on incapable runners, letting defects land [patch] — todo
 
 - **Evidence:** PR #80's AVX2 interleave intrinsic imports broke `-D warnings`
@@ -60,7 +97,6 @@
   differential oracles); new value-semantic tests cover mask round-trip,
   word-boundary lanes at non-multiple-of-64 lengths, empty, all-set/all-clear,
   and validating-construction rejections; fmt/clippy/nextest/doc gates green.
-
 ## HS-AVX2-INTERLEAVE-OVERRIDES-2026-08-27 — Native AVX2 interleave/deinterleave [patch] — done 2026-08-27
 
 - **Delivered:** AVX2 f64 and f32 `interleave`/`deinterleave` overrides
@@ -95,13 +131,10 @@
   its row passes drop from ~5000 to register-resident cost; re-measured by
   apollo's pinned four-engine probe.
 
-## HS-DISPATCH-CACHE-THROUGHPUT-2026-08-27 — Measure cached dispatch boundary [patch] — in progress
+## HS-DISPATCH-CACHE-THROUGHPUT-2026-08-27 — Measure cached dispatch boundary [patch] — done 2026-08-27 (PR #82, merge 99910ad)
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** Codex — `crates/hermes-simd/benches/lane_throughput.rs`, a new
-  dispatch-boundary leaf under that benchmark, this item, its checklist
-  section, `gap_audit.md`, and affected dispatch documentation or source only
-  if the measurement admits a correction.
+  **Lease:** none.
 - **Outcome:** determine whether Hermes' per-operation runtime feature ladder
   has a stable measurable deficit against Fearless SIMD 0.7's cached `Level`,
   using Archmage 0.9.28 and simd-abstraction 0.7.1 as independent cached-design

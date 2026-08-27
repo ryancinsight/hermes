@@ -1143,8 +1143,13 @@ order (correctness → architecture → tests → docs → PM).
   `mask_from_bitmask` instead of the per-chunk per-call bool-conversion loop.
   Unused `DenseWithMaskBitMaskData` partial variant deleted. PR #81,
   backlog `HS-DENSEMASK-BITPACK-2026-08-27`.
-- **[open] `cmp_*_mask`/`cast` round-trip through stack buffers with
-  64-iter scalar loops (MED)** — route through native backend mask ops.
+- **[RESOLVED 2026-08-27] `cmp_*_mask` stack round-trip.** The six public
+  comparison-mask methods now convert the backend comparison register directly
+  to its native mask. Two unchanged f32/f64 measurements and exact AVX2
+  disassembly identified and then removed the store, lane-wise scalar scan, and
+  mask reconstruction (`HS-NATIVE-COMPARISON-MASK-2026-08-27`). **[open]
+  Cross-type `cast` stack round-trip with a 64-iteration scalar loop (MED)** —
+  requires a measured native conversion design across differing lane counts.
   **argmin/argmax two-pass (LOW-MED)** — bandwidth-bound-only win; a correct
   single-pass needs SIMD index-vector tracking with first-occurrence
   tie-breaking (non-trivial). All `[patch]`/`[minor]`.

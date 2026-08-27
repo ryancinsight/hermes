@@ -6,6 +6,12 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch][HS-NATIVE-COMPARISON-MASK] Route all six `Vector::cmp_*_mask`
+  operations directly through each backend's native vector-to-mask conversion.
+  This removes the prior register-to-stack store, lane-wise scalar scan, and
+  mask reconstruction while preserving the public API and ordered/unordered
+  NaN semantics.
+
 - [minor][HS-TRANSPOSE-SQUARE] Add `transpose_square` — in-register
   `LANE_COUNT x LANE_COUNT` tile transpose on the backend seam, the
   `SimdPermute` facet, and the safe `Vector` surface. AVX2 f64 uses the

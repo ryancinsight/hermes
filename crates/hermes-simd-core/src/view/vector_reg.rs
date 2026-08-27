@@ -586,42 +586,42 @@ where
     #[inline(always)]
     pub fn cmp_eq_mask(self, other: Self) -> Mask<T, Arch> {
         // SAFETY: constructing `self` proved that the host supports `Arch`.
-        unsafe { Mask::from_bitmask(self.cmp_eq(other).to_bitmask()) }
+        Mask::new(unsafe { Arch::vector_to_mask(Arch::cmp_eq(self.raw, other.raw)) })
     }
 
     /// Elementwise not-equal comparison returning a native `Mask`.
     #[inline(always)]
     pub fn cmp_ne_mask(self, other: Self) -> Mask<T, Arch> {
         // SAFETY: constructing `self` proved that the host supports `Arch`.
-        unsafe { Mask::from_bitmask(self.cmp_ne(other).to_bitmask()) }
+        Mask::new(unsafe { Arch::vector_to_mask(Arch::cmp_ne(self.raw, other.raw)) })
     }
 
     /// Elementwise less-than comparison returning a native `Mask`.
     #[inline(always)]
     pub fn cmp_lt_mask(self, other: Self) -> Mask<T, Arch> {
         // SAFETY: constructing `self` proved that the host supports `Arch`.
-        unsafe { Mask::from_bitmask(self.cmp_lt(other).to_bitmask()) }
+        Mask::new(unsafe { Arch::vector_to_mask(Arch::cmp_lt(self.raw, other.raw)) })
     }
 
     /// Elementwise less-than-or-equal comparison returning a native `Mask`.
     #[inline(always)]
     pub fn cmp_le_mask(self, other: Self) -> Mask<T, Arch> {
         // SAFETY: constructing `self` proved that the host supports `Arch`.
-        unsafe { Mask::from_bitmask(self.cmp_le(other).to_bitmask()) }
+        Mask::new(unsafe { Arch::vector_to_mask(Arch::cmp_le(self.raw, other.raw)) })
     }
 
     /// Elementwise greater-than comparison returning a native `Mask`.
     #[inline(always)]
     pub fn cmp_gt_mask(self, other: Self) -> Mask<T, Arch> {
         // SAFETY: constructing `self` proved that the host supports `Arch`.
-        unsafe { Mask::from_bitmask(self.cmp_gt(other).to_bitmask()) }
+        Mask::new(unsafe { Arch::vector_to_mask(Arch::cmp_gt(self.raw, other.raw)) })
     }
 
     /// Elementwise greater-than-or-equal comparison returning a native `Mask`.
     #[inline(always)]
     pub fn cmp_ge_mask(self, other: Self) -> Mask<T, Arch> {
         // SAFETY: constructing `self` proved that the host supports `Arch`.
-        unsafe { Mask::from_bitmask(self.cmp_ge(other).to_bitmask()) }
+        Mask::new(unsafe { Arch::vector_to_mask(Arch::cmp_ge(self.raw, other.raw)) })
     }
 
     /// Cast the vector elements to another scalar type `U` where the lane counts match.

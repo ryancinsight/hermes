@@ -1,5 +1,21 @@
 # Checklist — active sprint
 
+## HS-NATIVE-COMPARISON-MASK-2026-08-27 [patch]
+
+- [x] Reconcile the recorded stack round-trip, current `Vector`/`Mask` public
+      surface, native backend conversion seam, existing comparison conformance,
+      and Fearless SIMD 0.7 mask route.
+- [x] Add one generic input-sensitive f32/f64 equality-mask comparison for the
+      current public route, direct backend route, and Fearless SIMD without
+      changing existing benchmark groups.
+- [x] Run two unchanged bounded measurements and inspect exact code generation;
+      implement only if the current/direct deficit is repeatable and the stack
+      mechanism is visible.
+- [x] Route all six public comparison-mask methods natively and extend generic
+      backend coverage, including NaN behavior, without changing the API.
+- [ ] Run exact-diff and affected full gates, synchronize evidence, commit,
+      publish, collect hosted verification, merge, and continue.
+
 ## HS-DISPATCH-CACHE-THROUGHPUT-2026-08-27 [patch]
 
 - [x] Reconcile current main, PR #80's disjoint AVX2 interleave change, and the
@@ -13,8 +29,8 @@
       feature-cache loads, but neither precision has a repeatable disjoint
       deficit across both runs, so an added atomic or indirect call fails the
       acceptance oracle.
-- [ ] Run exact-diff and affected full gates, synchronize evidence, commit,
-      publish, collect hosted verification, and merge.
+- [x] Run exact-diff and affected full gates, synchronize evidence, commit,
+      publish, collect hosted verification, and merge PR #82 as `99910ad`.
 
 ## HS-PULP-LANE-THROUGHPUT-2026-08-27 [patch]
 
