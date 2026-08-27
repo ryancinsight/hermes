@@ -3,7 +3,7 @@
 ## HS-EXACT-LANE-DISPATCH-2026-08-27 — Dispatch consumer kernels by exact lane count [minor] [arch] — review
 
 - **Integrator:** Codex task `01a0253c-6013-7552-99cc-36bbbcf77f6d`.
-  **Lease:** discharged by the delivery commit.
+  **Lease:** discharged by the AArch64 warning fix commit.
 - **Outcome:** add one const-generic consumer entry that selects the widest
   host-supported backend whose scalar lane count equals the requested count,
   enters that backend's target-feature scope once, and returns `None` without

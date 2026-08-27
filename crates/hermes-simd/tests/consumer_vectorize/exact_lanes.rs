@@ -2,8 +2,10 @@
 
 use core::cell::Cell;
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+use hermes_simd::TargetId;
 use hermes_simd::{
-    vectorize_lanes, LaneKernel, Simd, SimdArch, SimdKernel, SimdScalar, SimdStorage, TargetId,
+    vectorize_lanes, LaneKernel, Simd, SimdArch, SimdKernel, SimdScalar, SimdStorage,
 };
 
 struct SelectionProbe<'a>(&'a Cell<usize>);

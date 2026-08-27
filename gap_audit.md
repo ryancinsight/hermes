@@ -1179,6 +1179,13 @@ order (correctness → architecture → tests → docs → PM).
   attached to this result (`HS-NATIVE-CAST-THROUGHPUT-2026-08-27`).
   Lane-count-changing conversion
   remains outside the current `Vector::cast` contract.
+- **[RESOLVED 2026-08-27] AArch64 all-target warning escape.** PR #86's local
+  AArch64 evidence compiled library targets only, while hosted CI compiled test
+  targets and rejected three host-conditional imports under `-D warnings`. The
+  imports are now scoped to x86 or removed, and both AArch64 Linux and Windows
+  all-target checks reproduce the hosted warning policy. The prevention is to
+  run the hosted all-target command, not a library-only approximation, whenever
+  target-specific test code changes.
 - **argmin/argmax two-pass (LOW-MED)** — bandwidth-bound-only win; a correct
   single-pass needs SIMD index-vector tracking with first-occurrence
   tie-breaking (non-trivial). All `[patch]`/`[minor]`.
