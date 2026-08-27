@@ -149,7 +149,11 @@
   AVX-512/AMX under SDE, Miri, docs, dependency policy, lock integrity, and the
   12m30s bounded benchmark gate.
 
-## HS-CI-RUNNER-CLASS-SELECTION-2026-08-27 — Best-effort AVX-512 step skips on incapable runners, letting defects land [patch] — todo
+## HS-CI-RUNNER-CLASS-SELECTION-2026-08-27 — Best-effort AVX-512 step skips on incapable runners, letting defects land [patch] — in progress
+
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+  **Lease:** `.github/workflows/ci.yml`, this item block, and the matching
+  checklist section through the next verified commit.
 
 - **Evidence:** PR #80's AVX2 interleave intrinsic imports broke `-D warnings`
   under `--cfg hermes_benchmark_generic_default`, but only on AVX-512-capable
