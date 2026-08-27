@@ -168,6 +168,15 @@ impl BackendKernel<f32> for Avx2 {
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx2")]
     #[inline]
+    unsafe fn swap_pairs(v: Self::Vector) -> Self::Vector {
+        // Each 128-bit half holds two f32 pairs; `0b0100_1110` exchanges the
+        // two 64-bit pairs within each half.
+        Avx2F32Vec(_mm256_permute_ps(v.0, 0b0100_1110))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx2")]
+    #[inline]
     unsafe fn reverse(v: Self::Vector) -> Self::Vector {
         // `vpermps` is a full cross-lane permute (unlike `_mm256_permute_ps`,
         // which is per-128-bit-half), so one instruction expresses the flat

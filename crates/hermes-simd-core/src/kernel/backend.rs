@@ -1058,7 +1058,7 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
     // Adjacent-Pair Shuffles & Alternating FMA (interleaved complex support)
     // -------------------------------------------------------------------------
     //
-    // These five methods are the minimal primitive set required to express
+    // These methods are the minimal primitive set required to express
     // interleaved complex arithmetic (`[re, im, re, im, ...]` lane order)
     // entirely in vector registers:
     //
@@ -1086,6 +1086,37 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         while i + 1 < lanes {
             buf.swap(i, i + 1);
             i += 2;
+        }
+        Self::load_unaligned(buf.as_ptr().cast::<T>())
+    }
+
+    /// Swap adjacent lane *pairs*: `[a0, a1, a2, a3, a4, a5, a6, a7]` becomes
+    /// `[a2, a3, a0, a1, a6, a7, a4, a5]`.
+    ///
+    /// On interleaved complex data each pair is one sample, so this exchanges
+    /// neighbouring complex samples — the operand pairing of a
+    /// distance-one butterfly held in registers. A trailing pair with no
+    /// neighbour (`LANE_COUNT` not a multiple of four, NEON f64's two-lane
+    /// register included) passes through unchanged, extending the lone-lane
+    /// convention documented above to pair granularity.
+    ///
+    /// Default: scalar emulation via store/swap/load. x86 backends override
+    /// with `permute`/`shuffle` forms at the 128-bit or 64-bit-pair
+    /// granularity the width dictates.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn swap_pairs(v: Self::Vector) -> Self::Vector {
+        const { Self::LANE_BOUND_CHECK };
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let lanes = Self::LANE_COUNT;
+        Self::store_unaligned(buf.as_mut_ptr().cast::<T>(), v);
+        let mut i = 0usize;
+        while i + 3 < lanes {
+            buf.swap(i, i + 2);
+            buf.swap(i + 1, i + 3);
+            i += 4;
         }
         Self::load_unaligned(buf.as_ptr().cast::<T>())
     }

@@ -39,12 +39,14 @@ pub use chunk::SimdChunk;
 pub use tile::{TileMatrixMultiply, TileView};
 
 /// Module containing the SIMD mask register wrappers.
+pub mod complex_reg;
 pub mod mask_reg;
 /// Module containing operator overload implementations for SIMD vectors.
 pub mod vector_ops;
 /// Module containing the generic SIMD vector register wrappers.
 pub mod vector_reg;
 
+pub use complex_reg::ComplexReg;
 pub use mask_reg::Mask;
 pub use vector_reg::Vector;
 

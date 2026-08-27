@@ -825,6 +825,20 @@ where
         Self::new(unsafe { Arch::swap_adjacent(self.raw) })
     }
 
+    /// Swaps each adjacent lane *pair* with its neighbouring pair:
+    /// `[a, b, c, d]` becomes `[c, d, a, b]`.
+    ///
+    /// On interleaved complex data each pair is one sample, so this exchanges
+    /// neighbouring complex samples — the operand pairing a distance-one
+    /// butterfly needs while held in registers. A trailing pair with no
+    /// neighbour passes through unchanged.
+    #[inline(always)]
+    #[must_use]
+    pub fn swap_pairs(self) -> Self {
+        // SAFETY: constructing `self` proved host support for `Arch`.
+        Self::new(unsafe { Arch::swap_pairs(self.raw) })
+    }
+
     /// Duplicates each even-indexed lane over its odd neighbour:
     /// `[a, b, c, d]` becomes `[a, a, c, c]`.
     ///
