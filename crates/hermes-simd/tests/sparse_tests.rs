@@ -999,7 +999,6 @@ fn test_validators_accept_columns_beyond_i32_range() {
     );
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // elementwise_mul_dense dense-operand guards
 //
@@ -1035,7 +1034,14 @@ fn test_sellp_elementwise_rejects_dimension_product_overflow() {
     // 4 * (2^62 + 1) wraps `usize`: an unchecked guard would compare the dense
     // length against the wrapped product (4) and pass vacuously.
     let ncols = (1usize << 62) + 1;
-    let data = SellPData::new(&values, &col_indices, &slice_ptr, &slice_col_count, 4, ncols);
+    let data = SellPData::new(
+        &values,
+        &col_indices,
+        &slice_ptr,
+        &slice_col_count,
+        4,
+        ncols,
+    );
     let view = SparseView::<f32, SellP<4>, Scalar>::from_sellp(data);
     let dense = [1.0f32; 4];
     let mut out = [0.0f32; 4];
@@ -1051,7 +1057,14 @@ fn test_sellp_elementwise_rejects_flat_index_beyond_i32() {
     // indices no longer fit the `i32` gather-index lanes, so `as i32`
     // narrowing would wrap them into arbitrary (possibly negative) offsets.
     let ncols = (1usize << 32) + 5;
-    let data = SellPData::new(&values, &col_indices, &slice_ptr, &slice_col_count, 1, ncols);
+    let data = SellPData::new(
+        &values,
+        &col_indices,
+        &slice_ptr,
+        &slice_col_count,
+        1,
+        ncols,
+    );
     let view = SparseView::<f32, SellP<4>, Scalar>::from_sellp(data);
     let dense = [1.0f32; 4];
     let mut out = [0.0f32; 4];
@@ -1069,8 +1082,7 @@ fn test_blocked_coo_elementwise_rejects_dimension_product_overflow() {
     // unchecked guard would then accept any dense buffer and the per-block
     // extent checks would pass against the huge (unwrapped) dimensions.
     let huge = 1usize << 32;
-    let data =
-        BlockedCooData::<f32, 2, 2>::new(&block, &block_row, &block_col, 1, huge, huge);
+    let data = BlockedCooData::<f32, 2, 2>::new(&block, &block_row, &block_col, 1, huge, huge);
     let view = SparseView::<f32, BlockedCoo<2, 2>, Scalar>::from_blocked_coo(data);
     let dense = [1.0f32; 4];
     let mut out = [0.0f32; 4];
@@ -1085,17 +1097,10 @@ fn test_blocked_coo_validate_rejects_block_count_overflow() {
     let block = [1.0f32; 4];
     let block_row = [0i32];
     let block_col = [0i32];
-    let data = BlockedCooData::<f32, 2, 2>::new(
-        &block,
-        &block_row,
-        &block_col,
-        usize::MAX / 2,
-        4,
-        4,
-    );
+    let data =
+        BlockedCooData::<f32, 2, 2>::new(&block, &block_row, &block_col, usize::MAX / 2, 4, 4);
     assert_eq!(
         hermes_simd_core::sparse::types::SparseValidate::validate(&data),
         Err(SimdError::LengthMismatch)
     );
 }
-

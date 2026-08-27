@@ -569,14 +569,14 @@ fn check_blend_honors_canonical_mask<A: SimdKernel<f32>>(bm: u64) {
 /// bit-splicing the raw mask, as NEON `vbsl` would) diverges from the
 /// documented sign-bit selection.
 const NON_CANONICAL_MASK_PATTERNS: [f32; 8] = [
-    2.0,                          // nonzero, sign clear → inactive
-    -0.0,                         // zero, sign set → active
-    0.0,                          // zero, sign clear → inactive
-    f32::from_bits(0x7fc0_0000),  // positive NaN → inactive
-    f32::from_bits(0xffc0_0000),  // negative NaN → active
-    -3.5,                         // ordinary negative (not all-ones) → active
-    f32::from_bits(!0),           // canonical ALL_ONES → active
-    f32::from_bits(0x0000_0001),  // positive subnormal → inactive
+    2.0,                         // nonzero, sign clear → inactive
+    -0.0,                        // zero, sign set → active
+    0.0,                         // zero, sign clear → inactive
+    f32::from_bits(0x7fc0_0000), // positive NaN → inactive
+    f32::from_bits(0xffc0_0000), // negative NaN → active
+    -3.5,                        // ordinary negative (not all-ones) → active
+    f32::from_bits(!0),          // canonical ALL_ONES → active
+    f32::from_bits(0x0000_0001), // positive subnormal → inactive
 ];
 
 /// `blend` must select by the mask lane's *sign bit* alone — the documented
@@ -608,7 +608,8 @@ fn check_blend_sign_bit_semantics<A: SimdKernel<f32>>() {
             false_vals[i]
         };
         assert_eq!(
-            got, want,
+            got,
+            want,
             "blend lane {i} must select by sign bit (mask {:#010x})",
             mask_vals[i].to_bits()
         );
