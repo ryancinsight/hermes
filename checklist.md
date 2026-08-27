@@ -5,7 +5,7 @@
 - [x] Reconcile current main, PR #80's disjoint AVX2 interleave change, and the
       current Fearless SIMD, Archmage, simd-abstraction, Simdeez, and
       simply_simd dispatch/cache designs from authoritative sources.
-- [ ] Add one input-sensitive f32/f64 dispatch-only group without changing any
+- [x] Add one input-sensitive f32/f64 dispatch-only group without changing any
       established workload, timed region, or dependency.
 - [ ] Assert equal selected lane counts, then run two unchanged bounded
       Criterion measurements and inspect exact emitted dispatch code.
