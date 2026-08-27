@@ -1,5 +1,17 @@
 # Backlog — hermes-simd
 
+## HS-AVX2-INTERLEAVE-OVERRIDES-2026-08-27 — Native AVX2 interleave/deinterleave [patch] — done 2026-08-27
+
+- **Delivered:** AVX2 f64 and f32 `interleave`/`deinterleave` overrides
+  (unpack + cross-half permute networks, 4 shuffles per pair). Both ops
+  previously fell to the portable stack-bounce default on AVX2 — correct but
+  store-forward-stall-bound, which poisons planar<->interleaved boundary
+  networks in register-resident consumers (apollo's planar FFT rows, the
+  driving item). Verified by the existing per-arch flat-sequence conformance
+  oracles and round-trip property tests; `hermes_benchmark_generic_default`
+  cfg preserved for instrument comparisons. Integrator: Claude session
+  d791281c.
+
 ## HS-VECTORIZE-LARGE-KERNEL-2026-08-28 — Large kernel bodies fall out of the target-feature frame [patch] — fixed 2026-08-28
 
 - **Integrator:** Claude session d791281c. **Defect (asm-evidenced from
