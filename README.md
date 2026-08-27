@@ -105,7 +105,7 @@ they do not own task scheduling or GPU resource lifetimes.
 ## External SIMD Reference Baseline
 
 Hermes tracks external SIMD libraries as coverage references, not as API
-authorities. Two audits are current:
+authorities. Three measured or source-audited references are current:
 
 - [`NikoMalik/highway`](https://github.com/NikoMalik/highway) at commit
   `0984271e74db124cf5e200de542e745348eb0b9e` — operation-family and
@@ -119,10 +119,31 @@ authorities. Two audits are current:
   `#![forbid(unsafe_code)]` FFT library built entirely on that model and tracked
   as an Apollo transform comparison. Findings live in
   [`gap_audit.md`](gap_audit.md#fearless-simd-2026-08-25).
+- [`sarah-quinones/pulp`](https://github.com/sarah-quinones/pulp) 0.22.3 — a
+  second stable, runtime-dispatched capability model. A temporary
+  lane-throughput experiment compared its `Arch::dispatch`/`WithSimd` path
+  with Hermes and Fearless SIMD for the same f32/f64 planar butterfly, native
+  width, and input/output addresses. The row is not retained because Pulp's
+  published and upstream manifests require `paste = "1"`, which resolves to
+  unmaintained 1.0.15
+  ([RUSTSEC-2024-0436](https://rustsec.org/advisories/RUSTSEC-2024-0436)).
+  Findings live in
+  [`gap_audit.md`](gap_audit.md#stable-rust-simd-2026-08-27).
 
-Neither library is a dependency. Hermes owns CPU lane kernels and ISA dispatch
-for Atlas, so adopting a third-party portable-SIMD substrate would re-fork the
-dimension Hermes exists to own; both are read as design and coverage references.
+None is a dependency. Hermes owns CPU lane kernels and ISA dispatch for Atlas,
+so adopting a third-party portable-SIMD substrate would re-fork the dimension
+Hermes exists to own.
+
+The same refresh source-audits
+[`macerator`](https://docs.rs/macerator/0.3.4/macerator/) 0.3.4 but does not add
+a benchmark row: its published manifest has the same `paste = "1"` dependency,
+and its sealed `Simd`/`WithSimd` model does not expose a distinct live consumer
+contract beyond the measured references. [`wide`](https://github.com/Lokathor/wide)
+is excluded from this same-binary runtime-dispatch instrument because its own
+documentation requires build-time x86 target features and states that runtime
+feature detection does not work.
+[`std::simd`](https://doc.rust-lang.org/beta/std/simd/) remains a nightly-only
+experimental API, outside Hermes' stable-toolchain contract.
 
 Actionable gaps from the Highway audit are Hermes-native: target-token forced
 dispatch for tests/benchmarks, safe one-vector slice wrappers over raw

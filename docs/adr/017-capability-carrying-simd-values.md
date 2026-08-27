@@ -180,6 +180,16 @@ claim. No compatibility alias or forwarding constructor is retained.
   instructions, one loop branch, and no calls or bounds branches. Timings are
   compared only within one run; affinity experiments on the shared hybrid-core
   host widened variance and are not retained as evidence.
+- Pulp 0.22.3 supplies a second stable runtime-dispatch reference through
+  `Arch::dispatch` and `WithSimd`. A temporary planar experiment ran the same
+  generic f32/f64 butterfly through all three providers at equal native width
+  and identical addresses. No Pulp advantage has a disjoint 95% confidence
+  interval in both runs; exact AVX2 hot loops have the same six loads, four
+  stores, six fused arithmetic instructions, one branch, and no calls or
+  bounds branches. Pulp 0.22.3 and Macerator 0.3.4 both require `paste = "1"`,
+  which resolves to unmaintained 1.0.15 (RUSTSEC-2024-0436), so the
+  dependency-policy gate rejects a retained row. The evidence does not change
+  the accepted Hermes capability contract or any production kernel.
 - The same-address cross-lane instrument covers native f32/f64 interleave and
   deinterleave. Two unchanged runs moved absolute medians by 15--55% and changed
   or converged candidate ordering, so they do not establish a stable speed
@@ -223,6 +233,10 @@ claim. No compatibility alias or forwarding constructor is retained.
 
 ## Revisions
 
+- 2026-08-27: Evaluated and removed a Pulp 0.22.3 same-address f32/f64
+  comparison under `HS-PULP-LANE-THROUGHPUT-2026-08-27`. Repeated timing and
+  exact AVX2 code generation establish parity; RUSTSEC-2024-0436 rejects its
+  dependency closure, so no comparator or production change remains.
 - 2026-08-27: Rejected a capability-scoped checked one-register load under
   `HS-CAPABILITY-LOAD-THROUGHPUT-2026-08-27`. It removed support probes but
   retained five slice bounds/panic branches and failed the predeclared

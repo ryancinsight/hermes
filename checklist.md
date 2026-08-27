@@ -2,12 +2,13 @@
 
 ## HS-PULP-LANE-THROUGHPUT-2026-08-27 [patch]
 
-- [ ] Verify the current Pulp, Fearless SIMD, `wide`, Macerator, and
+- [x] Verify the current Pulp, Fearless SIMD, `wide`, Macerator, and
       `std::simd` capability/dispatch constraints from their authoritative
       documentation and select only same-binary comparators.
-- [ ] Add one generic Pulp row to the unchanged planar f32/f64 instrument and
-      assert native-width and scalar-oracle parity before timing.
-- [ ] Run exact AVX2 code generation plus two bounded unchanged measurements;
+- [x] Evaluate one generic Pulp row in the unchanged planar f32/f64 instrument,
+      assert native-width and scalar-oracle parity before timing, and remove the
+      row when dependency policy rejects its transitive closure.
+- [x] Run exact AVX2 code generation plus two bounded unchanged measurements;
       implement only a stable provider-owned correction.
 - [ ] Synchronize the gap audit, README, ADR 017, changelog, and item state;
       run exact gates, publish, collect hosted verification, and merge.
