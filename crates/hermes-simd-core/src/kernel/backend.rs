@@ -486,7 +486,14 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
 
     /// Convert a raw `u64` bitmask to the architecture-native mask type.
     ///
-    /// Default: expands to a boolean array then calls `mask_from_bools`.
+    /// Bits at and above `LANE_COUNT` are ignored. Default: expands to a
+    /// boolean array then calls `mask_from_bools` — the natural form for the
+    /// `[bool; N]`-masked emulated backends. Native-mask backends override
+    /// register-only: AVX-512 truncates the bitmask into the k-register
+    /// directly (the mask type *is* the bitmask), AVX2 broadcasts and
+    /// compare-equals against per-lane bit constants, and NEON `vtst`s
+    /// against a lane-bit table — the bit-packed sparse kernels call this
+    /// once per vector, so the expansion is on their hot path.
     ///
     /// # Safety
     /// Processor must support the required target feature.
@@ -1149,11 +1156,13 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
     /// `LANE_COUNT x LANE_COUNT` block loads, transposes in registers, and
     /// stores without touching memory in between.
     ///
-    /// Default: scalar emulation through a stack capture of the whole tile
-    /// (the buffer is `MAX_SIMD_LANES` squared because associated consts
-    /// cannot size arrays on stable; overriding backends never pay it).
-    /// x86 backends override with unpack/cross-half permute networks; NEON
-    /// f64 with `trn1`/`trn2`.
+    /// Default: scalar emulation via symmetric pair swaps staged through two
+    /// row buffers (`MAX_SIMD_LANES` elements each because associated consts
+    /// cannot size arrays on stable — never a `MAX_SIMD_LANES`-squared frame,
+    /// which reserved 16–32 KiB of stack for tiles that are at most
+    /// `LANE_COUNT`²; overriding backends never pay it). x86 backends
+    /// override with unpack/cross-half permute networks; NEON f64 with
+    /// `trn1`/`trn2`.
     ///
     /// # Safety
     /// Processor must support the required target feature. `tile` must hold
@@ -1163,16 +1172,21 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         const { Self::LANE_BOUND_CHECK };
         let lanes = Self::LANE_COUNT;
         debug_assert_eq!(tile.len(), lanes, "tile must hold LANE_COUNT rows");
-        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES * MAX_SIMD_LANES];
-        for (r, row) in tile.iter().enumerate() {
-            Self::store_unaligned(buf.as_mut_ptr().cast::<T>().add(r * lanes), *row);
-        }
-        let mut col = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        for (c, row) in tile.iter_mut().enumerate() {
-            for r in 0..lanes {
-                col[r] = buf[r * lanes + c];
+        // In-place transpose: each symmetric pair (r, c) / (c, r) with r < c
+        // swaps exactly once, staged through per-row lane buffers; diagonal
+        // elements stay in place. `store_unaligned` initializes lanes
+        // `0..lanes` of each buffer before any is read, and only those lanes
+        // are accessed.
+        let mut row_r = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let mut row_c = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        for r in 0..lanes {
+            Self::store_unaligned(row_r.as_mut_ptr().cast::<T>(), tile[r]);
+            for c in (r + 1)..lanes {
+                Self::store_unaligned(row_c.as_mut_ptr().cast::<T>(), tile[c]);
+                core::mem::swap(&mut row_r[c], &mut row_c[r]);
+                tile[c] = Self::load_unaligned(row_c.as_ptr().cast::<T>());
             }
-            *row = Self::load_unaligned(col.as_ptr().cast::<T>());
+            tile[r] = Self::load_unaligned(row_r.as_ptr().cast::<T>());
         }
     }
 

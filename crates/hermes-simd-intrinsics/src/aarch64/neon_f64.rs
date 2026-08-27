@@ -22,7 +22,11 @@ unsafe impl Sync for NeonF64Vec {}
 
 /// NEON f64 mask: `uint64x2_t` used as a bitwise select mask.
 ///
-/// Lane `i` is active when `mask[i] == 0xFFFF_FFFF_FFFF_FFFF`.
+/// Lane `i` is active iff bit 63 of `mask[i]` is set — the sign-bit
+/// convention shared with `mask_to_bitmask`. Every constructor
+/// (`mask_from_bools`, `leading_k_mask`, `vector_to_mask`) produces canonical
+/// all-ones/all-zero lanes, which is what the bitwise `vbslq_f64` merges rely
+/// on.
 #[cfg(target_arch = "aarch64")]
 #[repr(transparent)]
 #[derive(Copy, Clone)]
@@ -32,6 +36,19 @@ pub struct NeonF64Mask(pub uint64x2_t);
 unsafe impl Send for NeonF64Mask {}
 #[cfg(target_arch = "aarch64")]
 unsafe impl Sync for NeonF64Mask {}
+
+/// Per-lane active flags keyed on bit 63, the mask-active criterion every
+/// other consumer (`mask_to_bitmask` included) uses — a plain nonzero test
+/// would diverge on a non-canonical mask built through the `pub` field.
+#[cfg(target_arch = "aarch64")]
+#[target_feature(enable = "neon")]
+#[inline]
+fn lane_actives(mask: uint64x2_t) -> [bool; 2] {
+    [
+        vgetq_lane_u64::<0>(mask) >> 63 == 1,
+        vgetq_lane_u64::<1>(mask) >> 63 == 1,
+    ]
+}
 
 #[cfg(target_arch = "aarch64")]
 impl BackendKernel<f64> for Neon {
@@ -389,11 +406,12 @@ impl BackendKernel<f64> for Neon {
         true_val: Self::Vector,
         false_val: Self::Vector,
     ) -> Self::Vector {
-        NeonF64Vec(vbslq_f64(
-            vreinterpretq_u64_f64(mask.0),
-            true_val.0,
-            false_val.0,
-        ))
+        // Selection is on the mask lane's sign bit, but `vbsl` is a *bitwise*
+        // select that would splice the operands bit-by-bit on a non-canonical
+        // mask. Broadcast each lane's sign across the lane first (arithmetic
+        // shift right by 63), so `vbsl` sees all-ones or all-zeros per lane.
+        let sign = vreinterpretq_u64_s64(vshrq_n_s64::<63>(vreinterpretq_s64_f64(mask.0)));
+        NeonF64Vec(vbslq_f64(sign, true_val.0, false_val.0))
     }
 
     // -----------------------------------------------------------------------
@@ -477,10 +495,7 @@ impl BackendKernel<f64> for Neon {
     unsafe fn compress(src: Self::Vector, mask: Self::Mask) -> Self::Vector {
         let mut arr = [0.0f64; 2];
         vst1q_f64(arr.as_mut_ptr(), src.0);
-        let m = [
-            vgetq_lane_u64(mask.0, 0) != 0,
-            vgetq_lane_u64(mask.0, 1) != 0,
-        ];
+        let m = lane_actives(mask.0);
         let mut out = [0.0f64; 2];
         let mut k = 0usize;
         for i in 0..2 {
@@ -500,10 +515,7 @@ impl BackendKernel<f64> for Neon {
         vst1q_f64(src_arr.as_mut_ptr(), src.0);
         let mut out_arr = [0.0f64; 2];
         vst1q_f64(out_arr.as_mut_ptr(), fill.0);
-        let m = [
-            vgetq_lane_u64(mask.0, 0) != 0,
-            vgetq_lane_u64(mask.0, 1) != 0,
-        ];
+        let m = lane_actives(mask.0);
         let mut k = 0usize;
         for i in 0..2 {
             if m[i] {
@@ -540,10 +552,7 @@ impl BackendKernel<f64> for Neon {
     ) -> Self::Vector {
         let mut src_arr = [0.0f64; 2];
         vst1q_f64(src_arr.as_mut_ptr(), src.0);
-        let m = [
-            vgetq_lane_u64(mask.0, 0) != 0,
-            vgetq_lane_u64(mask.0, 1) != 0,
-        ];
+        let m = lane_actives(mask.0);
         let out = [
             if m[0] {
                 *base.add(indices[0] as usize)
@@ -581,6 +590,19 @@ impl BackendKernel<f64> for Neon {
     unsafe fn leading_k_mask(k: usize) -> Self::Mask {
         let vals: [u64; 2] = [if k > 0 { !0u64 } else { 0 }, if k > 1 { !0u64 } else { 0 }];
         NeonF64Mask(vld1q_u64(vals.as_ptr()))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); the only memory operand is the constant lane-bit table.
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn mask_from_bitmask(bm: u64) -> Self::Mask {
+        // `vtst` sets a lane to all-ones where `(bits & lane_bit) != 0` —
+        // canonical expansion in one test instruction, replacing the generic
+        // bool-array bounce (bits 2.. are ignored because only bits 0..2
+        // appear in the table).
+        let lane_bits: [u64; 2] = [1, 2];
+        let bits = vdupq_n_u64(bm);
+        NeonF64Mask(vtstq_u64(bits, vld1q_u64(lane_bits.as_ptr())))
     }
 
     // -----------------------------------------------------------------------
@@ -622,8 +644,14 @@ impl BackendKernel<f64> for Neon {
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn vector_to_mask(v: Self::Vector) -> Self::Mask {
-        // Bit-preserving reinterpretation, so lane sign bits survive into the
-        // `vgetq_lane_u64::<_>(..) >> 63` extraction performed by `mask_to_bitmask`.
-        NeonF64Mask(vreinterpretq_u64_f64(v.0))
+        // Canonicalize on entry: broadcast each lane's sign bit (the documented
+        // active criterion) across the lane with an arithmetic shift right by
+        // 63, so every `Mask` consumer — the bitwise `vbsl` merges included —
+        // sees all-ones or all-zeros per lane regardless of the mask vector's
+        // remaining bits. A bare reinterpretation kept non-canonical bits and
+        // let `vbsl`-based masked ops splice operands bit-by-bit.
+        NeonF64Mask(vreinterpretq_u64_s64(vshrq_n_s64::<63>(
+            vreinterpretq_s64_f64(v.0),
+        )))
     }
 }

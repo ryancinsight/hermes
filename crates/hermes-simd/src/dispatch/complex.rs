@@ -25,6 +25,25 @@ use hermes_simd_macros::runtime_dispatch;
 
 const MAX_STACK_LANES: usize = 128;
 
+/// Exact negation for any [`Scalar`]: sign-bit flip for float-family types
+/// (IEEE negation — `ZERO - x` would lose the sign of `+0.0`), arithmetic
+/// negation for integer types (where the sign-bit flip is not negation).
+/// `T::NAN.is_nan()` is a per-monomorphization constant (integer `NAN` is 0),
+/// so the branch folds at compile time.
+#[inline]
+fn exact_neg<T: Scalar>(x: T) -> T {
+    if T::NAN.is_nan() {
+        x.bitxor(T::SIGN_MASK)
+    } else {
+        T::ZERO - x
+    }
+}
+
+/// Scalar-tail complex product mirroring [`complex_mul_vector`]'s evaluation
+/// shape exactly — the cross product rounds once, then one fused
+/// multiply-add with an exactly negated addend — so the tail is bit-identical
+/// to the vector region and backends with different lane counts agree
+/// bitwise on every element.
 #[inline]
 fn mul_pair<T, const CONJ_B: bool>(ar: T, ai: T, br: T, bi: T) -> (T, T)
 where
@@ -32,10 +51,16 @@ where
 {
     if CONJ_B {
         // a * conj(b): (ar+i·ai)(br-i·bi) = (ar·br + ai·bi) + i·(ai·br - ar·bi)
-        (ar * br + ai * bi, ai * br - ar * bi)
+        (
+            ai.scalar_fmadd(bi, ar * br),
+            ai.scalar_fmadd(br, exact_neg(ar * bi)),
+        )
     } else {
         // a * b: (ar+i·ai)(br+i·bi) = (ar·br - ai·bi) + i·(ar·bi + ai·br)
-        (ar * br - ai * bi, ar * bi + ai * br)
+        (
+            ar.scalar_fmadd(br, exact_neg(ai * bi)),
+            ar.scalar_fmadd(bi, ai * br),
+        )
     }
 }
 

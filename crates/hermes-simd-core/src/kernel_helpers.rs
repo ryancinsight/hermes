@@ -191,6 +191,10 @@ where
     Arch::load_unaligned(buf.as_ptr().cast::<T>())
 }
 
+/// Scalar lane-by-lane blend default: lane `i` takes `true_val` exactly when
+/// the sign bit of `mask` lane `i` is set, matching the
+/// [`BackendKernel::blend`] contract and the hardware sign-bit selects
+/// (`vblendvps` and friends) the native backends dispatch to.
 #[inline(always)]
 pub unsafe fn generic_blend<T, Arch>(
     mask: Arch::Vector,
@@ -210,7 +214,10 @@ where
     Arch::store_unaligned(buf_false.as_mut_ptr().cast::<T>(), false_val);
     for i in 0..Arch::LANE_COUNT {
         let mask_val = buf_mask[i].assume_init();
-        let is_true = mask_val.is_nan() || mask_val.to_f64() != 0.0;
+        // Selection is on the lane's sign bit, tested bit-level: a
+        // nonzero-or-NaN test would diverge from the hardware sign-bit
+        // selects on non-canonical masks (`+2.0` active, `-0.0` inactive).
+        let is_true = mask_val.bitand(T::SIGN_MASK).count_ones() != 0;
         let val = if is_true {
             buf_true[i].assume_init()
         } else {
@@ -244,6 +251,11 @@ where
 /// Even lanes compute `a*b - c` and odd lanes `a*b + c` when `ADD_EVEN == false`
 /// (`fmaddsub` semantics); the signs flip per lane parity when `ADD_EVEN == true`
 /// (`fmsubadd` semantics).
+///
+/// Each lane is genuinely fused — one rounding via [`Scalar::scalar_fmadd`]
+/// on the exactly negated addend (`Arch::neg`), matching the hardware
+/// `vfmaddsub` sequences and the scalar `fmadd`/`fmsub` defaults. A separate
+/// multiply-then-add would round twice and diverge from the fused backends.
 #[inline(always)]
 pub unsafe fn generic_alternating_fma<T, Arch, const ADD_EVEN: bool>(
     a: Arch::Vector,
@@ -258,16 +270,24 @@ where
     let mut buf_a = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
     let mut buf_b = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
     let mut buf_c = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+    let mut buf_neg_c = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
     Arch::store_unaligned(buf_a.as_mut_ptr().cast::<T>(), a);
     Arch::store_unaligned(buf_b.as_mut_ptr().cast::<T>(), b);
     Arch::store_unaligned(buf_c.as_mut_ptr().cast::<T>(), c);
+    // The backend's own negation is exact per element type (sign-bit flip for
+    // floats, true negation on integer-bearing backends), unlike `ZERO - c`,
+    // which loses the sign of a `+0.0` addend.
+    Arch::store_unaligned(buf_neg_c.as_mut_ptr().cast::<T>(), Arch::neg(c));
     for i in 0..Arch::LANE_COUNT {
         let val_a = buf_a[i].assume_init();
         let val_b = buf_b[i].assume_init();
-        let val_c = buf_c[i].assume_init();
-        let prod = val_a * val_b;
         let add = (i & 1 == 1) ^ ADD_EVEN;
-        buf_a[i].write(if add { prod + val_c } else { prod - val_c });
+        let addend = if add {
+            buf_c[i].assume_init()
+        } else {
+            buf_neg_c[i].assume_init()
+        };
+        buf_a[i].write(val_a.scalar_fmadd(val_b, addend));
     }
     Arch::load_unaligned(buf_a.as_ptr().cast::<T>())
 }

@@ -22,8 +22,11 @@ unsafe impl Sync for NeonF32Vec {}
 
 /// NEON f32 mask: `uint32x4_t` used as a bitwise select mask.
 ///
-/// Lane `i` is active when `mask[i] == 0xFFFF_FFFF`. This matches the
-/// `vbslq_f32` convention (true lane selects from the first argument).
+/// Lane `i` is active iff bit 31 of `mask[i]` is set — the sign-bit
+/// convention shared with `mask_to_bitmask`. Every constructor
+/// (`mask_from_bools`, `leading_k_mask`, `vector_to_mask`) produces canonical
+/// all-ones/all-zero lanes, which is what the bitwise `vbslq_f32` merges rely
+/// on (true lane selects from the first argument).
 #[cfg(target_arch = "aarch64")]
 #[repr(transparent)]
 #[derive(Copy, Clone)]
@@ -33,6 +36,21 @@ pub struct NeonF32Mask(pub uint32x4_t);
 unsafe impl Send for NeonF32Mask {}
 #[cfg(target_arch = "aarch64")]
 unsafe impl Sync for NeonF32Mask {}
+
+/// Per-lane active flags keyed on bit 31, the mask-active criterion every
+/// other consumer (`mask_to_bitmask` included) uses — a plain nonzero test
+/// would diverge on a non-canonical mask built through the `pub` field.
+#[cfg(target_arch = "aarch64")]
+#[target_feature(enable = "neon")]
+#[inline]
+fn lane_actives(mask: uint32x4_t) -> [bool; 4] {
+    [
+        vgetq_lane_u32::<0>(mask) >> 31 == 1,
+        vgetq_lane_u32::<1>(mask) >> 31 == 1,
+        vgetq_lane_u32::<2>(mask) >> 31 == 1,
+        vgetq_lane_u32::<3>(mask) >> 31 == 1,
+    ]
+}
 
 #[cfg(target_arch = "aarch64")]
 impl BackendKernel<f32> for Neon {
@@ -388,11 +406,12 @@ impl BackendKernel<f32> for Neon {
         true_val: Self::Vector,
         false_val: Self::Vector,
     ) -> Self::Vector {
-        NeonF32Vec(vbslq_f32(
-            vreinterpretq_u32_f32(mask.0),
-            true_val.0,
-            false_val.0,
-        ))
+        // Selection is on the mask lane's sign bit, but `vbsl` is a *bitwise*
+        // select that would splice the operands bit-by-bit on a non-canonical
+        // mask. Broadcast each lane's sign across the lane first (arithmetic
+        // shift right by 31), so `vbsl` sees all-ones or all-zeros per lane.
+        let sign = vreinterpretq_u32_s32(vshrq_n_s32::<31>(vreinterpretq_s32_f32(mask.0)));
+        NeonF32Vec(vbslq_f32(sign, true_val.0, false_val.0))
     }
 
     // -----------------------------------------------------------------------
@@ -478,12 +497,7 @@ impl BackendKernel<f32> for Neon {
     unsafe fn compress(src: Self::Vector, mask: Self::Mask) -> Self::Vector {
         let mut arr = [0.0f32; 4];
         vst1q_f32(arr.as_mut_ptr(), src.0);
-        let m = [
-            vgetq_lane_u32(mask.0, 0) != 0,
-            vgetq_lane_u32(mask.0, 1) != 0,
-            vgetq_lane_u32(mask.0, 2) != 0,
-            vgetq_lane_u32(mask.0, 3) != 0,
-        ];
+        let m = lane_actives(mask.0);
         let mut out = [0.0f32; 4];
         let mut k = 0usize;
         for i in 0..4 {
@@ -503,12 +517,7 @@ impl BackendKernel<f32> for Neon {
         vst1q_f32(src_arr.as_mut_ptr(), src.0);
         let mut out_arr = [0.0f32; 4];
         vst1q_f32(out_arr.as_mut_ptr(), fill.0);
-        let m = [
-            vgetq_lane_u32(mask.0, 0) != 0,
-            vgetq_lane_u32(mask.0, 1) != 0,
-            vgetq_lane_u32(mask.0, 2) != 0,
-            vgetq_lane_u32(mask.0, 3) != 0,
-        ];
+        let m = lane_actives(mask.0);
         let mut k = 0usize;
         for i in 0..4 {
             if m[i] {
@@ -545,12 +554,7 @@ impl BackendKernel<f32> for Neon {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        let m = [
-            vgetq_lane_u32(mask.0, 0) != 0,
-            vgetq_lane_u32(mask.0, 1) != 0,
-            vgetq_lane_u32(mask.0, 2) != 0,
-            vgetq_lane_u32(mask.0, 3) != 0,
-        ];
+        let m = lane_actives(mask.0);
         let mut src_arr = [0.0f32; 4];
         vst1q_f32(src_arr.as_mut_ptr(), src.0);
         let out = [
@@ -600,6 +604,19 @@ impl BackendKernel<f32> for Neon {
         NeonF32Mask(vld1q_u32(vals.as_ptr()))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); the only memory operand is the constant lane-bit table.
+    #[target_feature(enable = "neon")]
+    #[inline]
+    unsafe fn mask_from_bitmask(bm: u64) -> Self::Mask {
+        // `vtst` sets a lane to all-ones where `(bits & lane_bit) != 0` —
+        // canonical expansion in one test instruction, replacing the generic
+        // bool-array bounce (bits 4.. are ignored because only bits 0..4
+        // appear in the table).
+        let lane_bits: [u32; 4] = [1, 2, 4, 8];
+        let bits = vdupq_n_u32(bm as u32);
+        NeonF32Mask(vtstq_u32(bits, vld1q_u32(lane_bits.as_ptr())))
+    }
+
     // -----------------------------------------------------------------------
     // Broadcast / zero
     // -----------------------------------------------------------------------
@@ -641,8 +658,14 @@ impl BackendKernel<f32> for Neon {
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn vector_to_mask(v: Self::Vector) -> Self::Mask {
-        // Bit-preserving reinterpretation, so lane sign bits survive into the
-        // `vgetq_lane_u32::<_>(..) >> 31` extraction performed by `mask_to_bitmask`.
-        NeonF32Mask(vreinterpretq_u32_f32(v.0))
+        // Canonicalize on entry: broadcast each lane's sign bit (the documented
+        // active criterion) across the lane with an arithmetic shift right by
+        // 31, so every `Mask` consumer — the bitwise `vbsl` merges included —
+        // sees all-ones or all-zeros per lane regardless of the mask vector's
+        // remaining bits. A bare reinterpretation kept non-canonical bits and
+        // let `vbsl`-based masked ops splice operands bit-by-bit.
+        NeonF32Mask(vreinterpretq_u32_s32(vshrq_n_s32::<31>(
+            vreinterpretq_s32_f32(v.0),
+        )))
     }
 }

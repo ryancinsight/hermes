@@ -410,6 +410,16 @@ impl BackendKernel<f32> for Avx512 {
         }
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); this is a pure integer truncation with no memory operands.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn mask_from_bitmask(bm: u64) -> Self::Mask {
+        // The k-register mask type IS the bitmask: truncating to the low 16
+        // bits (one KMOV at the use site) replaces the generic bool-array
+        // expansion.
+        bm as Self::Mask
+    }
+
     // -----------------------------------------------------------------------
     // Broadcast / zero
     // -----------------------------------------------------------------------
@@ -552,15 +562,16 @@ impl BackendKernel<f32> for Avx512 {
         >(a.0))
     }
 
-    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); every 512-bit intrinsic below is AVX512F-only (no DQ/BW/VL — the dispatcher probes only `avx512f`), and the 256-bit helpers are AVX2, which every AVX512F processor implements; there are no memory operands.
     #[target_feature(enable = "avx512f")]
     #[inline]
     unsafe fn popcount(a: Self::Vector) -> Self::Vector {
         use core::arch::x86_64::{
-            __m256, __m256i, _mm256_add_epi8, _mm256_and_si256, _mm256_cvtepi32_ps,
-            _mm256_madd_epi16, _mm256_maddubs_epi16, _mm256_set1_epi16, _mm256_set1_epi8,
-            _mm256_setr_epi8, _mm256_shuffle_epi8, _mm256_srli_epi16, _mm512_castps256_ps512,
-            _mm512_castps_si512, _mm512_extracti64x4_epi64, _mm512_insertf32x8,
+            __m256, __m256i, _mm256_add_epi8, _mm256_and_si256, _mm256_castps_pd,
+            _mm256_cvtepi32_ps, _mm256_madd_epi16, _mm256_maddubs_epi16, _mm256_set1_epi16,
+            _mm256_set1_epi8, _mm256_setr_epi8, _mm256_shuffle_epi8, _mm256_srli_epi16,
+            _mm512_castpd_ps, _mm512_castps256_ps512, _mm512_castps_pd, _mm512_castps_si512,
+            _mm512_extracti64x4_epi64, _mm512_insertf64x4,
         };
         let v_si512 = _mm512_castps_si512(a.0);
         let lo = _mm512_extracti64x4_epi64(v_si512, 0);
@@ -586,7 +597,16 @@ impl BackendKernel<f32> for Avx512 {
         let res_lo = run_avx2_popcount(lo);
         let res_hi = run_avx2_popcount(hi);
 
-        let merged = _mm512_insertf32x8(_mm512_castps256_ps512(res_lo), res_hi, 1);
+        // `_mm512_insertf32x8` would express this insertion directly but is an
+        // AVX512DQ intrinsic — a #UD on F-only silicon (Knights Landing class).
+        // `vinsertf64x4` is AVX512F and inserts the identical 256 high bits; the
+        // `pd` casts are bit-preserving reinterpretations that keep the value in
+        // the floating-point domain.
+        let merged = _mm512_castpd_ps(_mm512_insertf64x4(
+            _mm512_castps_pd(_mm512_castps256_ps512(res_lo)),
+            _mm256_castps_pd(res_hi),
+            1,
+        ));
         Avx512F32Vec(merged)
     }
 

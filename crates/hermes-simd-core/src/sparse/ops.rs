@@ -144,22 +144,43 @@ where
         let nslices = d.nslices();
         let lane_count = <Arch as SimdStorage<T>>::LANE_COUNT;
 
+        // SOUNDNESS: the vectorized arm loads `values[offset..]` and stores
+        // `out_values[offset..]` as full `C`-lane vectors, and gathers
+        // `dense[r * ncols + c]` through an unchecked masked gather whose index
+        // lanes are `i32`. Validate SELL-p slice geometry via the SSOT checker
+        // (bounds `offset + C <= values.len()`), require the output to be at
+        // least as long as the values array, require the dense operand to cover
+        // the full `nrows x ncols` extent (the per-lane mask proves
+        // `r < nrows && c < ncols`, which bounds the flat index only against
+        // `nrows * ncols`), and require every flat index to be representable as
+        // a non-negative `i32` so the `as i32` gather-index narrowing cannot
+        // wrap. The checked product also proves `r * ncols + c` cannot overflow
+        // `usize`. Both arms share the guard so the panic contract does not
+        // depend on the backend's lane count.
+        d.validate()
+            .expect("SELL-p matrix failed structural validation before elementwise_mul_dense");
+        let logical_len = d
+            .nrows
+            .checked_mul(d.ncols)
+            .expect("SELL-p elementwise_mul_dense: nrows * ncols overflows usize");
+        assert!(
+            logical_len <= i32::MAX as usize + 1,
+            "SELL-p elementwise_mul_dense: flat index range {logical_len} exceeds i32 gather indices"
+        );
+        assert!(
+            dense.len() >= logical_len,
+            "SELL-p elementwise_mul_dense: dense len {} < nrows * ncols = {}",
+            dense.len(),
+            logical_len
+        );
+        assert!(
+            out_values.len() >= d.values.len(),
+            "SELL-p elementwise_mul_dense: out_values len {} < values len {}",
+            out_values.len(),
+            d.values.len()
+        );
+
         if lane_count == C {
-            // SOUNDNESS: the vectorized path loads `values[offset..]` and stores
-            // `out_values[offset..]` as full `C`-lane vectors. Validate SELL-p
-            // slice geometry via the SSOT checker (bounds `offset + C <=
-            // values.len()`) and require the output to be at least as long as the
-            // values array, so both unchecked accesses stay in bounds even for a
-            // caller-constructed matrix with `pub` fields.
-            use super::types::SparseValidate;
-            d.validate()
-                .expect("SELL-p matrix failed structural validation before vectorized kernel");
-            assert!(
-                out_values.len() >= d.values.len(),
-                "SELL-p elementwise_mul_dense: out_values len {} < values len {}",
-                out_values.len(),
-                d.values.len()
-            );
             for s in 0..nslices {
                 let col_count = d.slice_col_count[s] as usize;
                 let start_offset = d.slice_ptr[s] as usize;
@@ -183,8 +204,9 @@ where
                     // SAFETY: `Arch::*` are target-feature kernels (module
                     // invariant). `idx_arr`/`mask_arr` hold `C == LANE_COUNT`
                     // valid entries; `mask` is set only where `r < nrows && c <
-                    // ncols`, so the masked gather touches `dense` only at those
-                    // computed in-bounds indices. `validate` and the output-length
+                    // ncols`, so every active flat index is `< nrows * ncols`,
+                    // which the guard block above proved fits `i32` and is
+                    // covered by `dense`. `validate` and the output-length
                     // assert above keep `values[offset..offset+C]` and the masked
                     // store into `out_values[offset..]` in bounds.
                     unsafe {
@@ -246,10 +268,22 @@ where
         // Bounds for the unchecked SIMD loads/stores below: the dense matrix and
         // the block/output buffers must be large enough, and every block must lie
         // within the `nrows x ncols` dense extent so each `dense[(br+i)*ncols+bc
-        // .. +BN]` read stays in bounds. O(nblocks), once per call.
-        let block_elems = d.nblocks * BM * BN;
+        // .. +BN]` read stays in bounds. O(nblocks), once per call. Both
+        // products are checked (mirroring `DenseWithMask::checked_logical_len`):
+        // an unchecked multiply wraps in release builds, so a pathological
+        // descriptor (`nrows = ncols = 2^32`) would pass a wrapped guard
+        // vacuously and let the unchecked loads read out of bounds.
+        let block_elems = d
+            .nblocks
+            .checked_mul(BM)
+            .and_then(|blocks| blocks.checked_mul(BN))
+            .expect("BlockedCoo elementwise_mul_dense: nblocks * BM * BN overflows usize");
+        let logical_len = d
+            .nrows
+            .checked_mul(d.ncols)
+            .expect("BlockedCoo elementwise_mul_dense: nrows * ncols overflows usize");
         assert!(
-            dense.len() >= d.nrows * d.ncols,
+            dense.len() >= logical_len,
             "dense buffer {} too small for {}x{}",
             dense.len(),
             d.nrows,

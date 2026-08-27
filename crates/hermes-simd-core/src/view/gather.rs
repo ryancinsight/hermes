@@ -58,11 +58,13 @@ where
         if out.len() < indices.len() {
             return Err(SimdError::InsufficientOutputLength);
         }
-        let max_idx = len as i32;
         // Validate all indices first: no element is written unless every index
-        // is in range, so the `Err` path leaves `out` untouched.
+        // is in range, so the `Err` path leaves `out` untouched. Compare in
+        // `usize` after the sign check: an `i32` bound (`len as i32`) would
+        // truncate for views of 2^31 elements or more and misclassify valid
+        // indices.
         for &idx in indices {
-            if idx < 0 || idx >= max_idx {
+            if idx < 0 || idx as usize >= len {
                 return Err(SimdError::IndexOutOfBounds);
             }
         }

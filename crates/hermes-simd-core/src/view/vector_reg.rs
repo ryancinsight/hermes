@@ -574,7 +574,12 @@ where
             let mut m = 0u64;
             for i in 0..lanes {
                 let val = buf[i].assume_init();
-                if val.to_f64() != 0.0 || val.is_nan() {
+                // A lane is active iff its sign bit is set — the documented
+                // mask convention (`BackendKernel::vector_to_mask`, hardware
+                // movemask semantics). Tested bit-level: a nonzero-or-NaN test
+                // would report `+2.0` active and `-0.0` inactive, diverging
+                // from the native movemask backends.
+                if val.bitand(T::SIGN_MASK).count_ones() != 0 {
                     m |= 1u64 << i;
                 }
             }
