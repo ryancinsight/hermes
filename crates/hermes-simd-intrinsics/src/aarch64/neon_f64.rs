@@ -178,6 +178,7 @@ impl BackendKernel<f64> for Neon {
     // SAFETY: NEON is mandatory on aarch64; operands are whole registers.
     #[target_feature(enable = "neon")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn transpose_square(tile: &mut [Self::Vector]) {
         debug_assert_eq!(tile.len(), 2, "tile must hold LANE_COUNT rows");
         // The two-lane transpose is one trn1/trn2 pair.
