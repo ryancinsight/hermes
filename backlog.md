@@ -1,6 +1,6 @@
 # Backlog — hermes-simd
 
-## HS-DENSEMASK-BITPACK-2026-08-27 — Bit-pack the DenseWithMask lane mask [minor] — in progress
+## HS-DENSEMASK-BITPACK-2026-08-27 — Bit-pack the DenseWithMask lane mask [minor] — in review (PR #81)
 
 - **Integrator:** Claude session 5050c72a-sub. **Lease:**
   `crates/hermes-simd-core/src/mask.rs`,
