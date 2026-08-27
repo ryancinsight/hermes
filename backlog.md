@@ -145,36 +145,18 @@
   16 shuffles per 4x4 tile where this network costs 8. Integrator: Claude
   session d791281c.
 
-## HS-DENSEMASK-BITPACK-2026-08-27 — Bit-pack the DenseWithMask lane mask [minor] — in review (PR #81)
+## HS-DENSEMASK-BITPACK-2026-08-27 — Bit-pack the DenseWithMask lane mask [minor] — done 2026-08-27 (PR #81, merge e1bd5e0)
 
-- **Integrator:** Claude session 5050c72a-sub. **Lease:**
-  `crates/hermes-simd-core/src/mask.rs`,
-  `crates/hermes-simd-core/src/sparse/{types.rs,mod.rs,spmv.rs,ops.rs,cow/mod.rs,cow/owned.rs}`,
-  `crates/hermes-simd-core/src/lib.rs`, `crates/hermes-simd/src/lib.rs`,
-  `crates/hermes-simd/tests/sparse_tests.rs`,
-  `crates/hermes-simd-intrinsics/src/scalar/f32.rs` (sparse test modules),
-  `crates/hermes-simd-benches/benches/sparse_bench.rs`,
-  `crates/hermes-simd-examples/examples/book_sparse.rs`,
-  `docs/book/sparse.md`, `CHANGELOG.md`, this item, and the `gap_audit.md`
-  "Memory / zero-copy" status line.
-- **Outcome:** `DenseWithMask` stores its structural mask bit-packed (one bit
-  per element) instead of `[bool]` (one byte per element) — 8× mask footprint
-  reduction — and kernels consume packed lane windows through
-  `mask_from_bitmask` instead of a per-chunk per-call bool-conversion loop.
-- **Driver:** `gap_audit.md` "Memory / zero-copy" open item (~line 1090,
-  MED-HIGH): "`DenseWithMask` stores `[bool]` mask, converts per-chunk
-  per-call".
-- **Scope / non-goals:** arbitrary-length `PackedMask` in the canonical mask
-  module; `DenseWithMaskData`/`OwnedDenseWithMask` storage swap in place (no
-  parallel variant, no compat shim); all call sites (kernels, cow, tests,
-  bench, example, book) updated; the superseded `[bool]` representation and
-  the unused `DenseWithMaskBitMaskData` partial variant deleted. Non-goals:
-  the `cmp_*_mask`/`cast` stack round-trip debt and the argmin/argmax
-  two-pass item (both remain recorded separately in `gap_audit.md`).
-- **Acceptance oracle:** existing sparse suites pass unchanged (dense-ref
-  differential oracles); new value-semantic tests cover mask round-trip,
-  word-boundary lanes at non-multiple-of-64 lengths, empty, all-set/all-clear,
-  and validating-construction rejections; fmt/clippy/nextest/doc gates green.
+- **Outcome:** `DenseWithMask` stores one bit per element, reducing its mask
+  footprint 8x, and sparse kernels consume packed lane windows without the
+  former per-chunk boolean conversion.
+- **Evidence:** dense-reference sparse laws plus empty, all-set/all-clear,
+  non-multiple-of-64, word-boundary, round-trip, and construction-rejection
+  tests pass; the superseded `[bool]` representation and unused partial variant
+  are deleted.
+- **Delivery:** PR #81 merged as `e1bd5e0`; hosted run `33107185117` is green
+  across x86, AArch64, Miri, SDE, dependency policy, lock integrity, docs, and
+  bounded benchmarks.
 ## HS-AVX2-INTERLEAVE-OVERRIDES-2026-08-27 — Native AVX2 interleave/deinterleave [patch] — done 2026-08-27
 
 - **Delivered:** AVX2 f64 and f32 `interleave`/`deinterleave` overrides
@@ -274,46 +256,17 @@
   `paste = "1"`, which resolves to unmaintained 1.0.15
   (RUSTSEC-2024-0436) and fails `cargo deny`.
 
-## HS-CAPABILITY-LOAD-THROUGHPUT-2026-08-27 — Hoist support probes from strided lane loads [patch] — in review (PR #77)
+## HS-CAPABILITY-LOAD-THROUGHPUT-2026-08-27 — Hoist support probes from strided lane loads [patch] — done 2026-08-27 (PR #77, merge c3d1b67)
 
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** Codex — `crates/hermes-simd-core/src/view/capability.rs`,
-  capability-load tests, `crates/hermes-simd/benches/lane_throughput/interleaved.rs`,
-  this item, its checklist section, `gap_audit.md`, ADR 017, `README.md`, and
-  `CHANGELOG.md`.
-- **Outcome:** a `LaneKernel` holding `Simd<T, A>` can perform a checked
-  one-register load at an irregular or strided slice position without repeating
-  `A`'s runtime-support probe. Preserve the standalone `Vector` constructor for
-  callers that hold no capability, and retain only an API whose measured loop
-  matches the direct provider path.
-- **Driver:** Apollo's current interleaved batched kernels receive `Simd<T, A>`
-  but cannot express their four-row strided loads through `Simd::io_chunks`;
-  they use `Vector::load_unaligned_from_slice` inside the fused stage loop.
-  Hermes' retained diagnostic shows that construction route keeps runtime
-  support probes in the hot loop, while Fearless SIMD 0.7 binds `from_slice` to
-  its capability value.
-- **Scope / non-goals:** capability-scoped one-register slice loading, its
-  negative and backend-generic value tests, the existing checked/view/direct
-  diagnostic, exact AVX2 codegen, and consumer guidance. Do not migrate Apollo,
-  remove standalone checked constructors, add unused operation families, or
-  change stores whose existing vector value already proves host support.
-- **Acceptance oracle:** insufficient input returns the existing typed error;
-  every supported backend loads the exact lane values; the AVX2 inner loop has
-  no support probe, call, or panic branch attributable to the new load; and two
-  bounded same-binary runs place its interval with the direct/view ceiling or
-  reject the API without weakening the instrument.
-- **Risk / change class:** [patch]. The rejected candidate would have added one
-  safe method to the existing capability value; no production or benchmark
-  change survives. Verification: exact-diff formatting and whitespace gates,
-  plus hosted workspace, Miri, AArch64, SDE, and benchmark-budget coverage.
-- **Decision:** reject the candidate method. It removed every support probe and
-  improved the checked path in both runs, but its safe slice boundary retained
-  five per-iteration bounds/panic branches. Its 256-element interval remained
-  disjoint from the view/direct ceiling in both runs, so it failed the stated
-  acceptance oracle. Existing `SimdView`/`SimdChunk` composition is the
-  authoritative probe-free and bounds-free route; strided in-place consumers
-  must partition disjoint rows once before constructing chunk iterators.
-  Delivery: PR #77.
+- **Outcome:** reject the capability-scoped checked-load candidate; it removed
+  support probes but retained five bounds/panic branches and missed the
+  `SimdView`/direct ceiling in the short-loop regime.
+- **Evidence:** two bounded measurements and exact AVX2 code generation keep
+  `SimdView`/`SimdChunk` as the authoritative probe-free, bounds-free route. No
+  production or benchmark change survives.
+- **Delivery:** PR #77 merged as `c3d1b67`; hosted run `33095471221` is green
+  across x86, AArch64, Miri, SDE, dependency policy, lock integrity, and
+  bounded benchmarks.
 
 ## HS-FEARLESS-COMPLEX-REG-THROUGHPUT-2026-08-27 — Measure interleaved complex-register parity [patch] — done 2026-08-27 (PR #76, merge ba32b8c)
 
