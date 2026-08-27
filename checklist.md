@@ -4,12 +4,17 @@
 
 - [x] Reconcile Apollo's four-lane contract with ADRs 016/017, current backend
       lane counts, forced-target helpers, and the generated widest dispatcher.
-- [ ] Record ADR 018 and implement one exact-lane entry without changing
+- [x] Record ADR 018 and implement one exact-lane entry without changing
       widest-native dispatch or adding fixed-vector aliases.
-- [ ] Add host-independent value and no-call tests plus x86/AArch64 selection
+- [x] Add host-independent value and no-call tests plus x86/AArch64 selection
       coverage under `#![forbid(unsafe_code)]`.
-- [ ] Inspect optimized codegen, run focused/full/cross-target/SemVer gates,
-      synchronize audit and changelog evidence, then publish and collect CI.
+- [x] Inspect optimized codegen, run focused/full/cross-target/SemVer gates,
+      and synchronize audit and changelog evidence.
+- [x] Obtain an independent judge verdict covering exact-width filtering,
+      absence semantics, widest-dispatch preservation, and target-feature
+      safety.
+- [ ] Commit, publish, and collect hosted verification before consumer
+      migration.
 
 ## HS-NATIVE-CAST-THROUGHPUT-2026-08-27 [minor]
 

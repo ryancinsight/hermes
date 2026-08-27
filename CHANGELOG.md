@@ -6,6 +6,13 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [minor][HS-EXACT-LANE-DISPATCH] Add `vectorize_lanes::<LANES, T, K>` for
+  register-resident consumer kernels whose lane count is part of their address
+  map. It selects the widest supported backend with exactly the requested
+  scalar lane count and returns `None` without invoking the kernel when no
+  exact backend exists; existing widest-native `vectorize` behavior is
+  unchanged.
+
 - [minor][HS-NATIVE-CAST-THROUGHPUT] Route AVX2 `f32` to `i32` `Vector::cast`
   through one packed precise conversion with Rust-compatible saturation and NaN
   handling. Other type and backend pairs retain the scalar conversion default.

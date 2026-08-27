@@ -286,6 +286,17 @@ multiply-subtract, and the immutable iterator `Send` bound (`T: Sync`, not
 without a current consumer contract; adding unused surface would expand the
 sealed provider without acceptance evidence.
 
+Apollo subsequently supplied one narrower width contract: its register-resident
+128-point and planar row kernels require exactly four scalar lanes, while
+widest-native dispatch selects eight f64 lanes on AVX-512. ADR 018 resolves that
+selection gap with `vectorize_lanes::<LANES, T, K>`: one operation-boundary
+dispatch selects the widest supported backend at the exact count and returns
+`None` without calling the kernel when none exists. This does not add Fearless's
+fixed-width storage/arithmetic family; that broader algebra remains a non-gap
+without a consumer requiring it. Host value tests, AArch64 Windows std/no-std
+strict-warning builds, and optimized x86 codegen establish the dispatch
+contract; native AArch64 execution remains hosted-CI evidence.
+
 ### Cross-lane throughput confirmation — 2026-08-26
 
 The same-binary lane instrument now compares the shared f32/f64 interleave and

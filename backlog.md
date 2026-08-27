@@ -1,28 +1,30 @@
 # Backlog — hermes-simd
 
-## HS-EXACT-LANE-DISPATCH-2026-08-27 — Dispatch consumer kernels by exact lane count [minor] [arch] — in progress
+## HS-EXACT-LANE-DISPATCH-2026-08-27 — Dispatch consumer kernels by exact lane count [minor] [arch] — review
 
 - **Integrator:** Codex task `01a0253c-6013-7552-99cc-36bbbcf77f6d`.
-  **Lease:** `crates/hermes-simd/src/vectorize.rs`, its `lib.rs` re-export,
-  `crates/hermes-simd/tests/consumer_vectorize.rs`, ADR 018, this item, and the
-  corresponding checklist section. The native-cast lease remains untouched.
+  **Lease:** discharged by the delivery commit.
 - **Outcome:** add one const-generic consumer entry that selects the widest
   host-supported backend whose scalar lane count equals the requested count,
   enters that backend's target-feature scope once, and returns `None` without
   invoking or mutating the kernel when no backend matches. Existing
   widest-native `vectorize` behavior remains unchanged.
 - **Driver:** Apollo's verified 128-point base requires four scalar lanes. Its
-  f64 path must select AVX2 even on an AVX-512 host; its f32 path may select
-  NEON and must decline cleanly where no four-lane backend exists. Apollo
-  commit `c6f4b639` records the consumer evidence and corrected timing.
+  f64 path must select AVX2 even on an AVX-512 host; its f32 path selects NEON
+  or the portable packed backend at the same width. Apollo commit `c6f4b639`
+  records the consumer evidence and corrected timing.
 - **Acceptance oracle:** consumer code under `#![forbid(unsafe_code)]` observes
-  the exact requested count, a non-matching count never calls the kernel,
-  scalar count one remains available, widest dispatch is unchanged, host and
-  cross-target gates pass, and codegen contains one operation-boundary dispatch
-  with no feature probes inside the kernel.
+  the exact requested count, a non-matching count never calls the kernel, the
+  portable fallback's actual packed widths remain available, widest dispatch
+  is unchanged, host and cross-target gates pass, and codegen contains one
+  operation-boundary dispatch with no feature probes inside the kernel.
 - **Risk / change class:** additive public [minor] and dispatch-policy [arch].
   ADR 018 owns selection order, absence semantics, safety obligations, and the
-  rejection of a new fixed-vector type family. **Last update:** 2026-08-27.
+  rejection of a new fixed-vector type family. Host all-feature Clippy and
+  435/435 nextest tests pass; docs/doctests, 196 SemVer checks, and AArch64
+  Windows std/no-std strict-warning builds pass. Optimized x86 codegen retains
+  one boundary probe and a call/probe/branch-free specialized kernel body.
+  **Last update:** 2026-08-27.
 
 ## HS-NATIVE-CAST-THROUGHPUT-2026-08-27 — Remove supported cross-type cast stack round-trip [minor] — in progress
 
