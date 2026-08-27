@@ -22,7 +22,11 @@ unsafe impl Sync for NeonF64Vec {}
 
 /// NEON f64 mask: `uint64x2_t` used as a bitwise select mask.
 ///
-/// Lane `i` is active when `mask[i] == 0xFFFF_FFFF_FFFF_FFFF`.
+/// Lane `i` is active iff bit 63 of `mask[i]` is set — the sign-bit
+/// convention shared with `mask_to_bitmask`. Every constructor
+/// (`mask_from_bools`, `leading_k_mask`, `vector_to_mask`) produces canonical
+/// all-ones/all-zero lanes, which is what the bitwise `vbslq_f64` merges rely
+/// on.
 #[cfg(target_arch = "aarch64")]
 #[repr(transparent)]
 #[derive(Copy, Clone)]
@@ -32,6 +36,19 @@ pub struct NeonF64Mask(pub uint64x2_t);
 unsafe impl Send for NeonF64Mask {}
 #[cfg(target_arch = "aarch64")]
 unsafe impl Sync for NeonF64Mask {}
+
+/// Per-lane active flags keyed on bit 63, the mask-active criterion every
+/// other consumer (`mask_to_bitmask` included) uses — a plain nonzero test
+/// would diverge on a non-canonical mask built through the `pub` field.
+#[cfg(target_arch = "aarch64")]
+#[target_feature(enable = "neon")]
+#[inline]
+fn lane_actives(mask: uint64x2_t) -> [bool; 2] {
+    [
+        vgetq_lane_u64::<0>(mask) >> 63 == 1,
+        vgetq_lane_u64::<1>(mask) >> 63 == 1,
+    ]
+}
 
 #[cfg(target_arch = "aarch64")]
 impl BackendKernel<f64> for Neon {
@@ -478,10 +495,7 @@ impl BackendKernel<f64> for Neon {
     unsafe fn compress(src: Self::Vector, mask: Self::Mask) -> Self::Vector {
         let mut arr = [0.0f64; 2];
         vst1q_f64(arr.as_mut_ptr(), src.0);
-        let m = [
-            vgetq_lane_u64(mask.0, 0) != 0,
-            vgetq_lane_u64(mask.0, 1) != 0,
-        ];
+        let m = lane_actives(mask.0);
         let mut out = [0.0f64; 2];
         let mut k = 0usize;
         for i in 0..2 {
@@ -501,10 +515,7 @@ impl BackendKernel<f64> for Neon {
         vst1q_f64(src_arr.as_mut_ptr(), src.0);
         let mut out_arr = [0.0f64; 2];
         vst1q_f64(out_arr.as_mut_ptr(), fill.0);
-        let m = [
-            vgetq_lane_u64(mask.0, 0) != 0,
-            vgetq_lane_u64(mask.0, 1) != 0,
-        ];
+        let m = lane_actives(mask.0);
         let mut k = 0usize;
         for i in 0..2 {
             if m[i] {
@@ -541,10 +552,7 @@ impl BackendKernel<f64> for Neon {
     ) -> Self::Vector {
         let mut src_arr = [0.0f64; 2];
         vst1q_f64(src_arr.as_mut_ptr(), src.0);
-        let m = [
-            vgetq_lane_u64(mask.0, 0) != 0,
-            vgetq_lane_u64(mask.0, 1) != 0,
-        ];
+        let m = lane_actives(mask.0);
         let out = [
             if m[0] {
                 *base.add(indices[0] as usize)
