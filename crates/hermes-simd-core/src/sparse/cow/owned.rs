@@ -8,6 +8,7 @@ use super::super::{
     SparseShape,
 };
 use crate::align::Aligned;
+use crate::mask::PackedMask;
 use crate::vec::AlignedVec;
 
 /// Owned heap-backed CSR storage.
@@ -202,9 +203,12 @@ impl<T, const BM: usize, const BN: usize> SparseValidate for OwnedBlockedCoo<T, 
 }
 
 /// Owned heap-backed `DenseWithMask` storage.
+///
+/// The structural mask is stored bit-packed ([`PackedMask`]), 8× smaller than
+/// the byte-per-element `[bool]` representation it replaced.
 pub struct OwnedDenseWithMask<T> {
     pub(crate) values: AlignedVec<T, Aligned<64>>,
-    pub(crate) mask: AlignedVec<bool, Aligned<64>>,
+    pub(crate) mask: PackedMask<Box<[u64]>>,
     pub(crate) nrows: usize,
     pub(crate) ncols: usize,
 }
@@ -215,7 +219,7 @@ impl<T> OwnedDenseWithMask<T> {
     #[must_use]
     pub fn new(
         values: AlignedVec<T, Aligned<64>>,
-        mask: AlignedVec<bool, Aligned<64>>,
+        mask: PackedMask<Box<[u64]>>,
         nrows: usize,
         ncols: usize,
     ) -> Self {
@@ -233,7 +237,7 @@ impl<T> OwnedDenseWithMask<T> {
     pub fn as_view(&self) -> DenseWithMaskData<'_, T> {
         DenseWithMaskMatrix::new(
             self.values.as_slice(),
-            self.mask.as_slice(),
+            self.mask.as_view(),
             self.nrows,
             self.ncols,
         )

@@ -56,12 +56,38 @@ fn test_spmv_csr_accumulates() {
 #[test]
 fn test_spmv_dense_masked() {
     let values = [1.0f32, 0.0, 0.0, 1.0]; // 2x2 identity
-    let mask_bits = [true, false, false, true];
-    let data = DenseWithMaskData::new(&values[..], &mask_bits[..], 2, 2);
+    let mask = PackedMask::from_bools(&[true, false, false, true]);
+    let data = DenseWithMaskData::new(&values[..], mask.as_view(), 2, 2);
     let x = [6.0f32, 9.0];
     let mut y = [0.0f32; 2];
     spmv_dense_masked::<f32>(data, &x, &mut y);
     assert_eq!(y, [6.0, 9.0]);
+}
+
+#[test]
+fn test_spmv_dense_masked_word_boundary_rows() {
+    // ncols = 70: each row's packed-mask window spans a 64-bit word boundary
+    // and leaves a non-multiple-of-lane-width scalar tail. Verified against an
+    // independent dense reference.
+    let (nrows, ncols) = (3, 70);
+    let values: Vec<f32> = (0..nrows * ncols).map(|i| (i % 7) as f32 - 3.0).collect();
+    let mask_bools: Vec<bool> = (0..nrows * ncols).map(|i| i % 3 != 1).collect();
+    let x: Vec<f32> = (0..ncols).map(|c| (c % 5) as f32 + 0.5).collect();
+
+    let mask = PackedMask::from_bools(&mask_bools);
+    let data = DenseWithMaskData::new(&values, mask.as_view(), nrows, ncols);
+    let mut y = vec![0.0f32; nrows];
+    spmv_dense_masked::<f32>(data, &x, &mut y);
+
+    let mut want = vec![0.0f32; nrows];
+    for r in 0..nrows {
+        for c in 0..ncols {
+            if mask_bools[r * ncols + c] {
+                want[r] += values[r * ncols + c] * x[c];
+            }
+        }
+    }
+    assert_eq!(y, want);
 }
 
 #[test]
@@ -538,8 +564,8 @@ fn test_sellp_cow_to_owned_promotes() {
 #[test]
 fn test_dense_masked_cow_borrowed_spmv() {
     let values = [1.0f32, 0.0, 0.0, 1.0]; // 2x2 identity
-    let mask = [true, false, false, true];
-    let data = DenseWithMaskData::new(&values, &mask, 2, 2);
+    let mask = PackedMask::from_bools(&[true, false, false, true]);
+    let data = DenseWithMaskData::new(&values, mask.as_view(), 2, 2);
     let cow: SparseCow<f32, DenseWithMask, Scalar> = SparseCow::borrowed(data);
 
     assert!(cow.is_borrowed());

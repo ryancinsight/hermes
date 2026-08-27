@@ -7,6 +7,7 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use hermes_simd::{spmv_bcoo, spmv_csr, spmv_dense_masked, spmv_sellp};
+use hermes_simd_core::mask::PackedMask;
 use hermes_simd_core::sparse::{
     BlockedCooData, CsrData, DenseWithMaskData, SellPData, ValidatedData,
 };
@@ -116,13 +117,13 @@ fn make_bcoo<const BM: usize, const BN: usize>(
     (blocks, block_rows, block_cols, nblocks)
 }
 
-fn make_dense_masked(case: MatrixCase) -> (Vec<f32>, Vec<bool>) {
+fn make_dense_masked(case: MatrixCase) -> (Vec<f32>, PackedMask<Box<[u64]>>) {
     let values = vec![1.0; case.dense_len()];
     let active_period = (1.0 / case.density).round() as usize;
-    let mask = (0..case.dense_len())
+    let mask_bools: Vec<bool> = (0..case.dense_len())
         .map(|idx| idx % active_period == 0)
         .collect();
-    (values, mask)
+    (values, PackedMask::from_bools(&mask_bools))
 }
 
 fn bench_csr_spmv(c: &mut Criterion) {
@@ -244,7 +245,7 @@ fn bench_dense_masked_spmv(c: &mut Criterion) {
         for density in DENSITIES {
             let case = MatrixCase { nrows, density };
             let (values, mask) = make_dense_masked(case);
-            let data = DenseWithMaskData::new(&values, &mask, nrows, NCOLS);
+            let data = DenseWithMaskData::new(&values, mask.as_view(), nrows, NCOLS);
             let mut y = vec![0.0f32; nrows];
             group.throughput(Throughput::Elements(case.logical_elements()));
             group.bench_with_input(
