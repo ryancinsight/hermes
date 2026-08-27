@@ -1,5 +1,21 @@
 # Checklist — active sprint
 
+## HS-PACKED-MASK-SHAPE-SAFETY-2026-08-27 [patch]
+
+- [x] Reconcile the merged packed-mask representation, public extraction
+      contracts, raw DenseWithMask operation boundaries, logical shape, and
+      current sparse value-semantic coverage.
+- [ ] Record the unchanged sparse benchmark baseline and exact AVX2 loop before
+      changing production code.
+- [ ] Enforce release-safe public extraction and exact overflow-safe matrix
+      validation, with one pre-loop validation boundary and private
+      prevalidated loop extraction.
+- [ ] Add debug/release boundary, adversarial shape, and dense-reference tests;
+      re-run the unchanged benchmark and inspect exact code generation.
+- [ ] Run exact-diff and affected full gates, synchronize evidence, obtain an
+      independent judge verdict, commit, publish, collect hosted verification,
+      merge, and continue.
+
 ## HS-NATIVE-COMPARISON-MASK-2026-08-27 [patch]
 
 - [x] Reconcile the recorded stack round-trip, current `Vector`/`Mask` public
@@ -13,8 +29,8 @@
       mechanism is visible.
 - [x] Route all six public comparison-mask methods natively and extend generic
       backend coverage, including NaN behavior, without changing the API.
-- [ ] Run exact-diff and affected full gates, synchronize evidence, commit,
-      publish, collect hosted verification, merge, and continue.
+- [x] Run exact-diff and affected full gates, synchronize evidence, commit,
+      publish, collect hosted verification, and merge PR #84 as `6efa67b`.
 
 ## HS-DISPATCH-CACHE-THROUGHPUT-2026-08-27 [patch]
 
