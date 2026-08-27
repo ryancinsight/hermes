@@ -1,5 +1,20 @@
 # Checklist — active sprint
 
+## HS-DISPATCH-CACHE-THROUGHPUT-2026-08-27 [patch]
+
+- [x] Reconcile current main, PR #80's disjoint AVX2 interleave change, and the
+      current Fearless SIMD, Archmage, simd-abstraction, Simdeez, and
+      simply_simd dispatch/cache designs from authoritative sources.
+- [ ] Add one input-sensitive f32/f64 dispatch-only group without changing any
+      established workload, timed region, or dependency.
+- [ ] Assert equal selected lane counts, then run two unchanged bounded
+      Criterion measurements and inspect exact emitted dispatch code.
+- [ ] Implement an internal correction only for a repeatable Hermes-owned
+      deficit; reject atomics and indirect calls that do not improve the same
+      instrument.
+- [ ] Run exact-diff and affected full gates, synchronize evidence, commit,
+      publish, collect hosted verification, and merge.
+
 ## HS-PULP-LANE-THROUGHPUT-2026-08-27 [patch]
 
 - [x] Verify the current Pulp, Fearless SIMD, `wide`, Macerator, and
@@ -10,8 +25,8 @@
       row when dependency policy rejects its transitive closure.
 - [x] Run exact AVX2 code generation plus two bounded unchanged measurements;
       implement only a stable provider-owned correction.
-- [ ] Synchronize the gap audit, README, ADR 017, changelog, and item state;
-      run exact gates, publish, collect hosted verification, and merge.
+- [x] Synchronize the gap audit, README, ADR 017, changelog, and item state;
+      exact-head local and hosted gates passed; PR #79 merged as `3c548015`.
 
 ## HS-CAPABILITY-LOAD-THROUGHPUT-2026-08-27 [patch]
 
