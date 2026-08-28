@@ -33,6 +33,8 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   f32, AVX-512 f32/f64, and NEON f32 `transpose_square` with fixed
   unpack/shuffle networks. Each override performs one exact tile-length check,
   then moves the complete tile through registers without scalar lane traffic.
+  Remove the prior NEON f64 override because the generic default measures
+  faster on AArch64.
 
 - [minor][HS-TRANSPOSE-SQUARE] Add `transpose_square` — in-register
   `LANE_COUNT x LANE_COUNT` tile transpose on the backend seam, the

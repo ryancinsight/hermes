@@ -44,8 +44,8 @@
   target validation, variant adjudication, and closure through the next commit.
 - **Outcome:** add unpack/permute `transpose_square` networks for AVX2 f32
   (8x8), AVX-512 f64 (8x8), AVX-512 f32 (16x16), and NEON f32 (`vtrn`/`vzip`
-  4x4). Only AVX2 f64 and NEON f64 have native networks today; every other
-  backend/type pair takes the scalar store/swap/load default
+  4x4), and remove the regressing NEON f64 override. AVX2 f64 remains native;
+  every other backend/type pair takes the scalar store/swap/load default
   (`kernel/backend.rs`, `transpose_square`).
 - **Acceptance oracle:** the existing per-backend index-coded reference and
   involution property (`check_transpose_square`) extended to f32; codegen
@@ -54,9 +54,13 @@
   from 408–421 ns to 4.21–4.32 ns and retain the existing f64 control at
   2.74–2.82 ns versus 100–101 ns. Exact x86 and AArch64 assembly contains one
   tile-length branch followed by the intended register network with no scalar
-  lane traffic; AArch64 cross-compilation is warning-clean.
-  **Remaining:** Intel SDE value execution plus real-silicon AVX-512 and NEON
-  native/default timing in the hosted matrix.
+  lane traffic; AArch64 cross-compilation is warning-clean. Hosted run
+  `33137876655` executes the generalized property on AArch64 and under SDE;
+  NEON f32 measures 3.536–3.540 ns native versus 7.307–7.324 ns generic, while
+  the incumbent NEON f64 override measures 2.265–2.268 ns versus the faster
+  2.080–2.086 ns generic default and is removed.
+  **Remaining:** a second NEON comparison and bounded real-silicon AVX-512
+  attempt; the first hosted x86 allocation lacked AVX-512.
 
 ## HS-F16-DISPATCH-PROBE-HOIST-2026-08-27 — Hoist F16 f16c probe to the dispatch boundary [patch] — todo
 

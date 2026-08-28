@@ -1162,7 +1162,8 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
     /// which reserved 16–32 KiB of stack for tiles that are at most
     /// `LANE_COUNT`²; overriding backends never pay it). AVX2 and AVX-512
     /// floating-point backends override with unpack/cross-half permute
-    /// networks; NEON floating-point backends use `trn`/`zip` networks.
+    /// networks; NEON f32 uses a `trn`/`zip` network while its two-lane f64
+    /// path takes the generic default.
     ///
     /// # Safety
     /// Processor must support the required target feature. `tile` must hold
