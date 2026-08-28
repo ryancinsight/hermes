@@ -66,8 +66,12 @@
   is GREEN after replacing AVX2 f64's debug-only tile check with an exact
   release-mode conversion. **Remaining:** final hosted verification and merge.
 
-## HS-F16-DISPATCH-PROBE-HOIST-2026-08-27 — Hoist F16 f16c probe to the dispatch boundary [patch] — todo
+## HS-F16-DISPATCH-PROBE-HOIST-2026-08-27 — Hoist F16 f16c probe to the dispatch boundary [patch] — in progress
 
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+  **Lease:** the same task owns runtime-dispatch macro, AVX2 F16 arithmetic,
+  focused codegen/benchmark coverage, ADR 009, and this item's PM regions
+  through the next commit.
 - **Outcome:** `avx2_f16.rs:180-209` re-probes `f16c_fma_available()` and
   calls a non-inlinable `#[target_feature(avx,f16c)]` helper on every lane op
   because the dispatch boundary enables only `avx2,fma`. Hoist the f16c
@@ -76,6 +80,14 @@
   structure (dispatch at kernel granularity: no in-loop capability checks).
 - **Acceptance oracle:** optimized codegen shows one boundary probe and
   probe-free lane-op bodies; existing F16 differential suites stay green.
+- **Scope / non-goals:** preserve AVX2 behavior for f32/f64 and the safe F16
+  software fallback on hosts without F16C; do not add a public backend marker,
+  duplicate lane surface, or change arithmetic semantics.
+- **Dependencies / risk:** depends on ADR 009's target-feature entry design;
+  [patch], with x86 feature-safety and non-F16 dispatch latency as the primary
+  risks. Verify exact assembly, controlled unchanged benchmarks, focused F16
+  differential tests, no-std, all-target Clippy, Nextest, docs, and SemVer.
+  **Last update:** 2026-08-27.
 
 ## HS-MASKED-TAIL-PARTIAL-LOAD-2026-08-27 — Partial masked load/store seam for dispatch tails [minor] — todo
 
