@@ -6,6 +6,11 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [minor][HS-F16-DISPATCH-PROBE-HOIST] Select the complete AVX2 F16C feature
+  frame once at the runtime-dispatch boundary, so dispatched F16 arithmetic
+  contains no repeated feature probes or fallback calls. Direct `Avx2` F16
+  values retain the software fallback on AVX2 hosts without F16C.
+
 - [minor][HS-EXACT-LANE-DISPATCH] Add `vectorize_lanes::<LANES, T, K>` for
   register-resident consumer kernels whose lane count is part of their address
   map. It selects the widest supported backend with exactly the requested

@@ -6,6 +6,11 @@
 //! 2. Falls back to runtime `is_x86_feature_detected!` / `is_aarch64_feature_detected!`.
 //! 3. Falls back to the scalar implementation.
 
+mod frame;
+mod generator;
+
+use frame::{generate_avx2_frame_adapter, kernel_scalar_type, upper_camel_case};
+use generator::generate_dispatcher;
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::{parse::Parser, punctuated::Punctuated, Error, FnArg, Ident, ItemFn, Pat, Result, Token};
@@ -28,7 +33,9 @@ impl DispatchTarget {
             "scalar" => Ok(Self::Scalar),
             other => Err(Error::new(
                 id.span(),
-                format!("unknown dispatch target `{other}`; expected one of: avx512f, avx2, neon, scalar"),
+                format!(
+                    "unknown dispatch target `{other}`; expected one of: avx512f, avx2, neon, scalar"
+                ),
             )),
         }
     }
@@ -42,7 +49,7 @@ impl DispatchTarget {
         }
     }
 
-    fn arch_marker(&self) -> proc_macro2::TokenStream {
+    fn arch_marker(&self) -> TokenStream {
         match self {
             Self::Avx512f => quote!(hermes_simd_intrinsics::Avx512),
             Self::Avx2 => quote!(hermes_simd_intrinsics::Avx2),
@@ -51,7 +58,7 @@ impl DispatchTarget {
         }
     }
 
-    fn target_arch_cfg(&self) -> proc_macro2::TokenStream {
+    fn target_arch_cfg(&self) -> TokenStream {
         match self {
             Self::Avx512f | Self::Avx2 => {
                 quote!(any(target_arch = "x86", target_arch = "x86_64"))
@@ -64,8 +71,8 @@ impl DispatchTarget {
 
 fn replace_ident(stream: TokenStream, target: &Ident, replacement: &TokenStream) -> TokenStream {
     let mut result = TokenStream::new();
-    for tt in stream {
-        match tt {
+    for token in stream {
+        match token {
             proc_macro2::TokenTree::Group(group) => {
                 let replaced = replace_ident(group.stream(), target, replacement);
                 let mut new_group = proc_macro2::Group::new(group.delimiter(), replaced);
@@ -75,242 +82,10 @@ fn replace_ident(stream: TokenStream, target: &Ident, replacement: &TokenStream)
             proc_macro2::TokenTree::Ident(ident) if ident == *target => {
                 result.extend(replacement.clone());
             }
-            other => {
-                result.extend(Some(other));
-            }
+            other => result.extend(Some(other)),
         }
     }
     result
-}
-
-#[expect(
-    clippy::too_many_arguments,
-    reason = "The dispatcher generator forwards the complete macro expansion inputs"
-)]
-#[expect(
-    clippy::too_many_lines,
-    reason = "The generator keeps target-specific helper and dispatch-arm construction together"
-)]
-fn generate_dispatcher(
-    arch_cfg: &TokenStream,
-    active_targets: &[DispatchTarget],
-    dispatch_name: &Ident,
-    inner_name: &Ident,
-    inner_args: &syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>,
-    inner_ret: &syn::ReturnType,
-    visibility: &TokenStream,
-    other_params: &[syn::GenericParam],
-    other_param_tokens: &[TokenStream],
-    call_args: &[TokenStream],
-    arch_ident: &Ident,
-    original_where_clause: Option<&syn::WhereClause>,
-    doc_attrs: &[syn::Attribute],
-) -> TokenStream {
-    let mut helper_fns = Vec::new();
-    let mut dispatch_arms = Vec::new();
-
-    let other_params_tokens = quote!(#(#other_params),*);
-
-    for target in active_targets {
-        if matches!(target, DispatchTarget::Scalar) {
-            continue;
-        }
-        let feat = target
-            .feature_str()
-            .expect("DispatchTarget::feature_str is Some for all non-Scalar variants");
-        let arch = target.arch_marker();
-        let arch_cfg = target.target_arch_cfg();
-        let helper_name = format_ident!("{}_{}", dispatch_name, feat.replace(['-', ','], "_"));
-
-        let helper_generics = if other_params.is_empty() {
-            quote!()
-        } else {
-            let replaced_params = replace_ident(other_params_tokens.clone(), arch_ident, &arch);
-            quote!(<#replaced_params>)
-        };
-
-        let helper_where = if let Some(wc) = original_where_clause {
-            let wc_tokens = quote!(#wc);
-            let replaced_wc = replace_ident(wc_tokens, arch_ident, &arch);
-            quote!(#replaced_wc)
-        } else {
-            quote!()
-        };
-
-        let helper_turbofish = if other_param_tokens.is_empty() {
-            quote!()
-        } else {
-            quote!(::<#(#other_param_tokens),*>)
-        };
-
-        let inner_turbofish = if other_param_tokens.is_empty() {
-            quote!(::<#arch>)
-        } else {
-            quote!(::<#(#other_param_tokens,)* #arch>)
-        };
-
-        let tf_attrs: Vec<TokenStream> = feat
-            .split(',')
-            .map(|f| quote!(#[target_feature(enable = #f)]))
-            .collect();
-
-        helper_fns.push(quote! {
-            #[cfg(#arch_cfg)]
-            #(#tf_attrs)*
-            #[inline]
-            unsafe fn #helper_name #helper_generics(#inner_args) #inner_ret #helper_where {
-                #inner_name #inner_turbofish(#(#call_args),*)
-            }
-        });
-
-        // Compile-time cfg! check arm
-        let ct_cfg_expr = {
-            let features: Vec<&str> = feat.split(',').collect();
-            let cfgs: Vec<TokenStream> = features
-                .iter()
-                .map(|f| quote!(cfg!(target_feature = #f)))
-                .collect();
-            quote!(#(#cfgs)&&*)
-        };
-
-        let ct_arm = quote! {
-            #[cfg(#arch_cfg)]
-            {
-                if #ct_cfg_expr {
-                    return unsafe { #helper_name #helper_turbofish(#(#call_args),*) };
-                }
-            }
-        };
-
-        // Runtime detection arm. `is_x86_feature_detected!` requires std, so
-        // the arm is additionally gated on the consuming crate's `std`
-        // feature; no_std builds keep the compile-time cfg! arms and the
-        // scalar fallback only.
-        let rt_arm = match target {
-            DispatchTarget::Avx512f => quote! {
-                #[cfg(all(#arch_cfg, feature = "std"))]
-                {
-                    if std::is_x86_feature_detected!("avx512f") {
-                        return unsafe { #helper_name #helper_turbofish(#(#call_args),*) };
-                    }
-                }
-            },
-            DispatchTarget::Avx2 => quote! {
-                #[cfg(all(#arch_cfg, feature = "std"))]
-                {
-                    if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
-                        return unsafe { #helper_name #helper_turbofish(#(#call_args),*) };
-                    }
-                }
-            },
-            DispatchTarget::Neon => quote! {
-                #[cfg(#arch_cfg)]
-                {
-                    // NEON is mandatory on aarch64
-                    return unsafe { #helper_name #helper_turbofish(#(#call_args),*) };
-                }
-            },
-            DispatchTarget::Scalar => quote! {},
-        };
-
-        dispatch_arms.push(quote! {
-            #ct_arm
-            #rt_arm
-        });
-    }
-
-    // Scalar fallback
-    let scalar_arch = quote!(hermes_simd_intrinsics::Scalar);
-    let scalar_turbofish = if other_param_tokens.is_empty() {
-        quote!(::<#scalar_arch>)
-    } else {
-        quote!(::<#(#other_param_tokens,)* #scalar_arch>)
-    };
-    let scalar_fallback = quote! {
-        #inner_name #scalar_turbofish(#(#call_args),*)
-    };
-
-    let dispatcher_generics = if other_params.is_empty() {
-        quote!()
-    } else {
-        quote!(<#(#other_params),*>)
-    };
-
-    // Filter bounds on the architecture parameter out of the dispatcher's where clause
-    // and specialized arch bounds for each active target
-    let mut arch_bounds = Vec::new();
-    if let Some(wc) = original_where_clause {
-        for pred in &wc.predicates {
-            if let syn::WherePredicate::Type(pred_ty) = pred {
-                if let syn::Type::Path(type_path) = &pred_ty.bounded_ty {
-                    if type_path.path.is_ident(arch_ident) {
-                        arch_bounds.push(pred_ty.clone());
-                    }
-                }
-            }
-        }
-    }
-
-    let mut specialized_bounds = Vec::new();
-    for target in active_targets {
-        let arch = target.arch_marker();
-        for bound in &arch_bounds {
-            let bound_tokens = quote!(#bound);
-            let replaced = replace_ident(bound_tokens, arch_ident, &arch);
-            specialized_bounds.push(replaced);
-        }
-    }
-
-    let non_arch_predicates: Vec<syn::WherePredicate> = original_where_clause
-        .map(|wc| {
-            wc.predicates
-                .iter()
-                .filter(|pred| {
-                    if let syn::WherePredicate::Type(pred_ty) = pred {
-                        if let syn::Type::Path(type_path) = &pred_ty.bounded_ty {
-                            if type_path.path.is_ident(arch_ident) {
-                                return false;
-                            }
-                        }
-                    }
-                    true
-                })
-                .cloned()
-                .collect()
-        })
-        .unwrap_or_default();
-
-    let dispatcher_where = quote! {
-        where
-            #(#non_arch_predicates,)*
-            #(#specialized_bounds,)*
-    };
-
-    let unreachable_code_expectation = if active_targets
-        .iter()
-        .any(|target| matches!(target, DispatchTarget::Neon))
-    {
-        quote! {
-            #[expect(
-                unreachable_code,
-                reason = "Generated architecture arms are cfg-selected before the scalar fallback"
-            )]
-        }
-    } else {
-        quote!()
-    };
-
-    quote! {
-        #(#doc_attrs)*
-        #[cfg(#arch_cfg)]
-        #[inline(always)]
-        #unreachable_code_expectation
-        #visibility fn #dispatch_name #dispatcher_generics(#inner_args) #inner_ret #dispatcher_where {
-            #(#helper_fns)*
-            #(#dispatch_arms)*
-            #scalar_fallback
-        }
-    }
 }
 
 #[expect(
@@ -318,7 +93,6 @@ fn generate_dispatcher(
     reason = "The macro entry point coordinates parsing and three target dispatch expansions"
 )]
 pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
-    // Parse target list from attribute args
     let targets: Vec<DispatchTarget> = {
         let parser = Punctuated::<Ident, Token![,]>::parse_terminated;
         let idents = parser.parse2(args)?;
@@ -328,67 +102,63 @@ pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
             .collect::<Result<_>>()?
     };
 
-    // Parse the annotated function
     let mut inner_fn: ItemFn = syn::parse2(item)?;
 
-    // The generated `#[target_feature]` helper is the only feature-carrying
-    // frame; the annotated function and the consumer's kernel body reach that
-    // scope by inlining into it. A plain `#[inline]` hint is not enough: a
-    // large kernel body (a fully unrolled FFT row pass) makes LLVM decline
-    // the helper -> inner inline, the body codegens in the inner symbol at
-    // baseline -- zero FMA, per-operation feature detection -- and runs an
-    // order of magnitude slow. `#[inline(always)]` maps to LLVM `alwaysinline`,
-    // which is honored regardless of body size, so the body always lands
-    // inside the target-feature frame. (`#[target_feature]` itself cannot be
-    // put on the inner fn: it is also called from the scalar fallback arm.)
-    if !inner_fn.attrs.iter().any(|a| a.path().is_ident("inline")) {
+    // The target-feature helper is the feature-carrying frame. Forced inlining
+    // places even large generic kernels inside it while leaving the same inner
+    // function available to the scalar fallback.
+    if !inner_fn
+        .attrs
+        .iter()
+        .any(|attribute| attribute.path().is_ident("inline"))
+    {
         inner_fn.attrs.push(syn::parse_quote!(#[inline(always)]));
     }
     let inner_name = &inner_fn.sig.ident;
     let inner_args = &inner_fn.sig.inputs;
     let inner_ret = &inner_fn.sig.output;
     let inner_vis = &inner_fn.vis;
-    // The generated dispatcher is what callers see, so it inherits the
-    // annotated function's documentation. Without this the dispatcher is
-    // undocumented, which `#![deny(missing_docs)]` rejects for any `pub`
-    // kernel -- the reason every dispatch module here had to stay crate-local.
     let doc_attrs: Vec<syn::Attribute> = inner_fn
         .attrs
         .iter()
-        .filter(|a| a.path().is_ident("doc"))
+        .filter(|attribute| attribute.path().is_ident("doc"))
         .cloned()
         .collect();
 
-    // Find type/const parameters and identify the architecture parameter
-    let mut type_params = Vec::new();
-    for param in &inner_fn.sig.generics.params {
-        if let syn::GenericParam::Type(ty) = param {
-            type_params.push(ty);
-        }
-    }
+    let type_params: Vec<_> = inner_fn
+        .sig
+        .generics
+        .params
+        .iter()
+        .filter_map(|parameter| {
+            let syn::GenericParam::Type(parameter) = parameter else {
+                return None;
+            };
+            Some(parameter)
+        })
+        .collect();
 
     if type_params.is_empty() {
         return Err(Error::new(
             inner_name.span(),
-            "#[runtime_dispatch] target function must have at least one generic type parameter for the architecture"
+            "#[runtime_dispatch] target function must have at least one generic type parameter for the architecture",
         ));
     }
 
-    // Last type parameter is the architecture parameter
     let arch_param = type_params
         .last()
         .expect("type_params verified non-empty by preceding length check");
     let arch_ident = &arch_param.ident;
+    let scalar_type = kernel_scalar_type(&inner_fn.sig.generics, arch_ident);
 
-    // The other parameters (lifetimes, consts, other types)
     let other_params: Vec<syn::GenericParam> = inner_fn
         .sig
         .generics
         .params
         .iter()
-        .filter(|param| {
-            if let syn::GenericParam::Type(ty) = param {
-                ty.ident != *arch_ident
+        .filter(|parameter| {
+            if let syn::GenericParam::Type(parameter) = parameter {
+                parameter.ident != *arch_ident
             } else {
                 true
             }
@@ -396,68 +166,87 @@ pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
         .cloned()
         .collect();
 
-    // Other parameter identifiers/tokens to pass to turbofish
     let other_param_tokens: Vec<TokenStream> = inner_fn
         .sig
         .generics
         .params
         .iter()
-        .filter_map(|param| match param {
-            syn::GenericParam::Type(ty) if ty.ident != *arch_ident => {
-                let id = &ty.ident;
-                Some(quote!(#id))
+        .filter_map(|parameter| match parameter {
+            syn::GenericParam::Type(parameter) if parameter.ident != *arch_ident => {
+                let ident = &parameter.ident;
+                Some(quote!(#ident))
             }
-            syn::GenericParam::Const(c) => {
-                let id = &c.ident;
-                Some(quote!(#id))
+            syn::GenericParam::Const(parameter) => {
+                let ident = &parameter.ident;
+                Some(quote!(#ident))
             }
             _ => None,
         })
         .collect();
 
-    // Build the list of call argument identifiers (strip self/type info)
     let call_args: Vec<TokenStream> = inner_args
         .iter()
-        .filter_map(|arg| {
-            if let FnArg::Typed(pat_type) = arg {
-                if let Pat::Ident(pat_ident) = pat_type.pat.as_ref() {
-                    let ident = &pat_ident.ident;
-                    return Some(quote!(#ident));
-                }
-            }
-            None
+        .filter_map(|argument| {
+            let FnArg::Typed(argument) = argument else {
+                return None;
+            };
+            let Pat::Ident(pattern) = argument.pat.as_ref() else {
+                return None;
+            };
+            let ident = &pattern.ident;
+            Some(quote!(#ident))
         })
         .collect();
 
-    // The public dispatch function has the same name minus any generic suffix
-    // Convention: inner fn is named `my_kernel_impl`, dispatcher becomes `my_kernel`
     let dispatch_name = {
-        let name_str = inner_name.to_string();
-        let stripped = name_str
+        let name = inner_name.to_string();
+        let stripped = name
             .strip_suffix("_kernel")
-            .or_else(|| name_str.strip_suffix("_impl"))
-            .unwrap_or(&name_str);
+            .or_else(|| name.strip_suffix("_impl"))
+            .unwrap_or(&name);
         Ident::new(stripped, Span::call_site())
     };
+    let avx2_adapter_name = scalar_type.as_ref().map(|_| {
+        format_ident!(
+            "__Hermes{}Avx2Frame",
+            upper_camel_case(&dispatch_name.to_string())
+        )
+    });
+    let avx2_adapter = scalar_type
+        .as_ref()
+        .zip(avx2_adapter_name.as_ref())
+        .map(|(scalar, adapter_name)| {
+            generate_avx2_frame_adapter(
+                adapter_name,
+                inner_name,
+                inner_args,
+                inner_ret,
+                &other_params,
+                &other_param_tokens,
+                &call_args,
+                arch_ident,
+                scalar,
+                inner_fn.sig.generics.where_clause.as_ref(),
+            )
+        })
+        .transpose()?;
 
     let x86_targets: Vec<DispatchTarget> = targets
         .iter()
-        .filter(|t| {
+        .filter(|target| {
             matches!(
-                t,
+                target,
                 DispatchTarget::Avx512f | DispatchTarget::Avx2 | DispatchTarget::Scalar
             )
         })
         .cloned()
         .collect();
-
     let aarch64_targets: Vec<DispatchTarget> = targets
         .iter()
-        .filter(|t| matches!(t, DispatchTarget::Neon | DispatchTarget::Scalar))
+        .filter(|target| matches!(target, DispatchTarget::Neon | DispatchTarget::Scalar))
         .cloned()
         .collect();
-
-    let fallback_targets: Vec<DispatchTarget> = vec![DispatchTarget::Scalar];
+    let fallback_targets = vec![DispatchTarget::Scalar];
 
     let x86_dispatcher = generate_dispatcher(
         &quote!(any(target_arch = "x86", target_arch = "x86_64")),
@@ -471,6 +260,9 @@ pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
         &other_param_tokens,
         &call_args,
         arch_ident,
+        &arch_param.bounds,
+        scalar_type.as_ref(),
+        avx2_adapter_name.as_ref(),
         inner_fn.sig.generics.where_clause.as_ref(),
         &doc_attrs,
     );
@@ -487,6 +279,9 @@ pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
         &other_param_tokens,
         &call_args,
         arch_ident,
+        &arch_param.bounds,
+        scalar_type.as_ref(),
+        None,
         inner_fn.sig.generics.where_clause.as_ref(),
         &doc_attrs,
     );
@@ -507,15 +302,16 @@ pub fn expand(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
         &other_param_tokens,
         &call_args,
         arch_ident,
+        &arch_param.bounds,
+        scalar_type.as_ref(),
+        None,
         inner_fn.sig.generics.where_clause.as_ref(),
         &doc_attrs,
     );
 
     Ok(quote! {
-        // Keep the inner generic kernel function (private/hidden)
         #inner_fn
-
-        // Generate the three dispatcher functions
+        #avx2_adapter
         #x86_dispatcher
         #aarch64_dispatcher
         #fallback_dispatcher

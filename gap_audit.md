@@ -818,6 +818,9 @@ assessed against a float-lane trait, not a general one.
   was available, so they were deleted rather than retained as unverified
   optimizations. The explicit AVX-512 benchmark rows remain the re-open
   instrument when suitable hardware is available.
+- Delivery: provider `4af1b25`, PR #94 merge `93ba7ce`, and exact hosted run
+  `33139847261` green across bounded benchmarks, x86, native AArch64, SDE,
+  Miri, no-std, dependency policy, and lock integrity.
 
 ### Backend matrix
 
@@ -1159,6 +1162,25 @@ order (correctness → architecture → tests → docs → PM).
   auto-vectorizes); hardware core deferred until a consumer needs it —
   remaining emulated gap is gather/compress/mask ops (scalar loops), deferred
   until a sparse-integer consumer exists. See CHANGELOG [Unreleased].
+
+### F16 dispatch-frame probe hoist (HS-F16-DISPATCH-PROBE-HOIST-2026-08-27)
+
+- **Resolved 2026-08-28 — repeated F16C probes in dispatched arithmetic.** The
+  F16 AVX2 implementation previously entered an `avx2,fma` dispatch helper, so
+  each add, multiply, and fused multiply-add repeated the cached F16C check and
+  called a separate conversion helper. Runtime dispatch now selects one
+  `avx2,fma,f16c` frame and monomorphizes the complete kernel with a private
+  proven marker. The public `Avx2` marker retains its direct-operation probe and
+  software fallback for AVX2 hosts without F16C.
+- **Exact codegen evidence:** the release F16 dot helper contains zero
+  `FeatureCache` references and zero fallback arithmetic calls; its body emits
+  68 `vcvtph2ps`, 30 `vcvtps2ph`, 6 `vaddps`, 10 `vmulps`, and 14 `vfmadd*`
+  instructions. The ordinary f32/f64 AVX2 frame remains `avx2,fma`.
+- **Controlled measurement:** on an Intel Core Ultra 9 285K, the unchanged
+  `Dense Dot f16/dispatch/16384` Criterion row measured 2.489–2.515 µs and
+  2.526–2.554 µs before the change, then 1.086–1.091 µs and 1.087–1.099 µs on
+  two final runs (2.30–2.33x by point estimate). This is empirical evidence for
+  that host and workload, not a cross-microarchitecture throughput guarantee.
 
 ### Memory / zero-copy
 

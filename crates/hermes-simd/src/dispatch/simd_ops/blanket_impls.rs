@@ -261,7 +261,7 @@ macro_rules! impl_simd_ops_methods {
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 impl<T> SimdOps for T
 where
-    T: ScalarTrait + private::Sealed,
+    T: ScalarTrait + private::Sealed + hermes_simd_intrinsics::x86_64::avx2_f16::Avx2FrameScalar,
     ScalarArch: hermes_simd_core::kernel::SimdKernel<T>,
     Avx2: hermes_simd_core::kernel::SimdKernel<T>,
     Avx512: hermes_simd_core::kernel::SimdKernel<T>,

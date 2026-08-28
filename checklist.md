@@ -12,7 +12,19 @@
       including host-independent compile coverage for unavailable ISAs.
 - [x] Run focused, release, all-target, cross-target, docs, and SemVer gates;
       synchronize evidence, and obtain an independent judge verdict.
-- [ ] Publish PR #94, collect exact hosted verification, and merge.
+- [x] Publish PR #94, collect exact hosted verification, and merge.
+
+## HS-F16-DISPATCH-PROBE-HOIST-2026-08-27 [minor]
+
+- [x] Record the current F16 AVX2 codegen and controlled runtime baseline,
+      including the probe/call count inside an unchanged arithmetic kernel.
+- [x] Select the narrowest dispatch-boundary design that preserves the AVX2
+      f32/f64 route and F16 software fallback on hosts without F16C.
+- [x] Implement one F16C target-feature entry with probe-free lane operations;
+      add boundary, differential, and no-std coverage.
+- [x] Re-run exact codegen, two unchanged benchmark comparisons, focused and
+      workspace gates, docs, SemVer, and independent artifact review.
+- [ ] Publish, collect exact hosted verification, merge, and discharge the item.
 
 ## HS-ARGEXTREMA-ONE-PASS-2026-08-27 [patch]
 

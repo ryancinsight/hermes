@@ -29,6 +29,10 @@ pub trait SimdStorage<T: Scalar>: crate::private::Sealed {
 
     /// Whether the backend provides a non-temporal store.
     const SUPPORTS_NT_STORE: bool;
+
+    /// Whether this scalar/backend pair needs the x86 F16C target frame.
+    #[doc(hidden)]
+    const REQUIRES_F16C: bool = false;
 }
 
 impl<T: Scalar, A: BackendKernel<T>> SimdStorage<T> for A {
@@ -39,4 +43,5 @@ impl<T: Scalar, A: BackendKernel<T>> SimdStorage<T> for A {
     const LANE_COUNT: usize = <A as BackendKernel<T>>::LANE_COUNT;
     const UNROLL_FACTOR: usize = <A as BackendKernel<T>>::UNROLL_FACTOR;
     const SUPPORTS_NT_STORE: bool = <A as BackendKernel<T>>::SUPPORTS_NT_STORE;
+    const REQUIRES_F16C: bool = <A as BackendKernel<T>>::REQUIRES_F16C;
 }

@@ -25,6 +25,12 @@ mod sparse_data;
 
 /// Attribute macro that wraps a generic kernel function with CPU-feature runtime dispatch.
 ///
+/// The final generic type parameter is the architecture parameter. Its inline
+/// bounds and `where` predicates are specialized for each selected backend.
+/// Borrowed outputs follow Rust lifetime elision: one input lifetime is reused,
+/// while signatures with multiple input lifetimes require an explicit output
+/// lifetime.
+///
 /// # Usage
 ///
 /// ```rust,ignore

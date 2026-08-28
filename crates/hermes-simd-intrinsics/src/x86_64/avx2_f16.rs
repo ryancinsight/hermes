@@ -8,13 +8,19 @@
 //! conversions in hardware — so the hot arithmetic methods (`add`/`sub`/`mul`/
 //! `fmadd`) execute convert→AVX-op→convert with results **identical** to the
 //! software path on all numeric values (NaN payload bits follow the hardware
-//! quieting convention, as with every native backend). Each method probes F16C
-//! once via the cached `is_x86_feature_detected!` (compile-time `cfg!` under
-//! `no_std`) and falls back to the per-lane software loop when absent, so the
-//! kernel stays sound on an AVX2-without-F16C host.
+//! quieting convention, as with every native backend). Dispatched kernels probe
+//! F16C once at the operation boundary and enter a complete `avx2,fma,f16c`
+//! target-feature frame. Direct AVX2 F16 values retain a per-operation cached
+//! probe and software fallback, preserving safe execution on AVX2 hosts without
+//! F16C.
 //!
 //! Everything outside the arithmetic core (loads, masks, gather, compress) is
 //! conversion-free and remains the plain 16-lane array form.
+
+mod frame;
+
+#[doc(hidden)]
+pub use frame::{Avx2FrameKernel, Avx2FrameScalar};
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use crate::Avx2;
@@ -23,13 +29,38 @@ use eunomia::F16;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use hermes_simd_core::kernel::BackendKernel;
 
+/// Internal AVX2 frame whose F16C requirement is proven by dispatch.
+///
+/// This marker never enters the public backend surface. It exists so a
+/// dispatched kernel and a directly constructed [`Avx2`] value can retain
+/// different arithmetic preconditions without a per-operation branch.
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[derive(Clone, Copy)]
+struct Avx2F16c;
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+impl hermes_simd_core::arch::SimdArch for Avx2F16c {
+    const NAME: &'static str = "avx2";
+    const REGISTER_WIDTH_BITS: u32 = 256;
+    const ISA_FAMILY: hermes_simd_core::arch::IsaFamily = hermes_simd_core::arch::IsaFamily::X86;
+    const FMA_THROUGHPUT_HINT: u32 = 4;
+
+    #[inline(always)]
+    fn is_runtime_supported() -> bool {
+        true
+    }
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+impl hermes_simd_core::private::Sealed for Avx2F16c {}
+
 /// True when the F16C + FMA hardware-conversion path may be entered.
 ///
 /// Under `std` this is the cached runtime probe (a relaxed atomic load after
-/// first use — negligible against a 16-lane operation); without `std` it falls
-/// back to the compile-time target-feature state, mirroring the dispatch
-/// macro's no-std arm. FMA is probed together with F16C because `fmadd` fuses
-/// in f32; on every shipping CPU the two coexist (both are AVX2-era features).
+/// first use); without `std` it falls back to the compile-time target-feature
+/// state. Only direct backend use calls this probe; the private dispatched
+/// frame carries the boundary proof in its type and therefore reports support
+/// without repeating detection inside views or arithmetic operations.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[inline(always)]
 fn f16c_fma_available() -> bool {
@@ -66,8 +97,8 @@ mod f16c {
     const ROUND_NEAREST: i32 = _MM_FROUND_TO_NEAREST_INT;
 
     /// # Safety
-    /// Caller must ensure `avx` and `f16c` are supported (enforced by the
-    /// `f16c_fma_available` probe at every call site).
+    /// Caller must ensure `avx` and `f16c` are supported, either through the
+    /// complete dispatch target frame or the direct-operation probe.
     #[inline]
     #[target_feature(enable = "avx,f16c")]
     unsafe fn to_f32_halves(v: &[F16; 16]) -> (__m256, __m256) {
@@ -149,6 +180,7 @@ impl BackendKernel<F16> for Avx2 {
     type Mask = [bool; 16];
     type IndexVector = [i32; 16];
     const LANE_COUNT: usize = 16;
+    const REQUIRES_F16C: bool = true;
     const UNROLL_FACTOR: usize = 4;
 
     #[inline(always)]
@@ -178,7 +210,7 @@ impl BackendKernel<F16> for Avx2 {
     #[inline(always)]
     unsafe fn add(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         if f16c_fma_available() {
-            // SAFETY: probe confirmed `f16c` (and `fma`) on this host.
+            // SAFETY: the probe confirms F16C and AVX is part of AVX2 support.
             return f16c::add(a, b);
         }
         core::array::from_fn(|i| a[i] + b[i])
@@ -187,7 +219,7 @@ impl BackendKernel<F16> for Avx2 {
     #[inline(always)]
     unsafe fn mul(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         if f16c_fma_available() {
-            // SAFETY: probe confirmed `f16c` (and `fma`) on this host.
+            // SAFETY: the probe confirms F16C and AVX is part of AVX2 support.
             return f16c::mul(a, b);
         }
         core::array::from_fn(|i| a[i] * b[i])
@@ -196,7 +228,7 @@ impl BackendKernel<F16> for Avx2 {
     #[inline(always)]
     unsafe fn sub(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         if f16c_fma_available() {
-            // SAFETY: probe confirmed `f16c` (and `fma`) on this host.
+            // SAFETY: the probe confirms F16C and AVX is part of AVX2 support.
             return f16c::sub(a, b);
         }
         core::array::from_fn(|i| a[i] - b[i])
@@ -205,7 +237,7 @@ impl BackendKernel<F16> for Avx2 {
     #[inline(always)]
     unsafe fn fmadd(a: Self::Vector, b: Self::Vector, c: Self::Vector) -> Self::Vector {
         if f16c_fma_available() {
-            // SAFETY: probe confirmed `f16c` and `fma` on this host.
+            // SAFETY: the probe confirms F16C and FMA; AVX is part of AVX2 support.
             return f16c::fmadd(a, b, c);
         }
         core::array::from_fn(|i| F16::from_f32(a[i].to_f32().mul_add(b[i].to_f32(), c[i].to_f32())))
