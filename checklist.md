@@ -6,12 +6,13 @@
       features, callers, and f32/f64 test coverage for all four backends.
 - [x] Add one focused instrument whose explicit backend rows compare native
       and forced-generic builds before retaining any network.
-- [ ] Implement canonical register networks only where two bounded runs and
+- [x] Implement canonical register networks only where two bounded runs and
       exact assembly show a repeatable win without a scalar bounce.
-- [ ] Extend index-coded reference and involution properties across f32/f64,
+- [x] Extend index-coded reference and involution properties across f32/f64,
       including host-independent compile coverage for unavailable ISAs.
-- [ ] Run focused, release, all-target, cross-target, docs, and SemVer gates;
-      synchronize evidence, obtain an independent judge, publish, and merge.
+- [x] Run focused, release, all-target, cross-target, docs, and SemVer gates;
+      synchronize evidence, and obtain an independent judge verdict.
+- [ ] Publish PR #94, collect exact hosted verification, and merge.
 
 ## HS-ARGEXTREMA-ONE-PASS-2026-08-27 [patch]
 

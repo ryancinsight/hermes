@@ -1160,10 +1160,9 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
     /// row buffers (`MAX_SIMD_LANES` elements each because associated consts
     /// cannot size arrays on stable — never a `MAX_SIMD_LANES`-squared frame,
     /// which reserved 16–32 KiB of stack for tiles that are at most
-    /// `LANE_COUNT`²; overriding backends never pay it). AVX2 and AVX-512
-    /// floating-point backends override with unpack/cross-half permute
-    /// networks; NEON f32 uses a `trn`/`zip` network while its two-lane f64
-    /// path takes the generic default.
+    /// `LANE_COUNT`²; overriding backends never pay it). AVX2 f32/f64 override
+    /// with unpack/cross-half permute networks; NEON f32 uses a `trn`/`zip`
+    /// network. AVX-512 and NEON f64 take the generic default.
     ///
     /// # Safety
     /// Processor must support the required target feature. `tile` must hold

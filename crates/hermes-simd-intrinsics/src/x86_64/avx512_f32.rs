@@ -27,10 +27,7 @@ use core::arch::x86_64::{
     _MM_FROUND_TO_NEG_INF, _MM_FROUND_TO_POS_INF, _MM_FROUND_TO_ZERO,
 };
 #[cfg(not(hermes_benchmark_generic_default))]
-use core::arch::x86_64::{
-    _mm512_permutex2var_ps, _mm512_permutexvar_ps, _mm512_setr_epi32, _mm512_shuffle_f32x4,
-    _mm512_shuffle_ps, _mm512_unpackhi_ps, _mm512_unpacklo_ps,
-};
+use core::arch::x86_64::{_mm512_permutex2var_ps, _mm512_permutexvar_ps, _mm512_setr_epi32};
 use hermes_simd_core::kernel::BackendKernel;
 
 /// Newtype over `__m512` providing `Send + Sync`.
@@ -157,94 +154,6 @@ impl BackendKernel<f32> for Avx512 {
         // Each 128-bit block holds two f32 pairs; `0b0100_1110` exchanges the
         // two 64-bit pairs within every block.
         Avx512F32Vec(_mm512_permute_ps::<0b0100_1110>(v.0))
-    }
-
-    // SAFETY: caller must ensure the target CPU supports `avx512f` and `tile`
-    // holds exactly sixteen rows; the dispatcher and safe vector wrapper
-    // enforce those requirements before entering this backend method.
-    #[target_feature(enable = "avx512f")]
-    #[inline]
-    #[cfg(not(hermes_benchmark_generic_default))]
-    unsafe fn transpose_square(tile: &mut [Self::Vector]) {
-        let tile: &mut [Self::Vector; 16] = tile
-            .try_into()
-            .expect("invariant: tile holds exactly LANE_COUNT rows");
-
-        let (a0, a4, a1, a5, a2, a6, a3, a7) = {
-            let t0 = _mm512_unpacklo_ps(tile[0].0, tile[1].0);
-            let t1 = _mm512_unpackhi_ps(tile[0].0, tile[1].0);
-            let t2 = _mm512_unpacklo_ps(tile[2].0, tile[3].0);
-            let t3 = _mm512_unpackhi_ps(tile[2].0, tile[3].0);
-            let t4 = _mm512_unpacklo_ps(tile[4].0, tile[5].0);
-            let t5 = _mm512_unpackhi_ps(tile[4].0, tile[5].0);
-            let t6 = _mm512_unpacklo_ps(tile[6].0, tile[7].0);
-            let t7 = _mm512_unpackhi_ps(tile[6].0, tile[7].0);
-
-            let s0 = _mm512_shuffle_ps::<0x44>(t0, t2);
-            let s4 = _mm512_shuffle_ps::<0x44>(t4, t6);
-            let s1 = _mm512_shuffle_ps::<0xEE>(t0, t2);
-            let s5 = _mm512_shuffle_ps::<0xEE>(t4, t6);
-            let s2 = _mm512_shuffle_ps::<0x44>(t1, t3);
-            let s6 = _mm512_shuffle_ps::<0x44>(t5, t7);
-            let s3 = _mm512_shuffle_ps::<0xEE>(t1, t3);
-            let s7 = _mm512_shuffle_ps::<0xEE>(t5, t7);
-            (
-                _mm512_shuffle_f32x4::<0x88>(s0, s4),
-                _mm512_shuffle_f32x4::<0xDD>(s0, s4),
-                _mm512_shuffle_f32x4::<0x88>(s1, s5),
-                _mm512_shuffle_f32x4::<0xDD>(s1, s5),
-                _mm512_shuffle_f32x4::<0x88>(s2, s6),
-                _mm512_shuffle_f32x4::<0xDD>(s2, s6),
-                _mm512_shuffle_f32x4::<0x88>(s3, s7),
-                _mm512_shuffle_f32x4::<0xDD>(s3, s7),
-            )
-        };
-        let (b0, b4, b1, b5, b2, b6, b3, b7) = {
-            let t0 = _mm512_unpacklo_ps(tile[8].0, tile[9].0);
-            let t1 = _mm512_unpackhi_ps(tile[8].0, tile[9].0);
-            let t2 = _mm512_unpacklo_ps(tile[10].0, tile[11].0);
-            let t3 = _mm512_unpackhi_ps(tile[10].0, tile[11].0);
-            let t4 = _mm512_unpacklo_ps(tile[12].0, tile[13].0);
-            let t5 = _mm512_unpackhi_ps(tile[12].0, tile[13].0);
-            let t6 = _mm512_unpacklo_ps(tile[14].0, tile[15].0);
-            let t7 = _mm512_unpackhi_ps(tile[14].0, tile[15].0);
-
-            let s0 = _mm512_shuffle_ps::<0x44>(t0, t2);
-            let s4 = _mm512_shuffle_ps::<0x44>(t4, t6);
-            let s1 = _mm512_shuffle_ps::<0xEE>(t0, t2);
-            let s5 = _mm512_shuffle_ps::<0xEE>(t4, t6);
-            let s2 = _mm512_shuffle_ps::<0x44>(t1, t3);
-            let s6 = _mm512_shuffle_ps::<0x44>(t5, t7);
-            let s3 = _mm512_shuffle_ps::<0xEE>(t1, t3);
-            let s7 = _mm512_shuffle_ps::<0xEE>(t5, t7);
-            (
-                _mm512_shuffle_f32x4::<0x88>(s0, s4),
-                _mm512_shuffle_f32x4::<0xDD>(s0, s4),
-                _mm512_shuffle_f32x4::<0x88>(s1, s5),
-                _mm512_shuffle_f32x4::<0xDD>(s1, s5),
-                _mm512_shuffle_f32x4::<0x88>(s2, s6),
-                _mm512_shuffle_f32x4::<0xDD>(s2, s6),
-                _mm512_shuffle_f32x4::<0x88>(s3, s7),
-                _mm512_shuffle_f32x4::<0xDD>(s3, s7),
-            )
-        };
-
-        tile[0] = Avx512F32Vec(_mm512_shuffle_f32x4::<0x88>(a0, b0));
-        tile[8] = Avx512F32Vec(_mm512_shuffle_f32x4::<0xDD>(a0, b0));
-        tile[4] = Avx512F32Vec(_mm512_shuffle_f32x4::<0x88>(a4, b4));
-        tile[12] = Avx512F32Vec(_mm512_shuffle_f32x4::<0xDD>(a4, b4));
-        tile[1] = Avx512F32Vec(_mm512_shuffle_f32x4::<0x88>(a1, b1));
-        tile[9] = Avx512F32Vec(_mm512_shuffle_f32x4::<0xDD>(a1, b1));
-        tile[5] = Avx512F32Vec(_mm512_shuffle_f32x4::<0x88>(a5, b5));
-        tile[13] = Avx512F32Vec(_mm512_shuffle_f32x4::<0xDD>(a5, b5));
-        tile[2] = Avx512F32Vec(_mm512_shuffle_f32x4::<0x88>(a2, b2));
-        tile[10] = Avx512F32Vec(_mm512_shuffle_f32x4::<0xDD>(a2, b2));
-        tile[6] = Avx512F32Vec(_mm512_shuffle_f32x4::<0x88>(a6, b6));
-        tile[14] = Avx512F32Vec(_mm512_shuffle_f32x4::<0xDD>(a6, b6));
-        tile[3] = Avx512F32Vec(_mm512_shuffle_f32x4::<0x88>(a3, b3));
-        tile[11] = Avx512F32Vec(_mm512_shuffle_f32x4::<0xDD>(a3, b3));
-        tile[7] = Avx512F32Vec(_mm512_shuffle_f32x4::<0x88>(a7, b7));
-        tile[15] = Avx512F32Vec(_mm512_shuffle_f32x4::<0xDD>(a7, b7));
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
