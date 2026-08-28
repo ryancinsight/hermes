@@ -6,6 +6,12 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch][HS-AVX512-TRANSPOSE] Add the AVX-512 f64 `transpose_square`
+  override, a 24-shuffle 8x8 network replacing the stack-capture default.
+  The permutation algebra is verified symbolically and the existing
+  per-backend property law covers it under the SDE job; it is unmeasured on
+  hardware, the development host having no AVX-512.
+
 - [patch][arch][HS-SPMV-SHORT-ROW-MASKED] Split the private SpMV
   implementation into format-owned CSR, DenseWithMask, Blocked-COO, and SELL-p
   leaf modules under ADR 019. DenseWithMask rows shorter than half a register
