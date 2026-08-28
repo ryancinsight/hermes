@@ -37,8 +37,11 @@
   rounding.
   **Last update:** 2026-08-27.
 
-## HS-TRANSPOSE-NETWORKS-2026-08-27 — In-register transpose_square permute networks [minor] — todo
+## HS-TRANSPOSE-NETWORKS-2026-08-27 — In-register transpose_square permute networks [minor] — in progress
 
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+  **Lease:** backend transpose overrides, f32 transpose properties, focused
+  transpose benchmark, this item, and its checklist through the next commit.
 - **Outcome:** add unpack/permute `transpose_square` networks for AVX2 f32
   (8x8), AVX-512 f64 (8x8), AVX-512 f32 (16x16), and NEON f32 (`vtrn`/`vzip`
   4x4). Only AVX2 f64 and NEON f64 have native networks today; every other

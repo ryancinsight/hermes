@@ -1,5 +1,18 @@
 # Checklist — active sprint
 
+## HS-TRANSPOSE-NETWORKS-2026-08-27 [minor]
+
+- [ ] Reconcile the default and existing native transpose contracts, target
+      features, callers, and f32/f64 test coverage for all four backends.
+- [ ] Add one focused same-binary benchmark comparing native overrides with the
+      forced generic default before retaining any network.
+- [ ] Implement canonical register networks only where two bounded runs and
+      exact assembly show a repeatable win without a scalar bounce.
+- [ ] Extend index-coded reference and involution properties across f32/f64,
+      including host-independent compile coverage for unavailable ISAs.
+- [ ] Run focused, release, all-target, cross-target, docs, and SemVer gates;
+      synchronize evidence, obtain an independent judge, publish, and merge.
+
 ## HS-ARGEXTREMA-ONE-PASS-2026-08-27 [patch]
 
 - [x] Reconcile the public empty, NaN, first-tie, signed-zero, and generic
