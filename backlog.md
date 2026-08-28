@@ -76,8 +76,12 @@
   before closure.
   **Last update:** 2026-08-28.
 
-## HS-MASKED-TAIL-PARTIAL-LOAD-2026-08-27 — Partial masked load/store seam for dispatch tails [minor] — todo
+## HS-MASKED-TAIL-PARTIAL-LOAD-2026-08-27 — Partial masked load/store seam for dispatch tails [minor] — in progress
 
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+  **Lease:** the same task owns masked load/store contracts and conformance,
+  dispatch tail routing, the focused benchmark row, and this item's PM regions
+  through the next commit.
 - **Outcome:** dispatch tail helpers (`dispatch/axpy.rs:22-53` and siblings)
   zero-fill 0.5–1.5 KiB stack buffers per tail because
   `masked_load/store_unaligned` demand full-`LANE_COUNT` validity for AVX2's
@@ -86,6 +90,12 @@
   route tails through it.
 - **Acceptance oracle:** criterion evidence on short-tail workloads; masked
   conformance suites instantiate the new seam across backends.
+- **Scope / non-goals:** preserve existing full-width masked operations and
+  arithmetic semantics; do not add per-backend public types, allocate, or
+  weaken the dispatch tail's exact-length behavior.
+- **Dependencies / risk:** additive public [minor] backend capability. The
+  default must remain sound for every scalar and backend, while native
+  overrides may touch only the active prefix. **Last update:** 2026-08-28.
 
 ## HS-SPMV-SHORT-ROW-MASKED-2026-08-27 — Masked single-vector body for short SpMV rows [patch] — todo
 
