@@ -16,6 +16,8 @@ const NCOLS: usize = 1024;
 const ROW_SWEEP: [usize; 3] = [1024, 10_000, 100_000];
 const DENSE_ROW_SWEEP: [usize; 2] = [1024, 10_000];
 const DENSITIES: [f64; 3] = [0.001, 0.01, 0.10];
+const SHORT_ROWS: usize = 4096;
+const SHORT_WIDTHS: [usize; 3] = [3, 7, 15];
 
 #[derive(Clone, Copy)]
 struct MatrixCase {
@@ -59,6 +61,20 @@ fn make_csr(case: MatrixCase) -> (Vec<f32>, Vec<i32>, Vec<i32>) {
             col_indices.push(col_for(row, ordinal) as i32);
         }
         row_ptr.push(values.len() as i32);
+    }
+    (values, col_indices, row_ptr)
+}
+
+fn make_short_csr(ncols: usize) -> (Vec<f32>, Vec<i32>, Vec<i32>) {
+    let nnz = SHORT_ROWS * ncols;
+    let values = vec![1.0; nnz];
+    let mut col_indices = Vec::with_capacity(nnz);
+    let mut row_ptr = Vec::with_capacity(SHORT_ROWS + 1);
+    row_ptr.push(0);
+
+    for _ in 0..SHORT_ROWS {
+        col_indices.extend((0..ncols).map(|column| column as i32));
+        row_ptr.push(col_indices.len() as i32);
     }
     (values, col_indices, row_ptr)
 }
@@ -144,6 +160,47 @@ fn bench_csr_spmv(c: &mut Criterion) {
                 });
             });
         }
+    }
+    group.finish();
+}
+
+fn bench_short_row_spmv(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Short-row SpMV f32");
+    for ncols in SHORT_WIDTHS {
+        let x = vec![1.0f32; ncols];
+        let logical_elements = (SHORT_ROWS * ncols) as u64;
+
+        let (values, columns, row_ptr) = make_short_csr(ncols);
+        let csr = ValidatedData::new(CsrData::new(&values, &columns, &row_ptr, SHORT_ROWS, ncols))
+            .expect("short-row CSR fixture must validate");
+        let mut csr_y = vec![0.0f32; SHORT_ROWS];
+        group.throughput(Throughput::Elements(logical_elements));
+        group.bench_with_input(BenchmarkId::new("csr", ncols), &ncols, |bench, _| {
+            bench.iter(|| {
+                csr_y.fill(0.0);
+                spmv_csr::<f32>(csr.clone(), black_box(&x), black_box(&mut csr_y));
+                black_box(csr_y[SHORT_ROWS - 1]);
+            });
+        });
+
+        let dense_values = vec![1.0f32; SHORT_ROWS * ncols];
+        let alternating: Vec<bool> = (0..dense_values.len())
+            .map(|index| index % 2 == 0)
+            .collect();
+        let dense_mask = PackedMask::from_bools(&alternating);
+        let dense = DenseWithMaskData::new(&dense_values, dense_mask.as_view(), SHORT_ROWS, ncols);
+        let mut dense_y = vec![0.0f32; SHORT_ROWS];
+        group.bench_with_input(
+            BenchmarkId::new("dense_alternating", ncols),
+            &ncols,
+            |bench, _| {
+                bench.iter(|| {
+                    dense_y.fill(0.0);
+                    spmv_dense_masked::<f32>(dense.clone(), black_box(&x), black_box(&mut dense_y));
+                    black_box(dense_y[SHORT_ROWS - 1]);
+                });
+            },
+        );
     }
     group.finish();
 }
@@ -266,6 +323,7 @@ fn bench_dense_masked_spmv(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_csr_spmv,
+    bench_short_row_spmv,
     bench_sellp_spmv,
     bench_bcoo_spmv,
     bench_dense_masked_spmv
