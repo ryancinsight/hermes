@@ -22,12 +22,15 @@ use core::arch::x86_64::{
     _mm512_min_pd, _mm512_movedup_pd, _mm512_mul_pd, _mm512_or_si512, _mm512_permute_pd,
     _mm512_reduce_add_pd, _mm512_roundscale_pd, _mm512_set1_pd, _mm512_setzero_pd,
     _mm512_setzero_si512, _mm512_shuffle_f64x2, _mm512_sqrt_pd, _mm512_store_pd, _mm512_storeu_pd,
-    _mm512_stream_pd, _mm512_sub_pd, _mm512_unpackhi_pd, _mm512_unpacklo_pd, _mm512_xor_si512,
+    _mm512_stream_pd, _mm512_sub_pd, _mm512_xor_si512,
     _CMP_EQ_OQ, _CMP_GE_OQ, _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ, _MM_FROUND_NO_EXC,
     _MM_FROUND_TO_NEAREST_INT, _MM_FROUND_TO_NEG_INF, _MM_FROUND_TO_POS_INF, _MM_FROUND_TO_ZERO,
 };
 #[cfg(not(hermes_benchmark_generic_default))]
-use core::arch::x86_64::{_mm512_permutex2var_pd, _mm512_permutexvar_pd, _mm512_setr_epi64};
+use core::arch::x86_64::{
+    _mm512_permutex2var_pd, _mm512_permutexvar_pd, _mm512_setr_epi64, _mm512_unpackhi_pd,
+    _mm512_unpacklo_pd,
+};
 use hermes_simd_core::kernel::BackendKernel;
 
 /// Newtype over `__m512d` providing `Send + Sync`.
