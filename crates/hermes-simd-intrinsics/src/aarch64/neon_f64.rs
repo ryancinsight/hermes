@@ -192,19 +192,6 @@ impl BackendKernel<f64> for Neon {
         NeonF64Vec(vtrn2q_f64(v.0, v.0))
     }
 
-    // SAFETY: NEON is mandatory on aarch64; operands are whole registers.
-    #[target_feature(enable = "neon")]
-    #[inline]
-    #[cfg(not(hermes_benchmark_generic_default))]
-    unsafe fn transpose_square(tile: &mut [Self::Vector]) {
-        debug_assert_eq!(tile.len(), 2, "tile must hold LANE_COUNT rows");
-        // The two-lane transpose is one trn1/trn2 pair.
-        let lo = vtrn1q_f64(tile[0].0, tile[1].0);
-        let hi = vtrn2q_f64(tile[0].0, tile[1].0);
-        tile[0] = NeonF64Vec(lo);
-        tile[1] = NeonF64Vec(hi);
-    }
-
     /// NEON has no alternating-FMA instruction; sign-flip the even lane of
     /// `c` (one XOR) then fuse with `vfmaq_f64`, which is rounding-identical
     /// to a native `fmaddsub`.

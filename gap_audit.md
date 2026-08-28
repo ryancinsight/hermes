@@ -802,6 +802,23 @@ assessed against a float-lane trait, not a general one.
   timing is assigned to HS-429's `test-avx512-hosted` job (SDE is semantic
   evidence, not timing evidence).
 
+### Square-transpose networks (HS-TRANSPOSE-NETWORKS, 2026-08-27)
+
+- Retained: AVX2 f32's 8x8 register network reduces 408–421 ns to 4.21–4.32 ns
+  across two unchanged Core Ultra 9 285K comparisons. NEON f32's 4x4 network
+  repeats at 3.536–3.544 ns versus 7.281–7.324 ns for the generic default in
+  hosted AArch64 runs `33137876655` and `33138579478`. Exact release assembly
+  contains one tile-length branch followed by register shuffles with no scalar
+  lane traffic.
+- Removed: the incumbent NEON f64 `trn1`/`trn2` override measures
+  2.265–2.268 ns versus 2.080–2.086 ns for LLVM's generic lowering. The generic
+  route repeats at 2.075–2.083 ns after removal. Provisional AVX-512 f32/f64
+  networks passed the index-coded oracle under Sapphire Rapids emulation and
+  produced spill-free exact assembly, but no controlled real-silicon timing
+  was available, so they were deleted rather than retained as unverified
+  optimizations. The explicit AVX-512 benchmark rows remain the re-open
+  instrument when suitable hardware is available.
+
 ### Backend matrix
 
 - [major] Resolved as HS-425. `TargetId::Sve` now routes through both forced

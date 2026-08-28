@@ -263,17 +263,29 @@ fn check_permutes<A: SimdKernel<f32>>() {
 
 /// `transpose_square` must move lane `c` of row `r` to lane `r` of row `c`,
 /// checked against a flat index-coded reference, and be an involution. Run
-/// per backend so overrides (AVX2 f64's unpack network, NEON f64's
-/// `trn1`/`trn2`) and the stack-capture default meet one specification.
-fn check_transpose_square<A: SimdKernel<f64>>() {
+/// both precisions per backend so every native network and the stack-capture
+/// default meet one specification.
+fn transpose_fixture_value<T: From<u16>>(row: usize, column: usize) -> T {
+    let encoded = row
+        .checked_mul(100)
+        .and_then(|base| base.checked_add(column))
+        .expect("fixture coordinates must fit in usize");
+    T::from(u16::try_from(encoded).expect("fixture value must fit in u16"))
+}
+
+fn check_transpose_square<T, A>()
+where
+    T: hermes_simd_core::Scalar + PartialEq + core::fmt::Debug + From<u16>,
+    A: SimdKernel<T>,
+{
     let lanes = A::LANE_COUNT;
     // Row r, lane c holds 100 * r + c, so any misrouting is visible.
-    let rows: Vec<Vec<f64>> = (0..lanes)
-        .map(|r| (0..lanes).map(|c| (100 * r + c) as f64).collect())
+    let rows: Vec<Vec<T>> = (0..lanes)
+        .map(|r| (0..lanes).map(|c| transpose_fixture_value(r, c)).collect())
         .collect();
 
-    let mut out = vec![vec![0.0f64; lanes]; lanes];
-    let mut twice = vec![vec![0.0f64; lanes]; lanes];
+    let mut out = rows.clone();
+    let mut twice = rows.clone();
     // SAFETY: caller gates on the required target features for `A`.
     unsafe {
         let mut tile: Vec<A::Vector> = rows
@@ -292,8 +304,9 @@ fn check_transpose_square<A: SimdKernel<f64>>() {
 
     for r in 0..lanes {
         for c in 0..lanes {
-            assert!(
-                (out[r][c] - (100 * c + r) as f64).abs() < f64::EPSILON,
+            assert_eq!(
+                out[r][c],
+                transpose_fixture_value(c, r),
                 "transpose mismatch at ({r}, {c}) with {lanes} lanes"
             );
         }
@@ -334,7 +347,8 @@ fn check_permutes_f64<A: SimdKernel<f64>>() {
 #[test]
 fn permutes_match_reference_all_backends() {
     check_permutes::<Scalar>();
-    check_transpose_square::<Scalar>();
+    check_transpose_square::<f32, Scalar>();
+    check_transpose_square::<f64, Scalar>();
     check_permutes::<SveArch>();
     check_permutes_f64::<Scalar>();
 
@@ -342,19 +356,22 @@ fn permutes_match_reference_all_backends() {
     {
         if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
             check_permutes::<hermes_simd::Avx2>();
-            check_transpose_square::<hermes_simd::Avx2>();
+            check_transpose_square::<f32, hermes_simd::Avx2>();
+            check_transpose_square::<f64, hermes_simd::Avx2>();
             check_permutes_f64::<hermes_simd::Avx2>();
         }
         if std::is_x86_feature_detected!("avx512f") {
             check_permutes::<hermes_simd::Avx512>();
-            check_transpose_square::<hermes_simd::Avx512>();
+            check_transpose_square::<f32, hermes_simd::Avx512>();
+            check_transpose_square::<f64, hermes_simd::Avx512>();
             check_permutes_f64::<hermes_simd::Avx512>();
         }
     }
     #[cfg(target_arch = "aarch64")]
     {
         check_permutes::<hermes_simd::Neon>();
-        check_transpose_square::<hermes_simd::Neon>();
+        check_transpose_square::<f32, hermes_simd::Neon>();
+        check_transpose_square::<f64, hermes_simd::Neon>();
         check_permutes_f64::<hermes_simd::Neon>();
     }
 }

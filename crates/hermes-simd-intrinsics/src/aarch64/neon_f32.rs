@@ -205,6 +205,27 @@ impl BackendKernel<f32> for Neon {
         NeonF32Vec(vtrn2q_f32(v.0, v.0))
     }
 
+    // SAFETY: NEON is mandatory on aarch64 and `tile` must hold exactly four
+    // rows; the safe vector wrapper enforces the length before entering here.
+    #[target_feature(enable = "neon")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn transpose_square(tile: &mut [Self::Vector]) {
+        let tile: &mut [Self::Vector; 4] = tile
+            .try_into()
+            .expect("invariant: tile holds exactly LANE_COUNT rows");
+        // The canonical eight-shuffle 4x4 network: `trn` weaves adjacent rows,
+        // then 64-bit `zip` operations assemble the four complete columns.
+        let t0 = vreinterpretq_u64_f32(vtrn1q_f32(tile[0].0, tile[1].0));
+        let t1 = vreinterpretq_u64_f32(vtrn2q_f32(tile[0].0, tile[1].0));
+        let t2 = vreinterpretq_u64_f32(vtrn1q_f32(tile[2].0, tile[3].0));
+        let t3 = vreinterpretq_u64_f32(vtrn2q_f32(tile[2].0, tile[3].0));
+        tile[0] = NeonF32Vec(vreinterpretq_f32_u64(vzip1q_u64(t0, t2)));
+        tile[1] = NeonF32Vec(vreinterpretq_f32_u64(vzip1q_u64(t1, t3)));
+        tile[2] = NeonF32Vec(vreinterpretq_f32_u64(vzip2q_u64(t0, t2)));
+        tile[3] = NeonF32Vec(vreinterpretq_f32_u64(vzip2q_u64(t1, t3)));
+    }
+
     /// NEON has no alternating-FMA instruction; sign-flip the even lanes of
     /// `c` (one XOR) then fuse with `vfmaq_f32`, which is rounding-identical
     /// to a native `fmaddsub`.

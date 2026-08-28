@@ -37,16 +37,34 @@
   rounding.
   **Last update:** 2026-08-27.
 
-## HS-TRANSPOSE-NETWORKS-2026-08-27 — In-register transpose_square permute networks [minor] — todo
+## HS-TRANSPOSE-NETWORKS-2026-08-27 — In-register transpose_square permute networks [patch] — in progress
 
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+  **Lease:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48` owns PR #94
+  hosted verification and delivery through the next commit.
 - **Outcome:** add unpack/permute `transpose_square` networks for AVX2 f32
-  (8x8), AVX-512 f64 (8x8), AVX-512 f32 (16x16), and NEON f32 (`vtrn`/`vzip`
-  4x4). Only AVX2 f64 and NEON f64 have native networks today; every other
-  backend/type pair takes the scalar store/swap/load default
-  (`kernel/backend.rs`, `transpose_square`).
+  (8x8) and NEON f32 (`vtrn`/`vzip` 4x4), and remove the regressing NEON f64
+  override. AVX2 f64 remains native; every other backend/type pair takes the
+  scalar store/swap/load default (`kernel/backend.rs`, `transpose_square`).
 - **Acceptance oracle:** the existing per-backend index-coded reference and
   involution property (`check_transpose_square`) extended to f32; codegen
   inspection shows no scalar bounce; criterion baseline against the default.
+  **Evidence:** two unchanged Core Ultra 9 285K AVX2 comparisons reduce f32
+  from 408–421 ns to 4.21–4.32 ns and retain the existing f64 control at
+  2.74–2.82 ns versus 100–101 ns. Exact x86 and AArch64 assembly contains one
+  tile-length branch followed by the intended register network with no scalar
+  lane traffic; AArch64 cross-compilation is warning-clean. Hosted runs
+  `33137876655` and `33138579478` execute the generalized property on AArch64;
+  NEON f32 repeats at 3.536–3.544 ns native versus 7.281–7.324 ns generic.
+  The incumbent NEON f64 override measured 2.265–2.268 ns versus the faster
+  2.080–2.086 ns generic default and is removed; the retained default repeats
+  at 2.075–2.083 ns. AVX-512 candidates passed the SDE value oracle and exact
+  codegen inspection but were deleted because no real-silicon baseline was
+  available; the instrument remains for a measurement-gated follow-up.
+  Exact final fmt/diff, all-target Clippy, debug and release 511/511 Nextest,
+  doctest, Rustdoc, forced-generic, and AArch64 gates pass. Independent review
+  is GREEN after replacing AVX2 f64's debug-only tile check with an exact
+  release-mode conversion. **Remaining:** final hosted verification and merge.
 
 ## HS-F16-DISPATCH-PROBE-HOIST-2026-08-27 — Hoist F16 f16c probe to the dispatch boundary [patch] — todo
 

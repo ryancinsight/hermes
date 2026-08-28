@@ -183,7 +183,9 @@ impl BackendKernel<f64> for Avx2 {
     #[inline]
     #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn transpose_square(tile: &mut [Self::Vector]) {
-        debug_assert_eq!(tile.len(), 4, "tile must hold LANE_COUNT rows");
+        let tile: &mut [Self::Vector; 4] = tile
+            .try_into()
+            .expect("invariant: tile holds exactly LANE_COUNT rows");
         // The canonical eight-shuffle 4x4 network: unpacks weave within
         // 128-bit halves, the cross-half permutes assemble whole columns.
         let t0 = _mm256_unpacklo_pd(tile[0].0, tile[1].0);
