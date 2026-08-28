@@ -90,6 +90,46 @@ fn test_spmv_dense_masked_word_boundary_rows() {
     assert_eq!(y, want);
 }
 
+fn assert_dense_masked_short_rows<T: SimdOps>() {
+    const WIDTHS: [usize; 6] = [3, 4, 5, 6, 7, 15];
+    const NROWS: usize = 3;
+
+    for ncols in WIDTHS {
+        let values: Vec<T> = (0..NROWS * ncols)
+            .map(|index| T::cast_from((index % 5 + 1) as i32))
+            .collect();
+        let x: Vec<T> = (0..ncols)
+            .map(|column| T::cast_from((column % 4 + 1) as i32))
+            .collect();
+        let mask_bits: Vec<bool> = (0..NROWS * ncols).map(|index| index % 3 != 1).collect();
+        let mask = PackedMask::from_bools(&mask_bits);
+        let data = DenseWithMaskData::new(&values, mask.as_view(), NROWS, ncols);
+        let mut actual = vec![T::cast_from(2); NROWS];
+        let mut expected = actual.clone();
+
+        for row in 0..NROWS {
+            for column in 0..ncols {
+                let index = row * ncols + column;
+                if mask_bits[index] {
+                    expected[row] += values[index] * x[column];
+                }
+            }
+        }
+
+        spmv_dense_masked::<T>(data, &x, &mut actual);
+        assert_eq!(actual, expected, "DenseWithMask short-row width {ncols}");
+    }
+}
+
+#[test]
+fn test_spmv_dense_masked_short_rows_all_float_precisions() {
+    // All products and sums are small integers, so both reduction orders are
+    // exact in f32 and f64. The widths straddle the measured scalar/masked
+    // crossover and include the one-full-vector-plus-tail regime.
+    assert_dense_masked_short_rows::<f32>();
+    assert_dense_masked_short_rows::<f64>();
+}
+
 #[test]
 fn test_dense_masked_validation_requires_exact_logical_shape() {
     let exact_values = [1.0f32, 2.0, 3.0, 4.0];

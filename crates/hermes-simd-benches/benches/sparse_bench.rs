@@ -17,7 +17,7 @@ const ROW_SWEEP: [usize; 3] = [1024, 10_000, 100_000];
 const DENSE_ROW_SWEEP: [usize; 2] = [1024, 10_000];
 const DENSITIES: [f64; 3] = [0.001, 0.01, 0.10];
 const SHORT_ROWS: usize = 4096;
-const SHORT_WIDTHS: [usize; 3] = [3, 7, 15];
+const SHORT_WIDTHS: [usize; 6] = [3, 4, 5, 6, 7, 15];
 
 #[derive(Clone, Copy)]
 struct MatrixCase {

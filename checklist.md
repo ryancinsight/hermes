@@ -40,13 +40,15 @@
 - [ ] Re-run unchanged benchmarks, codegen, focused/full/cross-target/docs/
       SemVer gates, obtain an independent artifact verdict, publish, and merge.
 
-## HS-SPMV-SHORT-ROW-MASKED-2026-08-27 [patch]
+## HS-SPMV-SHORT-ROW-MASKED-2026-08-27 [patch] [arch]
 
 - [x] Reconcile CSR and DenseWithMask short-row/tail behavior, existing sparse
       benchmark coverage, and the merged active-prefix memory seam.
-- [ ] Record exact scalar baselines for representative narrow-band regimes and
+- [x] Record ADR 019 and assign each SpMV format implementation to one leaf
+      module before retaining the dense-tail correction.
+- [x] Record exact scalar baselines for representative narrow-band regimes and
       inspect the current short-row code generation.
-- [ ] Implement only measured single-vector candidates and add generic
+- [x] Implement only measured single-vector candidates and add generic
       differential, boundary, and invalid-input coverage.
 - [ ] Re-run unchanged measurements, codegen, focused/full/cross-target/docs
       gates, obtain independent review, publish, and merge.

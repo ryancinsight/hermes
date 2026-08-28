@@ -571,6 +571,33 @@ places the live suffix at an inaccessible-page boundary and also passes an
 inaccessible pointer under a zero mask. Local AVX-512 and NEON evidence is
 compile-only; hosted native/SDE execution remains the closure gate.
 
+#### DenseWithMask short-row application
+
+HS-SPMV-SHORT-ROW-MASKED applies the active-prefix seam only where its fixed
+mask and reduction cost pays. On the local eight-lane AVX2 f32 backend, a
+three-lane masked candidate regressed, so rows shorter than half a register now
+bypass the empty vector accumulator and execute one scalar row loop. Tails of
+four or more live positions use two partial masked loads plus one masked FMA.
+The CSR candidate regressed by 36–186% in the entry experiment and was removed;
+its gather-bound path remains unchanged.
+
+The retained Criterion group fixes 4,096 rows and alternating packed mask bits
+at widths 3, 4, 5, 6, 7, and 15. Against the same-layout scalar-tail baseline,
+two confirmation runs pinned to the Intel Core Ultra 9 285K P-core set changed
+DenseWithMask median time by, respectively, −44.3/−42.9%, −18.0/−16.8%,
+−12.8/−17.2%, −18.5/−18.3%, −42.1/−42.6%, and −33.0/−36.2%. The unchanged CSR
+control stayed within −4.9% to +6.6%, bounding host drift below every retained
+DenseWithMask gain. These are local AVX2 results, not cross-machine or
+AVX-512/NEON throughput claims.
+
+Exact AVX2 assembly branches at three lanes, emits `vmaskmovps` for both live
+prefixes, and performs the masked FMA without a full-width tail buffer. AVX-512
+codegen uses mask-register loads/FMA. Exact integer-valued f32/f64 differential
+tests cover every measured width and accumulation into nonzero `y`; focused
+Miri executes the scalar-backend partial-pointer path. Native AVX-512 and NEON
+execution remain covered by the provider seam's hosted gates, not this local
+SpMV measurement.
+
 ### Cached dispatch boundary — 2026-08-27 <a id="cached-dispatch-2026-08-27"></a>
 
 Archmage's per-token atomic cache, simd-abstraction's resolved function pointer,
