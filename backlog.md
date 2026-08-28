@@ -1,5 +1,24 @@
 # Backlog — hermes-simd
 
+## HS-AVX512-TRANSPOSE-2026-08-28 — AVX-512 square-tile transpose [patch] — done 2026-08-28
+
+- **Gap:** `transpose_square` had AVX2 f64/f32 and NEON overrides; both
+  AVX-512 backends fell to the stack-capture default, which round-trips a
+  whole tile through memory. Every other permute in the family already had
+  an AVX-512 override, so this was the one hole in the surface.
+- **Delivered:** the canonical three-stage 8x8 f64 network — `unpack` weaving
+  within each 128-bit block, then two rounds of `shuffle_f64x2` moving whole
+  blocks, 24 shuffles. **Verification is stated honestly:** the permutation
+  algebra was checked symbolically off-machine (a model of `unpacklo/hi_pd`
+  and `shuffle_f64x2` on index pairs confirms `out[i][j] == (j, i)` for all
+  64 elements), and the existing per-backend property law covers it under
+  the CI SDE job. **It is not verified on hardware here** — this host is an
+  Arrow Lake Core Ultra 9 285K, which reports `avx512f: false`, so no
+  AVX-512 measurement of any kind is possible on it.
+- **Not done:** the f32 16x16 network, which is roughly 64 shuffles rather
+  than 24 and stays on the default. Its property instantiation already
+  exists, so it would be covered when written.
+
 ## HS-SPARSE-SAFETY-2026-08-27 — Sparse OOB guards, F-only AVX-512, mask contract [patch] — done 2026-08-27
 
 - **Delivered:** PR #92 merged (12 commits, tip `50256f9`); integrator review
