@@ -35,9 +35,6 @@ where
     _marker: PhantomData<T>,
 }
 
-#[repr(C, align(64))]
-struct AlignedBuf<T>([core::mem::MaybeUninit<T>; MAX_SIMD_LANES]);
-
 #[expect(
     clippy::expl_impl_clone_on_copy,
     reason = "The raw register capability is supplied by the architecture trait, so Clone stays explicit"
@@ -230,6 +227,40 @@ where
         Arch::masked_store_unaligned(ptr, mask.raw, self.raw);
     }
 
+    /// Loads active lanes from a pointer with a partial accessible prefix.
+    ///
+    /// Inactive lanes retain their values from `src` and are not read from
+    /// memory.
+    ///
+    /// # Safety
+    /// The host must support `Arch`'s target features, `valid_lanes` must not
+    /// exceed `Arch::LANE_COUNT`, every active mask lane must be less than
+    /// `valid_lanes`, and `ptr` must be valid for reading those active elements.
+    #[inline(always)]
+    pub unsafe fn masked_load_partial(
+        ptr: *const T,
+        valid_lanes: usize,
+        mask: Mask<T, Arch>,
+        src: Self,
+    ) -> Self {
+        // SAFETY: forwarded unchanged to the architecture contract.
+        Self::new(unsafe { Arch::masked_load_partial(ptr, valid_lanes, mask.raw, src.raw) })
+    }
+
+    /// Stores active lanes to a pointer with a partial accessible prefix.
+    ///
+    /// Inactive lanes are not read or written.
+    ///
+    /// # Safety
+    /// The host must support `Arch`'s target features, `valid_lanes` must not
+    /// exceed `Arch::LANE_COUNT`, every active mask lane must be less than
+    /// `valid_lanes`, and `ptr` must be valid for writing those active elements.
+    #[inline(always)]
+    pub unsafe fn masked_store_partial(self, ptr: *mut T, valid_lanes: usize, mask: Mask<T, Arch>) {
+        // SAFETY: forwarded unchanged to the architecture contract.
+        unsafe { Arch::masked_store_partial(ptr, valid_lanes, mask.raw, self.raw) };
+    }
+
     /// Load one vector from the start of a slice using the unaligned kernel load.
     ///
     /// # Errors
@@ -335,26 +366,9 @@ where
             // Hence, it is safe to load directly.
             unsafe { Ok(Self::masked_load_unaligned(data.as_ptr(), mask, src)) }
         } else {
-            // Short slice path to prevent page faults: copy to a stack-aligned
-            // `MAX_SIMD_LANES`-lane buffer.
-            // The buffer holds `LANE_COUNT` lanes; `LANE_BOUND_CHECK` proves
-            // `LANE_COUNT <= MAX_SIMD_LANES` at compile time per backend.
-            const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
-            let mut buf = AlignedBuf([core::mem::MaybeUninit::uninit(); MAX_SIMD_LANES]);
-            for i in 0..len {
-                buf.0[i].write(data[i]);
-            }
-            for i in len..Arch::LANE_COUNT {
-                buf.0[i].write(T::ZERO);
-            }
-
-            unsafe {
-                Ok(Self::masked_load_unaligned(
-                    buf.0.as_ptr().cast::<T>(),
-                    mask,
-                    src,
-                ))
-            }
+            // SAFETY: the mask was checked against the slice length, so every
+            // active lane is inside the accessible prefix.
+            unsafe { Ok(Self::masked_load_partial(data.as_ptr(), len, mask, src)) }
         }
     }
 
@@ -391,24 +405,9 @@ where
                 self.masked_store_unaligned(data.as_mut_ptr(), mask);
             }
         } else {
-            // Short slice path to prevent page faults: copy to stack-aligned buffer, perform masked store,
-            // then copy active elements back.
-            // The buffer holds `LANE_COUNT` lanes; `LANE_BOUND_CHECK` proves
-            // `LANE_COUNT <= MAX_SIMD_LANES` at compile time per backend.
-            const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
-            let mut buf = AlignedBuf([core::mem::MaybeUninit::uninit(); MAX_SIMD_LANES]);
-            for i in 0..len {
-                buf.0[i].write(data[i]);
-            }
-
-            unsafe {
-                self.masked_store_unaligned(buf.0.as_mut_ptr().cast::<T>(), mask);
-            }
-
-            unsafe {
-                let init_slice = core::slice::from_raw_parts(buf.0.as_ptr().cast::<T>(), len);
-                data.copy_from_slice(init_slice);
-            }
+            // SAFETY: the mask was checked against the slice length, so every
+            // active lane is inside the accessible prefix.
+            unsafe { self.masked_store_partial(data.as_mut_ptr(), len, mask) };
         }
         Ok(())
     }

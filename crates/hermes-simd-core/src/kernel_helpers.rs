@@ -9,7 +9,8 @@ use crate::scalar::Scalar;
 /// shift bounds it to `LANE_COUNT <= MAX_SIMD_LANES`, checked at compile time.
 ///
 /// # Safety
-/// `ptr` must be valid for reading `Arch::LANE_COUNT` elements of `T`.
+/// `ptr.add(i)` must be valid for reading one `T` for every active mask lane
+/// `i`. Inactive lanes are never dereferenced.
 #[inline(always)]
 pub unsafe fn generic_masked_load<T, Arch>(
     ptr: *const T,

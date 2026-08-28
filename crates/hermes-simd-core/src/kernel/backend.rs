@@ -328,6 +328,68 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         crate::kernel_helpers::generic_masked_store::<T, Self>(ptr, mask, val);
     }
 
+    /// Loads active lanes from a pointer with only `valid_lanes` accessible elements.
+    ///
+    /// Inactive lanes retain their value from `src`. Unlike
+    /// [`masked_load_unaligned`](Self::masked_load_unaligned), this operation
+    /// does not access inactive lanes and therefore supports allocation and page
+    /// boundaries without a full-width staging buffer.
+    ///
+    /// # Safety
+    ///
+    /// The processor must support this backend's target features,
+    /// `valid_lanes <= LANE_COUNT`, every active mask lane must be less than
+    /// `valid_lanes`, and `ptr` must be valid for reading those active elements.
+    #[inline(always)]
+    unsafe fn masked_load_partial(
+        ptr: *const T,
+        valid_lanes: usize,
+        mask: Self::Mask,
+        src: Self::Vector,
+    ) -> Self::Vector {
+        debug_assert!(valid_lanes <= Self::LANE_COUNT);
+        let valid_mask = if valid_lanes == u64::BITS as usize {
+            u64::MAX
+        } else {
+            (1_u64 << valid_lanes) - 1
+        };
+        debug_assert_eq!(Self::mask_to_bitmask(mask) & !valid_mask, 0);
+        // SAFETY: the caller guarantees validity for every active mask lane;
+        // the generic implementation dereferences active lanes only.
+        unsafe { crate::kernel_helpers::generic_masked_load::<T, Self>(ptr, mask, src) }
+    }
+
+    /// Stores active lanes to a pointer with only `valid_lanes` accessible elements.
+    ///
+    /// Inactive lanes are not read or written. Unlike
+    /// [`masked_store_unaligned`](Self::masked_store_unaligned), this operation
+    /// supports allocation and page boundaries without a full-width staging
+    /// buffer.
+    ///
+    /// # Safety
+    ///
+    /// The processor must support this backend's target features,
+    /// `valid_lanes <= LANE_COUNT`, every active mask lane must be less than
+    /// `valid_lanes`, and `ptr` must be valid for writing those active elements.
+    #[inline(always)]
+    unsafe fn masked_store_partial(
+        ptr: *mut T,
+        valid_lanes: usize,
+        mask: Self::Mask,
+        val: Self::Vector,
+    ) {
+        debug_assert!(valid_lanes <= Self::LANE_COUNT);
+        let valid_mask = if valid_lanes == u64::BITS as usize {
+            u64::MAX
+        } else {
+            (1_u64 << valid_lanes) - 1
+        };
+        debug_assert_eq!(Self::mask_to_bitmask(mask) & !valid_mask, 0);
+        // SAFETY: the caller guarantees validity for every active mask lane;
+        // the generic implementation dereferences active lanes only.
+        unsafe { crate::kernel_helpers::generic_masked_store::<T, Self>(ptr, mask, val) }
+    }
+
     // -------------------------------------------------------------------------
     // Masked Arithmetic (merge masking)
     // -------------------------------------------------------------------------

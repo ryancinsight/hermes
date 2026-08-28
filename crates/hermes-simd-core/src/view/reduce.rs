@@ -141,12 +141,17 @@ where
         // scalar left fold for this opt-in family.
         let tail = len - simd_len;
         if tail != 0 && Op::USE_MASKED_TAIL {
-            const { Arch::LANE_BOUND_CHECK };
-            let mut lanes = [T::ZERO; crate::kernel::MAX_SIMD_LANES];
-            lanes[..tail].copy_from_slice(&data[simd_len..simd_len + tail]);
+            // SAFETY: `data` contains the exact `tail` suffix and the leading
+            // mask selects no lane beyond it.
             let tail_value = unsafe {
                 let mask = Arch::leading_k_mask(tail);
-                Op::masked_finalize::<Arch>(Arch::load_unaligned(lanes.as_ptr()), mask)
+                let value = Arch::masked_load_partial(
+                    data.as_ptr().add(simd_len),
+                    tail,
+                    mask,
+                    Arch::zero(),
+                );
+                Op::masked_finalize::<Arch>(value, mask)
             };
             total = Op::scalar_combine(total, tail_value);
         } else {
@@ -271,23 +276,18 @@ where
             Op::finalize::<Arch>(acc)
         };
 
-        // Pairwise final vector. Both buffers are fully initialized because the
-        // provider's masked-memory contract still requires a valid full-width
-        // load even when inactive lanes are discarded by `masked_finalize`.
-        // The reduction strategy applies its own transform and identity, so this
-        // remains correct for every operation that opts into masked tails.
+        // The reduction strategy applies its own transform and identity, so the
+        // partial pair remains correct for every operation that opts into
+        // masked tails without accessing past either slice.
         let tail = len - simd_len;
         if tail != 0 && Op::USE_MASKED_TAIL {
-            const { Arch::LANE_BOUND_CHECK };
-            let mut left = [T::ZERO; crate::kernel::MAX_SIMD_LANES];
-            let mut right = [T::ZERO; crate::kernel::MAX_SIMD_LANES];
-            left[..tail].copy_from_slice(&s[simd_len..simd_len + tail]);
-            right[..tail].copy_from_slice(&o[simd_len..simd_len + tail]);
+            // SAFETY: both slices contain the exact `tail` suffix and the
+            // leading mask selects no lane beyond it.
             let tail_value = unsafe {
                 let mask = Arch::leading_k_mask(tail);
                 let pair = Arch::mul(
-                    Arch::load_unaligned(left.as_ptr()),
-                    Arch::load_unaligned(right.as_ptr()),
+                    Arch::masked_load_partial(s.as_ptr().add(simd_len), tail, mask, Arch::zero()),
+                    Arch::masked_load_partial(o.as_ptr().add(simd_len), tail, mask, Arch::zero()),
                 );
                 Op::masked_finalize::<Arch>(pair, mask)
             };
@@ -419,13 +419,17 @@ where
         // removing the element-at-a-time cleanup loop.
         let tail = len - simd_len;
         if tail != 0 {
-            const { Arch::LANE_BOUND_CHECK };
-            let mut lanes = [T::ZERO; crate::kernel::MAX_SIMD_LANES];
-            lanes[..tail].copy_from_slice(&data[simd_len..simd_len + tail]);
+            // SAFETY: `data` contains the exact `tail` suffix and the leading
+            // mask selects no lane beyond it.
             let tail_count = unsafe {
                 let mask = Arch::leading_k_mask(tail);
-                Arch::masked_sum_reduce(Arch::popcount(Arch::load_unaligned(lanes.as_ptr())), mask)
-                    .to_f64() as usize
+                let value = Arch::masked_load_partial(
+                    data.as_ptr().add(simd_len),
+                    tail,
+                    mask,
+                    Arch::zero(),
+                );
+                Arch::masked_sum_reduce(Arch::popcount(value), mask).to_f64() as usize
             };
             total += tail_count;
         }
@@ -547,21 +551,17 @@ where
             total += unsafe { Arch::sum_reduce(acc) }.to_f64() as usize;
         }
 
-        // Masked final vector. Both source buffers are initialized before the
-        // full-width loads required by blend-based backends; the integer count
-        // remains exact while the operation stays in the provider's SIMD seam.
+        // The integer count remains exact while the operation stays in the
+        // provider's SIMD seam without accessing beyond either source slice.
         let tail = len - simd_len;
         if tail != 0 {
-            const { Arch::LANE_BOUND_CHECK };
-            let mut left = [T::ZERO; crate::kernel::MAX_SIMD_LANES];
-            let mut right = [T::ZERO; crate::kernel::MAX_SIMD_LANES];
-            left[..tail].copy_from_slice(&s[simd_len..simd_len + tail]);
-            right[..tail].copy_from_slice(&o[simd_len..simd_len + tail]);
+            // SAFETY: both slices contain the exact `tail` suffix and the
+            // leading mask selects no lane beyond it.
             let tail_count = unsafe {
                 let mask = Arch::leading_k_mask(tail);
                 let combined = op.apply::<Arch>(
-                    Arch::load_unaligned(left.as_ptr()),
-                    Arch::load_unaligned(right.as_ptr()),
+                    Arch::masked_load_partial(s.as_ptr().add(simd_len), tail, mask, Arch::zero()),
+                    Arch::masked_load_partial(o.as_ptr().add(simd_len), tail, mask, Arch::zero()),
                 );
                 Arch::masked_sum_reduce(Arch::popcount(combined), mask).to_f64() as usize
             };

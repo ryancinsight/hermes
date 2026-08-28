@@ -108,7 +108,12 @@ fn runtime_dispatch_accepts_inline_bounds_and_borrowed_outputs() {
     } else {
         1.0
     };
-    #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+    #[cfg(target_arch = "aarch64")]
+    let expected_lanes = f32::from(
+        u16::try_from(<Neon as SimdStorage<eunomia::F16>>::LANE_COUNT)
+            .expect("invariant: a SIMD lane count fits in u16"),
+    );
+    #[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
     let expected_lanes = 1.0;
     let sum = inline_f16_add(
         std::hint::black_box(eunomia::F16::from_f32(1.0)),

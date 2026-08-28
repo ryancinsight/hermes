@@ -20,6 +20,7 @@ use hermes_simd::{Scalar, SveArch};
 use hermes_simd_core::align::Unaligned;
 use hermes_simd_core::execution::Unmasked;
 use hermes_simd_core::kernel::{SimdArith, SimdKernel, SimdReduce};
+use hermes_simd_core::scalar::Scalar as ScalarElement;
 use hermes_simd_core::view::SimdView;
 use proptest::prelude::*;
 
@@ -457,6 +458,121 @@ fn check_masked_merge_ops<A: SimdKernel<f32>>() {
             let want = if i < k { a_vals[i] } else { src_vals[i] };
             assert_eq!(dst[i], want, "masked_store lane {i}");
         }
+    }
+}
+
+/// Partial masked memory must access active lanes only, merge inactive loads
+/// from `src`, and leave inactive stores and adjacent canaries unchanged.
+fn check_partial_masked_memory<T, A>()
+where
+    T: ScalarElement,
+    A: hermes_simd_core::arch::SimdArch + SimdKernel<T>,
+{
+    let lanes = <A as hermes_simd::SimdStorage<T>>::LANE_COUNT;
+    let src_values: Vec<T> = (0..lanes)
+        .map(|lane| {
+            T::cast_from(
+                -1000 - i32::try_from(lane).expect("invariant: a SIMD lane index fits in i32"),
+            )
+        })
+        .collect();
+    let stored_values: Vec<T> = (0..lanes)
+        .map(|lane| {
+            T::cast_from(
+                100 + i32::try_from(lane).expect("invariant: a SIMD lane index fits in i32"),
+            )
+        })
+        .collect();
+    let mut loaded = vec![T::ZERO; lanes];
+
+    for valid_lanes in 0..=lanes {
+        let data: Vec<T> = (0..valid_lanes)
+            .map(|lane| T::cast_from(10 + lane as i32))
+            .collect();
+        let valid_mask = if valid_lanes == u64::BITS as usize {
+            u64::MAX
+        } else {
+            (1_u64 << valid_lanes) - 1
+        };
+        let alternating = 0x5555_5555_5555_5555_u64 & valid_mask;
+        let highest = valid_lanes.checked_sub(1).map_or(0, |lane| 1_u64 << lane);
+
+        for mask_bits in [valid_mask, alternating, highest] {
+            let sentinel = T::cast_from(-77);
+            let mut destination = vec![sentinel; valid_lanes + 2];
+
+            // SAFETY: the caller gates backend support. Every active bit is
+            // below `valid_lanes`; the input and destination expose exactly
+            // that prefix. Full-width source/output/value buffers are used only
+            // for register construction and observation.
+            unsafe {
+                let mask = A::mask_from_bitmask(mask_bits);
+                let src = A::load_unaligned(src_values.as_ptr());
+                let value = A::masked_load_partial(data.as_ptr(), valid_lanes, mask, src);
+                A::store_unaligned(loaded.as_mut_ptr(), value);
+
+                let stored = A::load_unaligned(stored_values.as_ptr());
+                A::masked_store_partial(destination.as_mut_ptr().add(1), valid_lanes, mask, stored);
+            }
+
+            for lane in 0..lanes {
+                let expected = if (mask_bits >> lane) & 1 == 1 {
+                    data[lane]
+                } else {
+                    src_values[lane]
+                };
+                assert_eq!(
+                    loaded[lane], expected,
+                    "partial load lane {lane}, valid_lanes {valid_lanes}, mask {mask_bits:#x}"
+                );
+            }
+            assert_eq!(destination[0], sentinel, "prefix canary changed");
+            assert_eq!(
+                destination[valid_lanes + 1],
+                sentinel,
+                "suffix canary changed"
+            );
+            for lane in 0..valid_lanes {
+                let expected = if (mask_bits >> lane) & 1 == 1 {
+                    stored_values[lane]
+                } else {
+                    sentinel
+                };
+                assert_eq!(
+                    destination[lane + 1],
+                    expected,
+                    "partial store lane {lane}, valid_lanes {valid_lanes}, mask {mask_bits:#x}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn partial_masked_memory_conforms_on_supported_backends() {
+    check_partial_masked_memory::<eunomia::F16, Scalar>();
+    check_partial_masked_memory::<f32, Scalar>();
+    check_partial_masked_memory::<f64, Scalar>();
+    check_partial_masked_memory::<f32, SveArch>();
+    check_partial_masked_memory::<f64, SveArch>();
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+            check_partial_masked_memory::<eunomia::F16, hermes_simd::Avx2>();
+            check_partial_masked_memory::<f32, hermes_simd::Avx2>();
+            check_partial_masked_memory::<f64, hermes_simd::Avx2>();
+        }
+        if std::is_x86_feature_detected!("avx512f") {
+            check_partial_masked_memory::<eunomia::F16, hermes_simd::Avx512>();
+            check_partial_masked_memory::<f32, hermes_simd::Avx512>();
+            check_partial_masked_memory::<f64, hermes_simd::Avx512>();
+        }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        check_partial_masked_memory::<f32, hermes_simd::Neon>();
+        check_partial_masked_memory::<f64, hermes_simd::Neon>();
     }
 }
 

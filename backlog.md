@@ -47,12 +47,9 @@
   benchmarks, x86, native AArch64, SDE, Miri, no-std, dependency policy, and
   lock integrity; local codegen and timings are recorded in [gap_audit](gap_audit.md#square-transpose-networks-hs-transpose-networks-2026-08-27).
 
-## HS-F16-DISPATCH-PROBE-HOIST-2026-08-27 — Hoist F16 F16C probe to the dispatch boundary [minor] — review
+## HS-F16-DISPATCH-PROBE-HOIST-2026-08-27 — Hoist F16 F16C probe to the dispatch boundary [minor] — done 2026-08-28
 
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** the same task owns runtime-dispatch macro, AVX2 F16 arithmetic,
-  focused codegen/benchmark coverage, ADR 009, and this item's PM regions
-  through the next commit.
+- **Delivery:** provider `81bc9b6`; PR #95 merged as `0115b4e`; lease none.
 - **Outcome:** runtime dispatch now selects a complete `avx2,fma,f16c` frame
   once for F16 and monomorphizes the whole kernel with a private proven marker.
   Direct `Avx2` F16 arithmetic retains its cached probe and software fallback;
@@ -72,30 +69,42 @@
   library pass. Independent artifact review is green.
 - **Dependencies / risk:** ADR 009 revision records the scalar-specific frame.
   [minor] because doc-hidden public macro-plumbing traits and a defaulted public
-  capability constant are additive surface. Hosted gates and delivery remain
-  before closure.
+  capability constant are additive surface. Hosted run `33144748464` passed
+  every reported Hermes gate except the AArch64 runtime job: its test oracle
+  still expected three F16 lanes instead of deriving the backend's eight-lane
+  width. The provider behavior was correct; the oracle correction is carried
+  by HS-MASKED-TAIL-PARTIAL-LOAD and passes the warning-denied AArch64 Windows
+  cross-check.
   **Last update:** 2026-08-28.
 
-## HS-MASKED-TAIL-PARTIAL-LOAD-2026-08-27 — Partial masked load/store seam for dispatch tails [minor] — in progress
+## HS-MASKED-TAIL-PARTIAL-LOAD-2026-08-27 — Partial masked load/store seam for dispatch tails [minor] — review
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** the same task owns masked load/store contracts and conformance,
-  dispatch tail routing, the focused benchmark row, and this item's PM regions
-  through the next commit.
-- **Outcome:** dispatch tail helpers (`dispatch/axpy.rs:22-53` and siblings)
-  zero-fill 0.5–1.5 KiB stack buffers per tail because
-  `masked_load/store_unaligned` demand full-`LANE_COUNT` validity for AVX2's
-  blend emulation. Add a `masked_load_partial`/`masked_store_partial` seam
-  (contract: inactive lanes never dereferenced; default = buffer bounce) and
-  route tails through it.
+  **Lease:** none after the provider commit.
+- **Outcome:** add active-prefix `masked_load_partial`/`masked_store_partial`
+  through the canonical backend, role-facet, and `Vector` surfaces. The generic
+  default dereferences active lanes only; AVX2 and AVX-512 f32/f64 use native
+  masked memory, while x86 F16 retains that generic default. Safe short-slice
+  access and applicable AXPY, scale, GEMM/GEMV, view, reduction, and
+  scatter-source tails no longer construct caller-side full-width staging
+  buffers. Existing full-width masked methods retain their contract.
 - **Acceptance oracle:** criterion evidence on short-tail workloads; masked
   conformance suites instantiate the new seam across backends.
 - **Scope / non-goals:** preserve existing full-width masked operations and
   arithmetic semantics; do not add per-backend public types, allocate, or
   weaken the dispatch tail's exact-length behavior.
-- **Dependencies / risk:** additive public [minor] backend capability. The
-  default must remain sound for every scalar and backend, while native
-  overrides may touch only the active prefix. **Last update:** 2026-08-28.
+- **Evidence:** generic prefix/mask/merge/canary conformance covers Scalar,
+  emulated SVE, x86 F16, and supported AVX2/AVX-512/NEON backends; Windows guard
+  pages verify active and zero-mask boundary access. Release Nextest passes
+  521/521; focused Miri passes 1/1; warning-denied all-target/all-feature Clippy
+  and the AArch64 Windows test-target check pass. Two short-tail AXPY
+  confirmation runs show repeatable gains for every f32 row and f64 length 3;
+  other f64 rows are noisy but show no repeated regression. AVX2 f32/f64
+  assembly removes 640/1088-byte frames and tail memset/memcpy, emitting
+  `vmaskmovps`/`vmaskmovpd` instead. The independent artifact review is green.
+- **Dependencies / risk:** additive public [minor] backend capability. AVX-512
+  and NEON are compile-verified locally; exact hosted runtime coverage remains
+  before closure. **Last update:** 2026-08-28.
 
 ## HS-SPMV-SHORT-ROW-MASKED-2026-08-27 — Masked single-vector body for short SpMV rows [patch] — todo
 

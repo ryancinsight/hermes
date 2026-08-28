@@ -9,9 +9,9 @@
 //! output lane-chunks of `y` in registers across all `nrows` reuses each
 //! accumulator `nrows` times — `y` is loaded and stored once per chunk rather
 //! than once per row — and the `TILE_N` independent chunks break the per-chunk
-//! FMA dependency chain. The `ncols mod lane` columns use one masked-FMA tail
-//! backed by initialized local lane buffers, so any shape is supported without
-//! reading or writing beyond the live slice. ∎
+//! FMA dependency chain. The `ncols mod lane` columns use one partial-memory
+//! masked-FMA tail, so any shape is supported without reading or writing beyond
+//! the live slice. ∎
 //!
 //! # Safety
 //!
@@ -26,7 +26,7 @@
 use crate::{
     align::Alignment,
     arch::SimdArch,
-    kernel::{SimdArith, SimdLoadStore, SimdMask, MAX_SIMD_LANES},
+    kernel::{SimdArith, SimdLoadStore, SimdMask},
     scalar::Scalar,
     view::{SimdError, SimdView},
 };
@@ -165,29 +165,26 @@ where
 
     // Masked tail (ncols not a multiple of the lane count).
     //
-    // The masked-memory trait contract still requires a full-width-valid pointer,
-    // so short caller tails are first copied into initialized local buffers. This
-    // preserves the bounds proof for every backend, including blend-based AVX2:
-    // inactive lanes are valid zero values in the local buffer, never speculative
-    // reads beyond `a`/`x`/`y`. The masked FMA preserves the same provider-owned
-    // fused arithmetic seam as the full vectors; non-dyadic results may therefore
-    // differ from a scalar multiply-plus-add by one rounding step.
+    // The partial-memory contract keeps inactive lanes from accessing `a` or
+    // `y`. The masked FMA preserves the same provider-owned fused arithmetic
+    // seam as full vectors; non-dyadic results may therefore differ from scalar
+    // multiply-plus-add by one rounding step.
     if simd_cols < ncols {
         let tail = ncols - simd_cols;
-        // SAFETY: `tail < lane_count <= MAX_SIMD_LANES` by construction, and the
-        // backend bound is asserted by every buffer-using kernel default.
+        // SAFETY: `tail < lane_count` and the validated output span contains
+        // exactly the accessible suffix `[simd_cols, ncols)`.
         let mask = unsafe { Arch::leading_k_mask(tail) };
-        let mut y_tail_buf = [T::ZERO; MAX_SIMD_LANES];
-        y_tail_buf[..tail].copy_from_slice(&y[simd_cols..ncols]);
-        // SAFETY: `y_tail_buf` is initialized and has at least LANE_COUNT slots.
-        let mut acc = unsafe { Arch::load_unaligned(y_tail_buf.as_ptr()) };
+        let mut acc = unsafe {
+            Arch::masked_load_partial(y.as_ptr().add(simd_cols), tail, mask, Arch::zero())
+        };
 
         for i in 0..nrows {
-            let mut a_tail_buf = [T::ZERO; MAX_SIMD_LANES];
             let row_start = i * lda + simd_cols;
-            a_tail_buf[..tail].copy_from_slice(&a_slice[row_start..row_start + tail]);
-            // SAFETY: `a_tail_buf` is initialized and has at least LANE_COUNT slots.
-            let a_tail = unsafe { Arch::load_unaligned(a_tail_buf.as_ptr()) };
+            // SAFETY: dimension validation proves the row contains exactly this
+            // accessible suffix and the leading mask selects no other lanes.
+            let a_tail = unsafe {
+                Arch::masked_load_partial(a_slice.as_ptr().add(row_start), tail, mask, Arch::zero())
+            };
             // SAFETY: all operands are valid registers; `mask` selects the live
             // tail lanes and inactive lanes retain the accumulator. `x[i]` is
             // broadcast because every output tail lane uses the same row scalar.
@@ -195,9 +192,8 @@ where
             acc = unsafe { Arch::masked_fmadd(xi, a_tail, acc, mask) };
         }
 
-        // SAFETY: `y_tail_buf` is initialized and has at least LANE_COUNT slots.
-        unsafe { Arch::store_unaligned(y_tail_buf.as_mut_ptr(), acc) };
-        y[simd_cols..ncols].copy_from_slice(&y_tail_buf[..tail]);
+        // SAFETY: identical validated suffix and mask to the load above.
+        unsafe { Arch::masked_store_partial(y.as_mut_ptr().add(simd_cols), tail, mask, acc) };
     }
 
     Ok(())

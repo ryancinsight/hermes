@@ -2,49 +2,31 @@
 //!
 //! `scale_in_place<T>(data, scalar)` broadcasts `scalar` to all SIMD lanes
 //! then multiplies each chunk of `data` by it. The final partial vector uses
-//! provider-owned masked multiplication over initialized local lane buffers so
-//! blend-based backends never read beyond the live slice.
+//! provider-owned masked memory and multiplication operations without touching
+//! storage beyond the live slice.
 
 use hermes_simd_core::{
     arch::SimdArch,
-    kernel::{SimdArith, SimdLoadStore, SimdMask, MAX_SIMD_LANES},
+    kernel::{SimdArith, SimdLoadStore, SimdMask},
     scalar::Scalar,
 };
 use hermes_simd_macros::runtime_dispatch;
 
 /// Apply the final partial scale vector without reading or writing beyond the
-/// live tail. The local buffers are initialized before any full-width register
-/// load because AVX2's emulated masked load/arithmetic path still operates on a
-/// full register and blends afterward.
+/// live tail. The partial-memory contract guarantees that inactive lanes do not
+/// access the allocation beyond the tail.
 #[inline(always)]
 unsafe fn scale_masked_tail<T, A>(data: *mut T, scalar: T, tail: usize)
 where
     T: Scalar,
     A: SimdArch + SimdArith<T> + SimdLoadStore<T> + SimdMask<T>,
 {
-    const { A::LANE_BOUND_CHECK };
     debug_assert!(tail > 0 && tail < A::LANE_COUNT);
 
-    let mut lanes = [T::ZERO; MAX_SIMD_LANES];
-    for lane in 0..tail {
-        // SAFETY: the caller passes the first element of the remaining
-        // in-bounds tail, and this loop visits exactly its live elements.
-        lanes[lane] = *data.add(lane);
-    }
-
     let mask = A::leading_k_mask(tail);
-    let value = A::masked_mul(
-        A::load_unaligned(lanes.as_ptr()),
-        A::splat(scalar),
-        mask,
-        A::load_unaligned(lanes.as_ptr()),
-    );
-    A::store_unaligned(lanes.as_mut_ptr(), value);
-
-    for lane in 0..tail {
-        // SAFETY: only the validated live tail is written back.
-        *data.add(lane) = lanes[lane];
-    }
+    let loaded = A::masked_load_partial(data, tail, mask, A::zero());
+    let value = A::masked_mul(loaded, A::splat(scalar), mask, loaded);
+    A::masked_store_partial(data, tail, mask, value);
 }
 
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]

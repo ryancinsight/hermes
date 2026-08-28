@@ -516,6 +516,61 @@ Timing evidence is limited to AVX2 on this shared Windows Arrow Lake S host;
 AVX-512 received compile and value-semantic coverage only in the removed
 experiment, not retained regression coverage.
 
+### Active-prefix masked memory — 2026-08-28 <a id="active-prefix-masked-memory-2026-08-28"></a>
+
+Evidence tier: published-source comparison, generic differential and boundary
+tests, Windows guard pages, exact AVX2 code generation, and two controlled
+Criterion confirmation runs. The timing evidence is local AVX2 evidence, not
+an AVX-512, NEON, or cross-machine throughput claim.
+
+| Substrate | Short or partial memory contract | Result |
+| --- | --- | --- |
+| `fearless_simd` 0.7.0 | fixed-width `from_slice`/`store_slice`; examples split exact chunks and handle the remainder separately | no first-class active-prefix masked memory surface found |
+| [`pulp` 0.22.3](https://docs.rs/pulp/0.22.3/pulp/trait.Simd.html) | `partial_load_*`/`partial_store_*` build a leading mask and enter native mask load/store | closest capability comparator; leading-prefix convenience only |
+| [`simdeez` 3.0.1](https://docs.rs/simdeez/3.0.1/simdeez/trait.SimdBaseIo.html) | short-slice load/store copy lanes through a zero vector | safe partial I/O, but no native arbitrary-mask merge seam |
+| Hermes | arbitrary active mask constrained to an exact accessible prefix; loads merge inactive lanes from `src` | broader memory contract, generic default, native AVX2/AVX-512 f32/f64 overrides |
+
+The old Hermes tail route zero-filled full-width stack buffers because
+`masked_load_unaligned` and `masked_store_unaligned` correctly require a pointer
+valid for `LANE_COUNT` elements. HS-MASKED-TAIL-PARTIAL-LOAD retains those
+methods and adds a distinct contract: only active lanes below `valid_lanes` may
+be dereferenced. Safe short-slice `Vector` access and applicable dense, view,
+reduction, GEMM/GEMV, and scatter-source tails now use it. Scalar, NEON,
+emulated SVE, and x86 F16 inherit the active-lane default; AVX2 f32/f64 emit
+mask-move loads/stores and AVX-512 f32/f64 use mask-register memory
+instructions. The generic default may stage registers internally, but callers
+no longer build full-width tail buffers.
+
+The focused short-tail AXPY instrument uses lengths 3, 7, 15, and 31 for f32
+and f64, with all output allocation and cloning outside the timed closure. The
+first baseline and two post-change runs reported these 95% intervals in ns:
+
+| Type / length | Baseline | Post 1 | Post 2 |
+| --- | ---: | ---: | ---: |
+| f32 / 3 | 20.866–22.188 | 8.933–9.113 | 8.082–9.089 |
+| f32 / 7 | 24.329–25.085 | 10.078–10.493 | 10.199–10.605 |
+| f32 / 15 | 21.360–22.606 | 10.847–12.731 | 7.912–9.250 |
+| f32 / 31 | 24.034–25.803 | 8.087–9.799 | 12.847–13.762 |
+| f64 / 3 | 17.370–17.867 | 6.403–7.336 | 5.937–6.861 |
+| f64 / 7 | 17.865–19.941 | 19.963–24.565 | 4.982–5.587 |
+| f64 / 15 | 18.925–20.288 | 23.766–27.682 | 6.065–6.453 |
+| f64 / 31 | 24.072–28.534 | 17.663–30.587 | 9.742–15.008 |
+
+Every f32 row and f64 length 3 improve with disjoint intervals in both
+post-change runs. The other f64 rows are host-noisy: the first confirmation is
+neutral or slower and the second is faster, so they support neither a stable
+gain nor a regression claim. Exact assembly supplies the mechanism evidence:
+the AVX2 f32/f64 AXPY frames fall from 640/1088 bytes to 88 bytes; tail memset and
+memcpy calls disappear; the tail is `vmaskmovps`/`vmaskmovpd`, FMA, then the
+matching masked store.
+
+The generic conformance suite enumerates every accessible-prefix length with
+full, alternating, highest-active, and zero masks, checking load merge values,
+store canaries, and inactive preservation. The Windows AVX2 guard-page test
+places the live suffix at an inaccessible-page boundary and also passes an
+inaccessible pointer under a zero mask. Local AVX-512 and NEON evidence is
+compile-only; hosted native/SDE execution remains the closure gate.
+
 ### Cached dispatch boundary — 2026-08-27 <a id="cached-dispatch-2026-08-27"></a>
 
 Archmage's per-token atomic cache, simd-abstraction's resolved function pointer,
@@ -1075,10 +1130,16 @@ order (correctness → architecture → tests → docs → PM).
   `C += A·B` contract; ordinary hosts skip only the hardware-specific execution
   while still compiling and testing the fallback. A hosted AVX-512 BF16 runtime
   and benchmark gate remains open.
-- **[open] Scalar tails on every hot kernel (MED-HIGH).** `view/reduce.rs`,
-  `view/ops.rs`, `dispatch/axpy.rs`, etc. end in element-at-a-time loops although
-  `leading_k_mask` exists on every backend; up to 15 scalar iters on AVX-512 f32
-  tails, dominating short/odd-length vectors. `[minor]`. **Partial closure
+- **Resolved 2026-08-28 — active-prefix memory removes tail staging.** The
+  scalar-tail campaign first moved each eligible family onto masked arithmetic
+  while preserving full-width pointer validity through local lane buffers.
+  HS-MASKED-TAIL-PARTIAL-LOAD now replaces those buffers with an exact
+  active-prefix memory contract in AXPY/scale, GEMM/GEMV, view arithmetic,
+  opt-in reductions, and scatter-source tails. AVX2/AVX-512 f32/f64 use native
+  masked memory; other scalar/backend pairs inherit an active-lane default.
+  `Product` and future
+  operations that do not opt into reassociation retain their distinct scalar
+  tail by contract. **Earlier partial closure
   2026-08-07 (HS-410/HS-411/HS-412):** `dispatch/axpy.rs` now routes its final
   partial vector through `masked_fmadd`, `dispatch/scale.rs` routes its final
   partial vector through `masked_mul`, and `dispatch/axpy.rs`'s `axpy_mul` path routes its
@@ -1470,7 +1531,12 @@ Scope fit:
 - Out of scope for Hermes: High-level vector search similarity/distance metric algorithms (Cosine Similarity/Distance, Jaccard Index, Hamming Distance, KL/JS Divergence, geospatial distance) which belong in the Leto operations layer and the Hephaestus GPU layer; thread/MIMD execution scheduling (Moirai).
 
 Findings:
-- [minor] Masked tail-load/store elimination: NumKong completely eliminates scalar tail loop overhead on hardware that supports masking (AVX-512, SVE) by using active lane masks. Hermes currently defaults to scalar tail loops in [mod.rs](file:///d:/atlas/repos/hermes/crates/hermes-simd-core/src/ops/mod.rs) for irregular lengths. Supporting first-class masked load/store APIs in Hermes would allow Leto to bypass scalar tails in its domain kernels.
+- [minor] **Resolved 2026-08-28:** Hermes now exposes first-class active-prefix
+  masked load/store through the backend, role, and `Vector` surfaces. Eligible
+  provider tails use it without caller-side full-width staging; AVX2 and
+  AVX-512 f32/f64 have native overrides, while scalar, NEON, emulated SVE, and
+  x86 F16 use the active-lane default.
+  See [active-prefix masked memory](#active-prefix-masked-memory-2026-08-28).
 - [minor] Fast reciprocal square root: NumKong optimizes vector norms and Cosine similarity by using hardware-native fast reciprocal square root approximations (`rsqrtps` on x86, `frsqrte` on Arm) refined with a Newton-Raphson iteration. Hermes lacks a fast reciprocal square root strategy in [unary.rs](file:///d:/atlas/repos/hermes/crates/hermes-simd-core/src/ops/unary.rs) and iterates standard/vector `sqrt`.
 - [minor] Popcount and horizontal reductions for binary/integer metrics: Binary and integer distance calculations (like Jaccard and Hamming) in Leto require highly efficient SIMD population count (`popcnt`) and horizontal reductions (bitwise reductions). Hermes lacks generic `popcnt` and horizontal bitwise fold primitives.
 - [minor] Low-precision integer/sub-byte unpacking: NumKong leverages VNNI algebraic transforms and sub-byte type unpacking (e.g. 4-bit/6-bit) to accelerate low-precision dot products and similarity metrics. Hermes defines sub-byte scalar types like `Bf4` and `F4` but has not exposed vector sign-extension, widening, and byte-alignment unpacking primitives.

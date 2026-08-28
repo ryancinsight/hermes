@@ -1,7 +1,7 @@
 use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
-use crate::kernel::{SimdKernel, SimdStorage, MAX_SIMD_LANES};
+use crate::kernel::SimdKernel;
 use crate::mask::BitMask;
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
@@ -83,37 +83,28 @@ where
 
         let tail = len - simd_len;
         if tail != 0 {
-            // Blend-based backends perform a full-width vector load even when
-            // only part of the final logical vector is live. Copying the live
-            // prefix into initialized provider-local buffers makes that load
-            // bounded by the local allocation; the combined mask prevents the
-            // inactive tail lanes from reaching the output.
-            const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
-            let mut left = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-            let mut right = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-            let mut result = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-            for i in 0..tail {
-                left[i].write(self.as_slice()[simd_len + i]);
-                right[i].write(other.as_slice()[simd_len + i]);
-            }
-            for i in tail..lane_count {
-                left[i].write(T::ZERO);
-                right[i].write(T::ZERO);
-                result[i].write(T::ZERO);
-            }
+            // SAFETY: both inputs and the validated output contain the exact
+            // `tail` suffix. `live_mask` selects that whole suffix for memory;
+            // `operation_mask` selects the subset that participates in add.
             unsafe {
-                let tail_mask = *mask & BitMask::<N>::leading_k(tail);
-                let value = Arch::masked_add(
-                    Arch::load_unaligned(left.as_ptr().cast::<T>()),
-                    Arch::load_unaligned(right.as_ptr().cast::<T>()),
-                    tail_mask.to_native_mask::<T, Arch>(),
-                    Arch::load_unaligned(left.as_ptr().cast::<T>()),
+                let live_mask = BitMask::<N>::leading_k(tail).to_native_mask::<T, Arch>();
+                let operation_mask =
+                    (*mask & BitMask::<N>::leading_k(tail)).to_native_mask::<T, Arch>();
+                let left = Arch::masked_load_partial(
+                    self.as_slice().as_ptr().add(simd_len),
+                    tail,
+                    live_mask,
+                    Arch::zero(),
                 );
-                Arch::store_unaligned(result.as_mut_ptr().cast::<T>(), value);
+                let right = Arch::masked_load_partial(
+                    other.as_slice().as_ptr().add(simd_len),
+                    tail,
+                    live_mask,
+                    Arch::zero(),
+                );
+                let value = Arch::masked_add(left, right, operation_mask, left);
+                Arch::masked_store_partial(out.as_mut_ptr().add(simd_len), tail, live_mask, value);
             }
-            out[simd_len..].copy_from_slice(unsafe {
-                core::slice::from_raw_parts(result.as_ptr().cast::<T>(), tail)
-            });
         }
 
         Ok(())
@@ -191,32 +182,28 @@ where
 
         let tail = len - simd_len;
         if tail != 0 {
-            const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
-            let mut left = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-            let mut right = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-            let mut result = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-            for i in 0..tail {
-                left[i].write(self.as_slice()[simd_len + i]);
-                right[i].write(other.as_slice()[simd_len + i]);
-            }
-            for i in tail..lane_count {
-                left[i].write(T::ZERO);
-                right[i].write(T::ZERO);
-                result[i].write(T::ZERO);
-            }
+            // SAFETY: both inputs and the validated output contain the exact
+            // `tail` suffix. `live_mask` selects that whole suffix for memory;
+            // `operation_mask` selects the subset that participates in multiply.
             unsafe {
-                let tail_mask = *mask & BitMask::<N>::leading_k(tail);
-                let value = Arch::masked_mul(
-                    Arch::load_unaligned(left.as_ptr().cast::<T>()),
-                    Arch::load_unaligned(right.as_ptr().cast::<T>()),
-                    tail_mask.to_native_mask::<T, Arch>(),
-                    Arch::load_unaligned(left.as_ptr().cast::<T>()),
+                let live_mask = BitMask::<N>::leading_k(tail).to_native_mask::<T, Arch>();
+                let operation_mask =
+                    (*mask & BitMask::<N>::leading_k(tail)).to_native_mask::<T, Arch>();
+                let left = Arch::masked_load_partial(
+                    self.as_slice().as_ptr().add(simd_len),
+                    tail,
+                    live_mask,
+                    Arch::zero(),
                 );
-                Arch::store_unaligned(result.as_mut_ptr().cast::<T>(), value);
+                let right = Arch::masked_load_partial(
+                    other.as_slice().as_ptr().add(simd_len),
+                    tail,
+                    live_mask,
+                    Arch::zero(),
+                );
+                let value = Arch::masked_mul(left, right, operation_mask, left);
+                Arch::masked_store_partial(out.as_mut_ptr().add(simd_len), tail, live_mask, value);
             }
-            out[simd_len..].copy_from_slice(unsafe {
-                core::slice::from_raw_parts(result.as_ptr().cast::<T>(), tail)
-            });
         }
 
         Ok(())
@@ -300,35 +287,34 @@ where
 
         let tail = len - simd_len;
         if tail != 0 {
-            const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
-            let mut left = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-            let mut right = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-            let mut addend = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-            let mut result = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-            for i in 0..tail {
-                left[i].write(self.as_slice()[simd_len + i]);
-                right[i].write(b.as_slice()[simd_len + i]);
-                addend[i].write(c.as_slice()[simd_len + i]);
-            }
-            for i in tail..lane_count {
-                left[i].write(T::ZERO);
-                right[i].write(T::ZERO);
-                addend[i].write(T::ZERO);
-                result[i].write(T::ZERO);
-            }
+            // SAFETY: all inputs and the validated output contain the exact
+            // `tail` suffix. `live_mask` selects that whole suffix for memory;
+            // `operation_mask` selects the subset that participates in FMA.
             unsafe {
-                let tail_mask = *mask & BitMask::<N>::leading_k(tail);
-                let value = Arch::masked_fmadd(
-                    Arch::load_unaligned(left.as_ptr().cast::<T>()),
-                    Arch::load_unaligned(right.as_ptr().cast::<T>()),
-                    Arch::load_unaligned(addend.as_ptr().cast::<T>()),
-                    tail_mask.to_native_mask::<T, Arch>(),
+                let live_mask = BitMask::<N>::leading_k(tail).to_native_mask::<T, Arch>();
+                let operation_mask =
+                    (*mask & BitMask::<N>::leading_k(tail)).to_native_mask::<T, Arch>();
+                let left = Arch::masked_load_partial(
+                    self.as_slice().as_ptr().add(simd_len),
+                    tail,
+                    live_mask,
+                    Arch::zero(),
                 );
-                Arch::store_unaligned(result.as_mut_ptr().cast::<T>(), value);
+                let right = Arch::masked_load_partial(
+                    b.as_slice().as_ptr().add(simd_len),
+                    tail,
+                    live_mask,
+                    Arch::zero(),
+                );
+                let addend = Arch::masked_load_partial(
+                    c.as_slice().as_ptr().add(simd_len),
+                    tail,
+                    live_mask,
+                    Arch::zero(),
+                );
+                let value = Arch::masked_fmadd(left, right, addend, operation_mask);
+                Arch::masked_store_partial(out.as_mut_ptr().add(simd_len), tail, live_mask, value);
             }
-            out[simd_len..].copy_from_slice(unsafe {
-                core::slice::from_raw_parts(result.as_ptr().cast::<T>(), tail)
-            });
         }
 
         Ok(())

@@ -13,7 +13,7 @@
 use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
-use crate::kernel::{SimdKernel, SimdStorage, MAX_SIMD_LANES};
+use crate::kernel::SimdKernel;
 use crate::ops::{Add, ElementOp, Mul};
 use crate::scalar::Scalar;
 use crate::view::{SimdError, SimdView};
@@ -90,28 +90,35 @@ where
             }
         }
 
-        // Masked tail. The provider masked-memory contract requires a
-        // full-width-valid pointer even when inactive lanes are discarded, so
-        // stage both operands in initialized local buffers. Compute through the
-        // same generic vector operation as the full-width loop, then copy back
-        // only live result lanes. This keeps every `ElementOp` on one SIMD SSOT
-        // without reading or writing beyond the caller's tail.
+        // Compute the tail through the same generic vector operation as the
+        // full-width loop. Partial loads/stores access live lanes only.
         let tail = len - simd_len;
         if tail != 0 {
-            const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
-            let mut left = [T::ZERO; MAX_SIMD_LANES];
-            let mut right = [T::ZERO; MAX_SIMD_LANES];
-            let mut result = [T::ZERO; MAX_SIMD_LANES];
-            left[..tail].copy_from_slice(&self.as_slice()[simd_len..]);
-            right[..tail].copy_from_slice(&other.as_slice()[simd_len..]);
+            // SAFETY: both views contain the exact `tail` suffix and the
+            // leading mask selects no lane beyond it.
             unsafe {
+                let mask = Arch::leading_k_mask(tail);
                 let value = op.apply::<Arch>(
-                    Arch::load_unaligned(left.as_ptr()),
-                    Arch::load_unaligned(right.as_ptr()),
+                    Arch::masked_load_partial(
+                        self.as_slice().as_ptr().add(simd_len),
+                        tail,
+                        mask,
+                        Arch::zero(),
+                    ),
+                    Arch::masked_load_partial(
+                        other.as_slice().as_ptr().add(simd_len),
+                        tail,
+                        mask,
+                        Arch::zero(),
+                    ),
                 );
-                Arch::store_unaligned(result.as_mut_ptr(), value);
+                Arch::masked_store_partial(
+                    self.as_slice_mut().as_mut_ptr().add(simd_len),
+                    tail,
+                    mask,
+                    value,
+                );
             }
-            self.as_slice_mut()[simd_len..].copy_from_slice(&result[..tail]);
         }
 
         Ok(())

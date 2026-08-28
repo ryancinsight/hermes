@@ -5,58 +5,30 @@
 //! updates of `out`, with no temporary allocation. SIMD chunks use the fused
 //! multiply-add primitive; scalar tails are covered element-by-element.
 
-use hermes_simd_core::{
-    arch::SimdArch,
-    kernel::{SimdKernel, MAX_SIMD_LANES},
-    scalar::Scalar,
-    view::SimdError,
-};
+use hermes_simd_core::{arch::SimdArch, kernel::SimdKernel, scalar::Scalar, view::SimdError};
 use hermes_simd_macros::runtime_dispatch;
 
 /// Apply the final partial AXPY vector through the provider's masked arithmetic
-/// seam without ever reading or writing beyond the live tail. The temporary
-/// lane buffers are fully initialized before a full-width register load, which
-/// keeps the helper sound for backends whose emulated masked load still performs
-/// a full-width memory read (notably AVX2 blend-based masks).
+/// seam without ever reading or writing beyond the live tail.
 #[inline(always)]
 unsafe fn axpy_masked_tail<T, A>(alpha: T, x: *const T, out: *mut T, tail: usize)
 where
     T: Scalar,
     A: SimdArch + SimdKernel<T>,
 {
-    const { A::LANE_BOUND_CHECK };
     debug_assert!(tail > 0 && tail < A::LANE_COUNT);
 
-    let mut x_lanes = [T::ZERO; MAX_SIMD_LANES];
-    let mut out_lanes = [T::ZERO; MAX_SIMD_LANES];
-    for lane in 0..tail {
-        // SAFETY: the caller supplies exactly `tail` live elements in each
-        // source, and this loop stays within that validated prefix.
-        x_lanes[lane] = *x.add(lane);
-        out_lanes[lane] = *out.add(lane);
-    }
-
     let mask = A::leading_k_mask(tail);
-    let result = A::masked_fmadd(
-        A::load_unaligned(x_lanes.as_ptr()),
-        A::splat(alpha),
-        A::load_unaligned(out_lanes.as_ptr()),
-        mask,
-    );
-    A::store_unaligned(out_lanes.as_mut_ptr(), result);
-
-    for lane in 0..tail {
-        // SAFETY: the destination has exactly `tail` writable elements and the
-        // loop writes only those active lanes.
-        *out.add(lane) = out_lanes[lane];
-    }
+    let x_value = A::masked_load_partial(x, tail, mask, A::zero());
+    let out_value = A::masked_load_partial(out, tail, mask, A::zero());
+    let result = A::masked_fmadd(x_value, A::splat(alpha), out_value, mask);
+    A::masked_store_partial(out, tail, mask, result);
 }
 
-/// Apply a full-width SIMD AXPY tail using a local initialized lane buffer.
+/// Apply a SIMD AXPY tail through the active-prefix masked-memory seam.
 ///
-/// The buffer is deliberately provider-local rather than a new public SIMD
-/// abstraction: the backend owns mask semantics, while this dispatch kernel
-/// owns the live-slice boundary proof.
+/// The backend owns mask semantics, while this dispatch kernel owns the exact
+/// accessible-prefix proof for each caller slice.
 
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
 pub(super) fn dispatch_axpy_kernel<T, A>(alpha: T, x: &[T], out: &mut [T]) -> Result<(), SimdError>
@@ -131,9 +103,8 @@ where
         }
     }
 
-    // Masked tail. The local lane buffer avoids the full-width load hazard of
-    // blend-based backends while still routing the arithmetic through the
-    // provider-owned masked FMA operation.
+    // The provider-owned partial-memory seam keeps the final SIMD operation
+    // inside the live slice even on an allocation or page boundary.
     let simd_len = (len / lane_count) * lane_count;
     let tail = len - simd_len;
     if tail != 0 {
@@ -152,42 +123,22 @@ where
 }
 
 /// Apply the final partial fused ternary update without reading or writing
-/// beyond the live tail. Every lane buffer is initialized before the full-width
-/// loads needed by blend-based masked backends such as AVX2.
+/// beyond the live tail.
 #[inline(always)]
 unsafe fn axpy_mul_masked_tail<T, A>(alpha: T, a: *const T, b: *const T, out: *mut T, tail: usize)
 where
     T: Scalar,
     A: SimdArch + SimdKernel<T>,
 {
-    const { A::LANE_BOUND_CHECK };
     debug_assert!(tail > 0 && tail < A::LANE_COUNT);
 
-    let mut a_lanes = [T::ZERO; MAX_SIMD_LANES];
-    let mut b_lanes = [T::ZERO; MAX_SIMD_LANES];
-    let mut out_lanes = [T::ZERO; MAX_SIMD_LANES];
-    for lane in 0..tail {
-        // SAFETY: the caller supplies exactly `tail` live elements in each
-        // source and destination, and this loop stays within those bounds.
-        a_lanes[lane] = *a.add(lane);
-        b_lanes[lane] = *b.add(lane);
-        out_lanes[lane] = *out.add(lane);
-    }
-
     let mask = A::leading_k_mask(tail);
-    let scaled_a = A::mul(A::load_unaligned(a_lanes.as_ptr()), A::splat(alpha));
-    let result = A::masked_fmadd(
-        scaled_a,
-        A::load_unaligned(b_lanes.as_ptr()),
-        A::load_unaligned(out_lanes.as_ptr()),
-        mask,
-    );
-    A::store_unaligned(out_lanes.as_mut_ptr(), result);
-
-    for lane in 0..tail {
-        // SAFETY: only the validated live tail is written back.
-        *out.add(lane) = out_lanes[lane];
-    }
+    let a_value = A::masked_load_partial(a, tail, mask, A::zero());
+    let b_value = A::masked_load_partial(b, tail, mask, A::zero());
+    let out_value = A::masked_load_partial(out, tail, mask, A::zero());
+    let scaled_a = A::mul(a_value, A::splat(alpha));
+    let result = A::masked_fmadd(scaled_a, b_value, out_value, mask);
+    A::masked_store_partial(out, tail, mask, result);
 }
 
 /// Fused ternary update `out[i] += alpha * a[i] * b[i]` without a temporary.
@@ -338,7 +289,7 @@ where
     Ok(())
 }
 
-/// Apply one row's final partial AXPY vector through initialized local lanes.
+/// Apply one row's final partial AXPY vector through partial masked memory.
 ///
 /// The caller has already validated the row and tail bounds. Keeping the
 /// boundary handling here reuses the same provider-owned masked FMA contract as
@@ -358,38 +309,17 @@ unsafe fn axpy_rows_batch_masked_tail<T, A>(
     T: Scalar,
     A: SimdArch + SimdKernel<T>,
 {
-    const { A::LANE_BOUND_CHECK };
     debug_assert!(tail > 0 && tail < A::LANE_COUNT);
 
-    let mut out_lanes = [T::ZERO; MAX_SIMD_LANES];
-    for lane in 0..tail {
-        // SAFETY: the caller supplies exactly `tail` writable output elements.
-        out_lanes[lane] = *out.add(lane);
-    }
-
     let mask = A::leading_k_mask(tail);
-    let mut acc = A::load_unaligned(out_lanes.as_ptr());
+    let mut acc = A::masked_load_partial(out, tail, mask, A::zero());
     for shared in 0..depth {
-        let mut x_lanes = [T::ZERO; MAX_SIMD_LANES];
-        for lane in 0..tail {
-            // SAFETY: extent validation proves this panel row contains the
-            // requested tail at `shared * cols + simd_len`.
-            x_lanes[lane] = *x_panel.add(shared * cols + simd_len + lane);
-        }
+        let x_tail = x_panel.add(shared * cols + simd_len);
+        let x_value = A::masked_load_partial(x_tail, tail, mask, A::zero());
         let alpha = *alphas.add(shared * rows + row);
-        acc = A::masked_fmadd(
-            A::load_unaligned(x_lanes.as_ptr()),
-            A::splat(alpha),
-            acc,
-            mask,
-        );
+        acc = A::masked_fmadd(x_value, A::splat(alpha), acc, mask);
     }
-    A::store_unaligned(out_lanes.as_mut_ptr(), acc);
-
-    for lane in 0..tail {
-        // SAFETY: the destination has exactly `tail` writable elements.
-        *out.add(lane) = out_lanes[lane];
-    }
+    A::masked_store_partial(out, tail, mask, acc);
 }
 
 /// Type-independent extent validation for `axpy_rows_batch`, extracted so it is

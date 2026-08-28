@@ -102,6 +102,22 @@ were `cargo clippy --workspace --all-targets -- -D warnings`,
 `cargo test --doc --workspace`, and `RUSTDOCFLAGS=-D warnings cargo doc
 --no-deps --workspace`.
 
+### Revision record (2026-08-28)
+
+HS-MASKED-TAIL-PARTIAL-LOAD adds active-prefix masked load/store to the
+existing `BackendKernel` implementation seam and `SimdLoadStore` role. It does
+not add a ninth role, a backend-specific public type, or another implementation
+source: scalar, NEON, SVE, and x86 F16 inherit the canonical active-lane
+default, while AVX2 and AVX-512 f32/f64 override only the instruction
+selection. The existing full-width masked-memory methods retain their contract.
+
+The revision is additive because a tail at an allocation or page boundary is
+a distinct load/store capability. Generic conformance tests cover arbitrary
+merge masks and every accessible-prefix length; Windows guard-page tests cover
+the active and zero-mask boundary cases. Exact AVX2 f32/f64 code generation
+verifies native mask-move instructions and removal of the former caller-tail
+staging frames.
+
 ## References
 
 - HS-436 in `backlog.md`.

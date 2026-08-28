@@ -54,16 +54,22 @@ The round-trip is pinned by property tests.
 
 ## Where masked paths are mandatory
 
-Masked seams are not an optional convenience in hermes-simd; they are the
-mechanism that keeps the **full-width masked-memory contract** valid on every
-backend. When a kernel's final vector is only partially covered by live data
-(a non-dyadic slice length, a ragged GEMM tail, a short dense row), loading a
-full vector would read past the live slice. The kernel instead loads into an
-initialized local buffer and runs the partial vector through
-`masked_load_unaligned` / `masked_fmadd` / `masked_store_unaligned` so that
-only live lanes are read, computed, and written back. Every dense kernel tail
-— reductions, dot, AXPY and its row forms, GEMV column tails — uses this seam
-on scalar, AVX2, AVX-512, NEON, and the emulated SVE backend.
+Masked memory has two contracts. `masked_load_unaligned` and
+`masked_store_unaligned` require a pointer valid for a complete vector, even
+when the mask selects fewer lanes. `masked_load_partial` and
+`masked_store_partial` instead accept an exact accessible prefix: they touch
+only active lanes below `valid_lanes`; a partial load merges inactive lanes
+from `src`. This distinction permits a zero mask at an inaccessible pointer
+and permits a live tail at an allocation or page boundary without staging a
+full vector.
+
+AVX2 f32/f64 map the partial seam to `vmaskmovps`/`vmaskmovpd`; AVX-512 f32/f64
+use native mask-register loads and stores. Scalar, NEON, the emulated SVE
+backend, and x86 F16 inherit a default that dereferences active lanes only and
+may stage the register through a provider-internal buffer. Dense reduction,
+view, AXPY, GEMM/GEMV, and scatter-source tails use this seam where their
+operation supports a masked tail. Reductions such as `Product` that retain a
+distinct scalar ordering keep their documented scalar remainder.
 
 ## Error and edge behavior
 
@@ -82,6 +88,7 @@ identity demands.
   there is no per-lane branch in the vectorized path.
 - **Mode is a type, not a flag.** `Unmasked` vs. `Masked` is resolved at
   monomorphization; the `Masked` marker activates only the predicated methods.
-- **Masking is how tails stay correct.** The same hardware predicates that
-  express "selected lanes" express "live lanes", and the crate's tail handling
-  relies on them uniformly.
+- **Masking is how tails stay correct.** The same hardware predicates express
+  selected lanes and live lanes. The partial memory seam additionally records
+  the exact accessible prefix, so inactive addresses are not part of the
+  memory contract.
