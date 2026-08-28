@@ -106,15 +106,23 @@
   and NEON are compile-verified locally; exact hosted runtime coverage remains
   before closure. **Last update:** 2026-08-28.
 
-## HS-SPMV-SHORT-ROW-MASKED-2026-08-27 — Masked single-vector body for short SpMV rows [patch] — todo
+## HS-SPMV-SHORT-ROW-MASKED-2026-08-27 — Masked single-vector body for short SpMV rows [patch] — in progress
 
-- **Outcome:** CSR and DenseWithMask SpMV rows with `row_nnz < LANE_COUNT`
-  fall to the pure scalar loop (`sparse/spmv.rs:170,302`), so narrow-band
-  matrices never engage the vector path. A `leading_k_mask` + `masked_fmadd`
-  single-vector body is a small increment on the PackedMask machinery.
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+  **Lease:** the same task owns `sparse/spmv.rs`, its focused value tests,
+  `sparse_bench.rs`, and this item's PM regions through the next commit.
+- **Outcome:** CSR rows with `row_nnz < LANE_COUNT` and DenseWithMask column
+  tails currently fall to scalar loops (`sparse/spmv.rs:170,302`). Measure and,
+  only where faster, replace them with one exact-prefix masked vector body on
+  the existing partial-memory and PackedMask seams.
 - **Acceptance oracle:** differential equality with the scalar reference on
   narrow-band fixtures (reduction-order-exact inputs); criterion evidence on
   banded matrices.
+- **Scope / non-goals:** preserve sparse format validation, accumulation order
+  outside the candidate row/tail, and public APIs; do not specialize by scalar
+  type or retain a regressing candidate.
+- **Dependencies / risk:** depends on merged provider PR #96 (`eb4058a`). Risk
+  is [patch]: private kernel routing only. **Last update:** 2026-08-28.
 
 ## HS-ARGEXTREMA-ONE-PASS-2026-08-27 — Measure single-pass arg-extrema [patch] — done 2026-08-27
 
