@@ -37,11 +37,11 @@
   rounding.
   **Last update:** 2026-08-27.
 
-## HS-TRANSPOSE-NETWORKS-2026-08-27 — In-register transpose_square permute networks [minor] — in progress
+## HS-TRANSPOSE-NETWORKS-2026-08-27 — In-register transpose_square permute networks [patch] — in progress
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** backend transpose overrides, f32 transpose properties, focused
-  transpose benchmark, this item, and its checklist through the next commit.
+  **Lease:** none; the candidate increment is locally verified and ready for
+  hosted target validation.
 - **Outcome:** add unpack/permute `transpose_square` networks for AVX2 f32
   (8x8), AVX-512 f64 (8x8), AVX-512 f32 (16x16), and NEON f32 (`vtrn`/`vzip`
   4x4). Only AVX2 f64 and NEON f64 have native networks today; every other
@@ -50,6 +50,13 @@
 - **Acceptance oracle:** the existing per-backend index-coded reference and
   involution property (`check_transpose_square`) extended to f32; codegen
   inspection shows no scalar bounce; criterion baseline against the default.
+  **Evidence:** two unchanged Core Ultra 9 285K AVX2 comparisons reduce f32
+  from 408–421 ns to 4.21–4.32 ns and retain the existing f64 control at
+  2.74–2.82 ns versus 100–101 ns. Exact x86 and AArch64 assembly contains one
+  tile-length branch followed by the intended register network with no scalar
+  lane traffic; AArch64 cross-compilation is warning-clean.
+  **Remaining:** Intel SDE value execution plus real-silicon AVX-512 and NEON
+  native/default timing in the hosted matrix.
 
 ## HS-F16-DISPATCH-PROBE-HOIST-2026-08-27 — Hoist F16 f16c probe to the dispatch boundary [patch] — todo
 

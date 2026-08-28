@@ -27,7 +27,10 @@ use core::arch::x86_64::{
     _MM_FROUND_TO_NEG_INF, _MM_FROUND_TO_POS_INF, _MM_FROUND_TO_ZERO,
 };
 #[cfg(not(hermes_benchmark_generic_default))]
-use core::arch::x86_64::{_mm512_permutex2var_pd, _mm512_permutexvar_pd, _mm512_setr_epi64};
+use core::arch::x86_64::{
+    _mm512_permutex2var_pd, _mm512_permutexvar_pd, _mm512_setr_epi64, _mm512_unpackhi_pd,
+    _mm512_unpacklo_pd,
+};
 use hermes_simd_core::kernel::BackendKernel;
 
 /// Newtype over `__m512d` providing `Send + Sync`.
@@ -154,6 +157,52 @@ impl BackendKernel<f64> for Avx512 {
         // Eight f64 lanes hold four pairs, one per 128-bit block; the shuffle
         // selects blocks in the order 1, 0, 3, 2.
         Avx512F64Vec(_mm512_shuffle_f64x2::<0b10_11_00_01>(v.0, v.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` and `tile`
+    // holds exactly eight rows; the dispatcher and safe vector wrapper enforce
+    // those requirements before entering this backend method.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn transpose_square(tile: &mut [Self::Vector]) {
+        let tile: &mut [Self::Vector; 8] = tile
+            .try_into()
+            .expect("invariant: tile holds exactly LANE_COUNT rows");
+
+        let (u0, u1, u2, u3) = {
+            let t0 = _mm512_unpacklo_pd(tile[0].0, tile[1].0);
+            let t1 = _mm512_unpackhi_pd(tile[0].0, tile[1].0);
+            let t2 = _mm512_unpacklo_pd(tile[2].0, tile[3].0);
+            let t3 = _mm512_unpackhi_pd(tile[2].0, tile[3].0);
+            (
+                _mm512_shuffle_f64x2::<0x88>(t0, t2),
+                _mm512_shuffle_f64x2::<0x88>(t1, t3),
+                _mm512_shuffle_f64x2::<0xDD>(t0, t2),
+                _mm512_shuffle_f64x2::<0xDD>(t1, t3),
+            )
+        };
+        let (v0, v1, v2, v3) = {
+            let t0 = _mm512_unpacklo_pd(tile[4].0, tile[5].0);
+            let t1 = _mm512_unpackhi_pd(tile[4].0, tile[5].0);
+            let t2 = _mm512_unpacklo_pd(tile[6].0, tile[7].0);
+            let t3 = _mm512_unpackhi_pd(tile[6].0, tile[7].0);
+            (
+                _mm512_shuffle_f64x2::<0x88>(t0, t2),
+                _mm512_shuffle_f64x2::<0x88>(t1, t3),
+                _mm512_shuffle_f64x2::<0xDD>(t0, t2),
+                _mm512_shuffle_f64x2::<0xDD>(t1, t3),
+            )
+        };
+
+        tile[0] = Avx512F64Vec(_mm512_shuffle_f64x2::<0x88>(u0, v0));
+        tile[4] = Avx512F64Vec(_mm512_shuffle_f64x2::<0xDD>(u0, v0));
+        tile[1] = Avx512F64Vec(_mm512_shuffle_f64x2::<0x88>(u1, v1));
+        tile[5] = Avx512F64Vec(_mm512_shuffle_f64x2::<0xDD>(u1, v1));
+        tile[2] = Avx512F64Vec(_mm512_shuffle_f64x2::<0x88>(u2, v2));
+        tile[6] = Avx512F64Vec(_mm512_shuffle_f64x2::<0xDD>(u2, v2));
+        tile[3] = Avx512F64Vec(_mm512_shuffle_f64x2::<0x88>(u3, v3));
+        tile[7] = Avx512F64Vec(_mm512_shuffle_f64x2::<0xDD>(u3, v3));
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.

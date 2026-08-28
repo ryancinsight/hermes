@@ -29,6 +29,11 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   mask reconstruction while preserving the public API and ordered/unordered
   NaN semantics.
 
+- [patch][HS-TRANSPOSE-NETWORKS] Replace the scalar stack fallback for AVX2
+  f32, AVX-512 f32/f64, and NEON f32 `transpose_square` with fixed
+  unpack/shuffle networks. Each override performs one exact tile-length check,
+  then moves the complete tile through registers without scalar lane traffic.
+
 - [minor][HS-TRANSPOSE-SQUARE] Add `transpose_square` — in-register
   `LANE_COUNT x LANE_COUNT` tile transpose on the backend seam, the
   `SimdPermute` facet, and the safe `Vector` surface. AVX2 f64 uses the

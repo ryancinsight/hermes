@@ -211,6 +211,47 @@ impl BackendKernel<f32> for Avx2 {
         Avx2F32Vec(_mm256_permute_ps(v.0, 0b0100_1110))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx2` and `tile`
+    // holds exactly eight rows; the dispatcher and safe vector wrapper enforce
+    // those requirements before entering this backend method.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn transpose_square(tile: &mut [Self::Vector]) {
+        let tile: &mut [Self::Vector; 8] = tile
+            .try_into()
+            .expect("invariant: tile holds exactly LANE_COUNT rows");
+
+        // First weave row pairs, then four-row groups inside each 128-bit half;
+        // the final cross-half permutes assemble the eight complete columns.
+        let t0 = _mm256_unpacklo_ps(tile[0].0, tile[1].0);
+        let t1 = _mm256_unpackhi_ps(tile[0].0, tile[1].0);
+        let t2 = _mm256_unpacklo_ps(tile[2].0, tile[3].0);
+        let t3 = _mm256_unpackhi_ps(tile[2].0, tile[3].0);
+        let t4 = _mm256_unpacklo_ps(tile[4].0, tile[5].0);
+        let t5 = _mm256_unpackhi_ps(tile[4].0, tile[5].0);
+        let t6 = _mm256_unpacklo_ps(tile[6].0, tile[7].0);
+        let t7 = _mm256_unpackhi_ps(tile[6].0, tile[7].0);
+
+        let s0 = _mm256_shuffle_ps::<0x44>(t0, t2);
+        let s1 = _mm256_shuffle_ps::<0xEE>(t0, t2);
+        let s2 = _mm256_shuffle_ps::<0x44>(t1, t3);
+        let s3 = _mm256_shuffle_ps::<0xEE>(t1, t3);
+        let s4 = _mm256_shuffle_ps::<0x44>(t4, t6);
+        let s5 = _mm256_shuffle_ps::<0xEE>(t4, t6);
+        let s6 = _mm256_shuffle_ps::<0x44>(t5, t7);
+        let s7 = _mm256_shuffle_ps::<0xEE>(t5, t7);
+
+        tile[0] = Avx2F32Vec(_mm256_permute2f128_ps::<0x20>(s0, s4));
+        tile[1] = Avx2F32Vec(_mm256_permute2f128_ps::<0x20>(s1, s5));
+        tile[2] = Avx2F32Vec(_mm256_permute2f128_ps::<0x20>(s2, s6));
+        tile[3] = Avx2F32Vec(_mm256_permute2f128_ps::<0x20>(s3, s7));
+        tile[4] = Avx2F32Vec(_mm256_permute2f128_ps::<0x31>(s0, s4));
+        tile[5] = Avx2F32Vec(_mm256_permute2f128_ps::<0x31>(s1, s5));
+        tile[6] = Avx2F32Vec(_mm256_permute2f128_ps::<0x31>(s2, s6));
+        tile[7] = Avx2F32Vec(_mm256_permute2f128_ps::<0x31>(s3, s7));
+    }
+
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx2")]
     #[inline]
