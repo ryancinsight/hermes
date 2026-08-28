@@ -4,6 +4,7 @@
 )]
 
 use hermes_simd::*;
+use hermes_simd_macros::runtime_dispatch;
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,6 +23,98 @@ fn expected_x86_dispatch() -> HostDispatch {
     } else {
         HostDispatch::Scalar
     }
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+struct F16LaneCount;
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+impl LaneKernel<eunomia::F16> for F16LaneCount {
+    type Output = usize;
+
+    fn call<A: SimdArch + SimdKernel<eunomia::F16>>(
+        self,
+        _: Simd<eunomia::F16, A>,
+    ) -> Self::Output {
+        <A as SimdStorage<eunomia::F16>>::LANE_COUNT
+    }
+}
+
+#[runtime_dispatch(avx2, scalar)]
+fn inline_bound_kernel<T, A: SimdKernel<T>>(value: T) -> T
+where
+    T: SimdScalar,
+{
+    let _ = core::marker::PhantomData::<A>;
+    value
+}
+
+#[runtime_dispatch(avx2, scalar)]
+fn borrowed_output_kernel<T, A>(value: &T) -> &T
+where
+    T: SimdScalar,
+    A: SimdKernel<T>,
+{
+    let _ = core::marker::PhantomData::<A>;
+    value
+}
+
+#[runtime_dispatch(avx2, scalar)]
+fn explicit_output_kernel<'left, 'right: 'left, T, A>(left: &'left T, right: &'right T) -> &'left T
+where
+    T: SimdScalar,
+    A: SimdKernel<T>,
+{
+    let _ = (core::marker::PhantomData::<A>, left);
+    right
+}
+
+#[runtime_dispatch(avx2, scalar)]
+fn inline_f16_add_kernel<A: SimdKernel<eunomia::F16>>(
+    left: eunomia::F16,
+    right: eunomia::F16,
+) -> eunomia::F16 {
+    // SAFETY: runtime_dispatch selects a backend only after proving its host
+    // features, and the vectors do not escape that selected feature frame.
+    unsafe {
+        let left = <A as SimdArith<eunomia::F16>>::splat(left);
+        let right = <A as SimdArith<eunomia::F16>>::splat(right);
+        let sum = <A as SimdArith<eunomia::F16>>::add(left, right);
+        <A as SimdReduce<eunomia::F16>>::sum_reduce(sum)
+    }
+}
+
+#[test]
+fn runtime_dispatch_accepts_inline_bounds_and_borrowed_outputs() {
+    let value = eunomia::F16::from_f32(3.5);
+    let other = eunomia::F16::from_f32(-2.0);
+
+    assert_eq!(inline_bound(value), value);
+    assert_eq!(
+        core::ptr::from_ref(borrowed_output(&value)),
+        core::ptr::from_ref(&value)
+    );
+    assert_eq!(
+        core::ptr::from_ref(explicit_output(&value, &other)),
+        core::ptr::from_ref(&other)
+    );
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    let expected_lanes = if std::is_x86_feature_detected!("avx2")
+        && std::is_x86_feature_detected!("fma")
+        && std::is_x86_feature_detected!("f16c")
+    {
+        16.0
+    } else {
+        1.0
+    };
+    #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+    let expected_lanes = 1.0;
+    let sum = inline_f16_add(
+        std::hint::black_box(eunomia::F16::from_f32(1.0)),
+        std::hint::black_box(eunomia::F16::from_f32(2.0)),
+    );
+    assert_eq!(sum, eunomia::F16::from_f32(3.0 * expected_lanes));
 }
 
 #[test]
@@ -62,6 +155,31 @@ fn target_id_support_matches_host_features() {
         assert!(!TargetId::Avx2.is_supported());
         assert!(!TargetId::Avx512.is_supported());
         assert!(!TargetId::Neon.is_supported());
+    }
+}
+
+#[test]
+fn scalar_dispatch_requirement_preserves_direct_avx2_f16_fallback() {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        let avx2 = std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma");
+        let avx2_f16 = avx2 && std::is_x86_feature_detected!("f16c");
+
+        const {
+            assert!(!<Avx2 as SimdStorage<f32>>::REQUIRES_F16C);
+            assert!(<Avx2 as SimdStorage<eunomia::F16>>::REQUIRES_F16C);
+        }
+
+        let data = [eunomia::F16::from_f32(1.0); 16];
+        assert_eq!(
+            SimdView::<eunomia::F16, Avx2, Unaligned>::new(&data).is_some(),
+            avx2
+        );
+
+        assert_eq!(
+            vectorize_lanes::<16, eunomia::F16, _>(F16LaneCount),
+            avx2_f16.then_some(16)
+        );
     }
 }
 

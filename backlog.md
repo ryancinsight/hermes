@@ -47,28 +47,34 @@
   benchmarks, x86, native AArch64, SDE, Miri, no-std, dependency policy, and
   lock integrity; local codegen and timings are recorded in [gap_audit](gap_audit.md#square-transpose-networks-hs-transpose-networks-2026-08-27).
 
-## HS-F16-DISPATCH-PROBE-HOIST-2026-08-27 — Hoist F16 f16c probe to the dispatch boundary [patch] — in progress
+## HS-F16-DISPATCH-PROBE-HOIST-2026-08-27 — Hoist F16 F16C probe to the dispatch boundary [minor] — review
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
   **Lease:** the same task owns runtime-dispatch macro, AVX2 F16 arithmetic,
   focused codegen/benchmark coverage, ADR 009, and this item's PM regions
   through the next commit.
-- **Outcome:** `avx2_f16.rs:180-209` re-probes `f16c_fma_available()` and
-  calls a non-inlinable `#[target_feature(avx,f16c)]` helper on every lane op
-  because the dispatch boundary enables only `avx2,fma`. Hoist the f16c
-  decision to the dispatch boundary — a per-(backend, scalar) support hook or
-  folding `f16c` into the f16 entry's target-feature frame — the ADR 009
-  structure (dispatch at kernel granularity: no in-loop capability checks).
+- **Outcome:** runtime dispatch now selects a complete `avx2,fma,f16c` frame
+  once for F16 and monomorphizes the whole kernel with a private proven marker.
+  Direct `Avx2` F16 arithmetic retains its cached probe and software fallback;
+  f32/f64 retain the ordinary `avx2,fma` route. The proc-macro growth was split
+  into 323/364/311-line entry, frame, and dispatcher modules.
 - **Acceptance oracle:** optimized codegen shows one boundary probe and
   probe-free lane-op bodies; existing F16 differential suites stay green.
 - **Scope / non-goals:** preserve AVX2 behavior for f32/f64 and the safe F16
   software fallback on hosts without F16C; do not add a public backend marker,
   duplicate lane surface, or change arithmetic semantics.
-- **Dependencies / risk:** depends on ADR 009's target-feature entry design;
-  [patch], with x86 feature-safety and non-F16 dispatch latency as the primary
-  risks. Verify exact assembly, controlled unchanged benchmarks, focused F16
-  differential tests, no-std, all-target Clippy, Nextest, docs, and SemVer.
-  **Last update:** 2026-08-27.
+- **Evidence:** release helper assembly has zero feature-cache references and
+  zero fallback arithmetic calls; two unchanged 16,384-element F16 dot runs
+  measure 1.086–1.099 µs versus the 2.489–2.554 µs entry baseline. Release
+  Nextest 519/519, warning-denied all-target/all-feature Clippy, workspace
+  no-default-features, warning-denied AArch64 Windows consumer cross-check,
+  22 runnable doctests, rustdoc, and 196/196 SemVer checks on each affected
+  library pass. Independent artifact review is green.
+- **Dependencies / risk:** ADR 009 revision records the scalar-specific frame.
+  [minor] because doc-hidden public macro-plumbing traits and a defaulted public
+  capability constant are additive surface. Hosted gates and delivery remain
+  before closure.
+  **Last update:** 2026-08-28.
 
 ## HS-MASKED-TAIL-PARTIAL-LOAD-2026-08-27 — Partial masked load/store seam for dispatch tails [minor] — todo
 

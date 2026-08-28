@@ -119,6 +119,15 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
     /// Loop unrolling register accumulation factor to break loop-carried dependency chains.
     const UNROLL_FACTOR: usize = 4;
 
+    /// Whether this scalar/backend pair requires the x86 F16C feature in
+    /// addition to the architecture marker's ordinary target features.
+    ///
+    /// This is consumed only by target-feature dispatch. It keeps the public
+    /// architecture marker singular while allowing reduced-precision kernels
+    /// to enter the complete feature frame once at their operation boundary.
+    #[doc(hidden)]
+    const REQUIRES_F16C: bool = false;
+
     // -------------------------------------------------------------------------
     // Load / Store
     // -------------------------------------------------------------------------

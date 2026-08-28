@@ -88,6 +88,8 @@ use hermes_simd_core::{
     scalar::Scalar,
     Simd,
 };
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+use hermes_simd_intrinsics::x86_64::avx2_f16::{Avx2FrameKernel, Avx2FrameScalar};
 #[cfg(target_arch = "aarch64")]
 use hermes_simd_intrinsics::Neon;
 use hermes_simd_intrinsics::Scalar as ScalarArch;
@@ -124,6 +126,29 @@ pub trait LaneKernel<T: Scalar> {
     /// proves that the host supports `A` and constructs views without another
     /// runtime feature probe.
     fn call<A: SimdArch + SimdKernel<T>>(self, simd: Simd<T, A>) -> Self::Output;
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+struct LaneKernelFrame<K>(K);
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+impl<T, K> Avx2FrameKernel<T, ()> for LaneKernelFrame<K>
+where
+    T: Scalar,
+    K: LaneKernel<T>,
+{
+    type Output = K::Output;
+
+    #[inline(always)]
+    fn call<A>(self, (): ()) -> Self::Output
+    where
+        A: SimdArch + SimdKernel<T>,
+    {
+        // SAFETY: `Avx2FrameScalar` selects this specialization only from an
+        // AVX2 target-feature helper after its complete feature set is proved.
+        self.0
+            .call::<A>(unsafe { Simd::<T, A>::assume_supported() })
+    }
 }
 
 /// A scalar type every Hermes backend can operate on.
@@ -192,7 +217,9 @@ impl_lane_scalar!(f32, f64, eunomia::F16);
 /// set, the corresponding arm is chosen with no runtime branch at all. Failing
 /// that, the host is probed once per call and the ladder falls through
 /// AVX-512F, AVX2 with FMA, NEON, and finally the portable scalar backend,
-/// which always applies.
+/// which always applies. F16 selects AVX2 only when F16C is also available,
+/// placing conversion and arithmetic inside one complete feature frame;
+/// direct `Avx2` F16 values retain their safe software fallback without F16C.
 ///
 /// The dispatch decision is made once, here, not per operation inside the
 /// kernel — so a kernel that transforms a whole buffer pays for it once.
@@ -205,8 +232,8 @@ pub fn vectorize<T: LaneScalar, K: LaneKernel<T>>(kernel: K) -> K::Output {
 ///
 /// Unlike [`vectorize`], this entry does not substitute a different width. It
 /// returns `None` without invoking `kernel` when the current architecture has
-/// no backend with the requested lane count. Selection and feature
-/// detection occur once at the operation boundary.
+/// no backend with the requested lane count and scalar-specific feature set.
+/// Selection and feature detection occur once at the operation boundary.
 ///
 /// This is intended for register-resident kernels whose schedule is part of
 /// their correctness and performance contract. Width-agnostic kernels should
@@ -240,7 +267,7 @@ pub fn vectorize_lanes<const LANES: usize, T: LaneScalar, K: LaneKernel<T>>(
 #[inline(always)]
 fn dispatch_lane_count<T, K, const LANES: usize>(kernel: K) -> Option<K::Output>
 where
-    T: Scalar,
+    T: Avx2FrameScalar,
     K: LaneKernel<T>,
     Avx512: SimdKernel<T>,
     Avx2: SimdKernel<T>,
@@ -252,9 +279,17 @@ where
         return Some(unsafe { call_avx512(kernel) });
     }
     if <Avx2 as SimdStorage<T>>::LANE_COUNT == LANES && Avx2::is_runtime_supported() {
-        // SAFETY: the lane-count check selects this backend and the runtime
-        // probe proves AVX2 and FMA support before entering its target scope.
-        return Some(unsafe { call_avx2(kernel) });
+        if <Avx2 as SimdStorage<T>>::REQUIRES_F16C {
+            if avx2_f16c_available() {
+                // SAFETY: the architecture probe proves AVX2 and FMA; the
+                // scalar-specific probe additionally proves F16C.
+                return Some(unsafe { call_avx2_f16c(kernel) });
+            }
+        } else {
+            // SAFETY: the architecture probe proves ordinary AVX2 and FMA
+            // support; this scalar does not require the extended F16C frame.
+            return Some(unsafe { call_avx2(kernel) });
+        }
     }
     dispatch_scalar::<T, K, LANES>(kernel)
 }
@@ -318,6 +353,19 @@ where
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[inline(always)]
+fn avx2_f16c_available() -> bool {
+    #[cfg(feature = "std")]
+    {
+        std::is_x86_feature_detected!("f16c")
+    }
+    #[cfg(not(feature = "std"))]
+    {
+        cfg!(target_feature = "f16c")
+    }
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[target_feature(enable = "avx2")]
 #[target_feature(enable = "fma")]
 #[inline]
@@ -331,6 +379,21 @@ where
     // this target-feature scope.
     let simd = unsafe { Simd::<T, Avx2>::assume_supported() };
     kernel.call::<Avx2>(simd)
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[target_feature(enable = "avx2")]
+#[target_feature(enable = "fma")]
+#[target_feature(enable = "f16c")]
+unsafe fn call_avx2_f16c<T, K>(kernel: K) -> K::Output
+where
+    T: Avx2FrameScalar,
+    K: LaneKernel<T>,
+{
+    // SAFETY: the caller proves runtime AVX2, FMA, and F16C support before
+    // entering this scalar-specific target-feature scope. The selector keeps
+    // its private backend marker confined to this checked boundary.
+    unsafe { T::call_avx2_frame(LaneKernelFrame(kernel), ()) }
 }
 
 #[cfg(target_arch = "aarch64")]
