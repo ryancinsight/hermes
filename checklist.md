@@ -12,7 +12,7 @@
       including host-independent compile coverage for unavailable ISAs.
 - [x] Run focused, release, all-target, cross-target, docs, and SemVer gates;
       synchronize evidence, and obtain an independent judge verdict.
-- [ ] Publish PR #94, collect exact hosted verification, and merge.
+- [x] Publish PR #94, collect exact hosted verification, and merge.
 
 ## HS-F16-DISPATCH-PROBE-HOIST-2026-08-27 [patch]
 

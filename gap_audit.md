@@ -818,6 +818,9 @@ assessed against a float-lane trait, not a general one.
   was available, so they were deleted rather than retained as unverified
   optimizations. The explicit AVX-512 benchmark rows remain the re-open
   instrument when suitable hardware is available.
+- Delivery: provider `4af1b25`, PR #94 merge `93ba7ce`, and exact hosted run
+  `33139847261` green across bounded benchmarks, x86, native AArch64, SDE,
+  Miri, no-std, dependency policy, and lock integrity.
 
 ### Backend matrix
 
