@@ -334,6 +334,150 @@ fn test_masked_load_store_slice_avx512() {
     }
 }
 
+#[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), windows))]
+mod guarded_partial_memory {
+    use core::ffi::c_void;
+    use core::ptr;
+    use hermes_simd::{target::TargetId, Avx2, BitMask, Mask, Vector};
+
+    const REGION_BYTES: usize = 64 * 1024;
+    const TOTAL_BYTES: usize = REGION_BYTES * 2;
+    const MEM_COMMIT: u32 = 0x1000;
+    const MEM_RESERVE: u32 = 0x2000;
+    const MEM_RELEASE: u32 = 0x8000;
+    const PAGE_NOACCESS: u32 = 0x01;
+    const PAGE_READWRITE: u32 = 0x04;
+    const VALID_LANES: usize = 5;
+
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn VirtualAlloc(
+            address: *mut c_void,
+            size: usize,
+            allocation_type: u32,
+            protect: u32,
+        ) -> *mut c_void;
+        fn VirtualProtect(
+            address: *mut c_void,
+            size: usize,
+            new_protect: u32,
+            old_protect: *mut u32,
+        ) -> i32;
+        fn VirtualFree(address: *mut c_void, size: usize, free_type: u32) -> i32;
+    }
+
+    struct GuardedPages(*mut u8);
+
+    impl GuardedPages {
+        fn new() -> Self {
+            // SAFETY: the null address requests a fresh Windows mapping; the
+            // returned pointer is checked before the second-region protection
+            // is changed.
+            let base = unsafe {
+                VirtualAlloc(
+                    ptr::null_mut(),
+                    TOTAL_BYTES,
+                    MEM_RESERVE | MEM_COMMIT,
+                    PAGE_READWRITE,
+                )
+            }
+            .cast::<u8>();
+            assert!(!base.is_null(), "VirtualAlloc failed");
+
+            let mut previous = 0_u32;
+            // SAFETY: `base` owns `TOTAL_BYTES`; the second aligned 64-KiB
+            // region is wholly inside it and becomes inaccessible.
+            let protected = unsafe {
+                VirtualProtect(
+                    base.add(REGION_BYTES).cast::<c_void>(),
+                    REGION_BYTES,
+                    PAGE_NOACCESS,
+                    &raw mut previous,
+                )
+            };
+            if protected == 0 {
+                // SAFETY: `base` is the mapping returned above and MEM_RELEASE
+                // requires a zero size.
+                unsafe {
+                    VirtualFree(base.cast::<c_void>(), 0, MEM_RELEASE);
+                }
+                panic!("VirtualProtect failed");
+            }
+            Self(base)
+        }
+
+        #[expect(
+            clippy::cast_ptr_alignment,
+            reason = "VirtualAlloc returns allocation-granularity-aligned pages"
+        )]
+        fn boundary(&self) -> *mut f32 {
+            // SAFETY: the first accessible region has exactly REGION_BYTES.
+            unsafe { self.0.add(REGION_BYTES).cast::<f32>() }
+        }
+    }
+
+    impl Drop for GuardedPages {
+        fn drop(&mut self) {
+            // SAFETY: this is the original allocation base and MEM_RELEASE
+            // requires zero size. Cleanup cannot be made fallible in Drop.
+            unsafe {
+                VirtualFree(self.0.cast::<c_void>(), 0, MEM_RELEASE);
+            }
+        }
+    }
+
+    #[test]
+    fn avx2_partial_memory_stops_at_guard_page() {
+        if !TargetId::Avx2.is_supported() {
+            return;
+        }
+
+        let pages = GuardedPages::new();
+        let values = [1.0_f32, 2.0, 3.0, 4.0, 5.0];
+        let pointer = pages.boundary().wrapping_sub(VALID_LANES);
+        // SAFETY: the five-f32 suffix lies wholly in the accessible region and
+        // ends exactly at the no-access boundary.
+        unsafe {
+            pointer.copy_from_nonoverlapping(values.as_ptr(), VALID_LANES);
+        }
+
+        let mask = unsafe { Mask::<f32, Avx2>::from_bitmask(BitMask::<64>(0b1_0101)) };
+        let source = Vector::<f32, Avx2>::splat(-1.0);
+        // SAFETY: the mask activates lanes 0, 2, and 4, all within the five
+        // accessible elements; the following byte is in the no-access region.
+        let loaded = unsafe { Vector::masked_load_partial(pointer, VALID_LANES, mask, source) };
+        let mut observed = [0.0_f32; 8];
+        loaded.store_unaligned_to_slice(&mut observed).unwrap();
+        assert_eq!(observed, [1.0, -1.0, 3.0, -1.0, 5.0, -1.0, -1.0, -1.0]);
+
+        let replacement = Vector::<f32, Avx2>::load_unaligned_from_slice(&[
+            10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0,
+        ])
+        .unwrap();
+        // SAFETY: identical active-lane and boundary proof to the load.
+        unsafe { replacement.masked_store_partial(pointer, VALID_LANES, mask) };
+        let mut stored = [0.0_f32; VALID_LANES];
+        // SAFETY: the source is the five-element accessible suffix.
+        unsafe {
+            stored
+                .as_mut_ptr()
+                .copy_from_nonoverlapping(pointer, VALID_LANES);
+        }
+        assert_eq!(stored, [10.0, 2.0, 12.0, 4.0, 14.0]);
+
+        let no_access = pages.boundary();
+        let zero_mask = unsafe { Mask::<f32, Avx2>::from_bitmask(BitMask::<64>(0)) };
+        // SAFETY: no lane is active, so the partial-memory contract permits an
+        // inaccessible pointer and requires that it not be dereferenced.
+        let untouched = unsafe { Vector::masked_load_partial(no_access, 0, zero_mask, source) };
+        untouched
+            .store_unaligned_to_slice(&mut observed)
+            .expect("invariant: observation buffer has one full vector");
+        assert_eq!(observed, [-1.0; 8]);
+        unsafe { untouched.masked_store_partial(no_access, 0, zero_mask) };
+    }
+}
+
 #[test]
 fn test_widen_i8_simd_and_tails() {
     use hermes_simd::{

@@ -329,8 +329,9 @@ fn gemm_masked_tail<T, Arch, const TILE_M: usize>(
                 // `[col, col + w)` with `col + w ≤ n`, inside the validated
                 // `m × n` C span.
                 *slot = unsafe {
-                    Arch::masked_load_unaligned(
+                    Arch::masked_load_partial(
                         c.as_ptr().add((r + i) * n + col),
+                        w,
                         mask,
                         Arch::zero(),
                     )
@@ -340,8 +341,9 @@ fn gemm_masked_tail<T, Arch, const TILE_M: usize>(
                 // SAFETY: masked load of lanes `[col, col + w) ≤ n` in row
                 // `kk < k` of the validated `k × n` B span.
                 let b_reg = unsafe {
-                    Arch::masked_load_unaligned(
+                    Arch::masked_load_partial(
                         b_slice.as_ptr().add(kk * n + col),
+                        w,
                         mask,
                         Arch::zero(),
                     )
@@ -359,8 +361,9 @@ fn gemm_masked_tail<T, Arch, const TILE_M: usize>(
                 // SAFETY: identical span to the masked load above; only the first
                 // `w` lanes are written.
                 unsafe {
-                    Arch::masked_store_unaligned(
+                    Arch::masked_store_partial(
                         c.as_mut_ptr().add((r + i) * n + col),
+                        w,
                         mask,
                         *slot,
                     );

@@ -24,7 +24,21 @@
       add boundary, differential, and no-std coverage.
 - [x] Re-run exact codegen, two unchanged benchmark comparisons, focused and
       workspace gates, docs, SemVer, and independent artifact review.
-- [ ] Publish, collect exact hosted verification, merge, and discharge the item.
+- [x] Publish and merge PR #95; carry its stale AArch64 F16 lane-oracle
+      correction in the next exact-diff delivery.
+
+## HS-MASKED-TAIL-PARTIAL-LOAD-2026-08-27 [minor]
+
+- [x] Reconcile full-width masked contracts, every dispatch-tail caller, scalar
+      and backend implementations, governing ADRs, and current conformance.
+- [x] Record the exact short-tail baseline, allocation/stack mechanism, and
+      emitted code before changing production behavior.
+- [x] Add one partial masked seam whose inactive lanes are never dereferenced;
+      route all applicable tails without duplicating operation logic.
+- [x] Add generic value, boundary, adversarial guard-page where supported, and
+      no-call/no-overwrite coverage across shipped backends.
+- [ ] Re-run unchanged benchmarks, codegen, focused/full/cross-target/docs/
+      SemVer gates, obtain an independent artifact verdict, publish, and merge.
 
 ## HS-ARGEXTREMA-ONE-PASS-2026-08-27 [patch]
 

@@ -68,9 +68,8 @@ where
         // SAFETY: every index was validated in `[0, len)`, so each scattered
         // store targets a live element of the view. `src` holds at least
         // `indices_len` elements (checked above), so each full-width load reads
-        // initialized memory. The tail stages its live lanes in fully
-        // initialized local buffers and masks the dead ones off, so neither the
-        // load nor the store touches memory outside the live range.
+        // initialized memory. The partial tail load and masked scatter touch
+        // only live source and destination lanes.
         unsafe {
             for i in (0..simd_len).step_by(lane_count) {
                 let idx_vec =
@@ -87,13 +86,15 @@ where
                 let mut idx_buf = [0_i32; MAX_SIMD_LANES];
                 idx_buf[..rem].copy_from_slice(&indices[simd_len..indices_len]);
 
-                let mut lane_buf = [T::ZERO; MAX_SIMD_LANES];
-                lane_buf[..rem].copy_from_slice(&src[simd_len..indices_len]);
-
                 let idx_vec =
                     crate::sparse::spmv::build_index_vector::<T, Arch>(&idx_buf[..lane_count]);
-                let v = Arch::load_unaligned(lane_buf.as_ptr());
                 let mask = Arch::leading_k_mask(rem);
+                let v = Arch::masked_load_partial(
+                    src_ptr.add(simd_len),
+                    rem,
+                    mask,
+                    Arch::mask_to_vector(mask),
+                );
                 Arch::scatter_masked(base_ptr, idx_vec, mask, v);
             }
         }

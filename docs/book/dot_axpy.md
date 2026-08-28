@@ -28,8 +28,8 @@ the lane product into the accumulator in a single `fmadd(a, b, acc)`
 instruction with one rounding. On an FMA3-capable host the kernel is
 `vfmadd231ps`; on hosts without FMA the same generic body compiles to the
 separate multiply and add. The final ragged tail is routed through the
-provider's masked-FMA seam so the masked-memory contract stays valid on every
-backend and only live lanes contribute to the final reduction.
+provider's active-prefix masked loads and masked-FMA seam, so only live lanes
+are addressed and contribute to the final reduction.
 
 Floating-point dot, like floating-point sum (Chapter 4), reorders its
 reduction across SIMD lanes. Callers comparing against a sequential reference
@@ -60,8 +60,11 @@ axpy(2.0_f32, &[3.0, 1.0, -2.0, 5.0], &mut out).expect("equal lengths");
 
 Each returns `Result<(), SimdError>` and reports `LengthMismatch` on unequal
 lengths. Every tail (the partial final vector of any non-dyadic length) runs
-through the provider-owned masked-FMA seam, preserving the full-width masked
-memory contract on scalar, AVX2, AVX-512, NEON, and the emulated SVE backend.
+through the provider-owned active-prefix masked-memory and masked-FMA seams.
+AVX2 and AVX-512 f32/f64 use native predicated memory instructions; scalar,
+NEON, emulated SVE, and x86 F16 touch active lanes through the generic default.
+No AXPY caller constructs a full-width staging buffer or addresses outside the
+suffix; the generic default may use a provider-internal register buffer.
 
 ## GEMV: register-blocked matrix–vector product
 

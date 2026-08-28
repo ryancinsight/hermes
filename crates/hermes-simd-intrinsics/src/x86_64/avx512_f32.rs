@@ -213,6 +213,46 @@ impl BackendKernel<f32> for Avx512 {
         _mm512_mask_storeu_ps(ptr, mask, val.0);
     }
 
+    /// Merge-masked partial load using AVX-512 fault-suppressing predication.
+    // SAFETY: caller must ensure AVX-512F support, every active mask lane is
+    // below `valid_lanes`, and the active addresses are readable.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn masked_load_partial(
+        ptr: *const f32,
+        valid_lanes: usize,
+        mask: Self::Mask,
+        src: Self::Vector,
+    ) -> Self::Vector {
+        debug_assert!(valid_lanes <= <Self as BackendKernel<f32>>::LANE_COUNT);
+        #[cfg(debug_assertions)]
+        {
+            let valid_mask = (1_u64 << valid_lanes) - 1;
+            debug_assert_eq!(u64::from(mask) & !valid_mask, 0);
+        }
+        Avx512F32Vec(_mm512_mask_loadu_ps(src.0, mask, ptr))
+    }
+
+    /// Partial store using AVX-512 fault-suppressing predication.
+    // SAFETY: caller must ensure AVX-512F support, every active mask lane is
+    // below `valid_lanes`, and the active addresses are writable.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn masked_store_partial(
+        ptr: *mut f32,
+        valid_lanes: usize,
+        mask: Self::Mask,
+        val: Self::Vector,
+    ) {
+        debug_assert!(valid_lanes <= <Self as BackendKernel<f32>>::LANE_COUNT);
+        #[cfg(debug_assertions)]
+        {
+            let valid_mask = (1_u64 << valid_lanes) - 1;
+            debug_assert_eq!(u64::from(mask) & !valid_mask, 0);
+        }
+        _mm512_mask_storeu_ps(ptr, mask, val.0);
+    }
+
     // -----------------------------------------------------------------------
     // Native masked arithmetic
     // -----------------------------------------------------------------------

@@ -79,6 +79,34 @@ pub trait SimdLoadStore<T: Scalar>: SimdStorage<T> + Sealed {
     /// The pointer must be valid for `SimdStorage::LANE_COUNT` elements. Only
     /// active lanes selected by `mask` are written.
     unsafe fn masked_store_unaligned(ptr: *mut T, mask: Self::Mask, val: Self::Vector);
+
+    /// Loads active lanes from a pointer with only `valid_lanes` accessible elements.
+    ///
+    /// # Safety
+    /// The processor must support this backend's target features,
+    /// `valid_lanes <= SimdStorage::LANE_COUNT`, every active mask lane must be
+    /// less than `valid_lanes`, and the pointer must be valid for reading those
+    /// active elements. Inactive lanes are not accessed and retain `src`.
+    unsafe fn masked_load_partial(
+        ptr: *const T,
+        valid_lanes: usize,
+        mask: Self::Mask,
+        src: Self::Vector,
+    ) -> Self::Vector;
+
+    /// Stores active lanes to a pointer with only `valid_lanes` accessible elements.
+    ///
+    /// # Safety
+    /// The processor must support this backend's target features,
+    /// `valid_lanes <= SimdStorage::LANE_COUNT`, every active mask lane must be
+    /// less than `valid_lanes`, and the pointer must be valid for writing those
+    /// active elements. Inactive lanes are not read or written.
+    unsafe fn masked_store_partial(
+        ptr: *mut T,
+        valid_lanes: usize,
+        mask: Self::Mask,
+        val: Self::Vector,
+    );
 }
 
 impl<T: Scalar, A: BackendKernel<T>> SimdLoadStore<T> for A {
@@ -124,5 +152,25 @@ impl<T: Scalar, A: BackendKernel<T>> SimdLoadStore<T> for A {
 
     unsafe fn masked_store_unaligned(ptr: *mut T, mask: Self::Mask, val: Self::Vector) {
         <A as BackendKernel<T>>::masked_store_unaligned(ptr, mask, val);
+    }
+
+    unsafe fn masked_load_partial(
+        ptr: *const T,
+        valid_lanes: usize,
+        mask: Self::Mask,
+        src: Self::Vector,
+    ) -> Self::Vector {
+        // SAFETY: forwarded unchanged to the backend contract.
+        unsafe { <A as BackendKernel<T>>::masked_load_partial(ptr, valid_lanes, mask, src) }
+    }
+
+    unsafe fn masked_store_partial(
+        ptr: *mut T,
+        valid_lanes: usize,
+        mask: Self::Mask,
+        val: Self::Vector,
+    ) {
+        // SAFETY: forwarded unchanged to the backend contract.
+        unsafe { <A as BackendKernel<T>>::masked_store_partial(ptr, valid_lanes, mask, val) };
     }
 }

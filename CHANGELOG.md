@@ -6,6 +6,15 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [minor][HS-MASKED-TAIL-PARTIAL-LOAD] Add active-prefix masked load/store to
+  the backend seam, `SimdLoadStore`, and `Vector`. Inactive lanes are never
+  addressed; loads merge them from a source register and stores preserve them.
+  AVX2 and AVX-512 f32/f64 use native predicated memory instructions, while
+  other scalar/backend combinations, including x86 F16, inherit the active-lane
+  default. Safe short-slice vector access and applicable dense, view,
+  reduction, GEMM/GEMV, and scatter tails no longer construct caller-side
+  full-width staging buffers.
+
 - [minor][HS-F16-DISPATCH-PROBE-HOIST] Select the complete AVX2 F16C feature
   frame once at the runtime-dispatch boundary, so dispatched F16 arithmetic
   contains no repeated feature probes or fallback calls. Direct `Avx2` F16

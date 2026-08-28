@@ -14,9 +14,9 @@ use core::arch::x86_64::{
     _mm256_cvtepi32_ps, _mm256_cvttps_epi32, _mm256_div_ps, _mm256_extractf128_ps, _mm256_floor_ps,
     _mm256_fmadd_ps, _mm256_fmaddsub_ps, _mm256_fmsub_ps, _mm256_fmsubadd_ps, _mm256_fnmadd_ps,
     _mm256_i32gather_ps, _mm256_load_ps, _mm256_loadu_ps, _mm256_madd_epi16, _mm256_maddubs_epi16,
-    _mm256_mask_i32gather_ps, _mm256_maskstore_ps, _mm256_max_ps, _mm256_min_ps,
-    _mm256_movehdup_ps, _mm256_moveldup_ps, _mm256_movemask_ps, _mm256_mul_ps, _mm256_or_ps,
-    _mm256_permute_ps, _mm256_permutevar8x32_ps, _mm256_round_ps, _mm256_rsqrt_ps,
+    _mm256_mask_i32gather_ps, _mm256_maskload_ps, _mm256_maskstore_ps, _mm256_max_ps,
+    _mm256_min_ps, _mm256_movehdup_ps, _mm256_moveldup_ps, _mm256_movemask_ps, _mm256_mul_ps,
+    _mm256_or_ps, _mm256_permute_ps, _mm256_permutevar8x32_ps, _mm256_round_ps, _mm256_rsqrt_ps,
     _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set1_epi8, _mm256_set1_ps, _mm256_setr_epi32,
     _mm256_setr_epi8, _mm256_setzero_ps, _mm256_shuffle_epi8, _mm256_sqrt_ps, _mm256_srli_epi16,
     _mm256_store_ps, _mm256_storeu_ps, _mm256_storeu_si256, _mm256_stream_ps, _mm256_sub_ps,
@@ -359,6 +359,53 @@ impl BackendKernel<f32> for Avx2 {
     #[target_feature(enable = "avx2")]
     #[inline]
     unsafe fn masked_store_unaligned(ptr: *mut f32, mask: Self::Mask, val: Self::Vector) {
+        _mm256_maskstore_ps(ptr, _mm256_castps_si256(mask.0), val.0);
+    }
+
+    /// Merge-masked partial load via AVX2 fault-suppressing maskload.
+    // SAFETY: caller must ensure AVX2 support, every active mask lane is below
+    // `valid_lanes`, and the active addresses are readable.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn masked_load_partial(
+        ptr: *const f32,
+        valid_lanes: usize,
+        mask: Self::Mask,
+        src: Self::Vector,
+    ) -> Self::Vector {
+        debug_assert!(valid_lanes <= <Self as BackendKernel<f32>>::LANE_COUNT);
+        #[cfg(debug_assertions)]
+        {
+            let valid_mask = (1_u64 << valid_lanes) - 1;
+            debug_assert_eq!(
+                <Self as BackendKernel<f32>>::mask_to_bitmask(mask) & !valid_mask,
+                0
+            );
+        }
+        let loaded = _mm256_maskload_ps(ptr, _mm256_castps_si256(mask.0));
+        Avx2F32Vec(_mm256_blendv_ps(src.0, loaded, mask.0))
+    }
+
+    /// Partial store via AVX2 fault-suppressing maskstore.
+    // SAFETY: caller must ensure AVX2 support, every active mask lane is below
+    // `valid_lanes`, and the active addresses are writable.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn masked_store_partial(
+        ptr: *mut f32,
+        valid_lanes: usize,
+        mask: Self::Mask,
+        val: Self::Vector,
+    ) {
+        debug_assert!(valid_lanes <= <Self as BackendKernel<f32>>::LANE_COUNT);
+        #[cfg(debug_assertions)]
+        {
+            let valid_mask = (1_u64 << valid_lanes) - 1;
+            debug_assert_eq!(
+                <Self as BackendKernel<f32>>::mask_to_bitmask(mask) & !valid_mask,
+                0
+            );
+        }
         _mm256_maskstore_ps(ptr, _mm256_castps_si256(mask.0), val.0);
     }
 

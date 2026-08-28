@@ -134,7 +134,12 @@ where
     let (tail_mask, x_tail) = unsafe {
         let tail_mask = Arch::leading_k_mask(tail);
         let x_tail = if tail > 0 {
-            Arch::masked_load_unaligned(x_slice.as_ptr().add(simd_len), tail_mask, Arch::zero())
+            Arch::masked_load_partial(
+                x_slice.as_ptr().add(simd_len),
+                tail,
+                tail_mask,
+                Arch::zero(),
+            )
         } else {
             Arch::zero()
         };
@@ -165,8 +170,9 @@ where
             for i in 0..TILE_M {
                 let row_idx = r + i;
                 if tail > 0 {
-                    let a_tail = Arch::masked_load_unaligned(
+                    let a_tail = Arch::masked_load_partial(
                         a_slice.as_ptr().add(row_idx * lda + simd_len),
+                        tail,
                         tail_mask,
                         Arch::zero(),
                     );
@@ -193,8 +199,9 @@ where
                 c += lane_count;
             }
             if tail > 0 {
-                let a_tail = Arch::masked_load_unaligned(
+                let a_tail = Arch::masked_load_partial(
                     a_slice.as_ptr().add(r * lda + simd_len),
+                    tail,
                     tail_mask,
                     Arch::zero(),
                 );
