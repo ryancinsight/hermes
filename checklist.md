@@ -2,15 +2,15 @@
 
 ## HS-ARGEXTREMA-ONE-PASS-2026-08-27 [patch]
 
-- [ ] Reconcile the public empty, NaN, first-tie, signed-zero, and generic
+- [x] Reconcile the public empty, NaN, first-tie, signed-zero, and generic
       scalar contracts with the current two-pass implementation and benchmark.
-- [ ] Add a same-binary, value-gated one-pass candidate to the existing dense
-      instrument and inspect exact AVX2 code generation before reading timing.
-- [ ] Run two unchanged bounded measurements across cache-resident and
+- [x] Add a same-binary, value-gated one-pass candidate to the existing dense
+      instrument and inspect its exact AVX2 code generation.
+- [x] Run two unchanged bounded measurements across cache-resident and
       bandwidth-bound sizes; retain only a repeatable net improvement.
-- [ ] If retained, implement one canonical generic path and extend positive,
-      boundary, adversarial, and backend-generic value coverage.
-- [ ] Run exact-diff and full affected gates, synchronize evidence, obtain an
+- [x] Reject the regressing candidate and remove the experimental benchmark
+      code without changing the production path or its value coverage.
+- [x] Run exact-diff and full affected gates, synchronize evidence, obtain an
       independent judge verdict, publish, merge, and continue.
 
 ## HS-EXACT-LANE-DISPATCH-2026-08-27 [minor] [arch]

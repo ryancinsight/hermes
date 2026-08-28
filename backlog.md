@@ -79,31 +79,18 @@
 - **Acceptance oracle:** differential equality with the scalar reference on
   narrow-band fixtures (reduction-order-exact inputs); criterion evidence on
   banded matrices.
-## HS-ARGEXTREMA-ONE-PASS-2026-08-27 — Measure single-pass arg-extrema [patch] — in progress
 
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** `crates/hermes-simd/benches/dense.rs`, this item block, and the
-  matching checklist section through the next verified commit.
-- **Outcome:** determine whether replacing `argmin`/`argmax`'s vector reduction
-  plus full locating/NaN scan with a semantics-equivalent single pass removes a
-  material memory-traffic bound; retain production code only when repeated
-  timings and exact code generation establish the mechanism and net benefit.
-- **Scope / non-goals:** preserve empty/NaN rejection, first-occurrence ties,
-  signed-zero representation, the public API, generic scalar coverage, and zero
-  allocation. Extend the existing dense benchmark rather than add a binary.
-  Do not add an index-vector public surface or a second arg-extrema API.
-- **Acceptance oracle:** current and candidate paths consume identical f32/f64
-  slices and match the scalar contract before timing at 256, 1024, 4096, and
-  16384 elements. Two unchanged bounded runs plus AVX2 inspection must show no
-  material regression in cache-resident regimes and a repeatable disjoint win
-  where the removed second read is binding; otherwise reject the candidate.
-  Any retained implementation passes generic value, adversarial, release, and
-  full workspace gates on every affected backend.
-- **Performance model / risk:** current work reads approximately `2N` elements;
-  a one-pass candidate reads `N` but pays a horizontal extremum and mask
-  extraction per vector. The expected win is limited to the bandwidth-bound
-  regime and may be falsified by shuffle/reduction latency. [patch], internal
-  hot reduction; no contract change.
+## HS-ARGEXTREMA-ONE-PASS-2026-08-27 — Measure single-pass arg-extrema [patch] — done 2026-08-27
+
+- **Outcome:** rejected the semantics-equivalent per-vector single-pass
+  candidate; production `argmin`/`argmax` remains unchanged. Lease: none.
+- **Evidence:** two unchanged f32/f64 runs at 256/1024/4096/16384 elements lost
+  every row (f32 2.07–4.00×; f64 1.23–1.58× slower). Exact AVX2 assembly shows
+  a serial horizontal-minimum shuffle chain on every vector before comparison.
+- **Risk / change class:** [patch], documentation-only closure; the current
+  vector reduction plus locating/NaN scan was faster of the two measured
+  designs.
+
 ## HS-EXACT-LANE-DISPATCH-2026-08-27 — Dispatch consumer kernels by exact lane count [minor] [arch] — review
 
 - **Integrator:** Codex task `01a0253c-6013-7552-99cc-36bbbcf77f6d`.

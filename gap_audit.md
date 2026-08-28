@@ -1190,9 +1190,16 @@ order (correctness → architecture → tests → docs → PM).
   all-target checks reproduce the hosted warning policy. The prevention is to
   run the hosted all-target command, not a library-only approximation, whenever
   target-specific test code changes.
-- **argmin/argmax two-pass (LOW-MED)** — bandwidth-bound-only win; a correct
-  single-pass needs SIMD index-vector tracking with first-occurrence
-  tie-breaking (non-trivial). All `[patch]`/`[minor]`.
+- **[RESOLVED 2026-08-27] `argmin`/`argmax` per-vector single pass rejected.**
+  A same-binary candidate preserved empty/NaN rejection, first-occurrence ties,
+  signed-zero representation, generic f32/f64 execution, and zero allocation.
+  Two unchanged runs at 256/1024/4096/16384 elements lost every row: f32 was
+  2.07–4.00× slower and f64 was 1.23–1.58× slower. Exact AVX2 assembly shows
+  the cause: each vector executes a serial horizontal-minimum shuffle chain
+  before scalar comparison and mask extraction. The current vector reduction
+  plus locating/NaN scan remains unchanged. A lane-local value/index
+  accumulation design requires new backend index-vector arithmetic, selection,
+  and extraction; it is not justified by this rejected experiment.
 - **[RESOLVED 2026-07-04] `compress` per-chunk buffer zero-init.** The hot
   compaction loop re-declared `[T::ZERO; 64]` each chunk (256–512 B of zero
   stores) though the vector store writes `lane_count` lanes and the copy reads
