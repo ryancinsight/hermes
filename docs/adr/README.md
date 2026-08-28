@@ -24,3 +24,4 @@
 | [016](016-consumer-target-feature-entry.md) | Consumer-Facing Target-Feature Entry for Generic Lane Kernels | Accepted |
 | [017](017-capability-carrying-simd-values.md) | Capability-Carrying SIMD Values | Accepted |
 | [018](018-exact-lane-consumer-dispatch.md) | Exact-Lane Consumer Dispatch | Accepted |
+| [019](019-format-owned-spmv-kernels.md) | Format-Owned SpMV Kernel Modules | Accepted |

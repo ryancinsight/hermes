@@ -106,15 +106,29 @@
   and NEON are compile-verified locally; exact hosted runtime coverage remains
   before closure. **Last update:** 2026-08-28.
 
-## HS-SPMV-SHORT-ROW-MASKED-2026-08-27 — Masked single-vector body for short SpMV rows [patch] — todo
+## HS-SPMV-SHORT-ROW-MASKED-2026-08-27 — Masked single-vector body for short SpMV rows [patch] [arch] — review
 
-- **Outcome:** CSR and DenseWithMask SpMV rows with `row_nnz < LANE_COUNT`
-  fall to the pure scalar loop (`sparse/spmv.rs:170,302`), so narrow-band
-  matrices never engage the vector path. A `leading_k_mask` + `masked_fmadd`
-  single-vector body is a small increment on the PackedMask machinery.
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+  **Lease:** the same task owns `sparse/spmv.rs`, its focused value tests,
+  `sparse_bench.rs`, and this item's PM regions through the next commit.
+- **Outcome:** DenseWithMask rows shorter than half a register bypass empty
+  vector setup; wider tails use one exact-prefix masked vector body on the
+  existing partial-memory and PackedMask seams. The regressing CSR candidate
+  was removed. ADR 019 assigns each format implementation to one leaf module.
 - **Acceptance oracle:** differential equality with the scalar reference on
   narrow-band fixtures (reduction-order-exact inputs); criterion evidence on
   banded matrices.
+- **Scope / non-goals:** preserve sparse format validation, accumulation order
+  outside the candidate row/tail, and public APIs; do not specialize by scalar
+  type or retain a regressing candidate. Split the touched four-format SpMV
+  implementation into format-owned leaf modules under [ADR 019](docs/adr/019-format-owned-spmv-kernels.md);
+  do not change format routing as part of that structural move.
+- **Dependencies / risk:** depends on merged provider PR #96 (`eb4058a`). Risk
+  is [patch] behavior with [arch] private module ownership. Two pinned P-core
+  confirmation runs improve all f32 widths 3/4/5/6/7/15 by 12.8–44.3% while
+  the unchanged CSR control stays within −4.9% to +6.6%; 31/31 focused tests,
+  warning-denied Clippy, Miri, and AVX2/AVX-512 codegen are green. **Last
+  update:** 2026-08-28.
 
 ## HS-ARGEXTREMA-ONE-PASS-2026-08-27 — Measure single-pass arg-extrema [patch] — done 2026-08-27
 

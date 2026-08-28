@@ -6,6 +6,14 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch][arch][HS-SPMV-SHORT-ROW-MASKED] Split the private SpMV
+  implementation into format-owned CSR, DenseWithMask, Blocked-COO, and SELL-p
+  leaf modules under ADR 019. DenseWithMask rows shorter than half a register
+  now bypass empty SIMD setup, while remainders at least half a register use
+  exact-prefix masked loads instead of scalar lane cleanup. The CSR masked-row
+  candidate was rejected after measured regressions, so CSR behavior is
+  unchanged.
+
 - [minor][HS-MASKED-TAIL-PARTIAL-LOAD] Add active-prefix masked load/store to
   the backend seam, `SimdLoadStore`, and `Vector`. Inactive lanes are never
   addressed; loads merge them from a source register and stores preserve them.

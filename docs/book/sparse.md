@@ -31,6 +31,9 @@ vectors:
   construction). The kernel uses masked loads (Chapter 6), not gathers,
   keeping the memory access pattern uniform; each lane window's mask bits are
   read straight out of the packed words, never converted from bools per call.
+  Rows shorter than half a register stay scalar to avoid fixed mask and
+  reduction setup. Wider remainders use exact-prefix masked loads, so the
+  kernel never requires memory beyond the logical row tail.
 
 The types are split so the shape and the storage are explicit: `SparseShape`
 carries the logical dimensions, the `*Data` types carry the raw arrays, and
@@ -94,7 +97,10 @@ type and architecture like the dense kernels.
 The blocked and masked forms are where sparse and dense meet: `spmv_bcoo`'s
 inner loop is a register-blocked GEMV over tiles (the tiling machinery from
 Chapter 8), and `spmv_dense_masked` uses the masked arithmetic from Chapter 6
-so the mask bits, not a gather, select the live lanes. The worked example in
+so the mask bits, not a gather, select the live lanes. Each format's kernel is
+owned by a private leaf under the public `sparse::spmv` trait module; this keeps
+the four traversal strategies independent without changing the public entry
+points. The worked example in
 [the sparse example](examples/sparse.md) exercises CSR accumulation, the
 `IndexOutOfBounds` rejection, and a dense-masked identity.
 
