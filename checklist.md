@@ -1,5 +1,18 @@
 # Checklist — active sprint
 
+## HS-ARGEXTREMA-ONE-PASS-2026-08-27 [patch]
+
+- [x] Reconcile the public empty, NaN, first-tie, signed-zero, and generic
+      scalar contracts with the current two-pass implementation and benchmark.
+- [x] Add a same-binary, value-gated one-pass candidate to the existing dense
+      instrument and inspect its exact AVX2 code generation.
+- [x] Run two unchanged bounded measurements across cache-resident and
+      bandwidth-bound sizes; retain only a repeatable net improvement.
+- [x] Reject the regressing candidate and remove the experimental benchmark
+      code without changing the production path or its value coverage.
+- [x] Run exact-diff and full affected gates, synchronize evidence, obtain an
+      independent judge verdict, publish, merge, and continue.
+
 ## HS-EXACT-LANE-DISPATCH-2026-08-27 [minor] [arch]
 
 - [x] Reconcile Apollo's four-lane contract with ADRs 016/017, current backend

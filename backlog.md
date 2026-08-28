@@ -80,6 +80,17 @@
   narrow-band fixtures (reduction-order-exact inputs); criterion evidence on
   banded matrices.
 
+## HS-ARGEXTREMA-ONE-PASS-2026-08-27 — Measure single-pass arg-extrema [patch] — done 2026-08-27
+
+- **Outcome:** rejected the semantics-equivalent per-vector single-pass
+  candidate; production `argmin`/`argmax` remains unchanged. Lease: none.
+- **Evidence:** two unchanged f32/f64 runs at 256/1024/4096/16384 elements lost
+  every row (f32 2.07–4.00×; f64 1.23–1.58× slower). Exact AVX2 assembly shows
+  a serial horizontal-minimum shuffle chain on every vector before comparison.
+- **Risk / change class:** [patch], documentation-only closure; the current
+  vector reduction plus locating/NaN scan was faster of the two measured
+  designs.
+
 ## HS-EXACT-LANE-DISPATCH-2026-08-27 — Dispatch consumer kernels by exact lane count [minor] [arch] — review
 
 - **Integrator:** Codex task `01a0253c-6013-7552-99cc-36bbbcf77f6d`.
