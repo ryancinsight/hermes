@@ -1,5 +1,16 @@
 # Checklist — active sprint
 
+## HS-GEMM-PANEL-REUSE-2026-08-29 [patch] [perf]
+
+- [ ] Record the current packed-path provider allocation/free count and the
+      pinned 256/512 timing baseline before production editing.
+- [ ] Add bounded per-thread panel reuse without duplicating the pack/kernel
+      loop or changing the no-std path.
+- [ ] Prove exact values, warm reuse, one-time growth, bounded retention,
+      oversized fallback, and thread-exit release with provider hooks.
+- [ ] Run focused and workspace gates, two paired Criterion comparisons, docs,
+      and an independent review before publish and merge.
+
 ## HS-SPMV-GATHER-PREFETCH-2026-08-29 [patch] [perf]
 
 - [x] Reconcile, instrument, measure, reject the unproven prefetch candidate,

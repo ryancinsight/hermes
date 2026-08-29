@@ -1,5 +1,25 @@
 # Backlog — hermes-simd
 
+## HS-GEMM-PANEL-REUSE-2026-08-29 — Reuse bounded packed-B scratch [patch] [perf] — in progress
+
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+  **Lease:** the same task owns `tiling/gemm.rs`, its focused allocation/value
+  tests, the tiled-GEMM benchmark, CHANGELOG/gap-audit, and this item's PM
+  regions through the next commit.
+- **Outcome:** remove repeated provider allocation/deallocation from warmed
+  packed GEMM calls by retaining one 64-byte-aligned panel scratch per thread.
+- **Scope / non-goals:** retain only panels bounded by the established 512 KiB
+  cache threshold; oversized panels remain call-owned. Preserve packing,
+  arithmetic, dispatch, no-std behavior, public API, and every benchmark input,
+  workload, assertion, and timeout.
+- **Acceptance oracle:** a provider-hook census proves the current packed path
+  allocates and frees once per call; after warmup, same-size and smaller bounded
+  calls allocate and free zero times, growth allocates once, thread teardown
+  releases retained storage, and oversized calls are not retained. Independent
+  scalar values remain exact. Two pinned-core Criterion comparisons at 256 and
+  512 reject a statistically significant timing regression. **Last update:**
+  2026-08-29.
+
 ## HS-SPMV-GATHER-PREFETCH-2026-08-29 — Measure out-of-cache CSR prefetch [patch] [perf] — done 2026-08-29
 
 - **Outcome:** rejected software prefetch because two paired median wins were not established; retained the corrected five-case sparse Criterion instrument and restored production source unchanged ([ADR 020](docs/adr/020-backend-owned-read-prefetch.md)).
