@@ -27,7 +27,10 @@ use core::arch::x86_64::{
     _MM_FROUND_TO_NEG_INF, _MM_FROUND_TO_POS_INF, _MM_FROUND_TO_ZERO,
 };
 #[cfg(not(hermes_benchmark_generic_default))]
-use core::arch::x86_64::{_mm512_permutex2var_ps, _mm512_permutexvar_ps, _mm512_setr_epi32};
+use core::arch::x86_64::{
+    _mm512_permutex2var_ps, _mm512_permutexvar_ps, _mm512_setr_epi32, _mm512_shuffle_f32x4,
+    _mm512_shuffle_ps, _mm512_unpackhi_ps, _mm512_unpacklo_ps,
+};
 use hermes_simd_core::kernel::BackendKernel;
 
 /// Newtype over `__m512` providing `Send + Sync`.
@@ -154,6 +157,56 @@ impl BackendKernel<f32> for Avx512 {
         // Each 128-bit block holds two f32 pairs; `0b0100_1110` exchanges the
         // two 64-bit pairs within every block.
         Avx512F32Vec(_mm512_permute_ps::<0b0100_1110>(v.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); `tile` must hold exactly sixteen rows, which the safe vector wrapper enforces before entering this backend method.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn transpose_square(tile: &mut [Self::Vector]) {
+        // Re-borrowing as a fixed-size array proves every index below in
+        // bounds once, so the register network carries no per-access panic
+        // path; the same idiom keeps the AVX2 f32 network branch-free.
+        let tile: &mut [Self::Vector; 16] = tile
+            .try_into()
+            .expect("invariant: tile holds exactly LANE_COUNT rows");
+
+        // The canonical four-stage 16x16 network, 64 shuffles. Stages one and
+        // two weave lanes inside each 128-bit block — `unpack` at element
+        // granularity, then `shuffle_ps` at 64-bit-pair granularity — leaving
+        // each block holding one transposed 4x4 sub-tile. Stages three and
+        // four move whole blocks with `shuffle_f32x4`, at row distance four
+        // then eight, which assembles the sixteen complete columns. The
+        // default would round-trip the whole tile through the stack instead.
+        //
+        // Every instruction is AVX512F (`vunpcklps`, `vunpckhps`, `vshufps`,
+        // `vshuff32x4` in their zmm forms), so the dispatcher's `avx512f`-only
+        // probe is sufficient: nothing here needs AVX512DQ, BW, or VL.
+        let mut t = [_mm512_setzero_ps(); 16];
+        for k in 0..8 {
+            t[2 * k] = _mm512_unpacklo_ps(tile[2 * k].0, tile[2 * k + 1].0);
+            t[2 * k + 1] = _mm512_unpackhi_ps(tile[2 * k].0, tile[2 * k + 1].0);
+        }
+        let mut s = [_mm512_setzero_ps(); 16];
+        for g in 0..4 {
+            let b = 4 * g;
+            s[b] = _mm512_shuffle_ps::<0x44>(t[b], t[b + 2]);
+            s[b + 1] = _mm512_shuffle_ps::<0xEE>(t[b], t[b + 2]);
+            s[b + 2] = _mm512_shuffle_ps::<0x44>(t[b + 1], t[b + 3]);
+            s[b + 3] = _mm512_shuffle_ps::<0xEE>(t[b + 1], t[b + 3]);
+        }
+        let mut u = [_mm512_setzero_ps(); 16];
+        for h in 0..2 {
+            let b = 8 * h;
+            for o in 0..4 {
+                u[b + o] = _mm512_shuffle_f32x4::<0x88>(s[b + o], s[b + o + 4]);
+                u[b + o + 4] = _mm512_shuffle_f32x4::<0xDD>(s[b + o], s[b + o + 4]);
+            }
+        }
+        for o in 0..8 {
+            tile[o] = Avx512F32Vec(_mm512_shuffle_f32x4::<0x88>(u[o], u[o + 8]));
+            tile[o + 8] = Avx512F32Vec(_mm512_shuffle_f32x4::<0xDD>(u[o], u[o + 8]));
+        }
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.

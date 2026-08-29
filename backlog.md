@@ -1,5 +1,67 @@
 # Backlog — hermes-simd
 
+## HS-SIMD-PERF-2026-08-28 — AVX-512 f32 transpose network and bit-exact oracle [patch] — review
+
+- **Outcome:** closed the last hole in the `transpose_square` override
+  surface. The AVX-512 f32 16x16 network — filed as the explicit not-done
+  follow-on of HS-AVX512-TRANSPOSE-2026-08-28 — replaces the stack-capture
+  default with four stages of 64 shuffles, and the generic default's override
+  roster no longer claims AVX-512 takes the default.
+- **Re-verification of the 2026-08-27 audit findings:** both were already
+  delivered and are confirmed against current source. HS-TRANSPOSE-NETWORKS
+  landed AVX2 f32 and NEON f32 (PR #94) and HS-AVX512-TRANSPOSE landed
+  AVX-512 f64 (PR #98); NEON f64 correctly stays on the default, which
+  measured faster. HS-F16-DISPATCH-PROBE-HOIST landed as PR #95: the
+  `Avx2F16Frame` marker proves F16C at construction so the dispatched body is
+  probe-free and call-free. The `f16c_fma_available()` probes remaining in
+  `avx2_f16.rs` are the direct-`Avx2` path, which has no F16C proof and
+  retains its cached probe and software fallback by design. No work remained.
+- **Evidence — feature budget:** every instruction in the new network is
+  AVX512F in its zmm form (`vunpcklps`, `vunpckhps`, `vshufps`,
+  `vshuff32x4`), so the dispatcher's `avx512f`-only probe is sufficient and
+  no AVX512DQ/BW/VL operand can reach F-only silicon.
+- **Evidence — correctness:** the permutation algebra was checked symbolically
+  off-machine against a model of the four intrinsics; the same model
+  reproduces the in-repo AVX-512 f64 network exactly, which is what validates
+  the model. The per-backend index-coded law and involution law cover the
+  network under the SDE job.
+- **Evidence — gates:** `fmt --check` clean, warning-denied workspace
+  all-target Clippy clean, Nextest 523/523, 22 runnable doctests, and the
+  warning-denied `aarch64-unknown-linux-gnu` all-target cross-check clean.
+- **Added oracle:** `transpose_square_is_bit_exact_all_backends` asserts every
+  backend moves lane bit patterns unchanged, using signalling and quiet NaNs,
+  negative zero, and denormals. Confirmed live: a no-op `_mm256_add_ps` in the
+  AVX2 f32 network fails it at (0, 0) while the index-coded law still passes,
+  so it covers a defect class the suite could not previously detect.
+- **Bounds elision (found by codegen inspection, not by the audit):** both
+  AVX-512 networks indexed the tile as a slice under a `debug_assert`, so
+  release codegen kept a panic path per access — 24 `ud2` sites for f32 and 30
+  for f64. Re-borrowing as a fixed-size array, the idiom the AVX2 f32 and NEON
+  f32 networks already use, drops both to one and collapses the f64 body from
+  roughly 3400 lines of assembly to 64. Shuffle counts are unchanged.
+- **Measurement (pinned, single P-core, `ProcessorAffinity = 1`):** native
+  network versus the same backend's forced `hermes_benchmark_generic_default`
+  build — AVX2 f32 8x8 4.185-4.198 ns against 422.74-426.87 ns (101x); AVX2
+  f64 4x4 2.861-3.032 ns against 100.94-101.38 ns (34x). The native f32 figure
+  reproduces the 4.21-4.32 ns recorded under HS-TRANSPOSE-NETWORKS, which
+  validates the instrument. These are the unchanged AVX2 paths: they quantify
+  what the default costs, not the changed path, which cannot be measured here.
+- **Residual risk — no hardware measurement:** this host is an Arrow Lake Core
+  Ultra 9 285K reporting `avx512f: false`, so the changed path cannot execute
+  here and no timing evidence for it exists. Every host-executable transpose
+  path is byte-identical to `origin/main`, so a before/after comparison would
+  measure only noise. The explicit AVX-512 benchmark rows remain the re-open
+  instrument when suitable hardware is available.
+- **Precedent tension to adjudicate:** PR #94 deleted provisional AVX-512
+  f32/f64 networks specifically because no controlled real-silicon timing was
+  available, recording them as unverified optimizations. PR #98 then landed
+  the f64 network on symbolic verification alone without overturning that
+  decision, and this change follows PR #98 for f32. The two precedents
+  disagree; an integrator should settle which standard governs AVX-512
+  optimizations on AVX-512-less development hosts.
+- **Integrator:** claude-fable session 03d80d33 subagent.
+- **Last update:** 2026-08-28.
+
 ## HS-AVX512-TRANSPOSE-2026-08-28 — AVX-512 square-tile transpose [patch] — done 2026-08-28
 
 - **Gap:** `transpose_square` had AVX2 f64/f32 and NEON overrides; both

@@ -1233,7 +1233,9 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
     /// which reserved 16–32 KiB of stack for tiles that are at most
     /// `LANE_COUNT`²; overriding backends never pay it). AVX2 f32/f64 override
     /// with unpack/cross-half permute networks; NEON f32 uses a `trn`/`zip`
-    /// network. AVX-512 and NEON f64 take the generic default.
+    /// network; AVX-512 f64 and f32 use three- and four-stage
+    /// `unpack`/`shuffle_fNxM` block networks. NEON f64 takes the generic
+    /// default, which measured faster than a `trn` override.
     ///
     /// # Safety
     /// Processor must support the required target feature. `tile` must hold
