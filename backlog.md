@@ -1,5 +1,24 @@
 # Backlog — hermes-simd
 
+## HS-COMPLEXREG-ZERO-PROBE-2026-08-29 — Rotations re-probed the host inside the hot loop [patch] — done 2026-08-29
+
+- **Defect:** `ComplexReg::mul_i` and `mul_neg_i` built their operands with
+  `Vector::zero()`, a public constructor that asks whether the host supports
+  `Arch` before handing one out. Inside a method taking `self` that question
+  is already answered — a `ComplexReg` cannot exist without a `Vector`, and a
+  `Vector` cannot exist without proof.
+- **Why it was expensive, not merely redundant:** the probe is a *call*, so
+  the register allocator spills every live vector around it. Apollo's
+  128-point base kernel uses these rotations in an inner butterfly loop, and
+  its disassembly carried **28 feature-detection call sites and 494 stack
+  moves against 978 vector instructions** — over half the kernel's vector
+  instructions were spill traffic for a question already answered at
+  dispatch.
+- **Fix:** a private `zero_proved()` that constructs the register directly,
+  with the safety argument recorded at the site.
+- **Verified:** workspace clippy `-D warnings` clean, 448/448 hermes-simd,
+  `cargo fmt --all --check` clean.
+
 ## HS-SIMD-CAPABILITY-COPY-2026-08-28 — The capability token is a proof, not a resource [patch] — done 2026-08-28
 
 - **Delivered:** `Simd<T, Arch>` derives `Clone, Copy`. It is a `PhantomData`
