@@ -122,7 +122,25 @@ where
     pub fn mul_i(self) -> Self {
         // fmaddsub(0, 0, c) = [-c, +c, ...]: even lanes negate, odd pass.
         let swapped = self.0.swap_adjacent();
-        Self(Vector::zero().fmaddsub(Vector::zero(), swapped))
+        Self(Self::zero_proved().fmaddsub(Self::zero_proved(), swapped))
+    }
+
+    /// A zero register built without re-probing the host.
+    ///
+    /// [`Vector::zero`] is a public constructor, so it asks whether the host
+    /// supports `Arch` before handing one out. Inside a method taking `self`
+    /// that question is already answered: a `ComplexReg` can only be built
+    /// from a [`Vector`], and a `Vector` can only be built with proof. Asking
+    /// again is not merely redundant — the probe is a call, so the register
+    /// allocator spills every live vector around it, and a rotation used in
+    /// an inner butterfly loop drags the whole working set through the stack
+    /// each time (`apollo gap_audit.md#base-kernel-probes`).
+    #[inline(always)]
+    fn zero_proved() -> Vector<T, Arch> {
+        // SAFETY: possessing a `ComplexReg<T, Arch>` proves the host executes
+        // `Arch` for `T`, since one cannot be constructed without a `Vector`,
+        // which cannot be constructed without that proof.
+        Vector::new(unsafe { Arch::zero() })
     }
 
     /// Rotates every sample by `-i`: `(re, im)` becomes `(im, -re)`.
@@ -130,7 +148,7 @@ where
     #[must_use]
     pub fn mul_neg_i(self) -> Self {
         let swapped = self.0.swap_adjacent();
-        Self(Vector::zero().fmsubadd(Vector::zero(), swapped))
+        Self(Self::zero_proved().fmsubadd(Self::zero_proved(), swapped))
     }
 
     /// Exchanges neighbouring complex samples: `[c0, c1, c2, c3]` becomes

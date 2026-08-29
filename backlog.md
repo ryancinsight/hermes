@@ -34,12 +34,29 @@
   call or conditional hint branch. [ADR 020](docs/adr/020-backend-owned-read-prefetch.md)
   owns the retained backend contract and rejected alternatives.
 
+## HS-COMPLEXREG-ZERO-PROBE-2026-08-29 — Rotations re-probed the host inside the hot loop [patch] — done 2026-08-29
+
+- **Defect:** `ComplexReg::mul_i` and `mul_neg_i` built their operands with
+  `Vector::zero()`, a public constructor that asks whether the host supports
+  `Arch` before handing one out. Inside a method taking `self` that question
+  is already answered — a `ComplexReg` cannot exist without a `Vector`, and a
+  `Vector` cannot exist without proof.
+- **Why it was expensive, not merely redundant:** the probe is a *call*, so
+  the register allocator spills every live vector around it. Apollo's
+  128-point base kernel uses these rotations in an inner butterfly loop, and
+  its disassembly carried **28 feature-detection call sites and 494 stack
+  moves against 978 vector instructions** — over half the kernel's vector
+  instructions were spill traffic for a question already answered at
+  dispatch.
+- **Fix:** a private `zero_proved()` that constructs the register directly,
+  with the safety argument recorded at the site.
+- **Verified:** workspace clippy `-D warnings` clean, 448/448 hermes-simd,
+  `cargo fmt --all --check` clean.
 ## HS-REDUCTION-UNROLL-2026-08-29 — Measure backend-specific reduction depth [patch] [perf] — done 2026-08-29
 
 - **Outcome:** rejected eight accumulators; production and the 48-row dense benchmark remain unchanged.
 - **Evidence:** two pinned-core, same-binary Criterion runs covered f32/f64 sum and dot at 256/1024/4096/16384 elements with exact dyadic value gates. Only f64 sum at 4096 repeated materially (15.1–15.2% versus four); f32 had no repeated material win and other f64 rows were flat, unstable, or already slower than production.
 - **Closure:** the measurement threshold failed before production editing or codegen qualification; no API, arithmetic, allocation, workload, timeout, or cache-policy change landed. Lease discharged in the closure commit.
-
 ## HS-SIMD-CAPABILITY-COPY-2026-08-28 — The capability token is a proof, not a resource [patch] — done 2026-08-28
 
 - **Delivered:** `Simd<T, Arch>` derives `Clone, Copy`. It is a `PhantomData`
