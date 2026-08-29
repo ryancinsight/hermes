@@ -1,5 +1,20 @@
 # Checklist — active sprint
 
+## HS-SPMV-GATHER-PREFETCH-2026-08-29 [patch] [perf]
+
+- [x] Reconcile the CSR kernel, dispatch and backend ownership, current sparse
+      instruments, cache working sets, and stable prefetch API availability.
+- [ ] Add one deterministic 64 MiB-operand CSR instrument with independent
+      exact-value validation, nonzero throughput, and no timed allocation.
+- [ ] Record two pinned-core production baselines at both bounded row counts.
+- [ ] Measure only named prefetch distances; retain a candidate only when every
+      repeated row clears the 5% and disjoint-confidence-interval threshold.
+- [ ] If retained, record the backend-seam ADR and add cross-backend value,
+      target-feature, no-std, and codegen coverage; otherwise delete the
+      candidate and record the rejection.
+- [ ] Run focused and workspace gates, synchronize the exact evidence, obtain
+      independent review when production changes, then publish and merge.
+
 ## HS-REDUCTION-UNROLL-2026-08-29 [patch] [perf]
 
 - [x] Reconcile the generic reduction body, backend unroll contract, existing

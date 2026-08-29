@@ -1,5 +1,27 @@
 # Backlog — hermes-simd
 
+## HS-SPMV-GATHER-PREFETCH-2026-08-29 — Measure out-of-cache CSR gather latency [patch] [perf] — in progress
+
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+  **Lease:** the same task owns `crates/hermes-simd/benches/sparse.rs` and this
+  item's PM regions through the next commit.
+- **Outcome:** add one bounded, allocation-free timed CSR fixture whose 64 MiB
+  dense operand exceeds the development host's last-level cache, then measure
+  whether software read prefetch improves the existing four-gather kernel.
+- **Scope / non-goals:** preserve every established sparse workload, arithmetic
+  path, API, timeout, and dispatch route. Fixture construction and validation
+  stay outside the timed region. No production prefetch seam or ISA intrinsic
+  lands unless two pinned-core runs at both measured row counts clear the
+  acceptance threshold; a retained seam first reclassifies this item as
+  `[minor] [arch]` and records its ADR.
+- **Acceptance oracle:** production and candidate results equal an independent
+  dyadic scalar reference; the timed region performs no allocation; throughput
+  counts structural nonzeros; a candidate must reduce median time by at least
+  5% with disjoint 95% confidence intervals at both row counts in two runs,
+  while exact codegen contains the intended hints and no added inner-loop
+  branch, call, spill, or bounds check. Otherwise remove it and record the
+  rejection. **Last update:** 2026-08-29.
+
 ## HS-REDUCTION-UNROLL-2026-08-29 — Measure backend-specific reduction depth [patch] [perf] — done 2026-08-29
 
 - **Outcome:** rejected eight accumulators; production and the 48-row dense benchmark remain unchanged.
