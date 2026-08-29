@@ -2,21 +2,10 @@
 
 ## HS-SPMV-GATHER-PREFETCH-2026-08-29 [patch] [perf]
 
-- [x] Reconcile the CSR kernel, dispatch and backend ownership, current sparse
-      instruments, cache working sets, and stable prefetch API availability.
-- [x] Add one deterministic 64 MiB-operand CSR instrument with independent
-      exact-value validation, nonzero throughput, and no timed allocation.
-- [x] Register the existing sparse Criterion target with `harness = false`;
-      warning-denied bench Clippy and its five-case smoke run pass.
-- [x] Record two pinned-core production baselines at both bounded row counts.
-- [x] Measure only named prefetch distances; retain a candidate only when every
-      repeated row clears the 5% and disjoint-confidence-interval threshold.
-- [x] Record ADR 020, recompute the declared median statistic from retained raw
-      samples, and reject the candidate when two paired wins are not proven.
-- [x] Remove the backend seam, intrinsic, CSR loop change, and candidate-only
-      regression; restore production source and public surface exactly.
-- [ ] Run focused and workspace gates, synchronize the exact evidence, obtain
-      independent review when production changes, then publish and merge.
+- [x] Reconcile, instrument, measure, reject the unproven prefetch candidate,
+      and restore production source exactly at provider `335c3f8`.
+- [x] Complete local gates and independent GREEN review; PR #104 merged as
+      `232d167`, and hosted run `33273062108` passed every job. Lease discharged.
 
 ## HS-REDUCTION-UNROLL-2026-08-29 [patch] [perf]
 

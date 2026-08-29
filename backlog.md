@@ -1,38 +1,9 @@
 # Backlog — hermes-simd
 
-## HS-SPMV-GATHER-PREFETCH-2026-08-29 — Measure out-of-cache CSR prefetch [patch] [perf] — in progress
+## HS-SPMV-GATHER-PREFETCH-2026-08-29 — Measure out-of-cache CSR prefetch [patch] [perf] — done 2026-08-29
 
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** the same task owns candidate removal, sparse benchmark, ADR 020,
-  gap audit, and this item's PM regions through the next commit; the manifest
-  lease discharged in `f0cb63d`.
-- **Outcome:** add one bounded, allocation-free timed CSR fixture whose 64 MiB
-  dense operand exceeds the development host's last-level cache, then measure
-  whether software read prefetch improves the existing four-gather kernel.
-- **Scope / non-goals:** preserve every established sparse workload, arithmetic
-  path, API, timeout, and dispatch route. Fixture construction and validation
-  stay outside the timed region. No production prefetch seam or ISA intrinsic
-  lands unless two pinned-core runs at both measured row counts clear the
-  acceptance threshold; a retained seam first reclassifies this item as
-  `[minor] [arch]` and records its ADR.
-- **Acceptance oracle:** production and candidate results equal an independent
-  dyadic scalar reference; the timed region performs no allocation; throughput
-  counts structural nonzeros; a candidate must reduce median time by at least
-  5% with disjoint 95% confidence intervals at both row counts in two runs,
-  while exact codegen contains the intended hints and no added hint branch,
-  helper call, or register spill. Otherwise remove it and record the
-  rejection. The audit also found that the existing `sparse.rs` target used
-  Cargo's default libtest harness and therefore executed zero Criterion cases;
-  the instrument now has an explicit `harness = false` registration. **Last
-  update:** 2026-08-29.
-- **Candidate evidence:** rejected. The reported 8.2%/19.5% and 26.5%/17.8%
-  changes were Criterion mean estimates, not the predeclared median statistic.
-  Retained second-pair samples show 21.04%/18.01% median reductions, but the
-  first candidate sample was overwritten; comparing the retained final sample
-  with production run 1 gives 1.49%/18.29% and is not a paired run. The
-  required two paired median wins are not established, so production source and
-  public surface are restored unchanged. The corrected benchmark remains.
-  [ADR 020](docs/adr/020-backend-owned-read-prefetch.md) records the rejection.
+- **Outcome:** rejected software prefetch because two paired median wins were not established; retained the corrected five-case sparse Criterion instrument and restored production source unchanged ([ADR 020](docs/adr/020-backend-owned-read-prefetch.md)).
+- **Evidence:** provider `335c3f8`, independent GREEN review, PR #104 merged as `232d167`, and hosted run `33273062108` passed every job, including the bounded benchmark suite. **Lease:** none.
 
 ## HS-COMPLEXREG-ZERO-PROBE-2026-08-29 — Rotations re-probed the host inside the hot loop [patch] — done 2026-08-29
 
