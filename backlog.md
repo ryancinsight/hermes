@@ -1,28 +1,10 @@
 # Backlog — hermes-simd
 
-## HS-REDUCTION-UNROLL-2026-08-29 — Measure backend-specific reduction depth [patch] [perf] — in progress
+## HS-REDUCTION-UNROLL-2026-08-29 — Measure backend-specific reduction depth [patch] [perf] — done 2026-08-29
 
-- **Outcome:** determine whether the uniform four-accumulator reduction body
-  under-fills the host AVX2 floating-point pipeline, and retain a correction
-  only when controlled measurement and emitted code agree.
-- **Scope:** the canonical `SimdView` sum/dot reduction implementation, one
-  same-binary benchmark instrument, value-semantic regression coverage, and
-  synchronized performance evidence. Min/max, sparse gather prefetch, public
-  API, benchmark workloads, cache policy, and timeout bounds are non-goals.
-- **Acceptance:** compare four and eight independent accumulators for
-  cache-resident f32/f64 sum and dot under identical inputs and timed regions;
-  two bounded runs must show a repeatable material improvement, exact codegen
-  must add no calls, bounds branches, panic paths, or spills, and every shipped
-  backend must preserve its derived floating-point error envelope. A regression,
-  noise-only result, or spill growth rejects the candidate and leaves production
-  unchanged.
-- **Integrator:** Codex; **lease:** reduction source, focused benchmark/tests,
-  this item, checklist section, gap-audit conclusion, and Unreleased note
-  through the next verified commit.
-- **Entry evidence:** the backend contract fixes `UNROLL_FACTOR = 4` for every
-  scalar/ISA pair while the generic sum and dot bodies hard-code four
-  accumulators. The existing audit records cache-resident under-fill as an open,
-  measurement-gated hypothesis; no performance conclusion exists yet.
+- **Outcome:** rejected eight accumulators; production and the 48-row dense benchmark remain unchanged.
+- **Evidence:** two pinned-core, same-binary Criterion runs covered f32/f64 sum and dot at 256/1024/4096/16384 elements with exact dyadic value gates. Only f64 sum at 4096 repeated materially (15.1–15.2% versus four); f32 had no repeated material win and other f64 rows were flat, unstable, or already slower than production.
+- **Closure:** the measurement threshold failed before production editing or codegen qualification; no API, arithmetic, allocation, workload, timeout, or cache-policy change landed. Lease discharged in the closure commit.
 
 ## HS-SIMD-CAPABILITY-COPY-2026-08-28 — The capability token is a proof, not a resource [patch] — done 2026-08-28
 

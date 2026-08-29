@@ -4,14 +4,17 @@
 
 - [x] Reconcile the generic reduction body, backend unroll contract, existing
       dense instruments, numerical-order guarantees, and current host capability.
-- [ ] Add one same-binary, value-gated four-versus-eight accumulator instrument
+- [x] Add one same-binary, value-gated four-versus-eight accumulator instrument
       without changing established workloads or timed regions.
-- [ ] Run two bounded cache-resident f32/f64 sum/dot measurements and inspect
-      exact AVX2 code generation for calls, branches, panic paths, and spills.
-- [ ] Retain only a repeatable material correction with generic differential and
+- [x] Run two bounded cache-resident f32/f64 sum/dot measurements; the candidate
+      failed the repeated-win gate before exact-codegen qualification.
+- [x] Retain only a repeatable material correction with generic differential and
       boundary coverage; otherwise delete the candidate and record rejection.
-- [ ] Run focused/full/cross-target/docs gates, synchronize evidence, obtain an
-      independent review, publish, merge, and continue.
+- [x] Run the exact host Clippy, 523-test Nextest, doctest, Rustdoc, formatting,
+      diff, and standalone-lock gates; cross-target and independent source
+      review are unaffected because the rejected candidate leaves no code.
+- [ ] Publish and merge the compact measurement record, then continue with the
+      next measured gap.
 
 ## HS-TRANSPOSE-NETWORKS-2026-08-27 [patch]
 
