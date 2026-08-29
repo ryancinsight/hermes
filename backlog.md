@@ -1,12 +1,12 @@
 # Backlog — hermes-simd
 
-## HS-SPMV-GATHER-PREFETCH-2026-08-29 — Measure out-of-cache CSR gather latency [patch] [perf] — in progress
+## HS-SPMV-GATHER-PREFETCH-2026-08-29 — Prefetch out-of-cache CSR gathers [minor] [arch] [perf] — in progress
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** the same task owns
-  `crates/hermes-simd-core/src/sparse/spmv/csr.rs`,
-  `crates/hermes-simd/benches/sparse.rs`, and this item's PM regions through
-  the next commit; the manifest lease discharged in `f0cb63d`.
+  **Lease:** the same task owns the `BackendKernel`/`SimdLoadStore` memory
+  seam, AVX2 f32 provider override, CSR kernel, sparse benchmark, ADR 020,
+  CHANGELOG, and this item's PM regions through the next commit; the manifest
+  lease discharged in `f0cb63d`.
 - **Outcome:** add one bounded, allocation-free timed CSR fixture whose 64 MiB
   dense operand exceeds the development host's last-level cache, then measure
   whether software read prefetch improves the existing four-gather kernel.
@@ -26,6 +26,11 @@
   Cargo's default libtest harness and therefore executed zero Criterion cases;
   the instrument now has an explicit `harness = false` registration. **Last
   update:** 2026-08-29.
+- **Candidate evidence:** one-unroll-distance prefetch reduced median time by
+  8.5%/9.3% against production run 1 and 26.2%/10.1% against production run 2
+  at 1,048,576/2,097,152 nonzeros; every candidate interval was disjoint from
+  its paired baseline. [ADR 020](docs/adr/020-backend-owned-read-prefetch.md)
+  owns the retained backend contract and rejected alternatives.
 
 ## HS-REDUCTION-UNROLL-2026-08-29 — Measure backend-specific reduction depth [patch] [perf] — done 2026-08-29
 

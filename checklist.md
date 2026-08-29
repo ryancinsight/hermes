@@ -11,7 +11,9 @@
 - [x] Record two pinned-core production baselines at both bounded row counts.
 - [ ] Measure only named prefetch distances; retain a candidate only when every
       repeated row clears the 5% and disjoint-confidence-interval threshold.
-- [ ] If retained, record the backend-seam ADR and add cross-backend value,
+- [x] Record ADR 020 after one-unroll-distance prefetch clears the repeated
+      threshold at both row counts; reject a core-owned architecture helper.
+- [ ] Add the backend-seam contract plus cross-backend value,
       target-feature, no-std, and codegen coverage; otherwise delete the
       candidate and record the rejection.
 - [ ] Run focused and workspace gates, synchronize the exact evidence, obtain
