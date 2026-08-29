@@ -1,5 +1,11 @@
 # Checklist — active sprint
 
+## HS-NO-STD-PACKED-MASK-IMPORTS-2026-08-29 [patch]
+
+- [ ] Restore only the missing `alloc::Box` and `vec!` imports.
+- [ ] Run warning-denied `no_std` check, all-feature Clippy, formatting, and
+      diff checks; commit and discharge the lease.
+
 ## HS-GEMM-PANEL-REUSE-2026-08-29 [patch] [perf]
 
 - [ ] Record the current packed-path provider allocation/free count and the

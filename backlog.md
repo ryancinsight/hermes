@@ -1,6 +1,18 @@
 # Backlog — hermes-simd
 
-## HS-GEMM-PANEL-REUSE-2026-08-29 — Reuse bounded packed-B scratch [patch] [perf] — in progress
+## HS-NO-STD-PACKED-MASK-IMPORTS-2026-08-29 — Restore alloc imports [patch] — in progress
+
+- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
+  **Lease:** the same task owns the `mask.rs` and sparse-owned import regions
+  plus this item's PM entries through the next commit.
+- **Outcome:** restore the explicit `alloc::Box` and `vec!` imports required by
+  the public packed-mask surface when the standard prelude is unavailable.
+- **Scope / non-goals:** imports only; no representation, API, allocation,
+  arithmetic, or feature-policy change.
+- **Acceptance oracle:** warning-denied `hermes-simd-core` `no_std` library
+  check and host all-feature Clippy pass. **Last update:** 2026-08-29.
+
+## HS-GEMM-PANEL-REUSE-2026-08-29 — Reuse bounded packed-B scratch [patch] [perf] — blocked
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
   **Lease:** the same task owns `tiling/gemm.rs`, its focused allocation/value
@@ -17,8 +29,9 @@
   calls allocate and free zero times, growth allocates once, thread teardown
   releases retained storage, and oversized calls are not retained. Independent
   scalar values remain exact. Two pinned-core Criterion comparisons at 256 and
-  512 reject a statistically significant timing regression. **Last update:**
-  2026-08-29.
+  512 reject a statistically significant timing regression. **Blocker:** the
+  pre-existing `no_std` packed-mask import failure; reopen when
+  HS-NO-STD-PACKED-MASK-IMPORTS-2026-08-29 lands. **Last update:** 2026-08-29.
 
 ## HS-SPMV-GATHER-PREFETCH-2026-08-29 — Measure out-of-cache CSR prefetch [patch] [perf] — done 2026-08-29
 
