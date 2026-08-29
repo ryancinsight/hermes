@@ -3,9 +3,10 @@
 ## HS-SPMV-GATHER-PREFETCH-2026-08-29 — Measure out-of-cache CSR gather latency [patch] [perf] — in progress
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** the same task owns `crates/hermes-simd/Cargo.toml`,
+  **Lease:** the same task owns
+  `crates/hermes-simd-core/src/sparse/spmv/csr.rs`,
   `crates/hermes-simd/benches/sparse.rs`, and this item's PM regions through
-  the next commit.
+  the next commit; the manifest lease discharged in `f0cb63d`.
 - **Outcome:** add one bounded, allocation-free timed CSR fixture whose 64 MiB
   dense operand exceeds the development host's last-level cache, then measure
   whether software read prefetch improves the existing four-gather kernel.
