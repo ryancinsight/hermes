@@ -1276,15 +1276,18 @@ order (correctness → architecture → tests → docs → PM).
   would add `⌈k/KC⌉` passes of C load/store to fix a non-problem. Bench rows
   256/512/768 retained as the scaling-regression gate. Not re-opened without a
   microarchitecture whose L2 cannot hold the panel (measured, not assumed).
-- **[open] No software prefetch in gather-bound SpMV (MED); no streaming/NT stores
-  for out-of-LLC writes (MED); `Aligned` typestate dead at the dispatch facade —
-  every op uses unaligned loads and NT stores are blocked on it (LOW-MED);
-  uniform `UNROLL_FACTOR=4` under-fills the FMA pipeline for cache-resident
-  reductions (LOW-MED).** The per-call detection-cache hypothesis is resolved:
-  the retained f32/f64 dispatch-boundary instrument exposes the extra feature
-  loads but rejects another cache because no Hermes deficit repeats across two
-  unchanged runs. Remaining entries are `[patch]`/`[minor]` and
+- **[open] No software prefetch in gather-bound SpMV (MED); `Aligned` typestate
+  remains absent from the dispatch facade (LOW-MED).** Non-temporal stores are
+  already resolved below. Both remaining entries are `[patch]`/`[minor]` and
   measurement-gated.
+- **[REJECTED 2026-08-29] Eight-accumulator floating reductions.** A temporary
+  same-binary instrument compared production, four, and eight independent
+  accumulators for exact dyadic f32/f64 sum and dot at 256/1024/4096/16384
+  elements. Two runs pinned to processor mask 1 produced one repeatable material
+  result: f64 sum at 4096 improved 15.1–15.2% versus four accumulators. f32 had
+  no repeated material win; other f64 sizes were flat, unstable, or slower than
+  the production path. The cross-type, two-size acceptance threshold failed, so
+  the instrument was removed and production remains at `UNROLL_FACTOR = 4`.
 - **[RESOLVED 2026-07-02] Integer/half emulated-kernel throughput — measured,
   split verdict (host-capability sweep, criterion).** (a) *Integer dense ops*:
   LLVM fully auto-vectorizes the emulated `[i32; 8]` kernels inside the
