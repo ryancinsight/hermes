@@ -1,5 +1,27 @@
 # Backlog — hermes-simd
 
+## HS-SIMD-PERF-2026-08-28 — Transpose networks and F16 dispatch hoist [patch] — in-progress
+
+- **Outcome:** close the one remaining hole in the `transpose_square` override
+  surface — the AVX-512 f32 16x16 network, filed as the explicit not-done
+  follow-on of HS-AVX512-TRANSPOSE-2026-08-28 — and re-verify the two 2026-08-27
+  audit findings (HS-TRANSPOSE-NETWORKS, HS-F16-DISPATCH-PROBE-HOIST) against
+  current source.
+- **Scope:** `crates/hermes-simd-intrinsics/src/x86_64/avx512_f32.rs` and the
+  stale override roster in `crates/hermes-simd-core/src/kernel/backend.rs`.
+- **Non-goals:** no change to the AVX2 f32, AVX-512 f64, or NEON f32 networks
+  already landed by PR #94/#98; no change to the F16 dispatch frame landed by
+  PR #95; no benchmark-body edits.
+- **Acceptance oracle:** the index-coded per-backend reference law and the
+  involution law pass for AVX-512 f32; every intrinsic used is AVX512F-only.
+- **Risk:** this host reports `avx512f: false`, so the network is
+  compile-verified and symbolically verified only, never executed here.
+- **Integrator:** claude-fable session 03d80d33 subagent.
+- **Lease:** claude-fable session 03d80d33 subagent —
+  `crates/hermes-simd-intrinsics/src/x86_64/avx512_f32.rs`,
+  `crates/hermes-simd-core/src/kernel/backend.rs`.
+- **Last update:** 2026-08-28.
+
 ## HS-AVX512-TRANSPOSE-2026-08-28 — AVX-512 square-tile transpose [patch] — done 2026-08-28
 
 - **Gap:** `transpose_square` had AVX2 f64/f32 and NEON overrides; both
