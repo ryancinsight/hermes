@@ -315,6 +315,107 @@ where
     }
 }
 
+/// `transpose_square` is pure data movement: it must relocate lane *bit
+/// patterns* without perturbing them. The index-coded law above manufactures
+/// small positive integers, which a network that leaked an operand through an
+/// arithmetic or NaN-canonicalizing instruction would still satisfy. These
+/// fixtures instead carry signalling and quiet NaNs, negative zero, and
+/// denormals, so any such leak shows up as a changed bit pattern — the exact
+/// sense in which each backend override must equal the generic default, which
+/// moves lanes through `store`/`load` and therefore cannot perturb them.
+fn check_transpose_square_bit_exact<T, A>(cell: impl Fn(usize, usize) -> T, bits: impl Fn(T) -> u64)
+where
+    T: hermes_simd_core::Scalar,
+    A: SimdKernel<T>,
+{
+    let lanes = A::LANE_COUNT;
+    let rows: Vec<Vec<T>> = (0..lanes)
+        .map(|r| (0..lanes).map(|c| cell(r, c)).collect())
+        .collect();
+    let mut out = rows.clone();
+
+    // SAFETY: caller gates on the required target features for `A`; every row
+    // holds exactly `LANE_COUNT` elements, and `tile` exactly `LANE_COUNT` rows.
+    unsafe {
+        let mut tile: Vec<A::Vector> = rows
+            .iter()
+            .map(|row| A::load_unaligned(row.as_ptr()))
+            .collect();
+        A::transpose_square(&mut tile);
+        for (row, dst) in tile.iter().zip(out.iter_mut()) {
+            A::store_unaligned(dst.as_mut_ptr(), *row);
+        }
+    }
+
+    for r in 0..lanes {
+        for c in 0..lanes {
+            assert_eq!(
+                bits(out[r][c]),
+                bits(rows[c][r]),
+                "transpose perturbed the bit pattern at ({r}, {c}) with {lanes} lanes"
+            );
+        }
+    }
+}
+
+/// Adversarial bit classes, tagged with a unique per-cell payload in the low
+/// mantissa bits. OR-ing the tag preserves each class: an all-ones exponent
+/// with a non-zero mantissa stays a NaN, and a zero exponent stays a denormal.
+fn transpose_bits_f32(row: usize, column: usize) -> f32 {
+    const CLASSES: [u32; 4] = [0x7F80_0001, 0x8000_0000, 0x0000_0001, 0xFFC0_0000];
+    let tag = u32::try_from(row * 16 + column).expect("lane index fits in u32");
+    f32::from_bits(CLASSES[(row + column) % CLASSES.len()] | (tag & 0xFFFF))
+}
+
+fn transpose_bits_f64(row: usize, column: usize) -> f64 {
+    const CLASSES: [u64; 4] = [
+        0x7FF0_0000_0000_0001,
+        0x8000_0000_0000_0000,
+        0x0000_0000_0000_0001,
+        0xFFF8_0000_0000_0000,
+    ];
+    let tag = u64::try_from(row * 16 + column).expect("lane index fits in u64");
+    f64::from_bits(CLASSES[(row + column) % CLASSES.len()] | (tag & 0xFFFF))
+}
+
+#[test]
+fn transpose_square_is_bit_exact_all_backends() {
+    check_transpose_square_bit_exact::<f32, Scalar>(transpose_bits_f32, |v| u64::from(v.to_bits()));
+    check_transpose_square_bit_exact::<f64, Scalar>(transpose_bits_f64, f64::to_bits);
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+            check_transpose_square_bit_exact::<f32, hermes_simd::Avx2>(transpose_bits_f32, |v| {
+                u64::from(v.to_bits())
+            });
+            check_transpose_square_bit_exact::<f64, hermes_simd::Avx2>(
+                transpose_bits_f64,
+                f64::to_bits,
+            );
+        }
+        if std::is_x86_feature_detected!("avx512f") {
+            check_transpose_square_bit_exact::<f32, hermes_simd::Avx512>(transpose_bits_f32, |v| {
+                u64::from(v.to_bits())
+            });
+            check_transpose_square_bit_exact::<f64, hermes_simd::Avx512>(
+                transpose_bits_f64,
+                f64::to_bits,
+            );
+        }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        check_transpose_square_bit_exact::<f32, hermes_simd::Neon>(transpose_bits_f32, |v| {
+            u64::from(v.to_bits())
+        });
+        check_transpose_square_bit_exact::<f64, hermes_simd::Neon>(
+            transpose_bits_f64,
+            f64::to_bits,
+        );
+    }
+}
+
 /// The f64 permute path is a separate monomorphization with its own lane count
 /// and, on AVX2, a different instruction (`vpermpd` by immediate rather than
 /// `vpermps` by index vector), so it needs its own coverage.
