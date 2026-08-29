@@ -17,6 +17,15 @@ use core::marker::PhantomData;
 /// feature probe. Consumer kernels receive a `Simd` from
 /// `hermes_simd::vectorize`; direct construction is unsafe because a freely
 /// nameable architecture marker is not itself a runtime capability.
+///
+/// It is `Copy` because it is a proof rather than a resource: the host does
+/// not stop supporting `Arch` because the proof was used once. Without that,
+/// a kernel wanting to run its body over several inputs has to re-enter the
+/// dispatcher per input — a capability probe and an indirect call each time,
+/// which is the placement ADR 016 exists to prevent — or reach for
+/// [`Simd::assume_supported`], which is unsafe for a reason that does not
+/// apply to duplicating a capability already held.
+#[derive(Clone, Copy)]
 pub struct Simd<T, Arch> {
     _marker: PhantomData<(T, Arch)>,
 }

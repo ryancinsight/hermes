@@ -1,5 +1,23 @@
 # Backlog — hermes-simd
 
+## HS-SIMD-CAPABILITY-COPY-2026-08-28 — The capability token is a proof, not a resource [patch] — done 2026-08-28
+
+- **Delivered:** `Simd<T, Arch>` derives `Clone, Copy`. It is a `PhantomData`
+  ZST asserting the host supports `Arch`, and the host does not stop
+  supporting it because the proof was used once.
+- **Why it mattered:** without `Copy`, a kernel wanting to run its body over
+  several inputs cannot — the token moves on first use — so it must re-enter
+  the dispatcher per input, paying a capability probe and an indirect call
+  each time. That is exactly the placement ADR 016 exists to prevent, and
+  the type was enforcing it against itself. The alternative was
+  `assume_supported`, unsafe for a reason that does not apply to duplicating
+  a capability already held.
+- **Driver:** apollo's small-size split calls the 128-point base once per
+  block and could not hoist the dispatch out of the block loop.
+- **Verified:** workspace check and clippy `-D warnings` clean, 448/448
+  hermes-simd tests, `cargo fmt --all --check` clean. Deriving `Copy` on a
+  ZST proof adds no representation and no runtime cost.
+
 ## HS-SIMD-PERF-2026-08-28 — AVX-512 f32 transpose network and bit-exact oracle [patch] — review
 
 - **Outcome:** closed the last hole in the `transpose_square` override
