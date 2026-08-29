@@ -1276,10 +1276,17 @@ order (correctness → architecture → tests → docs → PM).
   would add `⌈k/KC⌉` passes of C load/store to fix a non-problem. Bench rows
   256/512/768 retained as the scaling-regression gate. Not re-opened without a
   microarchitecture whose L2 cannot hold the panel (measured, not assumed).
-- **[open] No software prefetch in gather-bound SpMV (MED); `Aligned` typestate
-  remains absent from the dispatch facade (LOW-MED).** Non-temporal stores are
-  already resolved below. Both remaining entries are `[patch]`/`[minor]` and
-  measurement-gated.
+- **[REJECTED 2026-08-29] Software prefetch in gather-bound SpMV.** A permanent
+  Criterion instrument now covers 1,048,576 and 2,097,152 nonzeros against a
+  64 MiB dense operand with an independent exact dyadic oracle. The candidate's
+  reported changes were mean estimates mislabeled as medians. Retained raw
+  samples prove only the second paired median comparison (21.04%/18.01%); the
+  first candidate sample was overwritten, and the retained cross-run smaller
+  row improves only 1.49%. The predeclared two-pair median gate therefore fails
+  and production remains unchanged. ADR 020 records the evidence correction.
+- **[open] `Aligned` typestate remains absent from the dispatch facade
+  (LOW-MED).** Non-temporal stores are already resolved below. This remains a
+  `[minor]` measurement-gated candidate.
 - **[REJECTED 2026-08-29] Eight-accumulator floating reductions.** A temporary
   same-binary instrument compared production, four, and eight independent
   accumulators for exact dyadic f32/f64 sum and dot at 256/1024/4096/16384
