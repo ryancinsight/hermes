@@ -40,6 +40,10 @@ name = "complex"
 harness = false
 
 [[bench]]
+name = "sparse"
+harness = false
+
+[[bench]]
 name = "simd_isa_comparison"
 harness = false
 

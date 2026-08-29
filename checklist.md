@@ -4,9 +4,11 @@
 
 - [x] Reconcile the CSR kernel, dispatch and backend ownership, current sparse
       instruments, cache working sets, and stable prefetch API availability.
-- [ ] Add one deterministic 64 MiB-operand CSR instrument with independent
+- [x] Add one deterministic 64 MiB-operand CSR instrument with independent
       exact-value validation, nonzero throughput, and no timed allocation.
-- [ ] Record two pinned-core production baselines at both bounded row counts.
+- [x] Register the existing sparse Criterion target with `harness = false`;
+      warning-denied bench Clippy and its five-case smoke run pass.
+- [x] Record two pinned-core production baselines at both bounded row counts.
 - [ ] Measure only named prefetch distances; retain a candidate only when every
       repeated row clears the 5% and disjoint-confidence-interval threshold.
 - [ ] If retained, record the backend-seam ADR and add cross-backend value,
