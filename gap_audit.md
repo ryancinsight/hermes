@@ -904,6 +904,56 @@ assessed against a float-lane trait, not a general one.
   `33139847261` green across bounded benchmarks, x86, native AArch64, SDE,
   Miri, no-std, dependency policy, and lock integrity.
 
+### AVX-512 f32 transpose network and bounds elision (HS-SIMD-PERF, 2026-08-28)
+
+- Closed the last hole in the `transpose_square` override surface: the AVX-512
+  f32 16x16 network, filed as the explicit not-done follow-on of
+  HS-AVX512-TRANSPOSE. Four stages, 64 shuffles, every instruction AVX512F in
+  its zmm form, so the dispatcher's `avx512f`-only probe is sufficient and no
+  AVX512DQ/BW/VL operand can reach F-only silicon. Emitted assembly confirms
+  the budget and the count: 32 `vshuff64x2` plus 16 `vunpck*ps` and 16
+  `vunpck*pd` — LLVM lowers the `shuffle_ps` 0x44/0xEE pairs to 64-bit-pair
+  unpacks and prefers the `f64x2` block form, both AVX512F equivalents.
+- Correctness is symbolic, not hardware-measured. The permutation algebra was
+  checked off-machine against a model of the four intrinsics, and the same
+  model reproduces the in-repo AVX-512 f64 network exactly, which is what
+  validates the model rather than the claim. This host is an Arrow Lake Core
+  Ultra 9 285K reporting `avx512f: false`, so the path cannot execute here.
+- Bounds elision, found by codegen inspection rather than by the audit: both
+  AVX-512 networks indexed the tile as a slice under a `debug_assert`, so
+  release codegen kept a panic path per access — 24 `ud2` sites for f32 and 30
+  for f64 — while the AVX2 f32 and NEON f32 networks already re-borrow as a
+  fixed-size array. Adopting that idiom drops both to one panic path and
+  collapses the f64 body from roughly 3400 lines of assembly to 64, since the
+  per-access panic paths pulled formatting machinery inline. Shuffle counts
+  are unchanged. The reusable finding is that a register network's asm line
+  count, not just its shuffle histogram, is worth reading: the shuffles were
+  correct all along and the cost sat entirely in the panic scaffolding.
+- Motivating measurement, pinned to a single P-core (`ProcessorAffinity = 1`)
+  on the 285K, comparing the native network against the same backend's forced
+  `hermes_benchmark_generic_default` build: AVX2 f32 8x8 runs 4.185-4.198 ns
+  versus 422.74-426.87 ns for the default, a factor of 101; AVX2 f64 4x4 runs
+  2.861-3.032 ns versus 100.94-101.38 ns, a factor of 34. The native f32
+  figure reproduces the 4.21-4.32 ns recorded under HS-TRANSPOSE-NETWORKS,
+  which is what validates the pinned instrument. These measure the unchanged
+  AVX2 paths: they quantify what the stack-capture default costs, and so what
+  the AVX-512 f32 tile — four times larger at 256 elements — stood to lose,
+  but they are not a measurement of the changed path, which has none.
+- Added `transpose_square_is_bit_exact_all_backends`: the index-coded law
+  manufactures small positive integers, so a network leaking an operand
+  through an arithmetic or NaN-canonicalizing instruction would satisfy it
+  while rewriting lane bits. The new fixtures carry signalling and quiet NaNs,
+  negative zero, and denormals. Confirmed live before landing — a no-op
+  `_mm256_add_ps` in the AVX2 f32 network fails it at (0, 0) while the
+  index-coded law still passes.
+- Unresolved precedent: PR #94 deleted provisional AVX-512 networks precisely
+  because no controlled real-silicon timing was available, recording them as
+  unverified optimizations; PR #98 then landed the f64 network on symbolic
+  verification alone without overturning that decision, and this change
+  follows PR #98 for f32. Which standard governs AVX-512 work on
+  AVX-512-less development hosts is an open integrator call, not a settled
+  repository policy.
+
 ### Backend matrix
 
 - [major] Resolved as HS-425. `TargetId::Sve` now routes through both forced
