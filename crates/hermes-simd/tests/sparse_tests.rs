@@ -54,45 +54,6 @@ fn test_spmv_csr_accumulates() {
 }
 
 #[test]
-fn test_spmv_csr_long_rows_match_scalar_reference() {
-    const NCOLS: usize = 257;
-    const ROW_LENGTHS: [usize; 2] = [128, 65];
-
-    let row_ptr = [0i32, 128, 193];
-    let col_indices: Vec<i32> = (0..193)
-        .map(|index| {
-            i32::try_from((index * 131) % NCOLS).expect("manufactured CSR column must fit i32")
-        })
-        .collect();
-    let values: Vec<f32> = (0..193)
-        .map(|index| {
-            f32::from(u8::try_from(index % 4 + 1).expect("manufactured CSR value must fit u8"))
-        })
-        .collect();
-    let x: Vec<f32> = (0..NCOLS)
-        .map(|index| {
-            f32::from(u8::try_from(index % 17).expect("manufactured dense value must fit u8")) - 8.0
-        })
-        .collect();
-    let mut expected = [3.0f32, -5.0];
-    let mut offset = 0usize;
-    for (row, row_length) in ROW_LENGTHS.into_iter().enumerate() {
-        for index in offset..offset + row_length {
-            let column = usize::try_from(col_indices[index])
-                .expect("manufactured CSR column must be nonnegative");
-            expected[row] += values[index] * x[column];
-        }
-        offset += row_length;
-    }
-
-    let data = CsrData::new(&values, &col_indices, &row_ptr, 2, NCOLS);
-    let mut actual = [3.0f32, -5.0];
-    spmv_csr::<f32>(validated(data), &x, &mut actual);
-
-    assert_eq!(actual, expected);
-}
-
-#[test]
 fn test_spmv_dense_masked() {
     let values = [1.0f32, 0.0, 0.0, 1.0]; // 2x2 identity
     let mask = PackedMask::from_bools(&[true, false, false, true]);

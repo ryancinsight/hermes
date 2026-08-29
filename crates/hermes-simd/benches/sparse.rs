@@ -152,7 +152,9 @@ fn bench_spmv_csr_gather_bound_f32(c: &mut Criterion) {
         spmv_csr::<f32>(data.clone(), &x, &mut y);
         assert_eq!(y, expected, "gather-bound CSR fixture reference mismatch");
 
-        group.throughput(Throughput::Elements(values.len() as u64));
+        let structural_nonzeros =
+            u64::try_from(values.len()).expect("gather-bound fixture length must fit u64");
+        group.throughput(Throughput::Elements(structural_nonzeros));
         group.bench_with_input(BenchmarkId::from_parameter(nrows), &nrows, |bench, _| {
             bench.iter(|| {
                 y.fill(0.0);

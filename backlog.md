@@ -1,11 +1,10 @@
 # Backlog — hermes-simd
 
-## HS-SPMV-GATHER-PREFETCH-2026-08-29 — Prefetch out-of-cache CSR gathers [minor] [arch] [perf] — in progress
+## HS-SPMV-GATHER-PREFETCH-2026-08-29 — Measure out-of-cache CSR prefetch [patch] [perf] — in progress
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** the same task owns the `BackendKernel`/`SimdLoadStore` memory
-  seam, AVX2 f32 provider override, CSR kernel, sparse benchmark, ADR 020,
-  CHANGELOG, and this item's PM regions through the next commit; the manifest
+  **Lease:** the same task owns candidate removal, sparse benchmark, ADR 020,
+  gap audit, and this item's PM regions through the next commit; the manifest
   lease discharged in `f0cb63d`.
 - **Outcome:** add one bounded, allocation-free timed CSR fixture whose 64 MiB
   dense operand exceeds the development host's last-level cache, then measure
@@ -26,13 +25,14 @@
   Cargo's default libtest harness and therefore executed zero Criterion cases;
   the instrument now has an explicit `harness = false` registration. **Last
   update:** 2026-08-29.
-- **Candidate evidence:** the final provider-seam one-unroll-distance prefetch
-  reduced median time by 8.2%/19.5% against production run 1 and 26.5%/17.8%
-  against production run 2 at 1,048,576/2,097,152 nonzeros; every candidate
-  interval was disjoint from its paired baseline. Exact AVX2 codegen contains
-  32 `prefetcht0` hints followed by the four inlined gathers, with no helper
-  call or conditional hint branch. [ADR 020](docs/adr/020-backend-owned-read-prefetch.md)
-  owns the retained backend contract and rejected alternatives.
+- **Candidate evidence:** rejected. The reported 8.2%/19.5% and 26.5%/17.8%
+  changes were Criterion mean estimates, not the predeclared median statistic.
+  Retained second-pair samples show 21.04%/18.01% median reductions, but the
+  first candidate sample was overwritten; comparing the retained final sample
+  with production run 1 gives 1.49%/18.29% and is not a paired run. The
+  required two paired median wins are not established, so production source and
+  public surface are restored unchanged. The corrected benchmark remains.
+  [ADR 020](docs/adr/020-backend-owned-read-prefetch.md) records the rejection.
 
 ## HS-COMPLEXREG-ZERO-PROBE-2026-08-29 — Rotations re-probed the host inside the hot loop [patch] — done 2026-08-29
 

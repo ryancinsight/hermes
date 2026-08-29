@@ -160,22 +160,6 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
     /// `ptr` must be valid for reads.
     unsafe fn load_unaligned(ptr: *const T) -> Self::Vector;
 
-    /// Whether this backend emits a measured read-prefetch instruction.
-    const SUPPORTS_READ_PREFETCH: bool = false;
-
-    /// Hints that a scalar address will be read by a future kernel iteration.
-    ///
-    /// The default is a no-op. Backends override it only where controlled
-    /// measurement shows that an architecture read-prefetch instruction
-    /// improves the consuming kernel.
-    ///
-    /// # Safety
-    ///
-    /// The processor must support this backend's target features, and `ptr`
-    /// must be valid for one `T` read.
-    #[inline(always)]
-    unsafe fn prefetch_read(_ptr: *const T) {}
-
     /// Store a vector to an aligned pointer.
     ///
     /// # Safety

@@ -2,90 +2,72 @@
 
 ## Status
 
-Accepted.
+Rejected.
 
 ## Context
 
 `HS-SPMV-GATHER-PREFETCH-2026-08-29` measures CSR multiplication with a 64 MiB
 dense operand and 128 structurally nonzero entries per row. The operand exceeds
 the development host's last-level cache, while four independent SIMD gathers
-already expose memory-level parallelism. One-unroll-distance software prefetch
-reduced median time by 8.2%/19.5% in the first paired run and 26.5%/17.8% in
-the second at 1,048,576/2,097,152 nonzeros. Every final candidate confidence
-interval was disjoint from its paired production interval.
+already expose memory-level parallelism. The predeclared gate requires at least
+a 5% median reduction at both 1,048,576 and 2,097,152 nonzeros in two paired
+runs, with disjoint 95% confidence intervals.
 
-The generic CSR kernel cannot own an x86 or AArch64 intrinsic. Target-feature
-safety and instruction selection belong to the sealed backend seam. A read hint
-also belongs to the existing load/store capability family rather than a second
-parallel memory trait.
+The initial record mislabeled Criterion's mean change estimates as median
+reductions. The retained second-pair samples have candidate medians of
+4.3268/8.8900 ms and production medians of 5.4795/10.8422 ms, reductions of
+21.04%/18.01%. Criterion overwrote the first candidate sample when the second
+pair ran, so the claimed first-pair medians are not recoverable. Comparing the
+retained final candidate sample with the retained first production sample gives
+1.49%/18.29%, but that cross-run comparison is not a paired measurement and the
+smaller row is below the threshold. The artifact therefore does not establish
+the required two paired median wins.
 
 ## Decision
 
-Add a default no-op `prefetch_read` operation and a default-false
-`SUPPORTS_READ_PREFETCH` capability to the sealed `BackendKernel` contract, then
-forward both through `SimdLoadStore`. The compile-time capability preserves the
-original single-loop kernel for every backend that lacks measured evidence. The
-AVX2 f32 provider enables the capability and overrides the operation with a
-temporal read hint because that is the measured monomorphization; other scalar
-and backend combinations retain the no-op until their own measurements justify
-an override.
+Reject software prefetch and remove the candidate backend capability, AVX2
+intrinsic, and CSR loop changes. Production retains the original four-gather
+kernel and public surface.
 
-CSR schedules each hint one four-gather unroll group before use. A steady loop
-handles only groups that have a future group to prefetch, and an epilogue uses
-the same macro-expanded unroll body without a conditional hint. The local macro
-is the narrow code-generation exception to the declarative-macro default: a
-closure outlined the hot body, while a shared accumulator-array helper changed
-register allocation and regressed both measured sizes. The final machine loop
-must contain the intended hints without an added hint branch, helper call, or
-register spill. Failure of that code-generation gate rejects the implementation
-even if wall-clock samples improve.
-
-The hint address is derived only from `Validated<Csr>` columns after the public
-SpMV entry check proves `x.len() >= ncols`. The unsafe provider contract still
-requires a readable address even though current hardware treats the operation
-as a non-faulting hint. Prefetch changes neither arithmetic order nor observable
-results and performs no allocation.
+Retain the gather-bound Criterion rows and their explicit `harness = false`
+registration. The instrument constructs and validates the 64 MiB fixture
+outside the timed region, checks an independent exact dyadic scalar result, and
+reports structural nonzeros. Future candidates must preserve both candidate
+sample sets under distinct baseline names so the stated median gate is
+reproducible after the run.
 
 ## Rejected alternatives
 
-1. Call architecture intrinsics directly from the generic CSR module. This
+1. Change the selection statistic to Criterion's mean estimate after seeing the
+   result. That changes the instrument's acceptance oracle after measurement.
+2. Retain the candidate from the recoverable second pair alone. One pair cannot
+   satisfy the two-run stability requirement.
+3. Call architecture intrinsics directly from the generic CSR module. This
    bypasses provider ownership and duplicates target-specific policy in core.
-2. Override every backend and scalar combination. Only AVX2 f32 has controlled
-   evidence; widening the optimization would substitute inference for data.
-3. Add a separate prefetch capability trait. Read prefetch is a memory-access
-   operation and a second sealed forwarding hierarchy would duplicate
-   `SimdLoadStore` and `BackendKernel`.
-4. Retain a conditional hint in the unrolled loop. The branch is predictable,
-   but the accepted code-generation oracle requires it to be structurally
-   absent rather than relying on prediction.
-5. Prefetch two unroll groups ahead. The controlled candidate regressed the
+4. Prefetch two unroll groups ahead. The controlled candidate regressed the
    1,048,576-nonzero row set by 30.3% and produced unstable 2,097,152-nonzero
-   measurements, so the added distance does not cover its instruction cost.
+   measurements.
 
 ## Consequences
 
-- The public sealed capability surface grows additively and is classified
-  `[minor] [arch]`; no caller or first-party implementation migration is
-  required because both new methods have no-op defaults.
-- AVX2 f32 CSR adds read traffic only for values the following unrolled group
-  consumes. No operand, result, or scratch allocation changes.
+- Production code, arithmetic, memory traffic, allocation behavior, and public
+  API remain unchanged.
 - The permanent gather-bound Criterion rows become the regression instrument.
-  They validate exact dyadic results before timing and report structural
-  nonzeros rather than dense logical elements.
-- AVX-512, AArch64, reduced-precision, and integer override decisions remain
-  measurement-gated.
+- Software prefetch remains rejected until a new candidate satisfies a
+  predeclared, durably retained two-run oracle.
 
 ## Verification
 
 - Independent dyadic scalar equality at both benchmark sizes.
-- Two pinned-core paired Criterion comparisons with disjoint 95% confidence
-  intervals and at least 5% median reduction at both sizes.
-- Exact release code generation for hint, hint-branch, helper-call, and register
-  spill counts.
-- Warning-denied all-target and AArch64 no-std compilation, focused/workspace
-  Nextest, doctests, Rustdoc, SemVer classification, and benchmark smoke.
+- Median recomputation from each retained `sample.json` using per-iteration
+  times; the missing first candidate sample is an evidence failure.
+- Exact source restoration against the production CSR/backend files.
+- Warning-denied all-target compilation, workspace Nextest, benchmark smoke,
+  formatting, and standalone lock validation.
 
 ## Revision history
 
-- 2026-08-29: Accepted for `HS-SPMV-GATHER-PREFETCH-2026-08-29` after the
-  measurement threshold selected the provider-owned AVX2 f32 override.
+- 2026-08-29: Rejected after independent review identified mean estimates
+  mislabeled as medians and the retained samples failed to prove both required
+  paired median comparisons. The initially accepted source candidate was
+  removed before merge.

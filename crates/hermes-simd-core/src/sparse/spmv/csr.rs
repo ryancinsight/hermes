@@ -6,27 +6,6 @@ use crate::kernel::{SimdArith, SimdGather, SimdLoadStore, SimdReduce};
 use crate::scalar::Scalar;
 use crate::sparse::{Csr, SparseView, Validated};
 
-const PREFETCH_UNROLL_DISTANCE: usize = 1;
-
-#[inline(always)]
-unsafe fn prefetch_columns<T, Arch>(x: *const T, cols: *const i32, start: usize, len: usize)
-where
-    T: Scalar,
-    Arch: SimdLoadStore<T>,
-{
-    let end = start + len;
-    let mut cursor = start;
-    while cursor < end {
-        // SAFETY: the caller proves `[start, start + len)` lies in the current
-        // validated CSR row, whose columns are nonnegative and below `ncols`.
-        let column = unsafe { *cols.add(cursor) } as usize;
-        // SAFETY: validated columns plus the SpMV entry length check prove the
-        // addressed dense element exists.
-        unsafe { Arch::prefetch_read(x.add(column)) };
-        cursor += 1;
-    }
-}
-
 impl<T, Arch> SparseSpMv<T> for SparseView<'_, T, Validated<Csr>, Arch>
 where
     T: Scalar,
@@ -63,70 +42,42 @@ where
                 let mut acc_vec2 = Arch::zero();
                 let mut acc_vec3 = Arch::zero();
 
-                let unroll_width = lane_count * 4;
-                let unroll_len = (row_nnz / unroll_width) * unroll_width;
-                let prefetch_offset = unroll_width * PREFETCH_UNROLL_DISTANCE;
-                macro_rules! accumulate_unroll {
-                    ($j:expr) => {{
-                        let j = $j;
-                        let idx0 = build_index_vector::<T, Arch>(&cols[j..j + lane_count]);
-                        acc_vec0 = Arch::fmadd(
-                            Arch::gather(x.as_ptr(), idx0),
-                            Arch::load_unaligned(vals[j..].as_ptr()),
-                            acc_vec0,
-                        );
-
-                        let idx1 = build_index_vector::<T, Arch>(
-                            &cols[j + lane_count..j + lane_count * 2],
-                        );
-                        acc_vec1 = Arch::fmadd(
-                            Arch::gather(x.as_ptr(), idx1),
-                            Arch::load_unaligned(vals[j + lane_count..].as_ptr()),
-                            acc_vec1,
-                        );
-
-                        let idx2 = build_index_vector::<T, Arch>(
-                            &cols[j + lane_count * 2..j + lane_count * 3],
-                        );
-                        acc_vec2 = Arch::fmadd(
-                            Arch::gather(x.as_ptr(), idx2),
-                            Arch::load_unaligned(vals[j + lane_count * 2..].as_ptr()),
-                            acc_vec2,
-                        );
-
-                        let idx3 = build_index_vector::<T, Arch>(
-                            &cols[j + lane_count * 3..j + lane_count * 4],
-                        );
-                        acc_vec3 = Arch::fmadd(
-                            Arch::gather(x.as_ptr(), idx3),
-                            Arch::load_unaligned(vals[j + lane_count * 3..].as_ptr()),
-                            acc_vec3,
-                        );
-                    }};
-                }
-
-                let prefetch_len = unroll_len.saturating_sub(prefetch_offset);
+                let unroll_len = (row_nnz / (lane_count * 4)) * (lane_count * 4);
                 let mut j = 0usize;
-                if Arch::SUPPORTS_READ_PREFETCH {
-                    while j < prefetch_len {
-                        prefetch_columns::<T, Arch>(
-                            x.as_ptr(),
-                            cols.as_ptr(),
-                            j + prefetch_offset,
-                            unroll_width,
-                        );
-                        accumulate_unroll!(j);
-                        j += unroll_width;
-                    }
-                    while j < unroll_len {
-                        accumulate_unroll!(j);
-                        j += unroll_width;
-                    }
-                } else {
-                    while j < unroll_len {
-                        accumulate_unroll!(j);
-                        j += unroll_width;
-                    }
+                while j < unroll_len {
+                    let idx0 = build_index_vector::<T, Arch>(&cols[j..j + lane_count]);
+                    acc_vec0 = Arch::fmadd(
+                        Arch::gather(x.as_ptr(), idx0),
+                        Arch::load_unaligned(vals[j..].as_ptr()),
+                        acc_vec0,
+                    );
+
+                    let idx1 =
+                        build_index_vector::<T, Arch>(&cols[j + lane_count..j + lane_count * 2]);
+                    acc_vec1 = Arch::fmadd(
+                        Arch::gather(x.as_ptr(), idx1),
+                        Arch::load_unaligned(vals[j + lane_count..].as_ptr()),
+                        acc_vec1,
+                    );
+
+                    let idx2 = build_index_vector::<T, Arch>(
+                        &cols[j + lane_count * 2..j + lane_count * 3],
+                    );
+                    acc_vec2 = Arch::fmadd(
+                        Arch::gather(x.as_ptr(), idx2),
+                        Arch::load_unaligned(vals[j + lane_count * 2..].as_ptr()),
+                        acc_vec2,
+                    );
+
+                    let idx3 = build_index_vector::<T, Arch>(
+                        &cols[j + lane_count * 3..j + lane_count * 4],
+                    );
+                    acc_vec3 = Arch::fmadd(
+                        Arch::gather(x.as_ptr(), idx3),
+                        Arch::load_unaligned(vals[j + lane_count * 3..].as_ptr()),
+                        acc_vec3,
+                    );
+                    j += lane_count * 4;
                 }
 
                 let mut acc_vec =

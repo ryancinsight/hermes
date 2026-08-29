@@ -1,6 +1,6 @@
 # Checklist — active sprint
 
-## HS-SPMV-GATHER-PREFETCH-2026-08-29 [minor] [arch] [perf]
+## HS-SPMV-GATHER-PREFETCH-2026-08-29 [patch] [perf]
 
 - [x] Reconcile the CSR kernel, dispatch and backend ownership, current sparse
       instruments, cache working sets, and stable prefetch API availability.
@@ -11,11 +11,10 @@
 - [x] Record two pinned-core production baselines at both bounded row counts.
 - [x] Measure only named prefetch distances; retain a candidate only when every
       repeated row clears the 5% and disjoint-confidence-interval threshold.
-- [x] Record ADR 020 after one-unroll-distance prefetch clears the repeated
-      threshold at both row counts; reject a core-owned architecture helper.
-- [x] Add the backend-seam contract plus cross-backend value,
-      target-feature, no-std, and codegen coverage; otherwise delete the
-      candidate and record the rejection.
+- [x] Record ADR 020, recompute the declared median statistic from retained raw
+      samples, and reject the candidate when two paired wins are not proven.
+- [x] Remove the backend seam, intrinsic, CSR loop change, and candidate-only
+      regression; restore production source and public surface exactly.
 - [ ] Run focused and workspace gates, synchronize the exact evidence, obtain
       independent review when production changes, then publish and merge.
 

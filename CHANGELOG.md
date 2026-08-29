@@ -6,12 +6,6 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
-- [minor][arch][HS-SPMV-GATHER-PREFETCH] Add a default no-op backend read-hint
-  operation and a measured AVX2 f32 override. Validated CSR multiplication now
-  prefetches one four-gather group ahead without allocation; two pinned-core
-  comparisons over a 64 MiB dense operand reduce median time by 8.2%-26.5% at
-  1,048,576 nonzeros and 17.8%-19.5% at 2,097,152 nonzeros.
-
 - [patch][HS-AVX512-TRANSPOSE] Add the AVX-512 f64 `transpose_square`
   override, a 24-shuffle 8x8 network replacing the stack-capture default.
   The permutation algebra is verified symbolically and the existing
