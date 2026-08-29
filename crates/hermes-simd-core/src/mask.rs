@@ -19,6 +19,8 @@
 //!
 //! All `BitMask` methods are either `const` or trivially inlineable.
 
+use alloc::{boxed::Box, vec};
+
 /// Bit-packed predicate mask for exactly `N` SIMD lanes.
 ///
 /// The inner `u64` stores one bit per lane: bit `i` = lane `i` is active.
