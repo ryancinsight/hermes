@@ -164,7 +164,12 @@ impl BackendKernel<f64> for Avx512 {
     #[inline]
     #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn transpose_square(tile: &mut [Self::Vector]) {
-        debug_assert_eq!(tile.len(), 8, "tile must hold LANE_COUNT rows");
+        // Re-borrowing as a fixed-size array proves every index below in
+        // bounds once, so the register network carries no per-access panic
+        // path; the same idiom keeps the AVX2 f32 network branch-free.
+        let tile: &mut [Self::Vector; 8] = tile
+            .try_into()
+            .expect("invariant: tile holds exactly LANE_COUNT rows");
         // The canonical three-stage 8x8 network, 24 shuffles: `unpack` weaves
         // within each 128-bit block, then two rounds of `shuffle_f64x2` move
         // whole blocks. The default would round-trip the tile through the
