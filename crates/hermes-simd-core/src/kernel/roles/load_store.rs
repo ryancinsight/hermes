@@ -41,6 +41,20 @@ pub trait SimdLoadStore<T: Scalar>: SimdStorage<T> + Sealed {
     /// The pointer must be valid for one register of `T`.
     unsafe fn load_unaligned(ptr: *const T) -> Self::Vector;
 
+    /// Whether this architecture/scalar combination emits a read prefetch.
+    const SUPPORTS_READ_PREFETCH: bool;
+
+    /// Hints that a scalar address will be read by a future kernel iteration.
+    ///
+    /// Sealed backends emit it only for measured architecture/scalar
+    /// combinations.
+    ///
+    /// # Safety
+    ///
+    /// The processor must support this backend's target features, and `ptr`
+    /// must be valid for one `T` read.
+    unsafe fn prefetch_read(ptr: *const T);
+
     /// Stores one register to an aligned pointer.
     ///
     /// # Safety
@@ -110,6 +124,8 @@ pub trait SimdLoadStore<T: Scalar>: SimdStorage<T> + Sealed {
 }
 
 impl<T: Scalar, A: BackendKernel<T>> SimdLoadStore<T> for A {
+    const SUPPORTS_READ_PREFETCH: bool = <A as BackendKernel<T>>::SUPPORTS_READ_PREFETCH;
+
     #[inline(always)]
     unsafe fn try_cast<U>(value: Self::Vector, destination: *mut U) -> bool
     where
@@ -124,6 +140,12 @@ impl<T: Scalar, A: BackendKernel<T>> SimdLoadStore<T> for A {
 
     unsafe fn load_unaligned(ptr: *const T) -> Self::Vector {
         <A as BackendKernel<T>>::load_unaligned(ptr)
+    }
+
+    #[inline(always)]
+    unsafe fn prefetch_read(ptr: *const T) {
+        // SAFETY: forwarded unchanged to the backend contract.
+        unsafe { <A as BackendKernel<T>>::prefetch_read(ptr) };
     }
 
     unsafe fn store_aligned(ptr: *mut T, val: Self::Vector) {

@@ -10,9 +10,9 @@ Accepted.
 dense operand and 128 structurally nonzero entries per row. The operand exceeds
 the development host's last-level cache, while four independent SIMD gathers
 already expose memory-level parallelism. One-unroll-distance software prefetch
-reduced median time by 8.5%/9.3% in the first paired run and 26.2%/10.1% in the
-second at 1,048,576/2,097,152 nonzeros. Every candidate confidence interval was
-disjoint from its paired production interval.
+reduced median time by 8.2%/19.5% in the first paired run and 26.5%/17.8% in
+the second at 1,048,576/2,097,152 nonzeros. Every final candidate confidence
+interval was disjoint from its paired production interval.
 
 The generic CSR kernel cannot own an x86 or AArch64 intrinsic. Target-feature
 safety and instruction selection belong to the sealed backend seam. A read hint
@@ -21,19 +21,24 @@ parallel memory trait.
 
 ## Decision
 
-Add a default no-op `prefetch_read` operation to the sealed `BackendKernel`
-contract and forward it through `SimdLoadStore`. The default preserves every
-backend that lacks measured evidence. The AVX2 f32 provider overrides it with a
+Add a default no-op `prefetch_read` operation and a default-false
+`SUPPORTS_READ_PREFETCH` capability to the sealed `BackendKernel` contract, then
+forward both through `SimdLoadStore`. The compile-time capability preserves the
+original single-loop kernel for every backend that lacks measured evidence. The
+AVX2 f32 provider enables the capability and overrides the operation with a
 temporal read hint because that is the measured monomorphization; other scalar
 and backend combinations retain the no-op until their own measurements justify
 an override.
 
 CSR schedules each hint one four-gather unroll group before use. A steady loop
 handles only groups that have a future group to prefetch, and an epilogue uses
-the same inlined unroll body without a conditional hint. The final machine loop
-must contain the intended hints and no added branch, call, spill, or bounds
-check. Failure of that code-generation gate rejects the implementation even if
-wall-clock samples improve.
+the same macro-expanded unroll body without a conditional hint. The local macro
+is the narrow code-generation exception to the declarative-macro default: a
+closure outlined the hot body, while a shared accumulator-array helper changed
+register allocation and regressed both measured sizes. The final machine loop
+must contain the intended hints without an added hint branch, helper call, or
+register spill. Failure of that code-generation gate rejects the implementation
+even if wall-clock samples improve.
 
 The hint address is derived only from `Validated<Csr>` columns after the public
 SpMV entry check proves `x.len() >= ncols`. The unsafe provider contract still
@@ -53,6 +58,9 @@ results and performs no allocation.
 4. Retain a conditional hint in the unrolled loop. The branch is predictable,
    but the accepted code-generation oracle requires it to be structurally
    absent rather than relying on prediction.
+5. Prefetch two unroll groups ahead. The controlled candidate regressed the
+   1,048,576-nonzero row set by 30.3% and produced unstable 2,097,152-nonzero
+   measurements, so the added distance does not cover its instruction cost.
 
 ## Consequences
 
@@ -72,8 +80,8 @@ results and performs no allocation.
 - Independent dyadic scalar equality at both benchmark sizes.
 - Two pinned-core paired Criterion comparisons with disjoint 95% confidence
   intervals and at least 5% median reduction at both sizes.
-- Exact release code generation for hint, branch, call, spill, and bounds-check
-  counts.
+- Exact release code generation for hint, hint-branch, helper-call, and register
+  spill counts.
 - Warning-denied all-target and AArch64 no-std compilation, focused/workspace
   Nextest, doctests, Rustdoc, SemVer classification, and benchmark smoke.
 

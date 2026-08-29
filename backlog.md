@@ -20,16 +20,18 @@
   dyadic scalar reference; the timed region performs no allocation; throughput
   counts structural nonzeros; a candidate must reduce median time by at least
   5% with disjoint 95% confidence intervals at both row counts in two runs,
-  while exact codegen contains the intended hints and no added inner-loop
-  branch, call, spill, or bounds check. Otherwise remove it and record the
+  while exact codegen contains the intended hints and no added hint branch,
+  helper call, or register spill. Otherwise remove it and record the
   rejection. The audit also found that the existing `sparse.rs` target used
   Cargo's default libtest harness and therefore executed zero Criterion cases;
   the instrument now has an explicit `harness = false` registration. **Last
   update:** 2026-08-29.
-- **Candidate evidence:** one-unroll-distance prefetch reduced median time by
-  8.5%/9.3% against production run 1 and 26.2%/10.1% against production run 2
-  at 1,048,576/2,097,152 nonzeros; every candidate interval was disjoint from
-  its paired baseline. [ADR 020](docs/adr/020-backend-owned-read-prefetch.md)
+- **Candidate evidence:** the final provider-seam one-unroll-distance prefetch
+  reduced median time by 8.2%/19.5% against production run 1 and 26.5%/17.8%
+  against production run 2 at 1,048,576/2,097,152 nonzeros; every candidate
+  interval was disjoint from its paired baseline. Exact AVX2 codegen contains
+  32 `prefetcht0` hints followed by the four inlined gathers, with no helper
+  call or conditional hint branch. [ADR 020](docs/adr/020-backend-owned-read-prefetch.md)
   owns the retained backend contract and rejected alternatives.
 
 ## HS-REDUCTION-UNROLL-2026-08-29 — Measure backend-specific reduction depth [patch] [perf] — done 2026-08-29

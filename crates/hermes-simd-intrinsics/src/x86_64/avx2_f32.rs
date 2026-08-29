@@ -20,9 +20,9 @@ use core::arch::x86_64::{
     _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set1_epi8, _mm256_set1_ps, _mm256_setr_epi32,
     _mm256_setr_epi8, _mm256_setzero_ps, _mm256_shuffle_epi8, _mm256_sqrt_ps, _mm256_srli_epi16,
     _mm256_store_ps, _mm256_storeu_ps, _mm256_storeu_si256, _mm256_stream_ps, _mm256_sub_ps,
-    _mm256_xor_ps, _mm_add_ps, _mm_cvtss_f32, _mm_shuffle_ps, _CMP_EQ_OQ, _CMP_GE_OQ, _CMP_GT_OQ,
-    _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ, _CMP_ORD_Q, _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT,
-    _MM_FROUND_TO_ZERO,
+    _mm256_xor_ps, _mm_add_ps, _mm_cvtss_f32, _mm_prefetch, _mm_shuffle_ps, _CMP_EQ_OQ, _CMP_GE_OQ,
+    _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ, _CMP_ORD_Q, _MM_FROUND_NO_EXC,
+    _MM_FROUND_TO_NEAREST_INT, _MM_FROUND_TO_ZERO, _MM_HINT_T0,
 };
 #[cfg(all(
     any(target_arch = "x86", target_arch = "x86_64"),
@@ -76,6 +76,7 @@ impl BackendKernel<f32> for Avx2 {
     type IndexVector = Avx2IdxI32;
     const LANE_COUNT: usize = 8;
     const UNROLL_FACTOR: usize = 4;
+    const SUPPORTS_READ_PREFETCH: bool = true;
 
     // -----------------------------------------------------------------------
     // Load / store
@@ -93,6 +94,14 @@ impl BackendKernel<f32> for Avx2 {
     #[inline]
     unsafe fn load_unaligned(ptr: *const f32) -> Self::Vector {
         Avx2F32Vec(_mm256_loadu_ps(ptr))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` and `ptr`
+    // names one readable f32. The hint does not dereference through Rust.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn prefetch_read(ptr: *const f32) {
+        _mm_prefetch(ptr.cast::<i8>(), _MM_HINT_T0);
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.

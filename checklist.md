@@ -1,6 +1,6 @@
 # Checklist — active sprint
 
-## HS-SPMV-GATHER-PREFETCH-2026-08-29 [patch] [perf]
+## HS-SPMV-GATHER-PREFETCH-2026-08-29 [minor] [arch] [perf]
 
 - [x] Reconcile the CSR kernel, dispatch and backend ownership, current sparse
       instruments, cache working sets, and stable prefetch API availability.
@@ -9,11 +9,11 @@
 - [x] Register the existing sparse Criterion target with `harness = false`;
       warning-denied bench Clippy and its five-case smoke run pass.
 - [x] Record two pinned-core production baselines at both bounded row counts.
-- [ ] Measure only named prefetch distances; retain a candidate only when every
+- [x] Measure only named prefetch distances; retain a candidate only when every
       repeated row clears the 5% and disjoint-confidence-interval threshold.
 - [x] Record ADR 020 after one-unroll-distance prefetch clears the repeated
       threshold at both row counts; reject a core-owned architecture helper.
-- [ ] Add the backend-seam contract plus cross-backend value,
+- [x] Add the backend-seam contract plus cross-backend value,
       target-feature, no-std, and codegen coverage; otherwise delete the
       candidate and record the rejection.
 - [ ] Run focused and workspace gates, synchronize the exact evidence, obtain
