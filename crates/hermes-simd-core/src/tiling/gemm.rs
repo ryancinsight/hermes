@@ -82,6 +82,15 @@ use crate::{
     view::{SimdError, SimdView},
 };
 
+#[cfg(feature = "std")]
+std::thread_local! {
+    /// Per-thread packed-panel storage. Keeping the length at zero lets the
+    /// kernel treat the capacity as uninitialized scratch without fabricating
+    /// initialized `T` values between calls.
+    static PACKED_B_PANEL: core::cell::RefCell<AlignedVec<u8, crate::align::Aligned<64>>> =
+        core::cell::RefCell::new(AlignedVec::new());
+}
+
 /// Byte threshold of the right-hand operand `B` (`k × n`) above which
 /// [`gemm_impl`] packs B column panels into a contiguous scratch (Theorem 4).
 ///
@@ -89,6 +98,61 @@ use crate::{
 /// taken slightly early rather than late. Measured f64 on AVX2: ~6% faster at
 /// 512² (B = 2 MiB), no benefit and a small loss below (B resident in L2).
 pub(super) const GEMM_PACK_B_BYTES_THRESHOLD: usize = 512 * 1024;
+
+/// Run `use_panel` with storage for `panel_len` elements of `T`.
+///
+/// Standard builds retain one panel per thread when its byte size is at most
+/// [`GEMM_PACK_B_BYTES_THRESHOLD`]. Larger panels, and every `no_std` build,
+/// keep the former call-owned allocation lifecycle. The callback fully writes
+/// each panel before reading it, so the retained byte vector intentionally
+/// remains length zero.
+#[inline]
+fn with_packed_b_panel<T, R>(
+    panel_len: usize,
+    use_panel: impl FnOnce(&mut [core::mem::MaybeUninit<T>]) -> R,
+) -> R
+where
+    T: Scalar,
+{
+    #[cfg(feature = "std")]
+    {
+        assert!(
+            core::mem::size_of::<T>() > 0 && core::mem::align_of::<T>() <= 64,
+            "invariant: SIMD scalars are nonzero-sized and at most 64-byte aligned"
+        );
+        let panel_bytes = panel_len
+            .checked_mul(core::mem::size_of::<T>())
+            .expect("invariant: validated GEMM panel byte size fits usize");
+        if panel_bytes <= GEMM_PACK_B_BYTES_THRESHOLD {
+            return PACKED_B_PANEL.with(|panel| {
+                let mut panel = panel
+                    .try_borrow_mut()
+                    .expect("invariant: GEMM panel packing is not reentrant");
+                if panel.capacity() < panel_bytes {
+                    *panel = AlignedVec::with_capacity(panel_bytes);
+                }
+                // SAFETY: `AlignedVec<u8, Aligned<64>>` provides the alignment
+                // checked above, and `align_of::<T>() <= 64` was asserted on
+                // entry, so the pointer is aligned for `T`. The reservation
+                // above guarantees `capacity() >= panel_bytes`, and
+                // `panel_bytes == panel_len * size_of::<T>()`, so `panel_len`
+                // elements of `T` fit within the allocation. The elements are
+                // `MaybeUninit`, so no initialization is claimed here; the
+                // caller initializes every `T` before its first read.
+                let panel = unsafe {
+                    core::slice::from_raw_parts_mut(
+                        panel.as_mut_ptr().cast::<core::mem::MaybeUninit<T>>(),
+                        panel_len,
+                    )
+                };
+                use_panel(panel)
+            });
+        }
+    }
+
+    let mut panel = AlignedVec::<T, crate::align::Aligned<64>>::with_capacity(panel_len);
+    use_panel(panel.spare_capacity_mut())
+}
 
 #[inline(never)]
 fn check_tiled_gemm_dimensions(
@@ -226,49 +290,58 @@ where
         .saturating_mul(k)
         .saturating_mul(core::mem::size_of::<T>());
     if m > TILE_M && simd_n_len > 0 && b_bytes >= GEMM_PACK_B_BYTES_THRESHOLD {
-        let mut packed = AlignedVec::<T, crate::align::Aligned<64>>::with_capacity(k * block_n);
-        unsafe {
-            packed.set_len(k * block_n);
-        }
-        let mut col_n = 0;
-        while col_n < simd_n_len {
-            for kk in 0..k {
-                // SAFETY: `kk < k` and `col_n + block_n ≤ simd_n_len ≤ n`, so the
-                // source span `[kk*n+col_n, +block_n)` lies within `b` (validated by
-                // `check_tiled_gemm_dimensions`) and the destination
-                // `[kk*block_n, +block_n)` within the `k*block_n` scratch.
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        b_slice.as_ptr().add(kk * n + col_n),
-                        packed.as_mut_ptr().add(kk * block_n),
-                        block_n,
-                    );
+        // The panel loop stays lexically here rather than in a helper. This
+        // function is `#[inline]` into a `#[target_feature]` caller, and that
+        // frame is what compiles `gemm_register_tile` to the wide ISA; a
+        // separate non-inlined callee codegens at baseline instead. Measured:
+        // hoisting this loop into its own `#[inline(never)]` function costs
+        // 1.83 ms -> 112 ms at n = 512, and merely relaxing it to `#[inline]`
+        // still costs 70 ms, because a generic callee does not reliably
+        // inherit the caller's feature frame.
+        with_packed_b_panel::<T, _>(k * block_n, |packed| {
+            let packed_ptr = packed.as_mut_ptr().cast::<T>();
+            let mut col_n = 0;
+            while col_n < simd_n_len {
+                for kk in 0..k {
+                    // SAFETY: `kk < k` and `col_n + block_n ≤ simd_n_len ≤ n`,
+                    // so the source span `[kk*n+col_n, +block_n)` lies within
+                    // `b` (validated by `check_tiled_gemm_dimensions`) and the
+                    // destination `[kk*block_n, +block_n)` within the
+                    // `k*block_n` panel.
+                    unsafe {
+                        core::ptr::copy_nonoverlapping(
+                            b_slice.as_ptr().add(kk * n + col_n),
+                            packed_ptr.add(kk * block_n),
+                            block_n,
+                        );
+                    }
                 }
-            }
 
-            let mut r = 0;
-            while r < m {
-                let current_tile_m = if r + TILE_M <= m { TILE_M } else { m - r };
-                // SAFETY: the packed panel holds `k` rows of `block_n` contiguous
-                // elements (row stride `block_n`); the C tile at `(r, col_n)` is
-                // within the validated `m × n` output.
-                unsafe {
-                    gemm_register_tile::<T, Arch, TILE_M, TILE_N>(
-                        a_slice,
-                        c,
-                        r,
-                        current_tile_m,
-                        col_n,
-                        n,
-                        k,
-                        packed.as_ptr(),
-                        block_n,
-                    );
+                let mut r = 0;
+                while r < m {
+                    let current_tile_m = if r + TILE_M <= m { TILE_M } else { m - r };
+                    // SAFETY: the packed panel holds `k` rows of `block_n`
+                    // contiguous elements (row stride `block_n`), fully written
+                    // by the pack loop above; the C tile at `(r, col_n)` is
+                    // within the validated `m × n` output.
+                    unsafe {
+                        gemm_register_tile::<T, Arch, TILE_M, TILE_N>(
+                            a_slice,
+                            c,
+                            r,
+                            current_tile_m,
+                            col_n,
+                            n,
+                            k,
+                            packed_ptr,
+                            block_n,
+                        );
+                    }
+                    r += TILE_M;
                 }
-                r += TILE_M;
+                col_n += block_n;
             }
-            col_n += block_n;
-        }
+        });
     } else {
         let mut r = 0;
         while r < m {

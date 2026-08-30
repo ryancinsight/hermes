@@ -9,6 +9,133 @@
 
 use hermes_simd::*;
 
+#[cfg(feature = "mnemosyne-memory")]
+mod packed_panel_allocations {
+    use super::*;
+    use core::cell::Cell;
+    use core::sync::atomic::{AtomicUsize, Ordering};
+
+    static ALLOCATIONS: AtomicUsize = AtomicUsize::new(0);
+    static FREES: AtomicUsize = AtomicUsize::new(0);
+
+    std::thread_local! {
+        static COUNTING: Cell<bool> = const { Cell::new(false) };
+    }
+
+    unsafe extern "C" fn record_allocation(_ptr: *mut core::ffi::c_void, _bytes: usize) {
+        COUNTING.with(|counting| {
+            if counting.get() {
+                ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+            }
+        });
+    }
+
+    unsafe extern "C" fn record_free(_ptr: *mut core::ffi::c_void, _bytes: usize) {
+        COUNTING.with(|counting| {
+            if counting.get() {
+                FREES.fetch_add(1, Ordering::Relaxed);
+            }
+        });
+    }
+
+    struct HookGuard;
+
+    impl HookGuard {
+        fn install() -> Self {
+            ALLOCATIONS.store(0, Ordering::Relaxed);
+            FREES.store(0, Ordering::Relaxed);
+            mnemosyne::register_alloc_hook(Some(record_allocation));
+            mnemosyne::register_free_hook(Some(record_free));
+            Self
+        }
+    }
+
+    impl Drop for HookGuard {
+        fn drop(&mut self) {
+            COUNTING.with(|counting| counting.set(false));
+            mnemosyne::register_alloc_hook(None);
+            mnemosyne::register_free_hook(None);
+        }
+    }
+
+    fn counts() -> (usize, usize) {
+        (
+            ALLOCATIONS.load(Ordering::Relaxed),
+            FREES.load(Ordering::Relaxed),
+        )
+    }
+
+    struct GemmCase {
+        a: Vec<f32>,
+        b: Vec<f32>,
+        c: Vec<f32>,
+        n: usize,
+        k: usize,
+    }
+
+    impl GemmCase {
+        const M: usize = 2;
+
+        fn new(n: usize, k: usize) -> Self {
+            Self {
+                a: vec![1.0; Self::M * k],
+                b: vec![0.5; k * n],
+                c: vec![0.0; Self::M * n],
+                n,
+                k,
+            }
+        }
+
+        fn run(&mut self, expected: f32) {
+            tiled_gemm(&self.a, &self.b, &mut self.c, Self::M, self.n, self.k).unwrap();
+            assert!(self.c.iter().all(|&value| value == expected));
+        }
+    }
+
+    #[test]
+    fn packed_gemm_reuses_only_bounded_panels() {
+        let _hooks = HookGuard::install();
+
+        std::thread::spawn(|| {
+            // These fixtures use the same runtime backend. Their packed-panel
+            // sizes scale only with K: 128 (initial), 64 (smaller), 256
+            // (growth), and 16_385 (larger than 512 KiB even at one lane).
+            let mut initial = GemmCase::new(1024, 128);
+            let mut smaller = GemmCase::new(2048, 64);
+            let mut growth = GemmCase::new(512, 256);
+            let mut oversized = GemmCase::new(64, 16_385);
+
+            COUNTING.with(|counting| counting.set(true));
+
+            initial.run(64.0);
+            assert_eq!(counts(), (1, 0), "first bounded panel is retained");
+            initial.run(128.0);
+            assert_eq!(counts(), (1, 0), "same-size panel is reused");
+
+            smaller.run(32.0);
+            assert_eq!(counts(), (1, 0), "smaller panel is reused");
+
+            growth.run(128.0);
+            assert_eq!(counts(), (2, 1), "growth replaces the retained panel once");
+            growth.run(256.0);
+            assert_eq!(counts(), (2, 1), "grown panel is reused");
+
+            oversized.run(8192.5);
+            assert_eq!(
+                counts(),
+                (3, 2),
+                "oversized panel is allocated and freed by the call"
+            );
+            // Keep counting enabled so thread-local destruction records the
+            // retained panel's final free.
+        })
+        .join()
+        .expect("GEMM allocation census worker must complete");
+
+        assert_eq!(counts(), (3, 3), "thread teardown releases retained panel");
+    }
+}
+
 #[test]
 fn test_tiled_dot_matches_dot() {
     let a: Vec<f32> = (0..64).map(|i| i as f32).collect();

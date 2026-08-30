@@ -456,6 +456,7 @@ dependencies = [
  "hermes-simd-intrinsics",
  "hermes-simd-macros",
  "hermes-simd-types",
+ "mnemosyne-memory",
  "proptest",
  "rkyv",
  "themis-topology",
