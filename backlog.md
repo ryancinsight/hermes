@@ -8,25 +8,46 @@
 - **Evidence:** warning-denied `hermes-simd-core` `no_std` library check, host
   all-feature Clippy, formatting, and diff checks pass.
 
-## HS-GEMM-PANEL-REUSE-2026-08-29 — Reuse bounded packed-B scratch [patch] [perf] — in progress
+## HS-GEMM-PANEL-REUSE-2026-08-29 — Reuse bounded packed-B scratch [patch] [perf] — rejected 2026-08-29 on measurement
 
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** the same task owns `tiling/gemm.rs`, its focused allocation/value
-  tests, the tiled-GEMM benchmark, CHANGELOG/gap-audit, and this item's PM
-  regions through the next commit.
-- **Outcome:** remove repeated provider allocation/deallocation from warmed
-  packed GEMM calls by retaining one 64-byte-aligned panel scratch per thread.
-- **Scope / non-goals:** retain only panels bounded by the established 512 KiB
-  cache threshold; oversized panels remain call-owned. Preserve packing,
-  arithmetic, dispatch, no-std behavior, public API, and every benchmark input,
-  workload, assertion, and timeout.
-- **Acceptance oracle:** a provider-hook census proves the current packed path
-  allocates and frees once per call; after warmup, same-size and smaller bounded
-  calls allocate and free zero times, growth allocates once, thread teardown
-  releases retained storage, and oversized calls are not retained. Independent
-  scalar values remain exact. Two pinned-core Criterion comparisons at 256 and
-  512 reject a statistically significant timing regression. **Last update:**
-  2026-08-29.
+- **Rejected.** Retaining the panel per thread removes one allocate/free pair
+  per packed call and costs **69x** in exchange. Production source is restored
+  unchanged; the allocation census that produced the verdict is kept.
+- **Measured** (wall clock, best of 40 blocks of 5 calls, f32, same probe built
+  against each tree; `n = 256` is under the 512 KiB packing threshold so the
+  packed path is not taken there and the row is a control):
+
+  | n | call-owned | retained panel |
+  |---|---|---|
+  | 256 | 260 us | 261 us (control, packed path not taken) |
+  | 512 | 1.81 ms | **125.6 ms** |
+
+- **Why.** The register micro-kernel depends on the compiler proving the packed
+  panel does not alias `b` or `c`; a call-owned `AlignedVec` gives that for
+  free, and a pointer reached through a thread-local `RefCell` borrow does not.
+  Without it the accumulators cannot stay register-resident across the `p`-loop
+  (Theorem 3 in `tiling/gemm.rs`), which is the whole basis of the kernel.
+- **The handover also carried a second, independent regression.** The rescued
+  work had hoisted the packed loop into an `#[inline(never)]` helper -- an
+  attempt to restore the non-aliasing fact through distinct `&mut` parameters.
+  Measured on its own, with retention disabled, that hoist alone cost
+  1.81 ms -> 118 ms: the helper does not inherit the caller's
+  `#[target_feature]` frame, so the micro-kernel codegens at baseline ISA.
+  Relaxing it to `#[inline]` still cost 70 ms; a generic callee does not
+  reliably inherit the frame. Either change alone is disqualifying.
+- **What is kept.** `packed_gemm_allocates_its_panel_once_per_call` pins the
+  current one-pair-per-call behaviour, so a future attempt starts from a
+  measured baseline. The rejected implementation is preserved in this branch's
+  history (`eb06285`) rather than only described.
+- **What would change the verdict.** An approach that keeps the panel's
+  provenance unique at the kernel boundary -- a uniquely-borrowed slice threaded
+  through without a thread-local indirection, verified by codegen inspection
+  showing the accumulators still register-resident, not by allocation counts
+  alone. Allocation count was the wrong acceptance oracle here: the work passed
+  it while running 69x slower.
+- **Handover.** Claimed by Codex task 01a03eb2, whose tree sat seven hours
+  untouched with the work uncommitted and its own timing criterion unrun. Taken
+  over, completed to a verdict, lease released.
 
 ## HS-SPMV-GATHER-PREFETCH-2026-08-29 — Measure out-of-cache CSR prefetch [patch] [perf] — done 2026-08-29
 

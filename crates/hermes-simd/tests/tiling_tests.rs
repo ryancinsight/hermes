@@ -11,6 +11,15 @@ use hermes_simd::*;
 
 #[cfg(feature = "mnemosyne-memory")]
 mod packed_panel_allocations {
+    //! Pins how often the packed path allocates.
+    //!
+    //! One allocate/free pair per packed call is the current, deliberate
+    //! behaviour: retaining the panel per thread was measured and rejected
+    //! (HS-GEMM-PANEL-REUSE-2026-08-29) because it costs 69x at n = 512, far
+    //! more than the allocation it removes. This census is the instrument that
+    //! comparison was run against, kept so the next attempt starts from a
+    //! measured baseline rather than a guess.
+
     use super::*;
     use core::cell::Cell;
     use core::sync::atomic::{AtomicUsize, Ordering};
@@ -93,13 +102,14 @@ mod packed_panel_allocations {
     }
 
     #[test]
-    fn packed_gemm_reuses_only_bounded_panels() {
+    fn packed_gemm_allocates_its_panel_once_per_call() {
         let _hooks = HookGuard::install();
 
         std::thread::spawn(|| {
-            // These fixtures use the same runtime backend. Their packed-panel
-            // sizes scale only with K: 128 (initial), 64 (smaller), 256
-            // (growth), and 16_385 (larger than 512 KiB even at one lane).
+            // Packed-panel size scales only with K here: 128, then 64, then
+            // 256, then 16_385 (past 512 KiB even at one lane). Every one of
+            // them is call-owned, so the size relationships do not matter to
+            // the counts -- which is the point of the measurement.
             let mut initial = GemmCase::new(1024, 128);
             let mut smaller = GemmCase::new(2048, 64);
             let mut growth = GemmCase::new(512, 256);
@@ -108,31 +118,38 @@ mod packed_panel_allocations {
             COUNTING.with(|counting| counting.set(true));
 
             initial.run(64.0);
-            assert_eq!(counts(), (1, 0), "first bounded panel is retained");
-            initial.run(128.0);
-            assert_eq!(counts(), (1, 0), "same-size panel is reused");
-
-            smaller.run(32.0);
-            assert_eq!(counts(), (1, 0), "smaller panel is reused");
-
-            growth.run(128.0);
-            assert_eq!(counts(), (2, 1), "growth replaces the retained panel once");
-            growth.run(256.0);
-            assert_eq!(counts(), (2, 1), "grown panel is reused");
-
-            oversized.run(8192.5);
             assert_eq!(
                 counts(),
-                (3, 2),
-                "oversized panel is allocated and freed by the call"
+                (1, 1),
+                "the panel is allocated and freed per call"
             );
-            // Keep counting enabled so thread-local destruction records the
-            // retained panel's final free.
+            initial.run(128.0);
+            assert_eq!(
+                counts(),
+                (2, 2),
+                "a repeat call at the same size allocates again"
+            );
+
+            smaller.run(32.0);
+            assert_eq!(counts(), (3, 3), "a smaller panel allocates again");
+
+            growth.run(128.0);
+            assert_eq!(counts(), (4, 4), "a larger panel allocates again");
+            growth.run(256.0);
+            assert_eq!(counts(), (5, 5), "and again at the same larger size");
+
+            oversized.run(8192.5);
+            assert_eq!(counts(), (6, 6), "oversized panels are call-owned too");
         })
         .join()
         .expect("GEMM allocation census worker must complete");
 
-        assert_eq!(counts(), (3, 3), "thread teardown releases retained panel");
+        // Nothing is retained, so teardown has nothing left to release.
+        assert_eq!(
+            counts(),
+            (6, 6),
+            "thread teardown releases no retained panel"
+        );
     }
 }
 
