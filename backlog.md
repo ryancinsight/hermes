@@ -8,6 +8,46 @@
 - **Evidence:** warning-denied `hermes-simd-core` `no_std` library check, host
   all-feature Clippy, formatting, and diff checks pass.
 
+## HS-SCALAR-FALLBACK-FRAME-2026-08-30 — The scalar fallback compiled at baseline ISA [patch] [perf] — review
+
+- **Finding.** `dispatch_lane_count` enters AVX-512 and AVX2 through
+  `#[target_feature]` frames, but reaches `dispatch_scalar` through no frame at
+  all. A scalar whose native width misses every exact-width backend therefore
+  ran the *caller's whole kernel* at baseline x86-64 — SSE2, no FMA.
+- **Who lands there.** Any `vectorize_lanes::<N, T>` whose `N` matches no
+  backend's `LANE_COUNT`. AVX2 carries 8 lanes of a four-byte scalar and 4 of
+  an eight-byte one, so a request for exactly 4 matches AVX2 for the wide
+  scalar and nothing for the narrow one. Every one of apollo-fft's 15 SIMD
+  entry points requests exactly 4.
+- **What it cost.** The scalar backend implements `fmadd` with `f32::mul_add`,
+  which is *correctly-rounded fused*. Outside an FMA frame that is a libm
+  `fmaf` call, not an instruction — and an FFT butterfly is FMA-dense, so each
+  one was a function call into software FMA.
+- **Fix.** When the exact-width match fails and the host has AVX2, run the same
+  fallback inside the AVX2+FMA frame. Same backend, same lane count, same
+  values; only the instruction selection the compiler may use changes.
+- **Measured** through apollo, interleaved in one process, best of 200 blocks
+  of 200 transforms, framed against unframed on one build:
+
+  | n | four-byte unframed | framed | change |
+  |---|---|---|---|
+  | 128 | 457.5 ns | 167.0 ns | 2.74x |
+  | 256 | 1066.0 ns | 438.5 ns | 2.43x |
+  | 512 | 2122.5 ns | 919.0 ns | 2.31x |
+
+  Controls: the eight-byte scalar held flat (85.0 -> 85.5 ns at 128), because
+  it matches AVX2 exactly and never reaches this path; and n = 64, which apollo
+  routes away from the affected kernel, held at 126.0 ns both ways.
+- **Values are unchanged, by construction and by test.** Rust does not contract
+  `a*b + c` into an FMA without explicit request, so widening the frame cannot
+  re-associate arithmetic; `mul_add` is correctly rounded whether it lands on
+  software or hardware FMA, so it returns the same value either way. Verified:
+  hermes 524/524, apollo 1122/1122 including its DFT oracle sweep and
+  backend-differential cases, leto 900/900.
+- **Deliberately narrow.** The `REQUIRES_F16C` scalars keep the unframed path;
+  their frame is selected by a separate probe above and this change does not
+  touch it. Hosts without AVX2 are unaffected.
+
 ## HS-GEMM-PANEL-REUSE-2026-08-29 — Reuse bounded packed-B scratch [patch] [perf] — rejected 2026-08-29 on measurement
 
 - **Rejected.** Retaining the panel per thread removes one allocate/free pair
