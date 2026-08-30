@@ -1,5 +1,7 @@
 //! Owned heap-backed sparse storage types.
 
+use alloc::boxed::Box;
+
 use super::super::{
     types::{
         BlockedCooData, BlockedCooMatrix, CsrData, CsrMatrix, DenseWithMaskData,

@@ -6,6 +6,15 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch][HS-GEMM-PANEL-REUSE] Pin the packed-GEMM allocation behaviour with a
+  provider-hook census. Retaining the packed-B panel per thread was measured and
+  rejected: it removes one allocate/free pair per packed call and costs 69x at
+  n = 512 (1.81 ms to 125.6 ms), because a pointer reached through a
+  thread-local borrow defeats the non-aliasing inference the register
+  micro-kernel needs to keep its accumulators register-resident. Production
+  behaviour is unchanged; the census is kept so the next attempt starts from a
+  measured baseline.
+
 - [patch][HS-AVX512-TRANSPOSE] Add the AVX-512 f64 `transpose_square`
   override, a 24-shuffle 8x8 network replacing the stack-capture default.
   The permutation algebra is verified symbolically and the existing

@@ -1,5 +1,54 @@
 # Backlog — hermes-simd
 
+## HS-NO-STD-PACKED-MASK-IMPORTS-2026-08-29 — Restore alloc imports [patch] — done 2026-08-29
+
+- **Outcome:** restored the explicit `alloc::Box` and `vec!` imports required
+  by packed-mask storage without the standard prelude; behavior and layout are
+  unchanged. **Lease:** none.
+- **Evidence:** warning-denied `hermes-simd-core` `no_std` library check, host
+  all-feature Clippy, formatting, and diff checks pass.
+
+## HS-GEMM-PANEL-REUSE-2026-08-29 — Reuse bounded packed-B scratch [patch] [perf] — rejected 2026-08-29 on measurement
+
+- **Rejected.** Retaining the panel per thread removes one allocate/free pair
+  per packed call and costs **69x** in exchange. Production source is restored
+  unchanged; the allocation census that produced the verdict is kept.
+- **Measured** (wall clock, best of 40 blocks of 5 calls, f32, same probe built
+  against each tree; `n = 256` is under the 512 KiB packing threshold so the
+  packed path is not taken there and the row is a control):
+
+  | n | call-owned | retained panel |
+  |---|---|---|
+  | 256 | 260 us | 261 us (control, packed path not taken) |
+  | 512 | 1.81 ms | **125.6 ms** |
+
+- **Why.** The register micro-kernel depends on the compiler proving the packed
+  panel does not alias `b` or `c`; a call-owned `AlignedVec` gives that for
+  free, and a pointer reached through a thread-local `RefCell` borrow does not.
+  Without it the accumulators cannot stay register-resident across the `p`-loop
+  (Theorem 3 in `tiling/gemm.rs`), which is the whole basis of the kernel.
+- **The handover also carried a second, independent regression.** The rescued
+  work had hoisted the packed loop into an `#[inline(never)]` helper -- an
+  attempt to restore the non-aliasing fact through distinct `&mut` parameters.
+  Measured on its own, with retention disabled, that hoist alone cost
+  1.81 ms -> 118 ms: the helper does not inherit the caller's
+  `#[target_feature]` frame, so the micro-kernel codegens at baseline ISA.
+  Relaxing it to `#[inline]` still cost 70 ms; a generic callee does not
+  reliably inherit the frame. Either change alone is disqualifying.
+- **What is kept.** `packed_gemm_allocates_its_panel_once_per_call` pins the
+  current one-pair-per-call behaviour, so a future attempt starts from a
+  measured baseline. The rejected implementation is preserved in this branch's
+  history (`eb06285`) rather than only described.
+- **What would change the verdict.** An approach that keeps the panel's
+  provenance unique at the kernel boundary -- a uniquely-borrowed slice threaded
+  through without a thread-local indirection, verified by codegen inspection
+  showing the accumulators still register-resident, not by allocation counts
+  alone. Allocation count was the wrong acceptance oracle here: the work passed
+  it while running 69x slower.
+- **Handover.** Claimed by Codex task 01a03eb2, whose tree sat seven hours
+  untouched with the work uncommitted and its own timing criterion unrun. Taken
+  over, completed to a verdict, lease released.
+
 ## HS-SPMV-GATHER-PREFETCH-2026-08-29 — Measure out-of-cache CSR prefetch [patch] [perf] — done 2026-08-29
 
 - **Outcome:** rejected software prefetch because two paired median wins were not established; retained the corrected five-case sparse Criterion instrument and restored production source unchanged ([ADR 020](docs/adr/020-backend-owned-read-prefetch.md)).
