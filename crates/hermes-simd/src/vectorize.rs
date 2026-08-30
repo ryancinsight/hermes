@@ -291,6 +291,39 @@ where
             return Some(unsafe { call_avx2(kernel) });
         }
     }
+    // The fallback body still benefits from the wide frame. `ScalarArch`
+    // stores its lanes as a small fixed array and operates on them
+    // element-wise, which LLVM vectorizes readily — but only into whatever the
+    // enabled feature set allows. Reached without a frame it compiles to
+    // baseline SSE2 with no FMA, so a scalar whose native width misses every
+    // exact-width backend runs the caller's whole kernel at baseline. Entering
+    // the same fallback inside the AVX2 frame lets that vectorization use VEX
+    // encodings and fuse multiply-add, which is free: no backend changes, and
+    // the lane count and every value are identical either way.
+    if Avx2::is_runtime_supported() && !<Avx2 as SimdStorage<T>>::REQUIRES_F16C {
+        // SAFETY: the runtime probe proves AVX2 and FMA before entering the
+        // target scope, and the scalar backend is executable on every host, so
+        // widening the frame cannot make it unexecutable.
+        return unsafe { call_scalar_in_avx2_frame::<T, K, LANES>(kernel) };
+    }
+    dispatch_scalar::<T, K, LANES>(kernel)
+}
+
+/// The scalar fallback, compiled inside the AVX2 frame.
+///
+/// Identical to [`dispatch_scalar`] in every observable way — same backend,
+/// same lane count, same values. Only the instruction selection available to
+/// the compiler differs.
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[target_feature(enable = "avx2")]
+#[target_feature(enable = "fma")]
+#[inline]
+unsafe fn call_scalar_in_avx2_frame<T, K, const LANES: usize>(kernel: K) -> Option<K::Output>
+where
+    T: Scalar,
+    K: LaneKernel<T>,
+    ScalarArch: SimdKernel<T>,
+{
     dispatch_scalar::<T, K, LANES>(kernel)
 }
 

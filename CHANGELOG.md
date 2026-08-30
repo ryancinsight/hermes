@@ -6,6 +6,19 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch][HS-SCALAR-FALLBACK-FRAME] Run the scalar fallback inside the AVX2+FMA
+  frame when the host supports it. `dispatch_lane_count` entered AVX-512 and
+  AVX2 through `#[target_feature]` frames but reached the scalar fallback
+  through none, so a scalar whose native width matched no backend's exact lane
+  count ran the caller's whole kernel at baseline x86-64 — no FMA, so the
+  backend's `f32::mul_add` was a libm call rather than an instruction. Measured
+  through apollo, framed against unframed on one build: 457.5 -> 167.0 ns at
+  n = 128, 1066 -> 438.5 at 256, 2122.5 -> 919 at 512, while an eight-byte
+  scalar (which matches AVX2 exactly and never takes this path) held flat.
+  Values are unchanged: Rust does not contract multiply-add without an explicit
+  request, and `mul_add` is correctly rounded on either software or hardware
+  FMA.
+
 - [patch][HS-GEMM-PANEL-REUSE] Pin the packed-GEMM allocation behaviour with a
   provider-hook census. Retaining the packed-B panel per thread was measured and
   rejected: it removes one allocate/free pair per packed call and costs 69x at
