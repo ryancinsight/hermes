@@ -82,7 +82,7 @@
   `3c9623d`, independent GREEN, hosted run `33442609342`, PR #108, merge
   `54d05f6`. **Last update:** 2026-08-31.
 
-## HS-EXACT-PROCESSOR-BINDING-2026-08-31 — Exact thread placement for reproducible consumer measurements [minor] [arch] — in progress
+## HS-EXACT-PROCESSOR-BINDING-2026-08-31 — Exact thread placement for reproducible consumer measurements [minor] [arch] — review
 
 - **Outcome:** add one public, typed, allocation-free RAII guard that binds the
   calling thread to an exact logical processor and restores its prior affinity,
@@ -104,9 +104,14 @@
   `ATLAS-APOLLO-SWEEP-STOPS-AT-512-2026-08-31`; two release-profile runs make
   1,024/2,048 stable but retain split 32,768 latency bands across both Apollo
   and RustFFT without exact processor binding.
-- **Integrator / lease:** Codex `/root`; lease `numa/binding.rs`, public
-  re-exports, processor-binding tests, ADR 021, CHANGELOG, and this item.
-  Last update 2026-08-31.
+- **Integrator / lease:** Codex `/root`; lease none. Source `6baf287` passes
+  warning-denied workspace Clippy, 527/527 workspace Nextest, 23 executable
+  doctests plus the non-`Send` compile-fail contract, warning-denied Rustdoc,
+  host no-default builds, AArch64 Windows warning-denied all-target compile,
+  additive SemVer 196/196 for both public crates, exact standalone lock with 11
+  first-party Git sources, formatting, diff, and unchanged Atlas conformance
+  counts. Independent exact-head review, hosted gates, provider merge, and
+  Apollo adoption remain. Last update 2026-08-31.
 
 ## HS-NO-STD-PACKED-MASK-IMPORTS-2026-08-29 — Restore alloc imports [patch] — done 2026-08-29
 
