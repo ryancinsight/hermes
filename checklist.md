@@ -15,8 +15,21 @@
       hosts skip the case before timing rather than panic.
 - [x] Resolve the new CHANGELOG item reference and rerun the affected host and
       AArch64 compile plus benchmark-smoke gates.
-- [ ] Obtain exact-head review, merge PR #108, and discharge the takeover
+- [x] Obtain exact-head review, merge PR #108, and discharge the takeover
       lease.
+
+## HS-EXACT-PROCESSOR-BINDING-2026-08-31 [minor] [arch]
+
+- [x] Record ADR 021 with the processor identity, thread-affine lifetime,
+      processor-group, error, restoration, and cross-target contracts.
+- [x] Implement the typed index and non-Send RAII guard without allocation or
+      a compatibility surface; re-export through the Hermes facade.
+- [x] Cover exact bind/current/restore and invalid-no-mutation behavior on
+      Windows; cover explicit unsupported behavior and cross-target builds.
+- [x] Run host/AArch64 warning-denied gates, doctests, Rustdoc, SemVer, and
+      standalone-lock verification.
+- [ ] Obtain independent exact-head review, merge the provider increment, and
+      migrate Apollo before closing the consumer blocker.
 
 ## HS-AVX512-EVIDENCE-STANDARD-2026-08-31 [arch]
 

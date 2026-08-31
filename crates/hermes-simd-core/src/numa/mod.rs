@@ -10,7 +10,9 @@ pub mod allocator;
 pub mod binding;
 /// Page residency and socket locality verification.
 pub mod locality;
+mod processor;
 
 pub use allocator::{MnemosyneNumaAllocator, NumaAllocator};
 pub use binding::NumaBinding;
 pub use locality::{current_numa_node, refresh_numa_node, verify_numa_locality};
+pub use processor::{ProcessorBinding, ProcessorBindingError, ProcessorIndex};

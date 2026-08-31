@@ -97,6 +97,9 @@ pub use hermes_simd_core::{
     Neg,
     NumaBinding,
     Popcount,
+    ProcessorBinding,
+    ProcessorBindingError,
+    ProcessorIndex,
     Product,
     RecipSqrt,
     // Operation strategy ZSTs and sealed traits — zero-cost, erased at monomorphization.

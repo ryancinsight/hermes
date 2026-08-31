@@ -1,6 +1,6 @@
 # Backlog — hermes-simd
 
-## HS-F16C-SCALAR-FRAME-2026-08-31 — The scalar fallback stays unframed for F16C scalars [patch] [perf] — review
+## HS-F16C-SCALAR-FRAME-2026-08-31 — The scalar fallback stays unframed for F16C scalars [patch] [perf] — done 2026-08-31
 
 - **Outcome:** decide, on measurement, whether `dispatch_lane_count`'s
   `!REQUIRES_F16C` guard on the framed scalar fallback should be removed. A
@@ -78,8 +78,40 @@
   deferred to hosted CI because the Atlas development overlay rewrites Git
   sources to the local trees.
 - **Integrator:** Codex `/root`, stale-claim takeover from claude-fable session
-  5050c72a. **Lease:** benchmark capability gate, CHANGELOG reference, PM.
-  **Last update:** 2026-08-31.
+  5050c72a. **Lease:** none. **Delivered:** source `91cae6a`, review correction
+  `3c9623d`, independent GREEN, hosted run `33442609342`, PR #108, merge
+  `54d05f6`. **Last update:** 2026-08-31.
+
+## HS-EXACT-PROCESSOR-BINDING-2026-08-31 — Exact thread placement for reproducible consumer measurements [minor] [arch] — review
+
+- **Outcome:** add one public, typed, allocation-free RAII guard that binds the
+  calling thread to an exact logical processor and restores its prior affinity,
+  so hybrid-core consumers can exclude processor migration from measurements.
+- **Scope / non-goals:** `hermes-simd-core` affinity ownership and public facade,
+  Windows processor-group-safe implementation, explicit unsupported/failure
+  errors elsewhere, tests, ADR 021, Rustdoc, CHANGELOG, and Apollo adoption.
+  Do not change NUMA allocation policy, scheduler placement, or silently no-op.
+- **Acceptance:** validate the requested system processor before mutation;
+  bind with `SetThreadGroupAffinity`, preserve the complete previous group
+  affinity, keep the guard non-`Send`/non-`Sync`, restore on the originating
+  thread at scope exit, and structurally report invalid, unsupported, query,
+  bind, and explicit-restore failures. Invalid requests leave affinity
+  unchanged. Windows value tests cover bind/current/restore; other targets
+  compile and return the unsupported variant. The public addition passes
+  warning-denied host and AArch64 gates, doctests, Rustdoc, SemVer, exact lock,
+  independent review, and Apollo consumer verification.
+- **Dependency / driver:** Apollo item
+  `ATLAS-APOLLO-SWEEP-STOPS-AT-512-2026-08-31`; two release-profile runs make
+  1,024/2,048 stable but retain split 32,768 latency bands across both Apollo
+  and RustFFT without exact processor binding.
+- **Integrator / lease:** Codex `/root`; lease none. Source `6baf287` passes
+  warning-denied workspace Clippy, 527/527 workspace Nextest, 23 executable
+  doctests plus the non-`Send` compile-fail contract, warning-denied Rustdoc,
+  host no-default builds, AArch64 Windows warning-denied all-target compile,
+  additive SemVer 196/196 for both public crates, exact standalone lock with 11
+  first-party Git sources, formatting, diff, and unchanged Atlas conformance
+  counts. Independent exact-head review, hosted gates, provider merge, and
+  Apollo adoption remain. Last update 2026-08-31.
 
 ## HS-NO-STD-PACKED-MASK-IMPORTS-2026-08-29 — Restore alloc imports [patch] — done 2026-08-29
 
