@@ -26,3 +26,4 @@
 | [018](018-exact-lane-consumer-dispatch.md) | Exact-Lane Consumer Dispatch | Accepted |
 | [019](019-format-owned-spmv-kernels.md) | Format-Owned SpMV Kernel Modules | Accepted |
 | [020](020-backend-owned-read-prefetch.md) | Backend-Owned Read Prefetch | Rejected |
+| [021](021-exact-processor-binding.md) | Exact Processor Binding | Proposed |
