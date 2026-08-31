@@ -1,5 +1,86 @@
 # Backlog — hermes-simd
 
+## HS-F16C-SCALAR-FRAME-2026-08-31 — The scalar fallback stays unframed for F16C scalars [patch] [perf] — review
+
+- **Outcome:** decide, on measurement, whether `dispatch_lane_count`'s
+  `!REQUIRES_F16C` guard on the framed scalar fallback should be removed. A
+  recorded negative closes the item just as validly as a landed change.
+- **Finding.** HS-SCALAR-FALLBACK-FRAME-2026-08-30 runs the scalar fallback
+  inside the AVX2+FMA frame, but excludes `REQUIRES_F16C` scalars, so `F16` at
+  the scalar backend's eight-lane width still reaches `dispatch_scalar` with no
+  frame at all. `vectorize_lanes::<8, F16, _>` is the reachable hole: AVX-512
+  carries 32 `F16` lanes and AVX2 carries 16, so eight matches neither.
+- **Acceptance oracle:** pinned single-P-core criterion medians with intervals
+  on an FMA-dense `F16` kernel at exactly eight lanes, against the unchanged
+  `f32`@4 and `f64`@4 rows as instrument controls; values bit-identical either
+  way.
+- **Scope / non-goals:** do not change any backend, lane count, or arithmetic;
+  do not add a public API; do not enter a target-feature frame without a
+  runtime probe proving every feature it enables.
+- **The exclusion was not load-bearing, and the reason is a category error.**
+  The guard reads `<Avx2 as SimdStorage<T>>::REQUIRES_F16C` — a property of the
+  *AVX2* backend — to veto entering a frame around a body that runs the
+  *scalar* backend. `dispatch_scalar` constructs `Simd<T, ScalarArch>`, and
+  `ScalarArch` requires no feature on any host, so the question the guard asks
+  has no bearing on the arm it guards. What the frame must cover is what the
+  framed body executes, and `Avx2::is_runtime_supported()` already probes
+  exactly `avx2 && fma`, exactly what `call_scalar_in_avx2_frame` enables. The
+  guard is removed; the probe is untouched.
+- **`f16c` is deliberately not added to the frame.** `ScalarArch`'s `F16`
+  arithmetic goes through `eunomia::F16`'s `to_f32`/`from_f32`, which are
+  `widen::<5,10>`/`narrow::<5,10>` — integer bit manipulation, not
+  `fptrunc`/`fpext` — so no F16C instruction is selectable in this body.
+  Enabling the feature would add a probe for no reachable instruction and
+  would exclude AVX2-without-F16C hosts from the gain.
+- **Measured.** New `Exact Lane FMA` group in `simd_bench` (the exact-lane
+  entry had no instrument); same probe source built against each tree, run
+  pinned to one P-core (`ProcessorAffinity = 1`, High priority), 1 s warm-up /
+  5 s measurement / 30 samples, two interleaved rounds. Medians with 95%
+  intervals, `F16` at eight lanes — the changed path:
+
+  | n | unframed (round 1 / 2) | framed (round 1 / 2) | change |
+  |---|---|---|---|
+  | 256 | 4.2260 / 4.2315 us | 4.0100 / 4.0135 us | −5.1% |
+  | 1024 | 16.911 / 16.890 us | 16.014 / 16.021 us | −5.3% |
+  | 4096 | 67.988 / 68.587 us | 64.019 / 64.933 us | −5.8% / −5.3% |
+
+  Every interval is non-overlapping and every row repeats in both rounds.
+  Controls: `f32`@4 reaches the same fallback arm and was already framed —
+  30.211 / 29.949 / 30.263 / 30.180 ns at 256, flat; `f64`@4 matches AVX2
+  exactly and never reaches the fallback. The `f64`@4 4096 row moved 713 ->
+  524 ns *between rounds in both binaries*, a host-state shift that is exactly
+  why the comparison is read within a round rather than across.
+- **Why 5%, not the sibling path's 2.31–2.74x.** For `f32` the frame converted
+  a `fmaf` libcall into an instruction inside an otherwise cheap body. For
+  `F16` the body is dominated by the software widen/narrow bit manipulation,
+  which runs either way and only gains VEX encoding; the multiply-add is a
+  small share of it. Codegen confirms the mechanism: the framed build gains
+  one `vfmadd231ss` site whose surrounding widen/narrow is fully inlined and
+  call-free, and the unframed build has no such site. The pre-existing
+  call-per-widen `vfmadd231ss` site elsewhere in the binary is byte-identical
+  in both builds.
+- **Verdict: land.** A repeated, interval-separated 5.1–5.8% on every size of
+  the changed path, at the cost of one removed const-bool test in the
+  dispatch. Backend, lane count, and every value are unchanged.
+- **Gates:** `cargo fmt --all -- --check` clean; workspace all-target Clippy
+  `-D warnings` clean; nextest 507/507 across `hermes-simd`,
+  `hermes-simd-core`, `hermes-simd-intrinsics`; doctests 6 + 16 + 0 passed.
+- **Residual.** The measurement is one host (Arrow Lake Core Ultra 9 285K,
+  `avx512f: false`). No AArch64 path is touched — `dispatch_lane_count`'s
+  aarch64 arm has no scalar frame and is unchanged.
+- **Review correction.** Benchmark registration now runs the same exact-lane
+  dispatch once before creating its Criterion group and skips unsupported
+  host/type/lane combinations. Supported cases keep the fail-closed timed
+  assertion. The CHANGELOG item reference resolves to this record. Workspace
+  all-target/all-feature Clippy, AArch64 Windows all-target compilation, the
+  complete `simd_bench --test` smoke (including all nine exact-lane cases on
+  this host), formatting, and diff checks pass; standalone lock validation is
+  deferred to hosted CI because the Atlas development overlay rewrites Git
+  sources to the local trees.
+- **Integrator:** Codex `/root`, stale-claim takeover from claude-fable session
+  5050c72a. **Lease:** benchmark capability gate, CHANGELOG reference, PM.
+  **Last update:** 2026-08-31.
+
 ## HS-NO-STD-PACKED-MASK-IMPORTS-2026-08-29 — Restore alloc imports [patch] — done 2026-08-29
 
 - **Outcome:** restored the explicit `alloc::Box` and `vec!` imports required
@@ -8,7 +89,7 @@
 - **Evidence:** warning-denied `hermes-simd-core` `no_std` library check, host
   all-feature Clippy, formatting, and diff checks pass.
 
-## HS-SCALAR-FALLBACK-FRAME-2026-08-30 — The scalar fallback compiled at baseline ISA [patch] [perf] — review
+## HS-SCALAR-FALLBACK-FRAME-2026-08-30 — The scalar fallback compiled at baseline ISA [patch] [perf] — done 2026-08-31
 
 - **Finding.** `dispatch_lane_count` enters AVX-512 and AVX2 through
   `#[target_feature]` frames, but reaches `dispatch_scalar` through no frame at
@@ -47,6 +128,13 @@
 - **Deliberately narrow.** The `REQUIRES_F16C` scalars keep the unframed path;
   their frame is selected by a separate probe above and this change does not
   touch it. Hosts without AVX2 are unaffected.
+- **Closed 2026-08-31.** Verified against the current tree, not against the
+  report: `call_scalar_in_avx2_frame` is live in
+  `crates/hermes-simd/src/vectorize.rs` under `#[target_feature(enable =
+  "avx2")]`/`"fma"`, reached from `dispatch_lane_count`'s fallback arm, and
+  PR #107 is merged at `c4f931c`. The named residual — the `REQUIRES_F16C`
+  hole this item left open — is carried forward by
+  HS-F16C-SCALAR-FRAME-2026-08-31, not by this item.
 
 ## HS-GEMM-PANEL-REUSE-2026-08-29 — Reuse bounded packed-B scratch [patch] [perf] — rejected 2026-08-29 on measurement
 
@@ -135,7 +223,7 @@
   hermes-simd tests, `cargo fmt --all --check` clean. Deriving `Copy` on a
   ZST proof adds no representation and no runtime cost.
 
-## HS-SIMD-PERF-2026-08-28 — AVX-512 f32 transpose network and bit-exact oracle [patch] — review
+## HS-SIMD-PERF-2026-08-28 — AVX-512 f32 transpose network and bit-exact oracle [patch] — done 2026-08-31, residual: hosted AVX-512 runtime confirmation
 
 - **Outcome:** closed the last hole in the `transpose_square` override
   surface. The AVX-512 f32 16x16 network — filed as the explicit not-done
@@ -194,8 +282,51 @@
   decision, and this change follows PR #98 for f32. The two precedents
   disagree; an integrator should settle which standard governs AVX-512
   optimizations on AVX-512-less development hosts.
+- **Closed 2026-08-31, code delivery only.** Verified against the current
+  tree: `crates/hermes-simd-intrinsics/src/x86_64/avx512_f32.rs` carries the
+  four-stage 16x16 network (`_mm512_unpacklo_ps`/`unpackhi_ps`, two
+  `_mm512_shuffle_ps` stages, `_mm512_shuffle_f32x4` at row distance four then
+  eight) behind the fixed-size-array re-borrow, and PR #100 is merged at
+  `5c50d1d`. **The residual is not closed:** no AVX-512 silicon has executed
+  this path. The item is closed as delivered-and-unmeasured, and the standard
+  that governs whether that is acceptable is *not* settled here — the
+  precedent tension above is promoted to
+  HS-AVX512-EVIDENCE-STANDARD-2026-08-31 for an owner to rule on.
 - **Integrator:** claude-fable session 03d80d33 subagent.
-- **Last update:** 2026-08-28.
+- **Last update:** 2026-08-31.
+
+## HS-AVX512-EVIDENCE-STANDARD-2026-08-31 — Which evidence standard governs AVX-512 work on AVX-512-less hosts [arch] — todo, needs an owner
+
+- **Status.** Open decision. **No integrator has ruled.** This item exists so
+  the disagreement is visible on the board instead of implicit in two merged
+  PRs; the session that filed it deliberately did not decide it.
+- **The two precedents, both merged, mutually inconsistent.**
+  - PR #94 (`93ba7ce`) *deleted* provisional AVX-512 f32/f64 transpose
+    networks, on the stated ground that no controlled real-silicon timing was
+    available and an unmeasured optimization is not an optimization.
+  - PR #98 then *landed* the AVX-512 f64 network on symbolic verification of
+    the permutation algebra alone, without overturning PR #94's ground.
+    PR #100 (HS-SIMD-PERF-2026-08-28) followed PR #98 for f32.
+  A future AVX-512 change can cite either precedent and be consistent with the
+  board. That is the defect.
+- **Why it is not merely tidiness.** It silently gates every future AVX-512
+  item, including apollo's WIDER-ISA record, which needs to know before it
+  starts whether symbolic verification is a sufficient landing standard or
+  whether the work must wait for silicon. Left unruled, each item re-litigates
+  it and the answer depends on who picks it up.
+- **Development host.** Arrow Lake Core Ultra 9 285K, `avx512f: false`. Intel
+  SDE emulation runs the paths for *correctness* in CI; it produces no timing
+  evidence, so it does not settle the question either way.
+- **What a ruling must fix.** Which of the two standards governs; whether SDE
+  correctness coverage plus symbolic verification is a sufficient landing
+  standard for an AVX-512-only path, or whether such work parks until hosted
+  AVX-512 silicon is available; and what PR #94's deleted networks should have
+  done under the winning standard. The outcome is an ADR that both precedents
+  then cite.
+- **Non-goals.** Not a re-measurement item and not a request to acquire
+  hardware — it is a standards ruling. The affected code is already merged and
+  is not blocked on this.
+- **Dependencies.** None. **Lease:** none. **Last update:** 2026-08-31.
 
 ## HS-AVX512-TRANSPOSE-2026-08-28 — AVX-512 square-tile transpose [patch] — done 2026-08-28
 
@@ -293,7 +424,7 @@
   cross-check.
   **Last update:** 2026-08-28.
 
-## HS-MASKED-TAIL-PARTIAL-LOAD-2026-08-27 — Partial masked load/store seam for dispatch tails [minor] — review
+## HS-MASKED-TAIL-PARTIAL-LOAD-2026-08-27 — Partial masked load/store seam for dispatch tails [minor] — done 2026-08-31, residual: hosted AVX-512/NEON runtime confirmation
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
   **Lease:** none after the provider commit.
@@ -321,8 +452,21 @@
 - **Dependencies / risk:** additive public [minor] backend capability. AVX-512
   and NEON are compile-verified locally; exact hosted runtime coverage remains
   before closure. **Last update:** 2026-08-28.
+- **Closed 2026-08-31, code delivery only.** Verified against the current
+  tree: `masked_load_partial`/`masked_store_partial` are live on the canonical
+  backend (`hermes-simd-core/src/kernel/backend.rs`), the `load_store` role
+  facet, and the `Vector`/view surfaces, with native AVX2 and AVX-512 f32/f64
+  overrides in `hermes-simd-intrinsics/src/x86_64/`; the tail consumers named
+  in the outcome — `dispatch/axpy.rs`, `dispatch/scale.rs`, `tiling/gemm.rs`,
+  `tiling/gemv.rs`, `tiling/gemv_transpose.rs`, `view/{masked,ops,ops_mut,
+  reduce,scatter,vector_reg}.rs`, `sparse/spmv/dense_with_mask.rs` — all call
+  it. Provider PR #96 is merged at `eb4058a`. **The residual stands exactly as
+  written:** AVX-512 and NEON remain compile-verified and SDE/cross-checked
+  only; hosted AVX-512 and NEON *runtime* confirmation has not been obtained
+  on this host and is the sole outstanding work. Closed as delivered with that
+  residual rather than unconditionally done.
 
-## HS-SPMV-SHORT-ROW-MASKED-2026-08-27 — Masked single-vector body for short SpMV rows [patch] [arch] — review
+## HS-SPMV-SHORT-ROW-MASKED-2026-08-27 — Masked single-vector body for short SpMV rows [patch] [arch] — done 2026-08-31
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
   **Lease:** the same task owns `sparse/spmv.rs`, its focused value tests,
@@ -345,6 +489,14 @@
   the unchanged CSR control stays within −4.9% to +6.6%; 31/31 focused tests,
   warning-denied Clippy, Miri, and AVX2/AVX-512 codegen are green. **Last
   update:** 2026-08-28.
+- **Closed 2026-08-31.** Verified against the current tree: the format-owned
+  leaf modules ADR 019 mandates exist —
+  `crates/hermes-simd-core/src/sparse/spmv/{csr,sellp,blocked_coo,
+  dense_with_mask}.rs` under the `spmv.rs` manifest — `dense_with_mask.rs`
+  calls the `masked_load_partial` seam, and
+  `docs/adr/019-format-owned-spmv-kernels.md` is present and indexed.
+  Provider PR #96 (`eb4058a`) and PR #97 (`6382336`) are merged. The lease
+  recorded above is discharged; no residual.
 
 ## HS-ARGEXTREMA-ONE-PASS-2026-08-27 — Measure single-pass arg-extrema [patch] — done 2026-08-27
 
@@ -357,7 +509,7 @@
   vector reduction plus locating/NaN scan was faster of the two measured
   designs.
 
-## HS-EXACT-LANE-DISPATCH-2026-08-27 — Dispatch consumer kernels by exact lane count [minor] [arch] — review
+## HS-EXACT-LANE-DISPATCH-2026-08-27 — Dispatch consumer kernels by exact lane count [minor] [arch] — done 2026-08-31
 
 - **Integrator:** Codex task `01a0253c-6013-7552-99cc-36bbbcf77f6d`.
   **Lease:** discharged by the AArch64 warning fix commit.
@@ -382,6 +534,15 @@
   Windows std/no-std strict-warning builds pass. Optimized x86 codegen retains
   one boundary probe and a call/probe/branch-free specialized kernel body.
   **Last update:** 2026-08-27.
+- **Closed 2026-08-31.** Verified against the current tree: `vectorize_lanes`
+  and its per-architecture `dispatch_lane_count` ladder are live in
+  `crates/hermes-simd/src/vectorize.rs`, reachable through
+  `LaneScalar::run_lane_kernel_for`, and return `None` without invoking the
+  kernel when no backend matches the requested count; the exact-count
+  behaviour is pinned by the `vectorize_lanes` doctest and
+  `crates/hermes-simd/tests/host_capability_tests.rs`, and
+  `docs/adr/018-exact-lane-consumer-dispatch.md` is present and indexed. No
+  residual.
 
 ## HS-NATIVE-CAST-THROUGHPUT-2026-08-27 — Remove supported cross-type cast stack round-trip [minor] — done 2026-08-27 (PR #86, merge 5734b85; fix-forward PR #87, merge 4f6a1eb)
 

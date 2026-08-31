@@ -6,6 +6,27 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch][HS-F16C-SCALAR-FRAME] Extend the framed scalar fallback to the F16C
+  scalars. `dispatch_lane_count` gated the AVX2+FMA frame on
+  `!<Avx2 as SimdStorage<T>>::REQUIRES_F16C`, a property of a backend that arm
+  does not enter: the framed body is the portable scalar backend, which needs
+  no feature at all, so `F16` at eight lanes — the one width matching neither
+  AVX-512's 32 nor AVX2's 16 — kept running unframed. The guard is removed and
+  the probe is unchanged: `Avx2::is_runtime_supported()` proves exactly `avx2`
+  and `fma`, exactly what the frame enables. `f16c` is deliberately *not*
+  added, because the scalar backend's `F16` arithmetic runs through Eunomia's
+  software widen/narrow — integer bit manipulation, not `fptrunc`/`fpext` — so
+  no F16C instruction is selectable in that body. Pinned single-P-core
+  criterion medians, two interleaved rounds of the same probe source built
+  against each tree: `F16` at eight lanes improves 5.1–5.8% at 256/1024/4096
+  elements (4.226 -> 4.010 us, 16.911 -> 16.014 us, 67.988 -> 64.019 us in
+  round one), while the `f32`@4 and `f64`@4 control rows stay flat. The gain is
+  an order smaller than the same frame's 2.31–2.74x on `f32` because `F16`'s
+  cost is dominated by the software conversion bit manipulation, which the
+  frame only VEX-encodes; codegen confirms the framed instantiation is
+  call-free around a hardware `vfmadd231ss` that the unframed build lacks.
+  Values, backend, and lane count are unchanged.
+
 - [patch][HS-SCALAR-FALLBACK-FRAME] Run the scalar fallback inside the AVX2+FMA
   frame when the host supports it. `dispatch_lane_count` entered AVX-512 and
   AVX2 through `#[target_feature]` frames but reached the scalar fallback
@@ -1328,3 +1349,5 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 ## [0.1.0]
 
 Initial workspace: `SimdView` typestate views, `SimdKernel` trait with Scalar/AVX2/AVX-512/NEON backends, `#[runtime_dispatch]` macro, dense/masked/sparse (CSR, SELL-p, BCOO, Dense-with-Mask) kernels, `SimdCow`, precision ladder (`hermes-numeric`), Intel AMX + AVX-512 VNNI tile GEMM, SWAR chess bitboards, tiling, tensor views, criterion/divan benches.
+
+[HS-F16C-SCALAR-FRAME]: backlog.md#hs-f16c-scalar-frame-2026-08-31

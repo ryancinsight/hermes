@@ -1,5 +1,28 @@
 # Checklist — active sprint
 
+## HS-F16C-SCALAR-FRAME-2026-08-31 [patch] [perf]
+
+- [x] Establish whether the `!REQUIRES_F16C` exclusion is load-bearing: it is
+      not — the guard asks about `Avx2` while the framed body runs
+      `ScalarArch`, which needs no feature.
+- [x] Add a pinned exact-lane criterion instrument covering `F16`@8 with
+      `f32`@4 and `f64`@4 controls, inside the suite's bounded budget
+      (nine IDs, +5.4 s against the 300 s bound).
+- [x] Measure before/after on the same probe source; landed on a repeated
+      5.1–5.8% win with non-overlapping intervals and flat controls.
+- [x] Run fmt, workspace clippy, nextest, and doctests; publish and open the PR.
+- [x] Gate benchmark registration on exact-lane capability so unsupported
+      hosts skip the case before timing rather than panic.
+- [x] Resolve the new CHANGELOG item reference and rerun the affected host and
+      AArch64 compile plus benchmark-smoke gates.
+- [ ] Obtain exact-head review, merge PR #108, and discharge the takeover
+      lease.
+
+## HS-AVX512-EVIDENCE-STANDARD-2026-08-31 [arch]
+
+- [ ] Unowned. Filed for an integrator to rule on; deliberately not executed by
+      the session that filed it.
+
 ## HS-NO-STD-PACKED-MASK-IMPORTS-2026-08-29 [patch]
 
 - [x] Restore only the missing `alloc::Box` and `vec!` imports.
@@ -77,8 +100,10 @@
       route all applicable tails without duplicating operation logic.
 - [x] Add generic value, boundary, adversarial guard-page where supported, and
       no-call/no-overwrite coverage across shipped backends.
-- [ ] Re-run unchanged benchmarks, codegen, focused/full/cross-target/docs/
+- [x] Re-run unchanged benchmarks, codegen, focused/full/cross-target/docs/
       SemVer gates, obtain an independent artifact verdict, publish, and merge.
+      Merged as PR #96 (`eb4058a`). Hosted AVX-512/NEON *runtime* confirmation
+      is the recorded residual on the board item, not an open step here.
 
 ## HS-SPMV-SHORT-ROW-MASKED-2026-08-27 [patch] [arch]
 
@@ -90,8 +115,9 @@
       inspect the current short-row code generation.
 - [x] Implement only measured single-vector candidates and add generic
       differential, boundary, and invalid-input coverage.
-- [ ] Re-run unchanged measurements, codegen, focused/full/cross-target/docs
-      gates, obtain independent review, publish, and merge.
+- [x] Re-run unchanged measurements, codegen, focused/full/cross-target/docs
+      gates, obtain independent review, publish, and merge. Merged as PR #97
+      (`6382336`); the format-owned leaf modules and ADR 019 are in the tree.
 
 ## HS-ARGEXTREMA-ONE-PASS-2026-08-27 [patch]
 
@@ -119,8 +145,10 @@
 - [x] Obtain an independent judge verdict covering exact-width filtering,
       absence semantics, widest-dispatch preservation, and target-feature
       safety.
-- [ ] Commit, publish, and collect hosted verification before consumer
-      migration.
+- [x] Commit, publish, and collect hosted verification before consumer
+      migration. Published and merged; `vectorize_lanes` is live and consumer
+      migration has since happened — apollo's four-lane entry points and
+      HS-SCALAR-FALLBACK-FRAME-2026-08-30 both build on this ladder.
 
 ## HS-NATIVE-CAST-THROUGHPUT-2026-08-27 [minor]
 
