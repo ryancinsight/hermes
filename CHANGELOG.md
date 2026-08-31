@@ -6,6 +6,16 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [minor][HS-EXACT-PROCESSOR-BINDING] Add `ProcessorIndex` and the
+  allocation-free, thread-bound `ProcessorBinding` guard. On Windows the guard
+  validates the flattened processor-group index before mutation, binds the
+  calling thread through `SetThreadGroupAffinity`, and restores the complete
+  previous group affinity on explicit restore or scope exit. Unsupported
+  targets and platform failures return typed errors; no target silently
+  accepts an ineffective binding. The guard is neither `Send` nor `Sync`, and
+  the API remains available without the standard library. See
+  [ADR 021](docs/adr/021-exact-processor-binding.md).
+
 - [patch][HS-F16C-SCALAR-FRAME] Extend the framed scalar fallback to the F16C
   scalars. `dispatch_lane_count` gated the AVX2+FMA frame on
   `!<Avx2 as SimdStorage<T>>::REQUIRES_F16C`, a property of a backend that arm

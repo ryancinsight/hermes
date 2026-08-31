@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -86,5 +86,5 @@ and restoration semantics.
 
 ## Revision history
 
-- 2026-08-31: Proposed for `HS-EXACT-PROCESSOR-BINDING-2026-08-31`, driven by
+- 2026-08-31: Accepted for `HS-EXACT-PROCESSOR-BINDING-2026-08-31`, driven by
   Apollo's 32,768-point comparison variance after release-profile correction.

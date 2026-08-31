@@ -72,7 +72,7 @@ pub use kernel::{
 pub use mask::{BitMask, PackedMask};
 pub use numa::{
     current_numa_node, refresh_numa_node, verify_numa_locality, MnemosyneNumaAllocator,
-    NumaAllocator, NumaBinding,
+    NumaAllocator, NumaBinding, ProcessorBinding, ProcessorBindingError, ProcessorIndex,
 };
 pub use ops::{
     Abs, AbsMax, AbsSum, Add, BitAnd, BitOr, BitXor, Ceil, Clamp, Div, Dot, ElementOp, Exclusive,
