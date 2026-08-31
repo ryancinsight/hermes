@@ -66,6 +66,19 @@ pub fn bench<const LANES: usize, T>(
 ) where
     T: LaneScalar + Copy + 'static,
 {
+    let probe_a = [a_value; LANES];
+    let probe_b = [b_value; LANES];
+    let mut probe_out = [a_value; LANES];
+    if vectorize_lanes::<LANES, T, _>(FmaChain {
+        a: &probe_a,
+        b: &probe_b,
+        out: &mut probe_out,
+    })
+    .is_none()
+    {
+        return;
+    }
+
     let mut group = super::group::configured(criterion, group_name);
     for &size in &[256usize, 1024, 4096] {
         let a = vec![a_value; size];
@@ -82,7 +95,7 @@ pub fn bench<const LANES: usize, T>(
                         b: black_box(&b),
                         out: black_box(out.as_mut_slice()),
                     })
-                    .expect("invariant: this host provides the requested lane count");
+                    .expect("invariant: exact-lane capability preflight succeeded");
                 });
             },
         );

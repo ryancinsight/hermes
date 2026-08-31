@@ -1349,3 +1349,5 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 ## [0.1.0]
 
 Initial workspace: `SimdView` typestate views, `SimdKernel` trait with Scalar/AVX2/AVX-512/NEON backends, `#[runtime_dispatch]` macro, dense/masked/sparse (CSR, SELL-p, BCOO, Dense-with-Mask) kernels, `SimdCow`, precision ladder (`hermes-numeric`), Intel AMX + AVX-512 VNNI tile GEMM, SWAR chess bitboards, tiling, tensor views, criterion/divan benches.
+
+[HS-F16C-SCALAR-FRAME]: backlog.md#hs-f16c-scalar-frame-2026-08-31

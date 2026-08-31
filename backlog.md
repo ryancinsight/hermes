@@ -68,6 +68,15 @@
 - **Residual.** The measurement is one host (Arrow Lake Core Ultra 9 285K,
   `avx512f: false`). No AArch64 path is touched — `dispatch_lane_count`'s
   aarch64 arm has no scalar frame and is unchanged.
+- **Review correction.** Benchmark registration now runs the same exact-lane
+  dispatch once before creating its Criterion group and skips unsupported
+  host/type/lane combinations. Supported cases keep the fail-closed timed
+  assertion. The CHANGELOG item reference resolves to this record. Workspace
+  all-target/all-feature Clippy, AArch64 Windows all-target compilation, the
+  complete `simd_bench --test` smoke (including all nine exact-lane cases on
+  this host), formatting, and diff checks pass; standalone lock validation is
+  deferred to hosted CI because the Atlas development overlay rewrites Git
+  sources to the local trees.
 - **Integrator:** Codex `/root`, stale-claim takeover from claude-fable session
   5050c72a. **Lease:** benchmark capability gate, CHANGELOG reference, PM.
   **Last update:** 2026-08-31.
