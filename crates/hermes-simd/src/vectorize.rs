@@ -300,10 +300,24 @@ where
     // the same fallback inside the AVX2 frame lets that vectorization use VEX
     // encodings and fuse multiply-add, which is free: no backend changes, and
     // the lane count and every value are identical either way.
-    if Avx2::is_runtime_supported() && !<Avx2 as SimdStorage<T>>::REQUIRES_F16C {
-        // SAFETY: the runtime probe proves AVX2 and FMA before entering the
-        // target scope, and the scalar backend is executable on every host, so
-        // widening the frame cannot make it unexecutable.
+    //
+    // The frame's feature set must cover what the *framed body* executes, and
+    // the framed body is `dispatch_scalar` — that is, `ScalarArch`, which
+    // needs nothing. `REQUIRES_F16C` is a property of `Avx2`, a backend this
+    // arm does not enter, so it has no bearing here and does not gate entry.
+    // Nor is `f16c` added to the frame: `ScalarArch`'s `F16` arithmetic runs
+    // through Eunomia's software widen/narrow, which is integer bit
+    // manipulation rather than `fptrunc`/`fpext`, so no F16C instruction is
+    // selectable in this body and enabling the feature would only narrow the
+    // hosts that qualify. What this body does contain is `f32::mul_add` — a
+    // `fmaf` library call outside an FMA frame, one instruction inside it.
+    if Avx2::is_runtime_supported() {
+        // SAFETY: `Avx2::is_runtime_supported()` probes exactly `avx2` and
+        // `fma`, which is exactly the feature set the callee's
+        // `#[target_feature]` attributes enable — no feature is entered
+        // unproven. The frame is entered for its instruction selection only:
+        // the scalar backend is executable on every host, so widening the
+        // frame around it cannot make it unexecutable.
         return unsafe { call_scalar_in_avx2_frame::<T, K, LANES>(kernel) };
     }
     dispatch_scalar::<T, K, LANES>(kernel)

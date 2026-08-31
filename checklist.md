@@ -2,13 +2,15 @@
 
 ## HS-F16C-SCALAR-FRAME-2026-08-31 [patch] [perf]
 
-- [ ] Establish whether the `!REQUIRES_F16C` exclusion is load-bearing: read
-      what the framed body actually executes and which features it needs.
-- [ ] Add a pinned exact-lane criterion instrument covering `F16`@8 with
-      `f32`@4 and `f64`@4 controls, inside the suite's bounded budget.
-- [ ] Measure before/after on the same probe source; land only on a repeated
-      material win, otherwise record the negative and restore production.
-- [ ] Run fmt, workspace clippy, nextest, and doctests; publish and open the PR.
+- [x] Establish whether the `!REQUIRES_F16C` exclusion is load-bearing: it is
+      not — the guard asks about `Avx2` while the framed body runs
+      `ScalarArch`, which needs no feature.
+- [x] Add a pinned exact-lane criterion instrument covering `F16`@8 with
+      `f32`@4 and `f64`@4 controls, inside the suite's bounded budget
+      (nine IDs, +5.4 s against the 300 s bound).
+- [x] Measure before/after on the same probe source; landed on a repeated
+      5.1–5.8% win with non-overlapping intervals and flat controls.
+- [x] Run fmt, workspace clippy, nextest, and doctests; publish and open the PR.
 
 ## HS-AVX512-EVIDENCE-STANDARD-2026-08-31 [arch]
 

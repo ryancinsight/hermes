@@ -1,6 +1,6 @@
 # Backlog — hermes-simd
 
-## HS-F16C-SCALAR-FRAME-2026-08-31 — The scalar fallback stays unframed for F16C scalars [patch] [perf] — in-progress
+## HS-F16C-SCALAR-FRAME-2026-08-31 — The scalar fallback stays unframed for F16C scalars [patch] [perf] — review
 
 - **Outcome:** decide, on measurement, whether `dispatch_lane_count`'s
   `!REQUIRES_F16C` guard on the framed scalar fallback should be removed. A
@@ -17,10 +17,59 @@
 - **Scope / non-goals:** do not change any backend, lane count, or arithmetic;
   do not add a public API; do not enter a target-feature frame without a
   runtime probe proving every feature it enables.
-- **Integrator:** claude-fable session 5050c72a. **Lease:**
-  `crates/hermes-simd/src/vectorize.rs`,
-  `crates/hermes-simd-benches/benches/simd/`, and this item's PM regions
-  through the next commit. **Last update:** 2026-08-31.
+- **The exclusion was not load-bearing, and the reason is a category error.**
+  The guard reads `<Avx2 as SimdStorage<T>>::REQUIRES_F16C` — a property of the
+  *AVX2* backend — to veto entering a frame around a body that runs the
+  *scalar* backend. `dispatch_scalar` constructs `Simd<T, ScalarArch>`, and
+  `ScalarArch` requires no feature on any host, so the question the guard asks
+  has no bearing on the arm it guards. What the frame must cover is what the
+  framed body executes, and `Avx2::is_runtime_supported()` already probes
+  exactly `avx2 && fma`, exactly what `call_scalar_in_avx2_frame` enables. The
+  guard is removed; the probe is untouched.
+- **`f16c` is deliberately not added to the frame.** `ScalarArch`'s `F16`
+  arithmetic goes through `eunomia::F16`'s `to_f32`/`from_f32`, which are
+  `widen::<5,10>`/`narrow::<5,10>` — integer bit manipulation, not
+  `fptrunc`/`fpext` — so no F16C instruction is selectable in this body.
+  Enabling the feature would add a probe for no reachable instruction and
+  would exclude AVX2-without-F16C hosts from the gain.
+- **Measured.** New `Exact Lane FMA` group in `simd_bench` (the exact-lane
+  entry had no instrument); same probe source built against each tree, run
+  pinned to one P-core (`ProcessorAffinity = 1`, High priority), 1 s warm-up /
+  5 s measurement / 30 samples, two interleaved rounds. Medians with 95%
+  intervals, `F16` at eight lanes — the changed path:
+
+  | n | unframed (round 1 / 2) | framed (round 1 / 2) | change |
+  |---|---|---|---|
+  | 256 | 4.2260 / 4.2315 us | 4.0100 / 4.0135 us | −5.1% |
+  | 1024 | 16.911 / 16.890 us | 16.014 / 16.021 us | −5.3% |
+  | 4096 | 67.988 / 68.587 us | 64.019 / 64.933 us | −5.8% / −5.3% |
+
+  Every interval is non-overlapping and every row repeats in both rounds.
+  Controls: `f32`@4 reaches the same fallback arm and was already framed —
+  30.211 / 29.949 / 30.263 / 30.180 ns at 256, flat; `f64`@4 matches AVX2
+  exactly and never reaches the fallback. The `f64`@4 4096 row moved 713 ->
+  524 ns *between rounds in both binaries*, a host-state shift that is exactly
+  why the comparison is read within a round rather than across.
+- **Why 5%, not the sibling path's 2.31–2.74x.** For `f32` the frame converted
+  a `fmaf` libcall into an instruction inside an otherwise cheap body. For
+  `F16` the body is dominated by the software widen/narrow bit manipulation,
+  which runs either way and only gains VEX encoding; the multiply-add is a
+  small share of it. Codegen confirms the mechanism: the framed build gains
+  one `vfmadd231ss` site whose surrounding widen/narrow is fully inlined and
+  call-free, and the unframed build has no such site. The pre-existing
+  call-per-widen `vfmadd231ss` site elsewhere in the binary is byte-identical
+  in both builds.
+- **Verdict: land.** A repeated, interval-separated 5.1–5.8% on every size of
+  the changed path, at the cost of one removed const-bool test in the
+  dispatch. Backend, lane count, and every value are unchanged.
+- **Gates:** `cargo fmt --all -- --check` clean; workspace all-target Clippy
+  `-D warnings` clean; nextest 507/507 across `hermes-simd`,
+  `hermes-simd-core`, `hermes-simd-intrinsics`; doctests 6 + 16 + 0 passed.
+- **Residual.** The measurement is one host (Arrow Lake Core Ultra 9 285K,
+  `avx512f: false`). No AArch64 path is touched — `dispatch_lane_count`'s
+  aarch64 arm has no scalar frame and is unchanged.
+- **Integrator:** claude-fable session 5050c72a. **Lease:** discharged by the
+  delivery commit. **Last update:** 2026-08-31.
 
 ## HS-NO-STD-PACKED-MASK-IMPORTS-2026-08-29 — Restore alloc imports [patch] — done 2026-08-29
 
