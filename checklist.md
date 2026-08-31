@@ -11,6 +11,10 @@
 - [x] Measure before/after on the same probe source; landed on a repeated
       5.1–5.8% win with non-overlapping intervals and flat controls.
 - [x] Run fmt, workspace clippy, nextest, and doctests; publish and open the PR.
+- [ ] Gate benchmark registration on exact-lane capability so unsupported
+      hosts skip the case before timing rather than panic.
+- [ ] Resolve the new CHANGELOG item reference, rerun affected gates, obtain
+      exact-head review, merge PR #108, and discharge the takeover lease.
 
 ## HS-AVX512-EVIDENCE-STANDARD-2026-08-31 [arch]
 

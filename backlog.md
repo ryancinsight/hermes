@@ -68,8 +68,9 @@
 - **Residual.** The measurement is one host (Arrow Lake Core Ultra 9 285K,
   `avx512f: false`). No AArch64 path is touched — `dispatch_lane_count`'s
   aarch64 arm has no scalar frame and is unchanged.
-- **Integrator:** claude-fable session 5050c72a. **Lease:** discharged by the
-  delivery commit. **Last update:** 2026-08-31.
+- **Integrator:** Codex `/root`, stale-claim takeover from claude-fable session
+  5050c72a. **Lease:** benchmark capability gate, CHANGELOG reference, PM.
+  **Last update:** 2026-08-31.
 
 ## HS-NO-STD-PACKED-MASK-IMPORTS-2026-08-29 — Restore alloc imports [patch] — done 2026-08-29
 
