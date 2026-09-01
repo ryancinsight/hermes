@@ -5,6 +5,7 @@
 //! - `interleave_f32`: two-vector zip over a slice pair.
 //! - `deinterleave_f32`: the inverse unzip.
 //! - `transpose_square`: one register-resident square tile per backend/scalar.
+//! - `transpose_interleaved_square`: the corresponding complex-sample tile.
 //!
 //! Slice operations run through `PreferredArch`, as a consumer reaches them.
 //! The transpose group names each admitted backend explicitly so a native build
@@ -257,12 +258,91 @@ fn transpose_square(c: &mut Criterion) {
     group.finish();
 }
 
+fn measure_interleaved_transpose<T, A>(
+    group: &mut BenchmarkGroup<'_, WallTime>,
+    backend: &str,
+    scalar: &str,
+) where
+    T: Scalar + PartialEq + core::fmt::Debug + From<u16>,
+    A: SimdLoadStore<T> + SimdPermute<T> + SimdStorage<T>,
+{
+    let lanes = <A as SimdStorage<T>>::LANE_COUNT;
+    let samples = lanes / 2;
+    let values: Vec<T> = (0..samples * lanes)
+        .map(|index| T::from(u16::try_from(index).expect("fixture index must fit in u16")))
+        .collect();
+
+    // SAFETY: callers admit only a backend whose target features are present;
+    // every row contains exactly one complete register.
+    let mut tile: Vec<<A as SimdStorage<T>>::Vector> = values
+        .chunks_exact(lanes)
+        .map(|row| unsafe { <A as SimdLoadStore<T>>::load_unaligned(row.as_ptr()) })
+        .collect();
+
+    let mut observed = values.clone();
+    unsafe {
+        <A as SimdPermute<T>>::transpose_interleaved_square(&mut tile);
+        for (row, vector) in observed.chunks_exact_mut(lanes).zip(tile.iter().copied()) {
+            <A as SimdLoadStore<T>>::store_unaligned(row.as_mut_ptr(), vector);
+        }
+        <A as SimdPermute<T>>::transpose_interleaved_square(&mut tile);
+    }
+    for row in 0..samples {
+        for column in 0..samples {
+            for component in 0..2 {
+                assert_eq!(
+                    observed[row * lanes + 2 * column + component],
+                    values[column * lanes + 2 * row + component],
+                    "complex transpose fixture mismatch at ({row}, {column}), component {component}"
+                );
+            }
+        }
+    }
+
+    group.throughput(Throughput::Elements((samples * samples) as u64));
+    group.bench_with_input(BenchmarkId::new(backend, scalar), &samples, |bencher, _| {
+        bencher.iter(|| {
+            // SAFETY: backend admission and exact tile length are unchanged
+            // from the validated fixture above.
+            unsafe {
+                <A as SimdPermute<T>>::transpose_interleaved_square(black_box(&mut tile));
+            }
+        });
+    });
+}
+
+fn transpose_interleaved_square(c: &mut Criterion) {
+    let mut group = c.benchmark_group("transpose_interleaved_square");
+    configure(&mut group);
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if std::is_x86_feature_detected!("avx2") {
+            measure_interleaved_transpose::<f32, Avx2>(&mut group, "avx2", "f32");
+            measure_interleaved_transpose::<f64, Avx2>(&mut group, "avx2", "f64");
+        }
+        if std::is_x86_feature_detected!("avx512f") {
+            measure_interleaved_transpose::<f32, Avx512>(&mut group, "avx512", "f32");
+            measure_interleaved_transpose::<f64, Avx512>(&mut group, "avx512", "f64");
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        measure_interleaved_transpose::<f32, Neon>(&mut group, "neon", "f32");
+        measure_interleaved_transpose::<f64, Neon>(&mut group, "neon", "f64");
+    }
+
+    group.finish();
+}
+
 criterion_group!(
     permutes,
     reverse_f32,
     reverse_f64,
     interleave_f32,
     deinterleave_f32,
-    transpose_square
+    transpose_square,
+    transpose_interleaved_square
 );
 criterion_main!(permutes);

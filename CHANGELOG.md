@@ -6,6 +6,16 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [minor][HS-COMPLEX-TRANSPOSE] Add
+  `ComplexReg::transpose_square` for allocation-free, pair-preserving
+  transposition of a square interleaved-complex register tile. Every backend
+  receives the same portable operation contract; AVX2 f32 uses a native
+  four-register shuffle network. On a Core Ultra 9 285K, the unchanged
+  Criterion instrument reports 2.857 ns for the native network versus
+  98.242 ns for the forced generic default. Apollo consumer promotion remains
+  conditional on its separate unchanged N=96 FFT comparison. See
+  [ADR 004](docs/adr/004-generic-interleaved-complex-kernels.md).
+
 - [minor][HS-HARDWARE-LANE-DISPATCH] Add
   `vectorize_hardware_lanes::<LANES, T, K>` for consumers that already own a
   scalar fallback. It shares the exact AVX-512/AVX2/NEON selection ladder with

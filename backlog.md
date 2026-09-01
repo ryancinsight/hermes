@@ -22,6 +22,12 @@
   candidates lose at 193.51, 240.80, and 368.21 ns respectively. Promotion is
   conditional on the pair-preserving transpose plus radix-4×8 codelet winning
   the unchanged consumer comparison.
+- **Candidate evidence.** Exact sample-pair and involution oracles pass for the
+  scalar, AVX2, AVX-512, and f32/f64 monomorphizations; the safe wrapper rejects
+  the wrong row count. Warning-denied all-target package Clippy is green.
+  Criterion reports 2.857 ns for native AVX2 f32 versus 98.242 ns for the
+  forced generic default on a Core Ultra 9 285K. Apollo consumption and the
+  remaining provider gates are open.
 - **Integrator / lease:** `/root`; lease `/root` permutation role,
   `ComplexReg`, AVX2 f32, conformance tests, ADR 004, benchmark, PM. Last update
   2026-08-31.

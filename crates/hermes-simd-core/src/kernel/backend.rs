@@ -1263,6 +1263,43 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         }
     }
 
+    /// Transposes a square tile of interleaved complex registers in place.
+    ///
+    /// Each vector is one row of `LANE_COUNT / 2` complex samples. A sample
+    /// occupies adjacent `[re, im]` lanes, and sample `(r, c)` moves to
+    /// `(c, r)` without separating that pair.
+    ///
+    /// Default: scalar emulation via symmetric complex-pair swaps staged
+    /// through two row buffers. Hardware backends may override this with a
+    /// pair-preserving shuffle network.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature. `tile` must hold
+    /// exactly `LANE_COUNT / 2` vectors.
+    #[inline(always)]
+    unsafe fn transpose_interleaved_square(tile: &mut [Self::Vector]) {
+        const { Self::LANE_BOUND_CHECK };
+        let samples = Self::LANE_COUNT / 2;
+        debug_assert_eq!(
+            tile.len(),
+            samples,
+            "tile must hold LANE_COUNT / 2 complex rows"
+        );
+
+        let mut row_r = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let mut row_c = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        for r in 0..samples {
+            Self::store_unaligned(row_r.as_mut_ptr().cast::<T>(), tile[r]);
+            for c in (r + 1)..samples {
+                Self::store_unaligned(row_c.as_mut_ptr().cast::<T>(), tile[c]);
+                core::mem::swap(&mut row_r[2 * c], &mut row_c[2 * r]);
+                core::mem::swap(&mut row_r[2 * c + 1], &mut row_c[2 * r + 1]);
+                tile[c] = Self::load_unaligned(row_c.as_ptr().cast::<T>());
+            }
+            tile[r] = Self::load_unaligned(row_r.as_ptr().cast::<T>());
+        }
+    }
+
     /// Duplicate even lanes into odd lanes: `[a0, a1, a2, a3, ...] -> [a0, a0, a2, a2, ...]`.
     ///
     /// Default: scalar emulation. x86 backends override with `moveldup_ps` /

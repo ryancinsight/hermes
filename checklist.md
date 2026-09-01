@@ -2,9 +2,9 @@
 
 ## HS-COMPLEX-TRANSPOSE-2026-08-31 [minor] [perf]
 
-- [ ] Pin the pair-preserving transpose contract across every shipped backend
+- [x] Pin the pair-preserving transpose contract across every shipped backend
       and a wrong-length precondition before implementation.
-- [ ] Implement the allocation-free portable default and native AVX2 f32
+- [x] Implement the allocation-free portable default and native AVX2 f32
       register network through the existing permutation role.
 - [ ] Measure the primitive and Apollo N=96 consumer on the unchanged pinned
       instruments; reject production promotion if either fails its baseline.

@@ -29,7 +29,8 @@ use core::arch::x86_64::{
     not(hermes_benchmark_generic_default)
 ))]
 use core::arch::x86_64::{
-    _mm256_permute2f128_ps, _mm256_shuffle_ps, _mm256_unpackhi_ps, _mm256_unpacklo_ps,
+    _mm256_castpd_ps, _mm256_castps_pd, _mm256_permute2f128_ps, _mm256_shuffle_ps,
+    _mm256_unpackhi_pd, _mm256_unpackhi_ps, _mm256_unpacklo_pd, _mm256_unpacklo_ps,
 };
 use hermes_simd_core::kernel::BackendKernel;
 
@@ -250,6 +251,43 @@ impl BackendKernel<f32> for Avx2 {
         tile[5] = Avx2F32Vec(_mm256_permute2f128_ps::<0x31>(s1, s5));
         tile[6] = Avx2F32Vec(_mm256_permute2f128_ps::<0x31>(s2, s6));
         tile[7] = Avx2F32Vec(_mm256_permute2f128_ps::<0x31>(s3, s7));
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` and `tile`
+    // holds exactly four interleaved-complex rows. The dispatcher and safe
+    // `ComplexReg` wrapper enforce both requirements before entry.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn transpose_interleaved_square(tile: &mut [Self::Vector]) {
+        let tile: &mut [Self::Vector; 4] = tile
+            .try_into()
+            .expect("invariant: tile holds exactly COMPLEX_COUNT rows");
+
+        // Join rows 0/2 and 1/3 across 128-bit halves. Reinterpreting each
+        // vector as four f64 lanes then makes unpacklo/unpackhi move complete
+        // 64-bit complex pairs rather than individual f32 lanes.
+        let rows_02_lo = _mm256_permute2f128_ps::<0x20>(tile[0].0, tile[2].0);
+        let rows_13_lo = _mm256_permute2f128_ps::<0x20>(tile[1].0, tile[3].0);
+        let rows_02_hi = _mm256_permute2f128_ps::<0x31>(tile[0].0, tile[2].0);
+        let rows_13_hi = _mm256_permute2f128_ps::<0x31>(tile[1].0, tile[3].0);
+
+        tile[0] = Avx2F32Vec(_mm256_castpd_ps(_mm256_unpacklo_pd(
+            _mm256_castps_pd(rows_02_lo),
+            _mm256_castps_pd(rows_13_lo),
+        )));
+        tile[1] = Avx2F32Vec(_mm256_castpd_ps(_mm256_unpackhi_pd(
+            _mm256_castps_pd(rows_02_lo),
+            _mm256_castps_pd(rows_13_lo),
+        )));
+        tile[2] = Avx2F32Vec(_mm256_castpd_ps(_mm256_unpacklo_pd(
+            _mm256_castps_pd(rows_02_hi),
+            _mm256_castps_pd(rows_13_hi),
+        )));
+        tile[3] = Avx2F32Vec(_mm256_castpd_ps(_mm256_unpackhi_pd(
+            _mm256_castps_pd(rows_02_hi),
+            _mm256_castps_pd(rows_13_hi),
+        )));
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.

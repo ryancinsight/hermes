@@ -315,6 +315,68 @@ where
     }
 }
 
+/// The interleaved-complex transpose operates on `LANE_COUNT / 2` rows and
+/// moves complete adjacent scalar pairs as one sample.
+fn check_transpose_interleaved_square<T, A>()
+where
+    T: hermes_simd_core::Scalar + PartialEq + core::fmt::Debug + From<u16>,
+    A: SimdKernel<T>,
+{
+    let lanes = A::LANE_COUNT;
+    let samples = lanes / 2;
+    let rows: Vec<Vec<T>> = (0..samples)
+        .map(|row| {
+            (0..samples)
+                .flat_map(|column| {
+                    [
+                        transpose_fixture_value(row, column),
+                        transpose_fixture_value(row + samples, column),
+                    ]
+                })
+                .collect()
+        })
+        .collect();
+    let mut out = rows.clone();
+    let mut twice = rows.clone();
+
+    // SAFETY: caller gates on the required target features for `A`; each row
+    // holds one complete vector and the tile has exactly `LANE_COUNT / 2`
+    // rows.
+    unsafe {
+        let mut tile: Vec<A::Vector> = rows
+            .iter()
+            .map(|row| A::load_unaligned(row.as_ptr()))
+            .collect();
+        A::transpose_interleaved_square(&mut tile);
+        for (row, dst) in tile.iter().zip(out.iter_mut()) {
+            A::store_unaligned(dst.as_mut_ptr(), *row);
+        }
+        A::transpose_interleaved_square(&mut tile);
+        for (row, dst) in tile.iter().zip(twice.iter_mut()) {
+            A::store_unaligned(dst.as_mut_ptr(), *row);
+        }
+    }
+
+    for row in 0..samples {
+        for column in 0..samples {
+            assert_eq!(
+                out[row][2 * column],
+                rows[column][2 * row],
+                "complex transpose real lane mismatch at ({row}, {column})"
+            );
+            assert_eq!(
+                out[row][2 * column + 1],
+                rows[column][2 * row + 1],
+                "complex transpose imaginary lane mismatch at ({row}, {column})"
+            );
+        }
+        assert_eq!(
+            twice[row], rows[row],
+            "complex transpose is not an involution"
+        );
+    }
+}
+
 /// `transpose_square` is pure data movement: it must relocate lane *bit
 /// patterns* without perturbing them. The index-coded law above manufactures
 /// small positive integers, which a network that leaked an operand through an
@@ -451,6 +513,8 @@ fn permutes_match_reference_all_backends() {
     check_permutes::<Scalar>();
     check_transpose_square::<f32, Scalar>();
     check_transpose_square::<f64, Scalar>();
+    check_transpose_interleaved_square::<f32, Scalar>();
+    check_transpose_interleaved_square::<f64, Scalar>();
     check_permutes::<SveArch>();
     check_permutes_f64::<Scalar>();
 
@@ -460,12 +524,16 @@ fn permutes_match_reference_all_backends() {
             check_permutes::<hermes_simd::Avx2>();
             check_transpose_square::<f32, hermes_simd::Avx2>();
             check_transpose_square::<f64, hermes_simd::Avx2>();
+            check_transpose_interleaved_square::<f32, hermes_simd::Avx2>();
+            check_transpose_interleaved_square::<f64, hermes_simd::Avx2>();
             check_permutes_f64::<hermes_simd::Avx2>();
         }
         if std::is_x86_feature_detected!("avx512f") {
             check_permutes::<hermes_simd::Avx512>();
             check_transpose_square::<f32, hermes_simd::Avx512>();
             check_transpose_square::<f64, hermes_simd::Avx512>();
+            check_transpose_interleaved_square::<f32, hermes_simd::Avx512>();
+            check_transpose_interleaved_square::<f64, hermes_simd::Avx512>();
             check_permutes_f64::<hermes_simd::Avx512>();
         }
     }
@@ -474,6 +542,8 @@ fn permutes_match_reference_all_backends() {
         check_permutes::<hermes_simd::Neon>();
         check_transpose_square::<f32, hermes_simd::Neon>();
         check_transpose_square::<f64, hermes_simd::Neon>();
+        check_transpose_interleaved_square::<f32, hermes_simd::Neon>();
+        check_transpose_interleaved_square::<f64, hermes_simd::Neon>();
         check_permutes_f64::<hermes_simd::Neon>();
     }
 }

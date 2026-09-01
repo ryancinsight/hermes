@@ -271,3 +271,74 @@ fn splat_repeats_the_sample_and_butterfly_is_sum_and_difference() {
         );
     }
 }
+
+struct ComplexTranspose;
+
+impl LaneKernel<f32> for ComplexTranspose {
+    type Output = (usize, Vec<f32>);
+
+    fn call<A: SimdArch + SimdKernel<f32>>(self, _simd: Simd<f32, A>) -> Self::Output {
+        let lanes = <A as SimdStorage<f32>>::LANE_COUNT;
+        let samples = ComplexReg::<f32, A>::COMPLEX_COUNT;
+        let rows: Vec<Vec<f32>> = (0..samples)
+            .map(|row| {
+                (0..samples)
+                    .flat_map(|column| {
+                        let sample = (100 * row + column) as f32;
+                        [sample, -sample - 0.5]
+                    })
+                    .collect()
+            })
+            .collect();
+        let mut tile: Vec<ComplexReg<f32, A>> = rows
+            .iter()
+            .map(|row| {
+                ComplexReg::from_interleaved(
+                    hermes_simd::Vector::load_unaligned_from_slice(row)
+                        .expect("fixture row holds one register"),
+                )
+            })
+            .collect();
+
+        ComplexReg::transpose_square(&mut tile);
+        let mut out = vec![0.0f32; samples * lanes];
+        for (row, value) in tile.into_iter().enumerate() {
+            value
+                .into_interleaved()
+                .store_unaligned_to_slice(&mut out[row * lanes..(row + 1) * lanes])
+                .expect("output row holds one register");
+        }
+        (samples, out)
+    }
+}
+
+#[test]
+fn complex_square_transpose_preserves_sample_pairs() {
+    let (samples, out) = hermes_simd::vectorize(ComplexTranspose);
+    let lanes = samples * 2;
+    for row in 0..samples {
+        for column in 0..samples {
+            let expected = (100 * column + row) as f32;
+            let offset = row * lanes + 2 * column;
+            assert_eq!(out[offset].to_bits(), expected.to_bits());
+            assert_eq!(out[offset + 1].to_bits(), (-expected - 0.5).to_bits());
+        }
+    }
+}
+
+struct InvalidComplexTranspose;
+
+impl LaneKernel<f32> for InvalidComplexTranspose {
+    type Output = ();
+
+    fn call<A: SimdArch + SimdKernel<f32>>(self, _simd: Simd<f32, A>) {
+        let mut tile = vec![ComplexReg::<f32, A>::zero(); ComplexReg::<f32, A>::COMPLEX_COUNT + 1];
+        ComplexReg::transpose_square(&mut tile);
+    }
+}
+
+#[test]
+#[should_panic(expected = "tile must hold COMPLEX_COUNT rows")]
+fn complex_square_transpose_rejects_wrong_row_count_before_backend_entry() {
+    hermes_simd::vectorize(InvalidComplexTranspose);
+}

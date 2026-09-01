@@ -163,6 +163,34 @@ where
         Self(self.0.swap_pairs())
     }
 
+    /// Transposes a square tile of complex-register rows in place.
+    ///
+    /// A tile contains exactly [`Self::COMPLEX_COUNT`] registers, each holding
+    /// that many interleaved complex samples. Sample `(r, c)` moves to
+    /// `(c, r)` while its real and imaginary lanes remain adjacent.
+    ///
+    /// # Panics
+    /// Panics if `tile` does not hold exactly [`Self::COMPLEX_COUNT`] rows.
+    #[inline(always)]
+    pub fn transpose_square(tile: &mut [Self]) {
+        assert_eq!(
+            tile.len(),
+            Self::COMPLEX_COUNT,
+            "tile must hold COMPLEX_COUNT rows"
+        );
+        // SAFETY: `ComplexReg` and `Vector` are both `#[repr(transparent)]`
+        // over `Arch::Vector`; the slice cast preserves layout. Constructing
+        // every register proved host support for `Arch`, and the length check
+        // establishes the backend method's exact-square precondition.
+        unsafe {
+            let raw = core::slice::from_raw_parts_mut(
+                tile.as_mut_ptr().cast::<<Arch as SimdStorage<T>>::Vector>(),
+                tile.len(),
+            );
+            Arch::transpose_interleaved_square(raw);
+        }
+    }
+
     /// The butterfly pair `(self + other, self - other)` in one call.
     ///
     /// Lane-wise add and subtract of interleaved data are complex add and
