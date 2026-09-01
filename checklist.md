@@ -13,7 +13,8 @@
       SemVer, format, independent review, hosted, and non-squash merge gates.
       Local source gates are green: host Clippy; 450/450 Nextest; 7/7 doctests;
       Rustdoc; no-default-features; AArch64 Windows; SemVer 196/196; format and
-      diff checks. Independent/hosted/merge remain open.
+      diff checks at provider source `141b7e1`. Independent/hosted/merge remain
+      open.
 
 ## HS-F16C-SCALAR-FRAME-2026-08-31 [patch] [perf]
 

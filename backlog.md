@@ -19,8 +19,9 @@
   Linux artifacts: its new f32 exact-four fallback contributes a 5,080-byte
   unused monomorph while AVX2 executes exact eight. Local code-size and timing
   evidence does not establish the hosted regression's mechanism.
-- **Candidate evidence.** The shared hardware ladder and additive public entry
-  pass warning-denied host Clippy, 450/450 package Nextest tests, 7/7 doctests,
+- **Candidate evidence.** Provider source `141b7e1` shares the hardware ladder;
+  the additive public entry passes warning-denied host Clippy, 450/450 package
+  Nextest tests, 7/7 doctests,
   warning-denied Rustdoc, no-default-features, AArch64 Windows compilation, and
   cargo-semver-checks 196/196. Apollo's unchanged optimized benchmark executable
   shrinks 8,192,512 to 8,184,832 bytes. Two pinned N=64/N=256 timing pairs do
