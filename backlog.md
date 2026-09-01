@@ -1,5 +1,27 @@
 # Backlog — hermes-simd
 
+## HS-THEMIS-AFFINITY-CONSUMER-2026-09-01 [patch] — in progress
+
+- **Outcome.** Consume Themis's processor-group affinity values in the Windows
+  NUMA-node and exact-processor guards, deleting Hermes's duplicate flattened
+  processor division, remainder, checked-shift, grouping, and tie-breaking
+  logic while retaining Hermes ownership of the thread-affinity mechanism.
+- **Scope / non-goals.** `hermes-simd-core` Windows NUMA affinity leaves,
+  focused tests, the exact standalone Themis pin, CHANGELOG, and this item.
+  Preserve public types, coverage semantics, active-host validation,
+  `SetThreadGroupAffinity`, restoration, and unsupported-target behavior. Do
+  not move mutable binding into Themis or alter Linux affinity.
+- **Acceptance.** `NumaBinding` selects `ProcessorAffinityGroups::largest_group`;
+  `ProcessorBinding` uses `ProcessorGroupAffinity::from_processor`; no local
+  input decomposition or bit construction remains. Full/ragged multi-group,
+  deterministic tie, unavailable-processor, live bind, restore, no-default,
+  host, and AArch64 checks remain value-semantic and warning-clean. The lock
+  resolves Themis merge `64ac8ccee8a916b264f0f933de3f642b69ed5434`.
+- **Integrator / lease.** Codex `01a0253c-6013-7552-99cc-36bbbcf77f6d`;
+  branch=`refactor/hermes-affinity-provider`; lease=`crates/hermes-simd-core/
+  src/numa/{affinity,binding,processor}.rs`, their focused tests, lock,
+  CHANGELOG, and this item; last-update=2026-09-01.
+
 ## HS-ADR-INDEX-GENERATOR-ABSENT-2026-09-01 [patch] — todo
 
 - **Verified defect.** `docs/adr/README.md` opens with
