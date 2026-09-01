@@ -1,5 +1,16 @@
 # Checklist — active sprint
 
+## HS-REAL-WINDOW-INTERLEAVE-2026-09-01 [minor] [perf]
+
+- [ ] Pin validation-before-mutation, empty, full-vector, ragged-tail, scalar,
+      runtime-dispatch, and allocation contracts before implementation.
+- [ ] Implement one generic provider kernel and runtime selector; inspect
+      release codegen and measure it against the incumbent three-pass shape.
+- [ ] Consume it in Apollo STFT only if two unchanged full-path comparisons
+      improve while values and zero-allocation behavior remain unchanged.
+- [ ] Pass exact provider/consumer local and hosted gates, complete independent
+      review, and merge both repositories without squash.
+
 ## HS-COMPLEX-TRANSPOSE-2026-08-31 [minor] [perf]
 
 - [x] Pin the pair-preserving transpose contract across every shipped backend

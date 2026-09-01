@@ -1,5 +1,12 @@
 # Backlog — hermes-simd
 
+## HS-REAL-WINDOW-INTERLEAVE-2026-09-01 — Fuse real windowing into complex layout [minor] [perf] — in progress
+
+- **Outcome.** Add one allocation-free Hermes operation that multiplies equal-length real input/window slices and writes interleaved complex output as `[input[i] * window[i], 0]`, allowing Apollo STFT to delete its two per-worker scratch buffers and three-pass large-frame preparation.
+- **Scope / non-goals.** Confine Hermes source to the canonical dispatch family, public export, value/error/allocation tests, and a pinned benchmark. Preserve native `T` arithmetic, exact output order, runtime ISA safety, existing operations, and `no_std`; reject Apollo adoption unless two unchanged full-STFT comparisons improve. Do not change FFT arithmetic, frame scheduling, windows, workloads, assertions, or timeouts.
+- **Acceptance.** Validate every length before mutation; accept empty input; cover full and ragged vector tails for f32/f64 across scalar, runtime, x86, and AArch64-capable code; prove zero allocation and no per-element dispatch; pass warning-denied host/AArch64, debug/release tests, Rustdoc/doctests, Miri or stated SIMD substitute, SemVer, format, diff, size, and standalone-lock gates. Consumer closure must prove equal values, remove both retained scratch roles, retain zero warm allocation, and improve two unchanged Apollo STFT measurements.
+- **Risk / dependency.** [minor] [perf]. Driven by Apollo STFT's current three-pass frame preparation; no external blocker. Integrator `/root`; lease `/root` on the new dispatch leaf, its export/tests/benchmark, and this item's PM/doc hunks. Last update 2026-09-01.
+
 ## HS-COMPLEX-TRANSPOSE-2026-08-31 — Register-resident complex square transpose [minor] [perf] — done 2026-09-01
 
 - **Delivery:** provider `42a0d4c`; PR #111 merged without squash as `9ac23fa4`; lease none.
