@@ -9,7 +9,8 @@
 
 use hermes_simd::{
     interleaved_complex_dot, interleaved_complex_dot_runtime, interleaved_complex_mul_assign,
-    interleaved_complex_mul_assign_runtime, PreferredArch, Scalar, SimdError,
+    interleaved_complex_mul_assign_runtime, real_interleaved_complex_dot,
+    real_interleaved_complex_dot_runtime, PreferredArch, Scalar, SimdError,
 };
 
 fn reference_mul<const CONJ_B: bool>(a: &mut [f64], b: &[f64]) {
@@ -150,6 +151,40 @@ fn interleaved_complex_dot_conjugated_runtime_matches_provider_architecture() {
 
         assert_eq!(runtime, expected, "complex_len={complex_len}");
     }
+}
+
+#[test]
+fn real_interleaved_complex_dot_matches_reference_and_runtime() {
+    macro_rules! check_type {
+        ($t:ty) => {
+            for &len in &[0usize, 1, 2, 3, 4, 7, 8, 9, 16, 17, 33, 64, 65] {
+                let real = (0..len)
+                    .map(|index| ((index % 9) as $t) * 0.25 - 1.0)
+                    .collect::<Vec<_>>();
+                let weights = (0..len * 2)
+                    .map(|index| ((index % 7) as $t) * 0.5 - 1.5)
+                    .collect::<Vec<_>>();
+                let expected = real
+                    .iter()
+                    .zip(weights.chunks_exact(2))
+                    .fold((0.0 as $t, 0.0 as $t), |(re, im), (&value, pair)| {
+                        (re + value * pair[0], im + value * pair[1])
+                    });
+
+                let preferred =
+                    real_interleaved_complex_dot::<$t, PreferredArch>(&real, &weights).unwrap();
+                let scalar = real_interleaved_complex_dot::<$t, Scalar>(&real, &weights).unwrap();
+                let runtime = real_interleaved_complex_dot_runtime::<$t>(&real, &weights).unwrap();
+
+                assert_eq!(preferred, expected, "preferred len={len}");
+                assert_eq!(scalar, expected, "scalar len={len}");
+                assert_eq!(runtime, preferred, "runtime len={len}");
+            }
+        };
+    }
+
+    check_type!(f32);
+    check_type!(f64);
 }
 
 /// Differential verification of the vectorized kernels against the `Scalar`
@@ -396,6 +431,10 @@ fn interleaved_complex_mul_assign_rejects_invalid_shapes() {
     );
     assert_simd_error(
         interleaved_complex_dot::<f32, PreferredArch, false>(&lhs, &[1.0]),
+        SimdError::LengthMismatch,
+    );
+    assert_simd_error(
+        real_interleaved_complex_dot::<f32, PreferredArch>(&lhs, &[1.0, 2.0, 3.0]),
         SimdError::LengthMismatch,
     );
 }

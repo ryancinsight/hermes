@@ -258,6 +258,16 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     ) -> Result<(Self, Self), SimdError>
     where
         Self: core::ops::Neg<Output = Self>;
+    /// Computes `sum(real[k] * weights[k])` for interleaved complex weights.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] unless `weights.len()` is exactly
+    /// twice `real.len()`.
+    fn real_interleaved_complex_dot(
+        real: &[Self],
+        weights: &[Self],
+    ) -> Result<(Self, Self), SimdError>;
     /// Computes the horizontal sum of population counts of all elements.
     fn reduce_popcount(data: &[Self]) -> usize;
     /// Computes the horizontal sum of population counts of `a[i] & b[i]`.
