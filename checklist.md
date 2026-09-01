@@ -2,10 +2,11 @@
 
 ## HS-REAL-COMPLEX-DOT-2026-09-01 [minor] [perf]
 
-- [ ] Pin the exact `weights.len() == 2 * real.len()` preflight, empty/ragged
+- [x] Pin the exact `weights.len() == 2 * real.len()` preflight, empty/ragged
       behavior, and f32/f64 scalar/native differential oracle.
-- [ ] Add one complex-family kernel and runtime trait method without new backend
-      selection, allocation, unsafe code, or per-element capability probes.
+- [x] Add one complex-family kernel and runtime trait method without new backend
+      selection, allocation, public unsafe surface, or per-element capability
+      probes; guard explicit architecture selection before the private kernel.
 - [ ] Compare the primitive against Apollo's materialize-plus-complex-dot shape;
       retain it only if two complete Apollo forward-spectrum comparisons improve.
 - [ ] Pass exact provider/consumer gates, independent review, and merge without
