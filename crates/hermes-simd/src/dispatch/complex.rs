@@ -322,7 +322,8 @@ where
 /// # Errors
 ///
 /// Returns [`SimdError::LengthMismatch`] unless `weights.len()` is exactly
-/// twice `real.len()`.
+/// twice `real.len()`, or [`SimdError::UnsupportedTarget`] when architecture
+/// `A` is not available on the current processor.
 ///
 /// # Panics
 ///
@@ -347,13 +348,42 @@ where
     T: Scalar,
     A: SimdArch + SimdArith<T> + SimdLoadStore<T> + SimdPermute<T>,
 {
+    validate_real_interleaved_complex_dot_lengths(real, weights)?;
+    if !A::is_runtime_supported() {
+        return Err(SimdError::UnsupportedTarget);
+    }
+
+    // SAFETY: the runtime capability check above establishes `A`'s target
+    // features, and the length preflight establishes the kernel's slice shape.
+    Ok(unsafe { real_interleaved_complex_dot_kernel::<T, A>(real, weights) })
+}
+
+#[inline]
+fn validate_real_interleaved_complex_dot_lengths<T>(
+    real: &[T],
+    weights: &[T],
+) -> Result<(), SimdError> {
     let Some(expected_weights) = real.len().checked_mul(2) else {
         return Err(SimdError::LengthMismatch);
     };
     if weights.len() != expected_weights {
         return Err(SimdError::LengthMismatch);
     }
+    Ok(())
+}
 
+/// Executes after the caller proves target support and slice shape.
+///
+/// # Safety
+///
+/// `A::is_runtime_supported()` must be true and `weights.len()` must equal
+/// `2 * real.len()`.
+#[inline]
+unsafe fn real_interleaved_complex_dot_kernel<T, A>(real: &[T], weights: &[T]) -> (T, T)
+where
+    T: Scalar,
+    A: SimdArch + SimdArith<T> + SimdLoadStore<T> + SimdPermute<T>,
+{
     let lanes = A::LANE_COUNT;
     let mut offset = 0usize;
     let mut re = T::ZERO;
@@ -406,7 +436,7 @@ where
         index += 1;
     }
 
-    Ok((re, im))
+    (re, im)
 }
 
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
@@ -442,5 +472,9 @@ where
     T: Scalar,
     A: SimdArch + SimdArith<T> + SimdLoadStore<T> + SimdPermute<T>,
 {
-    real_interleaved_complex_dot::<T, A>(real, weights)
+    validate_real_interleaved_complex_dot_lengths(real, weights)?;
+    // SAFETY: `runtime_dispatch` invokes this specialization only after its
+    // architecture capability probe succeeds; the preflight above establishes
+    // the kernel's slice shape without repeating that probe.
+    Ok(unsafe { real_interleaved_complex_dot_kernel::<T, A>(real, weights) })
 }

@@ -187,6 +187,23 @@ fn real_interleaved_complex_dot_matches_reference_and_runtime() {
     check_type!(f64);
 }
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[test]
+fn real_interleaved_complex_dot_rejects_an_unsupported_explicit_architecture() {
+    if !<hermes_simd::Avx512 as hermes_simd::SimdArch>::is_runtime_supported() {
+        assert_simd_error(
+            real_interleaved_complex_dot::<f64, hermes_simd::Avx512>(&[2.0], &[3.0, 4.0]),
+            SimdError::UnsupportedTarget,
+        );
+    }
+    if !<hermes_simd::Avx2 as hermes_simd::SimdArch>::is_runtime_supported() {
+        assert_simd_error(
+            real_interleaved_complex_dot::<f64, hermes_simd::Avx2>(&[2.0], &[3.0, 4.0]),
+            SimdError::UnsupportedTarget,
+        );
+    }
+}
+
 /// Differential verification of the vectorized kernels against the `Scalar`
 /// backend for an explicit architecture marker.
 ///
