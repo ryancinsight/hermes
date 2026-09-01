@@ -1,12 +1,10 @@
 # Backlog — hermes-simd
 
-## HS-REAL-COMPLEX-DOT-2026-09-01 — Dot real samples with interleaved complex weights [minor] [perf] — in progress
+## HS-REAL-COMPLEX-DOT-2026-09-01 — Dot real samples with interleaved complex weights [minor] [perf] — review
 
-- **Outcome.** Add one allocation-free generic dot kernel for `sum(real[k] * complex[k])`, selected through the existing scalar/native runtime ladder, so Apollo Mellin can delete its retained `[sample, 0]` materialization and halve real-operand lane traffic in every forward-spectrum row.
-- **Scope / non-goals.** Confine source to the existing complex dispatch family, sealed runtime trait, tests, isolated benchmark, public exports, and synchronized docs/PM. Preserve current interleaved complex multiply/dot behavior, backend selection, accumulation order within each backend, `no_std`, and every unrelated kernel.
-- **Acceptance.** Reject unless the complex-weight slice has exactly twice the real length before work; handle empty and ragged SIMD tails; prove f32/f64 scalar/native results against an independent scalar oracle; inspect target-feature codegen; pass host/AArch64, debug/release, Miri, Rustdoc/doctest, SemVer, standalone-lock, format/diff, and independent review. The additive surface merges only with a measured Apollo consumer.
-- **Risk / dependency.** [minor] [perf]. Consumer: Apollo `ATLAS-APOLLO-MELLIN-REAL-COMPLEX-DOT-2026-09-01`. Integrator `/root`; lease `/root` on complex dispatch/tests/bench/lib exports and this item's PM/doc hunks. Last update 2026-09-01.
-- **Current evidence.** Source `e5422b5` plus capability correction `1424004`: two paired primitive runs reduce medians by 31–53% across 256–16,384 real values; 453/453 debug and release tests, 2/2 focused Miri cases, all-target/all-feature Clippy, doctests, AArch64 warning-denied check, and inspected AVX2 codegen pass. Apollo source `d3410c13` plus allocation census `cb00aa51` removes one retained 16N-byte f64 buffer per worker; two controlled same-provider pairs reduce N = 128 by 1.96%/1.49% and N = 256 by 1.46%/0.83%, while N = 64 moves -0.28%/+0.82%. Standalone exact-Git closure, corrected independent review, and delivery remain open.
+- **Delivery state:** provider source head `59c89431` merged through PR #113 as `2e993503`; documentation correction `e5b9e7d` is open on PR #114. Integrator `/root`; lease `/root` on this item's PM/documentation hunks.
+- **Outcome:** one allocation-free generic/runtime real-by-interleaved-complex dot lets Apollo Mellin remove its retained 16N-byte real-lane materialization while preserving target safety, exact shape validation, and ragged tails.
+- **Evidence:** two primitive pairs improve 31–53%; two Apollo public-plan pairs improve N = 128 by 1.96%/1.49% and N = 256 by 1.46%/0.83% with a neutral N = 64 control. Source hosted run `33492225619` passes every repository gate. The corrected exact-head review, PR #114 hosted gates, and merge remain open.
 
 ## HS-COMPLEX-TRANSPOSE-2026-08-31 — Register-resident complex square transpose [minor] [perf] — done 2026-09-01
 
