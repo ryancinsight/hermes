@@ -9,12 +9,6 @@
 //! silently, and a second copy of the affinity contract is the fork ADR 021
 //! records as the defect to avoid.
 
-/// Logical processors addressable by one Windows processor group.
-///
-/// This is also the divisor of the group-flattened processor identity
-/// (`group * 64 + number`) that Hermes shares with its topology dependency.
-pub(super) const PROCESSORS_PER_GROUP: u32 = 64;
-
 /// Windows `GROUP_AFFINITY`: a processor group and a mask within it.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(C)]
@@ -114,7 +108,7 @@ pub(super) fn last_error() -> u32 {
 /// validates a single index and reports typed errors, so it keeps its own
 /// checks rather than collapsing into this mask.
 #[cfg(feature = "std")]
-pub(super) fn active_mask(group: u16) -> Option<u64> {
+pub(super) fn active_mask(group: u16) -> Option<usize> {
     // SAFETY: parameter-free query with no pointer obligations.
     let group_count = unsafe { GetActiveProcessorGroupCount() };
     if group_count == 0 || group >= group_count {
@@ -124,8 +118,8 @@ pub(super) fn active_mask(group: u16) -> Option<u64> {
     let active = unsafe { GetActiveProcessorCount(group) };
     match active {
         0 => None,
-        PROCESSORS_PER_GROUP.. => Some(u64::MAX),
-        _ => Some((1u64 << active) - 1),
+        active if active >= usize::BITS => Some(usize::MAX),
+        _ => Some((1usize << active) - 1),
     }
 }
 

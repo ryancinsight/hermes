@@ -181,8 +181,11 @@ impl Drop for ProcessorBinding {
 mod windows {
     use super::{ProcessorBindingError, ProcessorIndex};
     use crate::numa::affinity::{self, GetActiveProcessorCount, GetActiveProcessorGroupCount};
+    use themis::ProcessorGroupAffinity;
 
-    pub(super) use crate::numa::affinity::{restore_on_drop, GroupAffinity, PROCESSORS_PER_GROUP};
+    pub(super) use crate::numa::affinity::{restore_on_drop, GroupAffinity};
+
+    const WINDOWS_PROCESSORS_PER_GROUP: u32 = 64;
 
     #[repr(C)]
     struct ProcessorNumber {
@@ -208,14 +211,14 @@ mod windows {
         // `PROCESSOR_NUMBER`; the API has no failure result.
         unsafe { GetCurrentProcessorNumberEx(core::ptr::addr_of_mut!(processor)) };
         ProcessorIndex::new(
-            u32::from(processor.group) * PROCESSORS_PER_GROUP + u32::from(processor.number),
+            u32::from(processor.group) * WINDOWS_PROCESSORS_PER_GROUP + u32::from(processor.number),
         )
     }
 
     pub(super) fn bind(processor: ProcessorIndex) -> Result<GroupAffinity, ProcessorBindingError> {
-        let raw_group = processor.get() / PROCESSORS_PER_GROUP;
-        let group = u16::try_from(raw_group).map_err(|_| unavailable(processor))?;
-        let number = processor.get() % PROCESSORS_PER_GROUP;
+        let requested = ProcessorGroupAffinity::from_processor(processor.get())
+            .ok_or_else(|| unavailable(processor))?;
+        let group = requested.group();
 
         // SAFETY: these parameter-free queries have no pointer obligations.
         let group_count = unsafe { GetActiveProcessorGroupCount() };
@@ -231,16 +234,13 @@ mod windows {
         if active_count == 0 {
             return Err(platform_error("query active processors in group"));
         }
-        if number >= active_count {
+        if requested.mask().trailing_zeros() >= active_count {
             return Err(unavailable(processor));
         }
-        let Some(mask) = 1usize.checked_shl(number) else {
-            return Err(unavailable(processor));
-        };
 
         // Validation above proves the requested single-bit group affinity is
         // active, so a failure here is a platform fault rather than a bad mask.
-        affinity::bind(&GroupAffinity::new(group, mask))
+        affinity::bind(&GroupAffinity::new(group, requested.mask()))
             .ok_or_else(|| platform_error("bind current thread"))
     }
 
@@ -274,8 +274,6 @@ mod windows {
 mod processor_tests {
     use super::{windows, ProcessorBinding, ProcessorBindingError, ProcessorIndex};
 
-    const PROCESSORS_PER_GROUP: u32 = 64;
-
     #[test]
     fn exact_binding_reports_processor_and_restores_on_drop() {
         let before = windows::thread_affinity().expect("current affinity must be queryable");
@@ -289,15 +287,10 @@ mod processor_tests {
             assert_eq!(ProcessorIndex::current(), Ok(processor));
 
             let exact = windows::thread_affinity().expect("bound affinity must be queryable");
-            assert_eq!(
-                exact.group,
-                u16::try_from(processor.get() / PROCESSORS_PER_GROUP)
-                    .expect("Windows processor groups fit u16")
-            );
-            assert_eq!(
-                exact.mask,
-                1usize << (processor.get() % PROCESSORS_PER_GROUP)
-            );
+            let expected = themis::ProcessorGroupAffinity::from_processor(processor.get())
+                .expect("a live Windows processor has a native affinity mask");
+            assert_eq!(exact.group, expected.group());
+            assert_eq!(exact.mask, expected.mask());
         }
 
         assert_eq!(

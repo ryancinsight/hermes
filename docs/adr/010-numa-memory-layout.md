@@ -35,9 +35,11 @@ history for the driving evidence.
   - **Linux**: Uses `numa_bind` with configured node masks.
   - **Windows**: Uses `SetThreadGroupAffinity` over the node's processor set as
     Themis reports it (`CpuTopology::numa_nodes()[i].processors`,
-    group-flattened as `group * 64 + number`). Hermes owns the mechanism that
-    applies affinity; it does not ask the operating system a second, separate
-    question about node membership.
+    group-flattened as `group * 64 + number`). Themis's
+    `ProcessorAffinityGroups` partitions that set into native masks and selects
+    the deterministic largest group. Hermes owns only active-host validation
+    and the mechanism that applies affinity; it neither reconstructs the masks
+    nor asks the operating system a second question about node membership.
 - Restoring the old affinity mask on drop ensures thread pinning does not leak outside of the compute phase.
 - One `SetThreadGroupAffinity` call names one processor group, so a node whose
   processors span several groups cannot be bound whole. The guard binds the
@@ -67,6 +69,11 @@ history for the driving evidence.
 
 ## Revision history
 
+- 2026-09-01: Route §2's group partitioning, native mask construction, and
+  largest-group tie resolution through Themis for
+  `HS-THEMIS-AFFINITY-CONSUMER-2026-09-01`. Hermes retains the
+  `SetThreadGroupAffinity` lifetime mechanism and intersects the provider value
+  with the live active-group mask before mutation.
 - 2026-09-01: Supersede §2's Windows mechanism for
   `HS-NUMA-BINDING-THEMIS-QUERY-2026-09-01`. `GetNumaNodeProcessorMask` is
   group-unaware — it reports a single group-0 mask and truncates the node index

@@ -42,9 +42,10 @@ the affinity contract again.
 
 Adopt option 4. `ProcessorIndex` is the operating system's logical-processor
 index. On Windows it uses the same stable flattening as the stack's topology
-queries: `group * 64 + processor_number`. `ProcessorBinding::bind` validates
-that group and processor against the active processor-group inventory before
-changing affinity.
+queries: `group * 64 + processor_number`. Themis's
+`ProcessorGroupAffinity::from_processor` converts that index to a native group
+and one-bit mask. `ProcessorBinding::bind` validates the provider value against
+the active processor-group inventory before changing affinity.
 
 The Windows backend uses `SetThreadGroupAffinity`, not the single-group
 `SetThreadAffinityMask`. It records the complete prior `GROUP_AFFINITY`, binds
@@ -86,5 +87,9 @@ and restoration semantics.
 
 ## Revision history
 
+- 2026-09-01: Delegate flattened-index decomposition and native one-bit mask
+  construction to Themis for `HS-THEMIS-AFFINITY-CONSUMER-2026-09-01`.
+  Hermes still owns active-host validation and the thread-bound bind/restore
+  mechanism, preserving the decision's topology-versus-execution boundary.
 - 2026-08-31: Accepted for `HS-EXACT-PROCESSOR-BINDING-2026-08-31`, driven by
   Apollo's 32,768-point comparison variance after release-profile correction.
