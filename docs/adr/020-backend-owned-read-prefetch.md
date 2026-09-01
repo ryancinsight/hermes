@@ -2,7 +2,7 @@
 
 ## Status
 
-Rejected.
+Rejected
 
 ## Context
 

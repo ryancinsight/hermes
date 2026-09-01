@@ -351,11 +351,29 @@
 - **Integrator:** claude-fable session 03d80d33 subagent.
 - **Last update:** 2026-08-31.
 
-## HS-AVX512-EVIDENCE-STANDARD-2026-08-31 — Which evidence standard governs AVX-512 work on AVX-512-less hosts [arch] — todo, needs an owner
+## HS-AVX512-EVIDENCE-STANDARD-2026-08-31 — Which evidence standard governs AVX-512 work on AVX-512-less hosts [arch] — review, awaiting owner ratification
 
-- **Status.** Open decision. **No integrator has ruled.** This item exists so
-  the disagreement is visible on the board instead of implicit in two merged
-  PRs; the session that filed it deliberately did not decide it.
+- **Status.** Adjudicated in
+  [ADR 022](docs/adr/022-unrunnable-isa-evidence-standard.md), filed
+  **Proposed** and **awaiting the owner's ratification**. Status is Proposed
+  rather than Accepted because the ruling sets a precedent binding on another
+  repository; the ADR carries a recommendation, not a survey, and the owner's
+  review is the veto. Until ratified the tree's current state stands unchanged
+  — the ADR ratifies the practice of PRs #98/#100 rather than altering it, so
+  no code moves on ratification either way.
+- **The ruling, in one line.** PR #98's disposition is binding on whether an
+  un-runnable-ISA kernel may *land*; PR #94's principle is binding on what may
+  be *claimed* about it. PR #94's remedy — deleting a correctness-verified
+  kernel for want of timing — is superseded, because deletion destroys verified
+  work and removes the only path by which the timing question is ever answered.
+  A landed-but-unmeasured kernel is **provisional**: when silicon measures it
+  and it loses to the generic default, it is deleted *then*, which is PR #94's
+  remedy applied where the evidence exists.
+- **Blocked consumer.** apollo's `ATLAS-APOLLO-WIDER-ISA-2026-08-28` is the
+  reason this could not stay unruled. Under ADR 022 it unblocks now: it may
+  land AVX-512 record widening on the ADR's section 1 evidence set, must make
+  no speed claim under section 2, and files the section 3 measurement
+  obligation. It does not wait for silicon.
 - **The two precedents, both merged, mutually inconsistent.**
   - PR #94 (`93ba7ce`) *deleted* provisional AVX-512 f32/f64 transpose
     networks, on the stated ground that no controlled real-silicon timing was
@@ -373,16 +391,32 @@
 - **Development host.** Arrow Lake Core Ultra 9 285K, `avx512f: false`. Intel
   SDE emulation runs the paths for *correctness* in CI; it produces no timing
   evidence, so it does not settle the question either way.
-- **What a ruling must fix.** Which of the two standards governs; whether SDE
-  correctness coverage plus symbolic verification is a sufficient landing
-  standard for an AVX-512-only path, or whether such work parks until hosted
-  AVX-512 silicon is available; and what PR #94's deleted networks should have
-  done under the winning standard. The outcome is an ADR that both precedents
-  then cite.
+- **What the ruling fixed**, against the four questions the item posed:
+  1. *Required to land* — validated symbolic model of every intrinsic, the
+     per-backend property and bit-exactness laws instantiated so `test-avx512-sde`
+     runs the real encodings, codegen inspection of instruction budget, feature
+     budget, and bounds elision, and a warning-denied compile. Where the ISA is
+     not emulable — AMX, whose tile-data permission SDE passes to the host
+     kernel — the kernel does **not** land.
+  2. *May not be claimed* — any performance claim whatsoever. Permitted
+     characterization is "canonical lowering, correctness-equivalent to the
+     default, speed unmeasured". Adjacent runnable-path figures may be reported
+     only as a cost of the default, never of the changed path.
+  3. *Disposition* — ships ungated on `main`, never behind a cargo feature and
+     never held out of tree, carrying the CHANGELOG limit statement, a standing
+     measurement item, and provisional status.
+  4. *Grandfathering* — the f64 network (#98) and f32 16x16 (#100) already meet
+     the landing standard, which was written from what they supplied; they owe
+     only the standing measurement item. PR #94's deleted networks are not
+     restored, having never been verified to that standard.
+- **On ratification.** The deliverable is the standing AVX-512 measurement item
+  required by ADR 022 section 3, with `test-avx512-hosted` landing on a hosted
+  runner reporting `avx512f` as its re-open trigger. Filing it before
+  ratification would presume the ruling.
 - **Non-goals.** Not a re-measurement item and not a request to acquire
   hardware — it is a standards ruling. The affected code is already merged and
   is not blocked on this.
-- **Dependencies.** None. **Lease:** none. **Last update:** 2026-08-31.
+- **Dependencies.** None. **Lease:** none. **Last update:** 2026-09-01.
 
 ## HS-AVX512-TRANSPOSE-2026-08-28 — AVX-512 square-tile transpose [patch] — done 2026-08-28
 
