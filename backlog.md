@@ -1,5 +1,12 @@
 # Backlog — hermes-simd
 
+## HS-REAL-COMPLEX-DOT-2026-09-01 — Dot real samples with interleaved complex weights [minor] [perf] — in progress
+
+- **Outcome.** Add one allocation-free generic dot kernel for `sum(real[k] * complex[k])`, selected through the existing scalar/native runtime ladder, so Apollo Mellin can delete its retained `[sample, 0]` materialization and halve real-operand lane traffic in every forward-spectrum row.
+- **Scope / non-goals.** Confine source to the existing complex dispatch family, sealed runtime trait, tests, isolated benchmark, public exports, and synchronized docs/PM. Preserve current interleaved complex multiply/dot behavior, backend selection, accumulation order within each backend, `no_std`, and every unrelated kernel.
+- **Acceptance.** Reject unless the complex-weight slice has exactly twice the real length before work; handle empty and ragged SIMD tails; prove f32/f64 scalar/native results against an independent scalar oracle; inspect target-feature codegen; pass host/AArch64, debug/release, Miri, Rustdoc/doctest, SemVer, standalone-lock, format/diff, and independent review. The additive surface merges only with a measured Apollo consumer.
+- **Risk / dependency.** [minor] [perf]. Consumer: Apollo `ATLAS-APOLLO-MELLIN-REAL-COMPLEX-DOT-2026-09-01`. Integrator `/root`; lease `/root` on complex dispatch/tests/bench/lib exports and this item's PM/doc hunks. Last update 2026-09-01.
+
 ## HS-COMPLEX-TRANSPOSE-2026-08-31 — Register-resident complex square transpose [minor] [perf] — done 2026-09-01
 
 - **Delivery:** provider `42a0d4c`; PR #111 merged without squash as `9ac23fa4`; lease none.

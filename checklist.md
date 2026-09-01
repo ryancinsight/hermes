@@ -1,5 +1,16 @@
 # Checklist — active sprint
 
+## HS-REAL-COMPLEX-DOT-2026-09-01 [minor] [perf]
+
+- [ ] Pin the exact `weights.len() == 2 * real.len()` preflight, empty/ragged
+      behavior, and f32/f64 scalar/native differential oracle.
+- [ ] Add one complex-family kernel and runtime trait method without new backend
+      selection, allocation, unsafe code, or per-element capability probes.
+- [ ] Compare the primitive against Apollo's materialize-plus-complex-dot shape;
+      retain it only if two complete Apollo forward-spectrum comparisons improve.
+- [ ] Pass exact provider/consumer gates, independent review, and merge without
+      squash; otherwise remove the candidate and record the negative result.
+
 ## HS-COMPLEX-TRANSPOSE-2026-08-31 [minor] [perf]
 
 - [x] Pin the pair-preserving transpose contract across every shipped backend
