@@ -297,6 +297,16 @@ without a consumer requiring it. Host value tests, AArch64 Windows std/no-std
 strict-warning builds, and optimized x86 codegen establish the dispatch
 contract; native AArch64 execution remains hosted-CI evidence.
 
+Apollo's later planar-combine path exposed a narrower ownership distinction:
+the consumer already has an allocation-free scalar loop, so allowing
+`vectorize_lanes` to instantiate `ScalarArch` carried a second portable
+implementation that the AVX2 f32 route never executed. The additive
+`vectorize_hardware_lanes` entry reuses the same native exact-width ladder and
+declines before `ScalarArch`. The unchanged local optimized benchmark executable
+shrinks 8,192,512 to 8,184,832 bytes. Two processor-pinned N=64/N=256 timing
+pairs overlap or regress slightly, so the result establishes linked code-size
+reduction, not a resolution of Apollo PR #219's hosted latency regression.
+
 ### Cross-lane throughput confirmation — 2026-08-26
 
 The same-binary lane instrument now compares the shared f32/f64 interleave and

@@ -6,6 +6,16 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [minor][HS-HARDWARE-LANE-DISPATCH] Add
+  `vectorize_hardware_lanes::<LANES, T, K>` for consumers that already own a
+  scalar fallback. It shares the exact AVX-512/AVX2/NEON selection ladder with
+  `vectorize_lanes` but declines before instantiating or invoking the portable
+  fixed-array backend. Existing widest and portable-fallback dispatch remain
+  unchanged. Apollo's planar-combine consumer removes 7,680 bytes from the
+  local optimized benchmark executable (8,192,512 to 8,184,832 bytes); two
+  pinned timing pairs do not establish a latency change, so this is a linked
+  code-size result only. See [ADR 018](docs/adr/018-exact-lane-consumer-dispatch.md).
+
 - [minor][HS-EXACT-PROCESSOR-BINDING] Add `ProcessorIndex` and the
   allocation-free, thread-bound `ProcessorBinding` guard. On Windows the guard
   validates the flattened processor-group index before mutation, binds the

@@ -174,13 +174,26 @@ pub trait LaneScalar: Scalar {
     #[doc(hidden)]
     fn run_lane_kernel<K: LaneKernel<Self>>(kernel: K) -> K::Output;
 
-    /// Enters the dispatch ladder at an exact native lane count.
+    /// Enters the dispatch ladder at an exact lane count.
     ///
     /// Call [`vectorize_lanes`] instead. The default preserves compatibility
     /// for downstream implementations while Hermes' sealed scalar set
     /// overrides it with the native dispatch ladder.
     #[doc(hidden)]
     fn run_lane_kernel_for<const LANES: usize, K: LaneKernel<Self>>(
+        kernel: K,
+    ) -> Option<K::Output> {
+        let _ = kernel;
+        None
+    }
+
+    /// Enters the hardware-only dispatch ladder at an exact lane count.
+    ///
+    /// Call [`vectorize_hardware_lanes`] instead. The default declines for
+    /// downstream implementations; Hermes' sealed scalar set overrides it
+    /// with the native ISA ladder.
+    #[doc(hidden)]
+    fn run_hardware_lane_kernel_for<const LANES: usize, K: LaneKernel<Self>>(
         kernel: K,
     ) -> Option<K::Output> {
         let _ = kernel;
@@ -202,6 +215,13 @@ macro_rules! impl_lane_scalar {
                     kernel: K,
                 ) -> Option<K::Output> {
                     dispatch_lane_count::<$t, K, LANES>(kernel)
+                }
+
+                #[inline(always)]
+                fn run_hardware_lane_kernel_for<const LANES: usize, K: LaneKernel<Self>>(
+                    kernel: K,
+                ) -> Option<K::Output> {
+                    dispatch_hardware_lane_count::<$t, K, LANES>(kernel).ok()
                 }
             }
         )+
@@ -263,6 +283,48 @@ pub fn vectorize_lanes<const LANES: usize, T: LaneScalar, K: LaneKernel<T>>(
     T::run_lane_kernel_for::<LANES, K>(kernel)
 }
 
+/// Runs `kernel` on the widest hardware backend with exactly `LANES` lanes.
+///
+/// This differs from [`vectorize_lanes`] only when no ISA backend has the
+/// requested width but Hermes' portable fixed-array backend does. In that
+/// case this entry returns `None` without invoking `kernel`, allowing a
+/// consumer to keep one scalar fallback outside the generic lane kernel rather
+/// than monomorphizing a second emulated vector body. Existing widest-native
+/// [`vectorize`] and portable-fallback [`vectorize_lanes`] behavior is
+/// unchanged.
+///
+/// Selection and feature detection occur once at the operation boundary. A
+/// returned `Some` always means the kernel ran inside a runtime-proven
+/// AVX-512, AVX2, or NEON target-feature scope.
+///
+/// # Examples
+///
+/// ```
+/// use hermes_simd::{
+///     vectorize_hardware_lanes, LaneKernel, Simd, SimdArch, SimdKernel,
+///     SimdStorage,
+/// };
+///
+/// struct LaneCount;
+///
+/// impl LaneKernel<f64> for LaneCount {
+///     type Output = usize;
+///
+///     fn call<A: SimdArch + SimdKernel<f64>>(self, _: Simd<f64, A>) -> usize {
+///         <A as SimdStorage<f64>>::LANE_COUNT
+///     }
+/// }
+///
+/// // No Hermes hardware backend has zero lanes, so the kernel is not called.
+/// assert_eq!(vectorize_hardware_lanes::<0, f64, _>(LaneCount), None);
+/// ```
+#[inline(always)]
+pub fn vectorize_hardware_lanes<const LANES: usize, T: LaneScalar, K: LaneKernel<T>>(
+    kernel: K,
+) -> Option<K::Output> {
+    T::run_hardware_lane_kernel_for::<LANES, K>(kernel)
+}
+
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[inline(always)]
 fn dispatch_lane_count<T, K, const LANES: usize>(kernel: K) -> Option<K::Output>
@@ -273,24 +335,10 @@ where
     Avx2: SimdKernel<T>,
     ScalarArch: SimdKernel<T>,
 {
-    if <Avx512 as SimdStorage<T>>::LANE_COUNT == LANES && Avx512::is_runtime_supported() {
-        // SAFETY: the lane-count check selects this backend and the runtime
-        // probe proves AVX-512F support before entering its target scope.
-        return Some(unsafe { call_avx512(kernel) });
-    }
-    if <Avx2 as SimdStorage<T>>::LANE_COUNT == LANES && Avx2::is_runtime_supported() {
-        if <Avx2 as SimdStorage<T>>::REQUIRES_F16C {
-            if avx2_f16c_available() {
-                // SAFETY: the architecture probe proves AVX2 and FMA; the
-                // scalar-specific probe additionally proves F16C.
-                return Some(unsafe { call_avx2_f16c(kernel) });
-            }
-        } else {
-            // SAFETY: the architecture probe proves ordinary AVX2 and FMA
-            // support; this scalar does not require the extended F16C frame.
-            return Some(unsafe { call_avx2(kernel) });
-        }
-    }
+    let kernel = match dispatch_hardware_lane_count::<T, K, LANES>(kernel) {
+        Ok(output) => return Some(output),
+        Err(kernel) => kernel,
+    };
     // The fallback body still benefits from the wide frame. `ScalarArch`
     // stores its lanes as a small fixed array and operates on them
     // element-wise, which LLVM vectorizes readily — but only into whatever the
@@ -323,6 +371,36 @@ where
     dispatch_scalar::<T, K, LANES>(kernel)
 }
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[inline(always)]
+fn dispatch_hardware_lane_count<T, K, const LANES: usize>(kernel: K) -> Result<K::Output, K>
+where
+    T: Avx2FrameScalar,
+    K: LaneKernel<T>,
+    Avx512: SimdKernel<T>,
+    Avx2: SimdKernel<T>,
+{
+    if <Avx512 as SimdStorage<T>>::LANE_COUNT == LANES && Avx512::is_runtime_supported() {
+        // SAFETY: the lane-count check selects this backend and the runtime
+        // probe proves AVX-512F support before entering its target scope.
+        return Ok(unsafe { call_avx512(kernel) });
+    }
+    if <Avx2 as SimdStorage<T>>::LANE_COUNT == LANES && Avx2::is_runtime_supported() {
+        if <Avx2 as SimdStorage<T>>::REQUIRES_F16C {
+            if avx2_f16c_available() {
+                // SAFETY: the architecture probe proves AVX2 and FMA; the
+                // scalar-specific probe additionally proves F16C.
+                return Ok(unsafe { call_avx2_f16c(kernel) });
+            }
+        } else {
+            // SAFETY: the architecture probe proves ordinary AVX2 and FMA
+            // support; this scalar does not require the extended F16C frame.
+            return Ok(unsafe { call_avx2(kernel) });
+        }
+    }
+    Err(kernel)
+}
+
 /// The scalar fallback, compiled inside the AVX2 frame.
 ///
 /// Identical to [`dispatch_scalar`] in every observable way — same backend,
@@ -350,12 +428,26 @@ where
     Neon: SimdKernel<T>,
     ScalarArch: SimdKernel<T>,
 {
+    match dispatch_hardware_lane_count::<T, K, LANES>(kernel) {
+        Ok(output) => Some(output),
+        Err(kernel) => dispatch_scalar::<T, K, LANES>(kernel),
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+#[inline(always)]
+fn dispatch_hardware_lane_count<T, K, const LANES: usize>(kernel: K) -> Result<K::Output, K>
+where
+    T: Scalar,
+    K: LaneKernel<T>,
+    Neon: SimdKernel<T>,
+{
     if <Neon as SimdStorage<T>>::LANE_COUNT == LANES && Neon::is_runtime_supported() {
         // SAFETY: NEON is mandatory on AArch64; the runtime probe preserves
         // the same capability boundary used by every other backend.
-        return Some(unsafe { call_neon(kernel) });
+        return Ok(unsafe { call_neon(kernel) });
     }
-    dispatch_scalar::<T, K, LANES>(kernel)
+    Err(kernel)
 }
 
 #[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
@@ -367,6 +459,16 @@ where
     ScalarArch: SimdKernel<T>,
 {
     dispatch_scalar::<T, K, LANES>(kernel)
+}
+
+#[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
+#[inline(always)]
+fn dispatch_hardware_lane_count<T, K, const LANES: usize>(kernel: K) -> Result<K::Output, K>
+where
+    T: Scalar,
+    K: LaneKernel<T>,
+{
+    Err(kernel)
 }
 
 #[inline(always)]
