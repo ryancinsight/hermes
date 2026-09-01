@@ -258,6 +258,8 @@ pub use dispatch::{
     max,
     min,
     ntt_butterfly_stage_u64,
+    real_interleaved_complex_dot,
+    real_interleaved_complex_dot_runtime,
     real_mul_to_interleaved_complex,
     real_mul_to_interleaved_complex_runtime,
     // Generic free functions — the primary public API.

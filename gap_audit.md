@@ -4,6 +4,25 @@ Persistent gap register. Evidence tiers follow the repository instruction
 hierarchy: machine-checked proof > type-level invariant > property/fuzz >
 differential/empirical > source audit.
 
+## Real samples by interleaved complex weights (2026-09-01)
+
+Resolved by `HS-REAL-COMPLEX-DOT-2026-09-01`. The complex family previously
+required consumers to materialize each real input as `[sample, 0]` before a
+complex dot product. The new generic/runtime operation validates one complex
+weight per real sample, preserves explicit target safety and ragged tails, and
+uses the existing scalar/native dispatch ladder without heap allocation.
+
+Apollo Mellin removes the corresponding 2N-lane f64 scratch role, or 16N
+retained bytes per active worker. A fresh-thread first-use census observes only
+the remaining 2N weight-lane allocation and matches an independent scalar sum.
+Two controlled same-provider public-plan pairs improve N = 128 by 1.96%/1.49%
+and N = 256 by 1.46%/0.83%; the N = 64 control moves -0.28%/+0.82%. Evidence is
+local Windows AVX2 only; AArch64 is compile-checked, not benchmarked. Provider
+head `59c89431` merged through PR #113 as `2e993503`; hosted run `33492225619`
+passes every repository gate, including the bounded benchmark suite. Follow-up
+documentation correction `e5b9e7d` is under exact review and hosted validation
+on PR #114; closure remains pending until that revision merges.
+
 ## NUMA generation-counter test isolation (2026-08-25)
 
 Evidence tier: reproduced failure plus source audit. Found incidentally while

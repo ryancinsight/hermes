@@ -249,6 +249,13 @@ macro_rules! impl_simd_ops_methods {
             )
         }
         #[inline(always)]
+        fn real_interleaved_complex_dot(
+            real: &[Self],
+            weights: &[Self],
+        ) -> Result<(Self, Self), SimdError> {
+            complex::dispatch_real_interleaved_complex_dot::<Self>(real, weights)
+        }
+        #[inline(always)]
         fn reduce_popcount(data: &[Self]) -> usize {
             dispatch_reduce_popcount::<Self>(data)
         }

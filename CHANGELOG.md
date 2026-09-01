@@ -17,6 +17,16 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   4,096-element medians of 2.466/2.519 us versus 805.02/852.72 ns
   (67.4%/66.1% lower). These are provider-kernel results; Apollo STFT adoption
   remains gated on unchanged full-path measurements.
+- \[minor\]\[HS-REAL-COMPLEX-DOT\] Add the allocation-free
+  `real_interleaved_complex_dot` generic and runtime entries plus the sealed
+  `SimdOps` method. The operation validates one complex weight per real sample
+  before unsafe kernel entry, and explicit architecture selection rejects an
+  unsupported processor at the same boundary. Apollo Mellin removes one retained
+  2N-lane f64 materialization buffer per active worker (16N bytes): controlled
+  same-provider pairs reduce its unchanged N = 128 public forward-spectrum
+  median by 1.96%/1.49% and N = 256 by 1.46%/0.83%, while the N = 64 control
+  moves -0.28%/+0.82%. See
+  [ADR 004](docs/adr/004-generic-interleaved-complex-kernels.md).
 
 - [minor][HS-COMPLEX-TRANSPOSE] Add
   `ComplexReg::transpose_square` for allocation-free, pair-preserving

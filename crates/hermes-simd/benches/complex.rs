@@ -2,6 +2,7 @@
 //!
 //! Groups (runtime-dispatched backend vs always-available `Scalar` backend):
 //! - `complex_dot`: interleaved complex dot product.
+//! - `real_complex_dot`: real samples against interleaved complex weights.
 //! - `complex_mul_assign`: in-place interleaved complex multiply.
 //! - `real_mul_interleave`: real multiply into interleaved complex storage,
 //!   compared with the prior copy/multiply/interleave materialization shape.
@@ -15,7 +16,7 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use hermes_simd::{
     elementwise_mul, interleaved_complex_dot, interleaved_complex_dot_runtime,
     interleaved_complex_mul_assign, interleaved_complex_mul_assign_runtime,
-    real_mul_to_interleaved_complex_runtime, Scalar,
+    real_interleaved_complex_dot_runtime, real_mul_to_interleaved_complex_runtime, Scalar,
 };
 
 const PAIR_SIZES: &[usize] = &[256, 1024, 4096, 16384];
@@ -28,6 +29,18 @@ fn make_inputs(pairs: usize) -> (Vec<f64>, Vec<f64>) {
         .map(|i| ((i % 13) as f64) * 0.5 - 3.0)
         .collect();
     (a, b)
+}
+
+fn make_real_input(pairs: usize) -> (Vec<f64>, Vec<f64>) {
+    let real = (0..pairs)
+        .map(|i| ((i % 17) as f64) * 0.25 - 2.0)
+        .collect::<Vec<_>>();
+    let mut interleaved = Vec::with_capacity(pairs * 2);
+    for &value in &real {
+        interleaved.push(value);
+        interleaved.push(0.0);
+    }
+    (real, interleaved)
 }
 
 fn bench_complex_dot(c: &mut Criterion) {
@@ -45,6 +58,42 @@ fn bench_complex_dot(c: &mut Criterion) {
                 interleaved_complex_dot::<f64, Scalar, false>(black_box(&a), black_box(&b)).unwrap()
             });
         });
+    }
+    group.finish();
+}
+
+fn bench_real_complex_dot(c: &mut Criterion) {
+    let mut group = c.benchmark_group("real_complex_dot");
+    for &pairs in PAIR_SIZES {
+        group.throughput(Throughput::Elements(pairs as u64));
+        let (real, interleaved) = make_real_input(pairs);
+        let (_, weights) = make_inputs(pairs);
+        group.bench_with_input(
+            BenchmarkId::new("materialized_runtime", pairs),
+            &pairs,
+            |bench, _| {
+                bench.iter(|| {
+                    interleaved_complex_dot_runtime::<f64, false>(
+                        black_box(&interleaved),
+                        black_box(&weights),
+                    )
+                    .unwrap()
+                });
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("real_runtime", pairs),
+            &pairs,
+            |bench, _| {
+                bench.iter(|| {
+                    real_interleaved_complex_dot_runtime::<f64>(
+                        black_box(&real),
+                        black_box(&weights),
+                    )
+                    .unwrap()
+                });
+            },
+        );
     }
     group.finish();
 }
@@ -147,6 +196,7 @@ fn bench_real_mul_interleave(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_complex_dot,
+    bench_real_complex_dot,
     bench_complex_mul_assign,
     bench_real_mul_interleave
 );

@@ -71,6 +71,16 @@ instruction operand type and emit no data movement. Other backends retain the
 allocation-free default until a consumer measurement justifies another native
 network.
 
+Revision 2026-09-01: `real_interleaved_complex_dot` extends the same family for
+`sum(real[k] * complex[k])` without first materializing `[real[k], 0]` lanes.
+The public boundary proves `weights.len() == 2 * real.len()` with checked
+arithmetic. Explicit architecture selection also proves the requested backend
+is available before entering the private unsafe kernel; runtime dispatch uses
+the existing single capability probe. Each SIMD iteration loads N real lanes,
+interleaves the register with itself, multiplies it by two interleaved-complex
+weight registers, and accumulates adjacent real/imaginary lanes. The scalar
+remainder handles every ragged tail without heap allocation.
+
 ## Consequences
 
 - Any present or future `Scalar` type with `BackendKernel` impls gets vectorized
@@ -90,3 +100,10 @@ network.
   f32 N = 96 complete-path median from 222.935 ns at entry to
   128.429/128.359 ns in two adjacent runs. The provider number establishes the
   primitive specialization; the consumer number remains Apollo-owned evidence.
+- Apollo Mellin no longer retains its 2N-lane real-materialization scratch
+  buffer. A fresh-thread first-use census observes one allocation for the
+  remaining 2N interleaved-weight buffer and matches an independent scalar
+  complex sum. Two controlled same-provider pairs reduce the unchanged public
+  N = 128 median by 1.96%/1.49% and N = 256 by 1.46%/0.83%; the below-threshold
+  N = 64 control moves -0.28%/+0.82%. These are local Windows AVX2 results, not
+  cross-machine throughput claims.

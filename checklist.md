@@ -14,6 +14,21 @@
       improve while values and zero-allocation behavior remain unchanged.
 - [ ] Pass exact provider/consumer local and hosted gates, complete independent
       review, and merge both repositories without squash.
+## HS-REAL-COMPLEX-DOT-2026-09-01 [minor] [perf]
+
+- [x] Pin the exact `weights.len() == 2 * real.len()` preflight, empty/ragged
+      behavior, and f32/f64 scalar/native differential oracle.
+- [x] Add one complex-family kernel and runtime trait method without new backend
+      selection, allocation, public unsafe surface, or per-element capability
+      probes; guard explicit architecture selection before the private kernel.
+- [x] Compare the primitive against Apollo's materialize-plus-complex-dot shape;
+      two controlled same-provider pairs improve N = 128/256 with mixed,
+      sub-1% N = 64 control movement, and the first-use census proves one
+      retained weight buffer instead of two buffers.
+- [x] Pass provider/consumer gates and merge source head `59c89431` through PR
+      #113 as `2e993503`; source hosted run `33492225619` passes every gate.
+- [ ] Pass independent review and every hosted gate for documentation correction
+      `e5b9e7d`, then merge PR #114 and discharge the PM lease.
 
 ## HS-COMPLEX-TRANSPOSE-2026-08-31 [minor] [perf]
 
