@@ -1,6 +1,33 @@
 # Backlog — hermes-simd
 
-## HS-REAL-WINDOW-INTERLEAVE-2026-09-01 — Fuse real windowing into complex layout [minor] [perf] — in progress
+## HS-REAL-WINDOW-INTERLEAVE-2026-09-01 — Fuse real windowing into complex layout [minor] [perf] — provider delivered; consumer closure open
+
+- **Delivery state (2026-09-01).** Provider source `c42571d` merged through PR
+  #115 as `3c6feb4`, without squash. Collected by Claude session 03d80d33 under
+  the stale-claim rule: the branch carried three commits with no PR for ~8
+  hours, past the staleness bound. Takeover completed the work rather than
+  restarting it; the commits are unmodified and authorship is unchanged.
+- **Provider evidence.** fmt clean; `clippy --workspace --all-targets -D
+  warnings` clean; `nextest --workspace` 536/536; workspace doctests 0 (none at
+  the root, as in CI); `cargo doc --no-deps --workspace` clean under
+  `RUSTDOCFLAGS=-D warnings`; `--no-default-features` check clean;
+  `--examples --workspace` clean.
+- **Falsifiability.** The new tests were proven to bite rather than accepted on
+  a green run: swapping the `low`/`high` store order in the SIMD main loop
+  fails `real_mul_to_interleaved_complex_covers_full_and_ragged_vectors` and
+  `..._preserves_native_f32_arithmetic` with value-semantic assertions
+  (`left: -1.0, right: 3.0`), confirming the vector path is covered and not
+  only the scalar tail. The perturbation was reverted and the suite re-run
+  green.
+- **Remaining — consumer closure.** Apollo STFT must prove equal values, remove
+  both retained scratch roles, retain zero warm allocation, and improve two
+  unchanged full-STFT measurements. Not started: Apollo is at its two-tree cap
+  with both trees held by live leases. The provider operation is additive and
+  changes no existing caller, so it ships independently of that closure.
+  **Re-open trigger:** Apollo tree capacity.
+- **Lease:** none. **Last-update:** 2026-09-01.
+
+### Original item
 
 - **Outcome.** Add one allocation-free Hermes operation that multiplies equal-length real input/window slices and writes interleaved complex output as `[input[i] * window[i], 0]`, allowing Apollo STFT to delete its two per-worker scratch buffers and three-pass large-frame preparation.
 - **Scope / non-goals.** Confine Hermes source to the canonical dispatch family, public export, value/error/allocation tests, and a pinned benchmark. Preserve native `T` arithmetic, exact output order, runtime ISA safety, existing operations, and `no_std`; reject Apollo adoption unless two unchanged full-STFT comparisons improve. Do not change FFT arithmetic, frame scheduling, windows, workloads, assertions, or timeouts.
