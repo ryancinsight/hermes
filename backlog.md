@@ -1,5 +1,39 @@
 # Backlog — hermes-simd
 
+## HS-COMPLEX-TRANSPOSE-2026-08-31 — Register-resident complex square transpose [minor] [perf] — review
+
+- **Outcome.** Add one pair-preserving square-transpose operation to
+  `ComplexReg`, allowing fixed complex codelets to change radix orientation
+  without storing their register tile through scalar memory.
+- **Scope / non-goals.** Extend the existing permutation role, its safe
+  `ComplexReg` vocabulary, native AVX2 f32 implementation, portable default,
+  tests, ADR 004, and capability benchmark. Do not expose architecture types,
+  add a general dynamic shuffle, or change existing lane/scalar transposes.
+- **Acceptance.** A `COMPLEX_COUNT × COMPLEX_COUNT` tile transposes exact
+  interleaved samples for every shipped scalar/backend; invalid tile lengths
+  fail before backend entry; the AVX2 f32 route is an in-register shuffle
+  network with no memory probe or allocation; Apollo's unchanged N=96
+  instrument establishes whether the primitive closes the measured DFT-32
+  row bottleneck. Unsupported/native-unmeasured backends retain the correct
+  allocation-free default.
+- **Risk / dependencies.** [minor] [perf]. Driven by Apollo's exact processor-2
+  N=96 phase probe: f32 spends 157.18 ns of a 213.45 ns codelet in three
+  DFT-32 rows; planar cross-row, iterative, and bit-reversed resident
+  candidates lose at 193.51, 240.80, and 368.21 ns respectively. Promotion is
+  conditional on the pair-preserving transpose plus radix-4×8 codelet winning
+  the unchanged consumer comparison.
+- **Candidate evidence.** Exact sample-pair and involution oracles pass for the
+  scalar, AVX2, AVX-512, and f32/f64 monomorphizations; the safe wrapper rejects
+  the wrong row count. Criterion reports 2.857 ns for native AVX2 f32 versus
+  98.242 ns for the forced generic default on a Core Ultra 9 285K. Apollo's
+  unchanged processor-2 comparison reduces f32 N = 96 from the 222.935 ns entry
+  median to 128.429/128.359 ns in two adjacent runs while f64 and N = 64/128
+  controls retain their established bands. Provider source `42a0d4c` passes
+  formatting, warning-denied host and AArch64 checks, focused 112/112 and release
+  420/420 Nextest, 5/5 doctests, and warning-denied Rustdoc. Hosted review and
+  merge remain open.
+- **Integrator / lease:** `/root`; lease none. Last update 2026-09-01.
+
 ## HS-HARDWARE-LANE-DISPATCH-2026-09-01 — Exact width without portable emulation [minor] [perf] — review
 
 - **Outcome.** Add one public exact-width entry that selects only real ISA

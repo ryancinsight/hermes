@@ -55,6 +55,22 @@ NEON f32/f64 override the primitives with `vrev64q_f32` / `vextq_f64`
 `fmaddsub`). Compile-verified against `aarch64-unknown-linux-gnu`; runtime
 differential validation on aarch64 hardware remains outstanding.
 
+Revision 2026-08-31: register-resident mixed-radix codelets also need to
+transpose a square tile while treating each adjacent `[re, im]` pair as one
+indivisible sample. `SimdPermute::transpose_interleaved_square` extends the
+same sealed backend seam with that operation. The portable default swaps
+symmetric complex pairs through two fixed stack row buffers; it performs no
+heap allocation. `ComplexReg::transpose_square` is the safe public vocabulary:
+it checks the exact `COMPLEX_COUNT` row count before backend entry and casts
+only through the two transparent register wrappers.
+
+AVX2 f32 overrides the default with the four-register `4 x 4` complex network:
+`vperm2f128` joins row halves, then `vunpcklpd` / `vunpckhpd` move complete
+64-bit complex pairs. The casts between `__m256` and `__m256d` change only the
+instruction operand type and emit no data movement. Other backends retain the
+allocation-free default until a consumer measurement justifies another native
+network.
+
 ## Consequences
 
 - Any present or future `Scalar` type with `BackendKernel` impls gets vectorized
@@ -67,3 +83,10 @@ differential validation on aarch64 hardware remains outstanding.
 - Measured on Core Ultra 9 285K (AVX2+FMA), 65 536 complex `f64` pairs,
   release profile: dot 47.3 ms vs 74.9 ms scalar (1.58×), mul_assign 78.2 ms
   vs 126.2 ms (1.61×) per 2 000 iterations (`examples/complex_dot.rs`).
+- On the same machine, the bounded `permute` Criterion instrument reports
+  2.857 ns for AVX2 f32's native four-register complex transpose versus
+  98.242 ns when the exact implementation is compiled through the portable
+  default. Apollo's separate unchanged processor-2 comparison then reduces its
+  f32 N = 96 complete-path median from 222.935 ns at entry to
+  128.429/128.359 ns in two adjacent runs. The provider number establishes the
+  primitive specialization; the consumer number remains Apollo-owned evidence.

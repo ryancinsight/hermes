@@ -57,6 +57,17 @@ pub trait SimdPermute<T: Scalar>: SimdStorage<T> + Sealed {
     /// exactly `LANE_COUNT` vectors.
     unsafe fn transpose_square(tile: &mut [Self::Vector]);
 
+    /// Transposes a square tile of interleaved complex registers in place.
+    ///
+    /// Each vector is one row of `LANE_COUNT / 2` complex samples. Sample
+    /// `(r, c)` moves to `(c, r)` while its adjacent real/imaginary lanes stay
+    /// paired.
+    ///
+    /// # Safety
+    /// The backend's target features must be available; `tile` must hold
+    /// exactly `LANE_COUNT / 2` vectors.
+    unsafe fn transpose_interleaved_square(tile: &mut [Self::Vector]);
+
     /// Duplicates each even lane into its adjacent odd lane.
     ///
     /// # Safety
@@ -112,6 +123,10 @@ impl<T: Scalar, A: BackendKernel<T>> SimdPermute<T> for A {
 
     unsafe fn transpose_square(tile: &mut [Self::Vector]) {
         <A as BackendKernel<T>>::transpose_square(tile);
+    }
+
+    unsafe fn transpose_interleaved_square(tile: &mut [Self::Vector]) {
+        <A as BackendKernel<T>>::transpose_interleaved_square(tile);
     }
 
     unsafe fn dup_even(v: Self::Vector) -> Self::Vector {
