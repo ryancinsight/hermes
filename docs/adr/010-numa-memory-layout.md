@@ -26,10 +26,23 @@ adapter:
 
 ### 2. Thread Affinity Binding
 
+Revision 2026-09-01: the Windows mechanism recorded here originally read the
+node's processor mask from `GetNumaNodeProcessorMask` and applied it with
+`SetThreadAffinityMask`. Both halves are superseded below; see the revision
+history for the driving evidence.
+
 - `NumaBinding` acts as an RAII guard that temporarily pins the executing thread to a specific NUMA node.
   - **Linux**: Uses `numa_bind` with configured node masks.
-  - **Windows**: Uses `SetThreadAffinityMask` using masks retrieved from `GetNumaNodeProcessorMask`.
+  - **Windows**: Uses `SetThreadGroupAffinity` over the node's processor set as
+    Themis reports it (`CpuTopology::numa_nodes()[i].processors`,
+    group-flattened as `group * 64 + number`). Hermes owns the mechanism that
+    applies affinity; it does not ask the operating system a second, separate
+    question about node membership.
 - Restoring the old affinity mask on drop ensures thread pinning does not leak outside of the compute phase.
+- One `SetThreadGroupAffinity` call names one processor group, so a node whose
+  processors span several groups cannot be bound whole. The guard binds the
+  group holding the largest share of the node and reports the shortfall through
+  `NumaBindingCoverage`, rather than truncating silently.
 
 ### 3. Memory Residency Verification
 
@@ -51,3 +64,17 @@ adapter:
 - There is no direct Hermes OS allocation fallback; allocation ownership stays
   with Mnemosyne or the configured allocator path.
 - Runtime routing mitigates performance degradation caused by incorrect tensor allocation placement.
+
+## Revision history
+
+- 2026-09-01: Supersede §2's Windows mechanism for
+  `HS-NUMA-BINDING-THEMIS-QUERY-2026-09-01`. `GetNumaNodeProcessorMask` is
+  group-unaware — it reports a single group-0 mask and truncates the node index
+  to `u8` — so on a host with more than 64 processors it disagreed with the
+  node membership Themis parses from `GetLogicalProcessorInformationEx`. Two
+  answers to one question is the defect; this ADR's own §1 already assigns
+  processor maps to Themis, and ADR 021 had already adopted
+  `SetThreadGroupAffinity` for the exact-processor guard while §2 still named
+  the single-group call. The query moves to Themis and the mechanism aligns
+  with ADR 021; ownership is unchanged, so ADR 021's mechanism-versus-policy
+  split stands as written.
