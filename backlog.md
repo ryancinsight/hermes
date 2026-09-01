@@ -1,5 +1,32 @@
 # Backlog — hermes-simd
 
+## HS-NUMA-BINDING-THEMIS-QUERY-2026-09-01 [patch] — todo
+
+- **Finding (stack audit 2026-09-01):** `crates/hermes-simd-core/src/numa/
+  binding.rs` `NumaBinding::bind` asks the OS for the node's processor mask
+  itself, via the legacy `GetNumaNodeProcessorMask(node as u8, *mut u64)`,
+  then binds with single-group `SetThreadAffinityMask`. themis already
+  publishes the same table as `topology.numa_nodes()[i].processors`,
+  group-flattened as `group * 64 + number`.
+- **Why it matters:** two answers to one question that disagree on real
+  hardware. The legacy API is group-unaware (group 0, at most 64 processors)
+  and truncates `node` to `u8`; themis's Windows backend parses
+  `GetLogicalProcessorInformationEx`. On a >64-processor host they diverge.
+- **The recorded rationale is stale, not protective:** ADR 010 endorses the
+  `GetNumaNodeProcessorMask` choice, while ADR 021 in this same repo already
+  argues the single-group path is wrong. Update ADR 010 §2 in the same change
+  rather than leaving the two records contradicting each other.
+- **Layering is fine:** `hermes-simd-core` already carries an unconditional
+  `themis` dependency; this removes a query, not adds an edge.
+- **Note the coverage gap:** `NumaBinding` has no Windows test at all (only
+  `ProcessorBinding` does), so a regression here is currently invisible — the
+  change should bring its own test rather than trusting the suite.
+- **Explicitly NOT in scope:** the `ProcessorBinding` mechanism-vs-policy
+  split. The audit checked it and found it correct — themis is an immutable
+  observation crate, a thread-lifetime mutable guard is execution, and ADR 021
+  considered and rejected moving it. "Hermes does not choose a core class"
+  stays the right line.
+
 ## HS-PAIR-DEINTERLEAVE-2026-09-01 — Deinterleave at adjacent-lane-pair granularity [minor] — done 2026-09-01
 
 - **Delivered.** `deinterleave_pairs` on `BackendKernel`/`SimdPermute` with a
