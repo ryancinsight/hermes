@@ -2,10 +2,14 @@
 
 ## HS-REAL-WINDOW-INTERLEAVE-2026-09-01 [minor] [perf]
 
-- [ ] Pin validation-before-mutation, empty, full-vector, ragged-tail, scalar,
+- [x] Pin validation-before-mutation, empty, full-vector, ragged-tail, scalar,
       runtime-dispatch, and allocation contracts before implementation.
-- [ ] Implement one generic provider kernel and runtime selector; inspect
-      release codegen and measure it against the incumbent three-pass shape.
+- [x] Implement one generic provider kernel and runtime selector; release AVX2
+      codegen has one boundary dispatch and a probe-free multiply/interleave
+      loop. Two retained Criterion pairs improve at every measured size; the
+      1,024-element medians fall 29.4% and 37.9%. Exact-baseline SemVer passes
+      196/196 checks; Miri passes all three non-allocator contracts after the
+      Windows global-allocator census is excluded from that interpreter run.
 - [ ] Consume it in Apollo STFT only if two unchanged full-path comparisons
       improve while values and zero-allocation behavior remain unchanged.
 - [ ] Pass exact provider/consumer local and hosted gates, complete independent

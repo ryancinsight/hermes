@@ -6,6 +6,18 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [minor][HS-REAL-WINDOW-INTERLEAVE] Add the allocation-free
+  `real_mul_to_interleaved_complex` operation and its runtime-selected entry.
+  It validates both real inputs and the doubled output length before mutation,
+  then multiplies one SIMD register and writes two flat `[product, zero]`
+  registers. A thread-local global-allocator census observes zero allocations
+  on both first and warm calls. On a Core Ultra 9 285K using AVX2, the unchanged
+  three-pass/fused Criterion instrument reports 1,024-element medians of
+  230.98/254.52 ns versus 163.03/157.93 ns in two runs (29.4%/37.9% lower), and
+  4,096-element medians of 2.466/2.519 us versus 805.02/852.72 ns
+  (67.4%/66.1% lower). These are provider-kernel results; Apollo STFT adoption
+  remains gated on unchanged full-path measurements.
+
 - [minor][HS-COMPLEX-TRANSPOSE] Add
   `ComplexReg::transpose_square` for allocation-free, pair-preserving
   transposition of a square interleaved-complex register tile. Every backend
