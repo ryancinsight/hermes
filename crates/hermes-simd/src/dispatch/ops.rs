@@ -459,6 +459,44 @@ where
     T::interleaved_complex_dot::<CONJ_B>(a, b)
 }
 
+/// Computes a real-by-interleaved-complex dot product using a monomorphized
+/// SIMD architecture.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] unless `weights.len()` is exactly
+/// twice `real.len()`, or [`SimdError::UnsupportedTarget`] when architecture
+/// `A` is not available on the current processor.
+#[inline]
+pub fn real_interleaved_complex_dot<T, A>(real: &[T], weights: &[T]) -> Result<(T, T), SimdError>
+where
+    T: ScalarTrait,
+    A: hermes_simd_core::arch::SimdArch
+        + hermes_simd_core::kernel::SimdArith<T>
+        + hermes_simd_core::kernel::SimdLoadStore<T>
+        + hermes_simd_core::kernel::SimdPermute<T>,
+{
+    complex::real_interleaved_complex_dot::<T, A>(real, weights)
+}
+
+/// Computes a real-by-interleaved-complex dot product using Hermes runtime
+/// provider selection.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] unless `weights.len()` is exactly
+/// twice `real.len()`.
+#[inline]
+pub fn real_interleaved_complex_dot_runtime<T>(
+    real: &[T],
+    weights: &[T],
+) -> Result<(T, T), SimdError>
+where
+    T: SimdOps,
+{
+    T::real_interleaved_complex_dot(real, weights)
+}
+
 /// Computes the horizontal sum of population counts of all elements using runtime-dispatched SIMD.
 #[inline(always)]
 pub fn reduce_popcount<T: SimdOps>(data: &[T]) -> usize {

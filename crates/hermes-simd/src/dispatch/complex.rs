@@ -313,6 +313,132 @@ where
     Ok((re, im))
 }
 
+/// Computes a real-by-complex dot product using architecture `A`.
+///
+/// `real` contains one scalar per value and `weights` stores the matching
+/// complex values in `[re0, im0, re1, im1, ...]` primitive lane order. The
+/// returned tuple is `(re, im)` for `sum(real[k] * weights[k])`.
+///
+/// # Errors
+///
+/// Returns [`SimdError::LengthMismatch`] unless `weights.len()` is exactly
+/// twice `real.len()`, or [`SimdError::UnsupportedTarget`] when architecture
+/// `A` is not available on the current processor.
+///
+/// # Panics
+///
+/// Panics if the selected SIMD architecture reports more lanes than the fixed
+/// stack scratch buffer supports; that is a violated architecture contract.
+///
+/// # Examples
+///
+/// ```
+/// use hermes_simd::{real_interleaved_complex_dot, Scalar};
+///
+/// let real = [2.0_f64, -1.0];
+/// let weights = [3.0_f64, 4.0, 5.0, -2.0];
+///
+/// let sum = real_interleaved_complex_dot::<f64, Scalar>(&real, &weights).unwrap();
+///
+/// assert_eq!(sum, (1.0, 10.0));
+/// ```
+#[inline]
+pub fn real_interleaved_complex_dot<T, A>(real: &[T], weights: &[T]) -> Result<(T, T), SimdError>
+where
+    T: Scalar,
+    A: SimdArch + SimdArith<T> + SimdLoadStore<T> + SimdPermute<T>,
+{
+    validate_real_interleaved_complex_dot_lengths(real, weights)?;
+    if !A::is_runtime_supported() {
+        return Err(SimdError::UnsupportedTarget);
+    }
+
+    // SAFETY: the runtime capability check above establishes `A`'s target
+    // features, and the length preflight establishes the kernel's slice shape.
+    Ok(unsafe { real_interleaved_complex_dot_kernel::<T, A>(real, weights) })
+}
+
+#[inline]
+fn validate_real_interleaved_complex_dot_lengths<T>(
+    real: &[T],
+    weights: &[T],
+) -> Result<(), SimdError> {
+    let Some(expected_weights) = real.len().checked_mul(2) else {
+        return Err(SimdError::LengthMismatch);
+    };
+    if weights.len() != expected_weights {
+        return Err(SimdError::LengthMismatch);
+    }
+    Ok(())
+}
+
+/// Executes after the caller proves target support and slice shape.
+///
+/// # Safety
+///
+/// `A::is_runtime_supported()` must be true and `weights.len()` must equal
+/// `2 * real.len()`.
+#[inline]
+unsafe fn real_interleaved_complex_dot_kernel<T, A>(real: &[T], weights: &[T]) -> (T, T)
+where
+    T: Scalar,
+    A: SimdArch + SimdArith<T> + SimdLoadStore<T> + SimdPermute<T>,
+{
+    let lanes = A::LANE_COUNT;
+    let mut offset = 0usize;
+    let mut re = T::ZERO;
+    let mut im = T::ZERO;
+
+    if lanes >= 2 && lanes & 1 == 0 && lanes <= real.len() {
+        assert!(
+            lanes <= MAX_STACK_LANES,
+            "SIMD lane count exceeds stack buffer"
+        );
+        // Interleaving one real register with itself expands its low and high
+        // halves into the two adjacent-pair registers matching 2*lanes weight
+        // values. Independent accumulators preserve the existing complex-dot
+        // reduction partition while breaking the loop-carried dependency.
+        // SAFETY: feature availability is guaranteed by the dispatching caller.
+        let (mut acc0, mut acc1) = unsafe { (A::zero(), A::zero()) };
+        while offset + lanes <= real.len() {
+            let weight_offset = offset * 2;
+            // SAFETY: the loop proves `offset + lanes <= real.len()` and the
+            // preflight proves `weights.len() == 2 * real.len()`, so the real
+            // load and both adjacent weight loads cover initialized elements.
+            // `A`'s target features are guaranteed by the dispatching caller.
+            unsafe {
+                let rv = A::load_unaligned(real.as_ptr().add(offset));
+                let (real_lo, real_hi) = A::interleave(rv, rv);
+                let weight_lo = A::load_unaligned(weights.as_ptr().add(weight_offset));
+                let weight_hi = A::load_unaligned(weights.as_ptr().add(weight_offset + lanes));
+                acc0 = A::add(acc0, A::mul(real_lo, weight_lo));
+                acc1 = A::add(acc1, A::mul(real_hi, weight_hi));
+            }
+            offset += lanes;
+        }
+        // SAFETY: same feature contract as above.
+        let acc = unsafe { A::add(acc0, acc1) };
+        let mut buf = [T::ZERO; MAX_STACK_LANES];
+        // SAFETY: `buf` holds at least `lanes` elements (asserted above).
+        unsafe { A::store_unaligned(buf.as_mut_ptr(), acc) };
+        let mut lane = 0usize;
+        while lane < lanes {
+            re = re + buf[lane];
+            im = im + buf[lane + 1];
+            lane += 2;
+        }
+    }
+
+    let mut index = offset;
+    while index < real.len() {
+        re = re + real[index] * weights[index * 2];
+        im = im + real[index] * weights[index * 2 + 1];
+        index += 1;
+    }
+
+    (re, im)
+}
+
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
 pub(super) fn dispatch_interleaved_complex_mul_assign_impl<T, const CONJ_B: bool, A>(
     a: &mut [T],
@@ -335,4 +461,20 @@ where
     A: SimdArch + SimdArith<T> + SimdLoadStore<T> + SimdPermute<T>,
 {
     interleaved_complex_dot::<T, A, CONJ_B>(a, b)
+}
+
+#[runtime_dispatch(avx512f, avx2, neon, scalar)]
+pub(super) fn dispatch_real_interleaved_complex_dot_impl<T, A>(
+    real: &[T],
+    weights: &[T],
+) -> Result<(T, T), SimdError>
+where
+    T: Scalar,
+    A: SimdArch + SimdArith<T> + SimdLoadStore<T> + SimdPermute<T>,
+{
+    validate_real_interleaved_complex_dot_lengths(real, weights)?;
+    // SAFETY: `runtime_dispatch` invokes this specialization only after its
+    // architecture capability probe succeeds; the preflight above establishes
+    // the kernel's slice shape without repeating that probe.
+    Ok(unsafe { real_interleaved_complex_dot_kernel::<T, A>(real, weights) })
 }
