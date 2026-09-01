@@ -209,6 +209,7 @@ fn check_permutes<A: SimdKernel<f32>>() {
     let mut rev_twice = vec![0.0f32; lanes];
     let mut pair_even = vec![0.0f32; lanes];
     let mut pair_odd = vec![0.0f32; lanes];
+    let mut quad = vec![vec![0.0f32; lanes]; 4];
 
     // SAFETY: caller gates on the required target features for `A`.
     unsafe {
@@ -234,6 +235,12 @@ fn check_permutes<A: SimdKernel<f32>>() {
         let (p_even, p_odd) = A::deinterleave_pairs(a, b);
         A::store_unaligned(pair_even.as_mut_ptr(), p_even);
         A::store_unaligned(pair_odd.as_mut_ptr(), p_odd);
+
+        let (q0, q1, q2, q3) = A::deinterleave_pairs4(a, b, a, b);
+        A::store_unaligned(quad[0].as_mut_ptr(), q0);
+        A::store_unaligned(quad[1].as_mut_ptr(), q1);
+        A::store_unaligned(quad[2].as_mut_ptr(), q2);
+        A::store_unaligned(quad[3].as_mut_ptr(), q3);
     }
 
     // Reference reversal.
@@ -280,6 +287,22 @@ fn check_permutes<A: SimdKernel<f32>>() {
         pair_odd, expected_pair_odd,
         "deinterleave_pairs odd mismatch"
     );
+
+    // Reference stride-4 pair split over `a || b || a || b`.
+    let concat4: Vec<f32> = concat.iter().chain(concat.iter()).copied().collect();
+    let pairs4: Vec<&[f32]> = concat4.chunks_exact(2).collect();
+    for lane_class in 0..4usize {
+        let expected: Vec<f32> = pairs4
+            .iter()
+            .skip(lane_class)
+            .step_by(4)
+            .flat_map(|p| p.iter().copied())
+            .collect();
+        assert_eq!(
+            quad[lane_class], expected,
+            "deinterleave_pairs4 output {lane_class} mismatch"
+        );
+    }
 
     assert_eq!(
         rt_a, a_vals,
@@ -521,6 +544,7 @@ fn check_permutes_f64<A: SimdKernel<f64>>() {
 
     let mut pair_even = vec![0.0f64; lanes];
     let mut pair_odd = vec![0.0f64; lanes];
+    let mut quad = vec![vec![0.0f64; lanes]; 4];
 
     // SAFETY: caller gates on the required target features for `A`.
     unsafe {
@@ -535,6 +559,12 @@ fn check_permutes_f64<A: SimdKernel<f64>>() {
         let (p_even, p_odd) = A::deinterleave_pairs(a, b);
         A::store_unaligned(pair_even.as_mut_ptr(), p_even);
         A::store_unaligned(pair_odd.as_mut_ptr(), p_odd);
+
+        let (q0, q1, q2, q3) = A::deinterleave_pairs4(a, b, a, b);
+        A::store_unaligned(quad[0].as_mut_ptr(), q0);
+        A::store_unaligned(quad[1].as_mut_ptr(), q1);
+        A::store_unaligned(quad[2].as_mut_ptr(), q2);
+        A::store_unaligned(quad[3].as_mut_ptr(), q3);
     }
 
     let mut expected_rev = a_vals.clone();
@@ -564,6 +594,21 @@ fn check_permutes_f64<A: SimdKernel<f64>>() {
         pair_odd, expected_pair_odd,
         "f64 deinterleave_pairs odd mismatch"
     );
+
+    let concat4: Vec<f64> = concat.iter().chain(concat.iter()).copied().collect();
+    let pairs4: Vec<&[f64]> = concat4.chunks_exact(2).collect();
+    for lane_class in 0..4usize {
+        let expected: Vec<f64> = pairs4
+            .iter()
+            .skip(lane_class)
+            .step_by(4)
+            .flat_map(|p| p.iter().copied())
+            .collect();
+        assert_eq!(
+            quad[lane_class], expected,
+            "f64 deinterleave_pairs4 output {lane_class} mismatch"
+        );
+    }
 }
 
 #[test]

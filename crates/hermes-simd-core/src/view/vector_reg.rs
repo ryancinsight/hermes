@@ -841,6 +841,20 @@ where
         (Self::new(even), Self::new(odd))
     }
 
+    /// Splits four vectors' adjacent-lane pairs into the four stride-4
+    /// subsequences: reading the concatenation as a flat pair sequence,
+    /// output `i` holds the pairs congruent to `i` modulo 4.
+    ///
+    /// On interleaved complex data this is the radix-4 complex decimation of
+    /// four registers in one operation.
+    #[inline(always)]
+    #[must_use]
+    pub fn deinterleave_pairs4(self, b: Self, c: Self, d: Self) -> (Self, Self, Self, Self) {
+        // SAFETY: constructing the operand vectors proved host support for `Arch`.
+        let (r0, r1, r2, r3) = unsafe { Arch::deinterleave_pairs4(self.raw, b.raw, c.raw, d.raw) };
+        (Self::new(r0), Self::new(r1), Self::new(r2), Self::new(r3))
+    }
+
     /// Swaps each adjacent lane pair: `[a, b, c, d]` becomes `[b, a, d, c]`.
     ///
     /// On interleaved complex data this exchanges the real and imaginary parts

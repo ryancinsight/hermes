@@ -43,6 +43,18 @@ pub trait SimdPermute<T: Scalar>: SimdStorage<T> + Sealed {
     /// The backend's target features must be available.
     unsafe fn deinterleave_pairs(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector);
 
+    /// Splits four registers' adjacent-lane pairs into the four stride-4
+    /// subsequences.
+    ///
+    /// # Safety
+    /// The backend's target features must be available.
+    unsafe fn deinterleave_pairs4(
+        a: Self::Vector,
+        b: Self::Vector,
+        c: Self::Vector,
+        d: Self::Vector,
+    ) -> (Self::Vector, Self::Vector, Self::Vector, Self::Vector);
+
     /// Swaps each adjacent lane pair.
     ///
     /// # Safety
@@ -122,6 +134,15 @@ impl<T: Scalar, A: BackendKernel<T>> SimdPermute<T> for A {
 
     unsafe fn deinterleave_pairs(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
         <A as BackendKernel<T>>::deinterleave_pairs(a, b)
+    }
+
+    unsafe fn deinterleave_pairs4(
+        a: Self::Vector,
+        b: Self::Vector,
+        c: Self::Vector,
+        d: Self::Vector,
+    ) -> (Self::Vector, Self::Vector, Self::Vector, Self::Vector) {
+        <A as BackendKernel<T>>::deinterleave_pairs4(a, b, c, d)
     }
 
     unsafe fn swap_adjacent(v: Self::Vector) -> Self::Vector {

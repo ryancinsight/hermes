@@ -1203,6 +1203,36 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         )
     }
 
+    /// Splits four registers' adjacent-lane pairs into the four stride-4
+    /// subsequences: reading `a || b || c || d` as a flat pair sequence,
+    /// output `i` holds the pairs congruent to `i` modulo 4, in order.
+    ///
+    /// The two-level composition of [`BackendKernel::deinterleave_pairs`],
+    /// exposed as one operation because a fused network halves the shuffle
+    /// count on backends where cross-half permutes are the expensive step
+    /// (the radix-4 complex decimation of an FFT split gather).
+    ///
+    /// Default: two levels of `deinterleave_pairs`.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn deinterleave_pairs4(
+        a: Self::Vector,
+        b: Self::Vector,
+        c: Self::Vector,
+        d: Self::Vector,
+    ) -> (Self::Vector, Self::Vector, Self::Vector, Self::Vector) {
+        // SAFETY: the caller's feature obligation covers every nested call.
+        unsafe {
+            let (e0, o0) = Self::deinterleave_pairs(a, b);
+            let (e1, o1) = Self::deinterleave_pairs(c, d);
+            let (r0, r2) = Self::deinterleave_pairs(e0, e1);
+            let (r1, r3) = Self::deinterleave_pairs(o0, o1);
+            (r0, r1, r2, r3)
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Adjacent-Pair Shuffles & Alternating FMA (interleaved complex support)
     // -------------------------------------------------------------------------
