@@ -1,5 +1,29 @@
 # Backlog — hermes-simd
 
+## HS-HARDWARE-LANE-DISPATCH-2026-09-01 — Exact width without portable emulation [minor] [perf] — in progress
+
+- **Outcome.** Add one public exact-width entry that selects only real ISA
+  backends, allowing consumers to decline rather than monomorphize and carry a
+  portable fixed-array kernel for a width the host hardware does not implement.
+- **Scope / non-goals.** Extend the existing `LaneKernel` dispatch family and
+  ADR 018; preserve `vectorize` and `vectorize_lanes` byte-for-byte in behavior,
+  including the latter's portable exact-width fallback. Do not add fixed-width
+  vector storage or expose backend marker types.
+- **Acceptance.** AVX-512/AVX2/NEON selection remains widest-first at the exact
+  requested lane count. When only `ScalarArch` matches, the new entry returns
+  `None` without invoking the kernel; the existing entry still invokes it once.
+  Runtime feature checks precede every target-feature frame, unsupported
+  targets decline, no allocation or public break is introduced, and Apollo's
+  f32 combine no longer links its unused exact-four scalar kernel.
+- **Risk / dependencies.** [minor] [perf]. Driven by Apollo PR #219's exact
+  Linux artifacts: its new f32 exact-four fallback contributes a 5,080-byte
+  unused monomorph while AVX2 executes exact eight. Local code-size and timing
+  evidence does not establish the hosted regression's mechanism until the
+  consumer comparison repeats.
+- **Integrator / lease:** `/root`; lease `/root` on `vectorize.rs`, facade
+  re-export, exact-lane consumer tests, ADR 018, CHANGELOG, gap audit, and this
+  item/checklist. Last update 2026-09-01.
+
 ## HS-F16C-SCALAR-FRAME-2026-08-31 — The scalar fallback stays unframed for F16C scalars [patch] [perf] — done 2026-08-31
 
 - **Outcome:** decide, on measurement, whether `dispatch_lane_count`'s

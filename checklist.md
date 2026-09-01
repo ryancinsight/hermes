@@ -1,5 +1,16 @@
 # Checklist — active sprint
 
+## HS-HARDWARE-LANE-DISPATCH-2026-09-01 [minor] [perf]
+
+- [ ] Refactor exact-width dispatch so hardware selection is one implementation
+      shared by the existing portable-fallback and new hardware-only entries.
+- [ ] Prove hardware-only absence does not invoke the kernel while existing
+      portable exact-width behavior and AVX2/AArch64 selection stay unchanged.
+- [ ] Migrate Apollo's combine boundary and show the unused f32 exact-four
+      scalar monomorph disappears before accepting any latency claim.
+- [ ] Pass warning-denied host/AArch64/no-std, Nextest, doctest, Rustdoc,
+      SemVer, format, independent review, hosted, and non-squash merge gates.
+
 ## HS-F16C-SCALAR-FRAME-2026-08-31 [patch] [perf]
 
 - [x] Establish whether the `!REQUIRES_F16C` exclusion is load-bearing: it is
