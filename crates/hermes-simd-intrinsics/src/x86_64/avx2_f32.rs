@@ -346,6 +346,22 @@ impl BackendKernel<f32> for Avx2 {
         )
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn deinterleave_pairs(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
+        // Regroup the 128-bit halves so each `shuffle_ps` operand holds four
+        // consecutive source pairs; the shuffles then pick alternating 64-bit
+        // pairs, keeping each pair's lanes adjacent.
+        let t0 = _mm256_permute2f128_ps::<0x20>(a.0, b.0);
+        let t1 = _mm256_permute2f128_ps::<0x31>(a.0, b.0);
+        (
+            Avx2F32Vec(_mm256_shuffle_ps::<0b01_00_01_00>(t0, t1)),
+            Avx2F32Vec(_mm256_shuffle_ps::<0b11_10_11_10>(t0, t1)),
+        )
+    }
+
     /// Alternating FMA requires `avx2` + `fma` target features.
     // SAFETY: caller must ensure the target CPU supports `avx2,fma` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx2,fma")]

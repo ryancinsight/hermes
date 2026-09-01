@@ -36,6 +36,13 @@ pub trait SimdPermute<T: Scalar>: SimdStorage<T> + Sealed {
     /// The backend's target features must be available.
     unsafe fn deinterleave(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector);
 
+    /// Deinterleaves two registers at adjacent-lane-pair granularity into
+    /// even-pair and odd-pair result registers.
+    ///
+    /// # Safety
+    /// The backend's target features must be available.
+    unsafe fn deinterleave_pairs(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector);
+
     /// Swaps each adjacent lane pair.
     ///
     /// # Safety
@@ -111,6 +118,10 @@ impl<T: Scalar, A: BackendKernel<T>> SimdPermute<T> for A {
 
     unsafe fn deinterleave(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
         <A as BackendKernel<T>>::deinterleave(a, b)
+    }
+
+    unsafe fn deinterleave_pairs(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
+        <A as BackendKernel<T>>::deinterleave_pairs(a, b)
     }
 
     unsafe fn swap_adjacent(v: Self::Vector) -> Self::Vector {

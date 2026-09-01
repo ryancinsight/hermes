@@ -181,6 +181,15 @@ impl BackendKernel<f64> for Neon {
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 2-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
+    unsafe fn deinterleave_pairs(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
+        // Two lanes are one pair: the even pair is `a` whole and the odd
+        // pair is `b` whole.
+        (a, b)
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 2-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "neon")]
+    #[inline]
     unsafe fn dup_even(v: Self::Vector) -> Self::Vector {
         NeonF64Vec(vtrn1q_f64(v.0, v.0))
     }
