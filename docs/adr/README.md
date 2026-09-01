@@ -27,3 +27,4 @@
 | [019](019-format-owned-spmv-kernels.md) | Format-Owned SpMV Kernel Modules | Accepted |
 | [020](020-backend-owned-read-prefetch.md) | Backend-Owned Read Prefetch | Rejected |
 | [021](021-exact-processor-binding.md) | Exact Processor Binding | Accepted |
+| [022](022-unrunnable-isa-evidence-standard.md) | Evidence Standard for Kernels on Un-runnable ISAs | Proposed |
