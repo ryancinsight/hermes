@@ -19,7 +19,9 @@ Two controlled same-provider public-plan pairs improve N = 128 by 1.96%/1.49%
 and N = 256 by 1.46%/0.83%; the N = 64 control moves -0.28%/+0.82%. Evidence is
 local Windows AVX2 only; AArch64 is compile-checked, not benchmarked. Provider
 head `59c89431` merged through PR #113 as `2e993503`; hosted run `33492225619`
-passes every repository gate, including the bounded benchmark suite.
+passes every repository gate, including the bounded benchmark suite. Follow-up
+documentation correction `e5b9e7d` is under exact review and hosted validation
+on PR #114; closure remains pending until that revision merges.
 
 ## NUMA generation-counter test isolation (2026-08-25)
 

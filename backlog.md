@@ -1,10 +1,10 @@
 # Backlog — hermes-simd
 
-## HS-REAL-COMPLEX-DOT-2026-09-01 — Dot real samples with interleaved complex weights [minor] [perf] — done 2026-09-01
+## HS-REAL-COMPLEX-DOT-2026-09-01 — Dot real samples with interleaved complex weights [minor] [perf] — review
 
-- **Delivery:** provider head `59c89431`; PR #113 merged without squash as `2e993503`; lease none.
+- **Delivery state:** provider source head `59c89431` merged through PR #113 as `2e993503`; documentation correction `e5b9e7d` is open on PR #114. Integrator `/root`; lease `/root` on this item's PM/documentation hunks.
 - **Outcome:** one allocation-free generic/runtime real-by-interleaved-complex dot lets Apollo Mellin remove its retained 16N-byte real-lane materialization while preserving target safety, exact shape validation, and ragged tails.
-- **Evidence:** two primitive pairs improve 31–53%; two Apollo public-plan pairs improve N = 128 by 1.96%/1.49% and N = 256 by 1.46%/0.83% with a neutral N = 64 control. Exact-head review and hosted run `33492225619` pass x86, native AArch64, AVX-512 SDE, Miri, dependency, lock, documentation, and bounded benchmark gates.
+- **Evidence:** two primitive pairs improve 31–53%; two Apollo public-plan pairs improve N = 128 by 1.96%/1.49% and N = 256 by 1.46%/0.83% with a neutral N = 64 control. Source hosted run `33492225619` passes every repository gate. The corrected exact-head review, PR #114 hosted gates, and merge remain open.
 
 ## HS-COMPLEX-TRANSPOSE-2026-08-31 — Register-resident complex square transpose [minor] [perf] — done 2026-09-01
 
