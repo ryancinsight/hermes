@@ -6,7 +6,7 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
-- [minor][HS-REAL-COMPLEX-DOT] Add the allocation-free
+- \[minor\]\[HS-REAL-COMPLEX-DOT\] Add the allocation-free
   `real_interleaved_complex_dot` generic and runtime entries plus the sealed
   `SimdOps` method. The operation validates one complex weight per real sample
   before selecting a backend, and explicit architecture selection rejects an
