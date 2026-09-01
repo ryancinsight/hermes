@@ -1,5 +1,23 @@
 # Backlog — hermes-simd
 
+## HS-PAIR-DEINTERLEAVE4-2026-09-01 — Fused four-way pair deinterleave [minor] — done 2026-09-01
+
+- **Delivered.** `deinterleave_pairs4` on `BackendKernel`/`SimdPermute` with a
+  safe `Vector` wrapper: splits four registers' adjacent-lane pairs into the
+  four stride-4 subsequences. Default composes `deinterleave_pairs` twice;
+  the AVX2 overrides fuse the network — f32: four lane-local 64-bit unpacks
+  plus four `vperm2f128` (half the composed shuffle count; the cross-half
+  permute is the expensive step on efficiency cores), f64: one half
+  concatenation per output (a quarter of the composed cost).
+- **Driver.** The consumer's four-block FFT split gather measured a P-core
+  win but an E-core regression on the composed two-level form
+  (apollo `ATLAS-APOLLO-WIDE-STRIDED-LOADS-2026-09-01`); the fused network
+  targets exactly that residue.
+- **Evidence.** Stride-4 reference checks added to both permute property
+  harnesses per detected backend; proven to bite by swapping two fused
+  outputs (4 assertion failures) then restored. fmt, clippy `-D warnings`,
+  519/519 nextest, doctests, warning-clean AArch64 cross-compilation.
+
 ## HS-NUMA-BINDING-THEMIS-QUERY-2026-09-01 [patch] — todo
 
 - **Finding (stack audit 2026-09-01):** `crates/hermes-simd-core/src/numa/

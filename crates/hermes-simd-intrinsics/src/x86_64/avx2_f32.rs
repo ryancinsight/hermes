@@ -29,8 +29,9 @@ use core::arch::x86_64::{
     not(hermes_benchmark_generic_default)
 ))]
 use core::arch::x86_64::{
-    _mm256_castpd_ps, _mm256_castps_pd, _mm256_permute2f128_ps, _mm256_shuffle_ps,
-    _mm256_unpackhi_pd, _mm256_unpackhi_ps, _mm256_unpacklo_pd, _mm256_unpacklo_ps,
+    _mm256_castpd_ps, _mm256_castps_pd, _mm256_permute2f128_pd, _mm256_permute2f128_ps,
+    _mm256_shuffle_ps, _mm256_unpackhi_pd, _mm256_unpackhi_ps, _mm256_unpacklo_pd,
+    _mm256_unpacklo_ps,
 };
 use hermes_simd_core::kernel::BackendKernel;
 
@@ -359,6 +360,37 @@ impl BackendKernel<f32> for Avx2 {
         (
             Avx2F32Vec(_mm256_shuffle_ps::<0b01_00_01_00>(t0, t1)),
             Avx2F32Vec(_mm256_shuffle_ps::<0b11_10_11_10>(t0, t1)),
+        )
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn deinterleave_pairs4(
+        a: Self::Vector,
+        b: Self::Vector,
+        c: Self::Vector,
+        d: Self::Vector,
+    ) -> (Self::Vector, Self::Vector, Self::Vector, Self::Vector) {
+        // Fused two-level network: lane-local 64-bit unpacks group each
+        // half's even/odd pairs, then one half concatenation per output —
+        // four cheap unpacks and four `vperm2f128`, half the shuffle count
+        // of composing the pairwise deinterleave twice (the cross-half
+        // permute is the expensive step on efficiency cores).
+        let a = _mm256_castps_pd(a.0);
+        let b = _mm256_castps_pd(b.0);
+        let c = _mm256_castps_pd(c.0);
+        let d = _mm256_castps_pd(d.0);
+        let s0 = _mm256_unpacklo_pd(a, b);
+        let s2 = _mm256_unpackhi_pd(a, b);
+        let s1 = _mm256_unpacklo_pd(c, d);
+        let s3 = _mm256_unpackhi_pd(c, d);
+        (
+            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x20>(s0, s1))),
+            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x20>(s2, s3))),
+            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x31>(s0, s1))),
+            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x31>(s2, s3))),
         )
     }
 
