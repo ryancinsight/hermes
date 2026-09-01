@@ -465,7 +465,8 @@ where
 /// # Errors
 ///
 /// Returns [`SimdError::LengthMismatch`] unless `weights.len()` is exactly
-/// twice `real.len()`.
+/// twice `real.len()`, or [`SimdError::UnsupportedTarget`] when architecture
+/// `A` is not available on the current processor.
 #[inline]
 pub fn real_interleaved_complex_dot<T, A>(real: &[T], weights: &[T]) -> Result<(T, T), SimdError>
 where

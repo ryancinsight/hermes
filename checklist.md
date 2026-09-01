@@ -7,8 +7,10 @@
 - [x] Add one complex-family kernel and runtime trait method without new backend
       selection, allocation, public unsafe surface, or per-element capability
       probes; guard explicit architecture selection before the private kernel.
-- [ ] Compare the primitive against Apollo's materialize-plus-complex-dot shape;
-      retain it only if two complete Apollo forward-spectrum comparisons improve.
+- [x] Compare the primitive against Apollo's materialize-plus-complex-dot shape;
+      two controlled same-provider pairs improve N = 128/256 with mixed,
+      sub-1% N = 64 control movement, and the first-use census proves one
+      retained weight buffer instead of two buffers.
 - [ ] Pass exact provider/consumer gates, independent review, and merge without
       squash; otherwise remove the candidate and record the negative result.
 
