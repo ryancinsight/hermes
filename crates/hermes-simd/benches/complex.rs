@@ -2,6 +2,7 @@
 //!
 //! Groups (runtime-dispatched backend vs always-available `Scalar` backend):
 //! - `complex_dot`: interleaved complex dot product.
+//! - `real_complex_dot`: real samples against interleaved complex weights.
 //! - `complex_mul_assign`: in-place interleaved complex multiply.
 //!
 //! Sizes are complex-pair counts; throughput is reported in complex pairs
@@ -27,6 +28,18 @@ fn make_inputs(pairs: usize) -> (Vec<f64>, Vec<f64>) {
     (a, b)
 }
 
+fn make_real_input(pairs: usize) -> (Vec<f64>, Vec<f64>) {
+    let real = (0..pairs)
+        .map(|i| ((i % 17) as f64) * 0.25 - 2.0)
+        .collect::<Vec<_>>();
+    let mut interleaved = Vec::with_capacity(pairs * 2);
+    for &value in &real {
+        interleaved.push(value);
+        interleaved.push(0.0);
+    }
+    (real, interleaved)
+}
+
 fn bench_complex_dot(c: &mut Criterion) {
     let mut group = c.benchmark_group("complex_dot");
     for &pairs in PAIR_SIZES {
@@ -42,6 +55,29 @@ fn bench_complex_dot(c: &mut Criterion) {
                 interleaved_complex_dot::<f64, Scalar, false>(black_box(&a), black_box(&b)).unwrap()
             });
         });
+    }
+    group.finish();
+}
+
+fn bench_real_complex_dot(c: &mut Criterion) {
+    let mut group = c.benchmark_group("real_complex_dot");
+    for &pairs in PAIR_SIZES {
+        group.throughput(Throughput::Elements(pairs as u64));
+        let (_real, interleaved) = make_real_input(pairs);
+        let (_, weights) = make_inputs(pairs);
+        group.bench_with_input(
+            BenchmarkId::new("materialized_runtime", pairs),
+            &pairs,
+            |bench, _| {
+                bench.iter(|| {
+                    interleaved_complex_dot_runtime::<f64, false>(
+                        black_box(&interleaved),
+                        black_box(&weights),
+                    )
+                    .unwrap()
+                });
+            },
+        );
     }
     group.finish();
 }
@@ -76,5 +112,10 @@ fn bench_complex_mul_assign(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_complex_dot, bench_complex_mul_assign);
+criterion_group!(
+    benches,
+    bench_complex_dot,
+    bench_real_complex_dot,
+    bench_complex_mul_assign
+);
 criterion_main!(benches);
