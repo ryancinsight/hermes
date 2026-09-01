@@ -826,6 +826,21 @@ where
         (Self::new(even), Self::new(odd))
     }
 
+    /// Deinterleaves two vectors at adjacent-lane-pair granularity: reading
+    /// `self || other` as a flat sequence of lane pairs, the results hold the
+    /// even-indexed and odd-indexed pairs.
+    ///
+    /// On interleaved complex data this splits a stride-2 complex decimation:
+    /// the even and odd complex samples of the concatenated registers, each
+    /// with its real/imaginary lanes still adjacent.
+    #[inline(always)]
+    #[must_use]
+    pub fn deinterleave_pairs(self, other: Self) -> (Self, Self) {
+        // SAFETY: constructing the operand vectors proved host support for `Arch`.
+        let (even, odd) = unsafe { Arch::deinterleave_pairs(self.raw, other.raw) };
+        (Self::new(even), Self::new(odd))
+    }
+
     /// Swaps each adjacent lane pair: `[a, b, c, d]` becomes `[b, a, d, c]`.
     ///
     /// On interleaved complex data this exchanges the real and imaginary parts

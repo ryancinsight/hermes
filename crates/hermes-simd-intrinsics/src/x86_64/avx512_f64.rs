@@ -422,6 +422,20 @@ impl BackendKernel<f64> for Avx512 {
         )
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn deinterleave_pairs(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
+        // Alternating 64-bit lane pairs of `a || b`.
+        let even_idx = _mm512_setr_epi64(0, 1, 4, 5, 8, 9, 12, 13);
+        let odd_idx = _mm512_setr_epi64(2, 3, 6, 7, 10, 11, 14, 15);
+        (
+            Avx512F64Vec(_mm512_permutex2var_pd(a.0, even_idx, b.0)),
+            Avx512F64Vec(_mm512_permutex2var_pd(a.0, odd_idx, b.0)),
+        )
+    }
+
     // -----------------------------------------------------------------------
     // Scatter (native `vscatterdpd`)
     // -----------------------------------------------------------------------

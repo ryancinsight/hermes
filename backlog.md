@@ -1,5 +1,24 @@
 # Backlog — hermes-simd
 
+## HS-PAIR-DEINTERLEAVE-2026-09-01 — Deinterleave at adjacent-lane-pair granularity [minor] — done 2026-09-01
+
+- **Delivered.** `deinterleave_pairs` on `BackendKernel`/`SimdPermute` with a
+  safe `Vector` wrapper: reading `a || b` as adjacent-lane pairs (interleaved
+  complex samples), the results hold the even- and odd-indexed pairs — the
+  split of a stride-2 complex decimation. Portable default plus native
+  overrides on all six backends (AVX2 f32: 2x`vperm2f128` + 2x`vshufps`;
+  AVX2 f64: two half concatenations; AVX-512: `permutex2var` pair indices;
+  NEON f32: 64-bit `uzp` reinterprets; NEON f64: pass-through).
+- **Driver.** A downstream FFT split gathers stride-2/4 complex subsequences
+  through a hand-rolled four-lane blend network; this is its width-generic
+  form (apollo `ATLAS-APOLLO-WIDE-STRIDED-LOADS-2026-09-01`).
+- **Evidence.** Reference-based pair checks added to both permute property
+  harnesses, running per detected backend; proven to bite by mutating the
+  AVX2 f32 shuffle immediate (value mismatch) then restored. fmt, clippy
+  `-D warnings`, 519/519 nextest, doctests, and warning-clean AArch64
+  cross-compilation on the delivered revision. AVX-512 and NEON overrides
+  are compile evidence only on this host.
+
 ## HS-REAL-WINDOW-INTERLEAVE-2026-09-01 — Fuse real windowing into complex layout [minor] [perf] — provider delivered; consumer closure open
 
 - **Delivery state (2026-09-01).** Provider source `c42571d` merged through PR

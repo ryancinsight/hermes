@@ -1154,6 +1154,55 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         )
     }
 
+    /// Deinterleaves two registers at adjacent-lane-pair granularity: reading
+    /// `a || b` as a flat sequence of lane pairs (interleaved complex
+    /// samples), the results hold the even-indexed and odd-indexed pairs.
+    ///
+    /// The pair analog of [`BackendKernel::deinterleave`]: with two complex
+    /// samples per pair-register half this is the split of a stride-2
+    /// complex decimation. Requires an even `LANE_COUNT`.
+    ///
+    /// Default: scalar emulation.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn deinterleave_pairs(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
+        const { Self::LANE_BOUND_CHECK };
+        let lanes = Self::LANE_COUNT;
+        debug_assert!(
+            lanes.is_multiple_of(2),
+            "pair granularity needs whole pairs"
+        );
+        let mut buf_a = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let mut buf_b = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        Self::store_unaligned(buf_a.as_mut_ptr().cast::<T>(), a);
+        Self::store_unaligned(buf_b.as_mut_ptr().cast::<T>(), b);
+
+        let mut even = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let mut odd = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let pick = |flat: usize| {
+            if flat < lanes {
+                // SAFETY: `store_unaligned` above initialized lanes `0..lanes`
+                // of both buffers, and `flat` is bounded by the caller loop.
+                unsafe { buf_a[flat].assume_init() }
+            } else {
+                // SAFETY: as above for the second buffer.
+                unsafe { buf_b[flat - lanes].assume_init() }
+            }
+        };
+        for p in 0..lanes / 2 {
+            even[2 * p].write(pick(4 * p));
+            even[2 * p + 1].write(pick(4 * p + 1));
+            odd[2 * p].write(pick(4 * p + 2));
+            odd[2 * p + 1].write(pick(4 * p + 3));
+        }
+        (
+            Self::load_unaligned(even.as_ptr().cast::<T>()),
+            Self::load_unaligned(odd.as_ptr().cast::<T>()),
+        )
+    }
+
     // -------------------------------------------------------------------------
     // Adjacent-Pair Shuffles & Alternating FMA (interleaved complex support)
     // -------------------------------------------------------------------------

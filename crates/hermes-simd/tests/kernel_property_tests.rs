@@ -207,6 +207,8 @@ fn check_permutes<A: SimdKernel<f32>>() {
     let mut rt_a = vec![0.0f32; lanes];
     let mut rt_b = vec![0.0f32; lanes];
     let mut rev_twice = vec![0.0f32; lanes];
+    let mut pair_even = vec![0.0f32; lanes];
+    let mut pair_odd = vec![0.0f32; lanes];
 
     // SAFETY: caller gates on the required target features for `A`.
     unsafe {
@@ -228,6 +230,10 @@ fn check_permutes<A: SimdKernel<f32>>() {
         let (r_a, r_b) = A::deinterleave(i_lo, i_hi);
         A::store_unaligned(rt_a.as_mut_ptr(), r_a);
         A::store_unaligned(rt_b.as_mut_ptr(), r_b);
+
+        let (p_even, p_odd) = A::deinterleave_pairs(a, b);
+        A::store_unaligned(pair_even.as_mut_ptr(), p_even);
+        A::store_unaligned(pair_odd.as_mut_ptr(), p_odd);
     }
 
     // Reference reversal.
@@ -251,6 +257,29 @@ fn check_permutes<A: SimdKernel<f32>>() {
     let expected_odd: Vec<f32> = concat.iter().skip(1).step_by(2).copied().collect();
     assert_eq!(even, expected_even, "deinterleave even mismatch");
     assert_eq!(odd, expected_odd, "deinterleave odd mismatch");
+
+    // Reference pair deinterleave: alternating adjacent-lane pairs of the
+    // concatenation, each pair's lanes kept adjacent.
+    let pairs: Vec<&[f32]> = concat.chunks_exact(2).collect();
+    let expected_pair_even: Vec<f32> = pairs
+        .iter()
+        .step_by(2)
+        .flat_map(|p| p.iter().copied())
+        .collect();
+    let expected_pair_odd: Vec<f32> = pairs
+        .iter()
+        .skip(1)
+        .step_by(2)
+        .flat_map(|p| p.iter().copied())
+        .collect();
+    assert_eq!(
+        pair_even, expected_pair_even,
+        "deinterleave_pairs even mismatch"
+    );
+    assert_eq!(
+        pair_odd, expected_pair_odd,
+        "deinterleave_pairs odd mismatch"
+    );
 
     assert_eq!(
         rt_a, a_vals,
@@ -490,6 +519,9 @@ fn check_permutes_f64<A: SimdKernel<f64>>() {
     let mut rt_a = vec![0.0f64; lanes];
     let mut rt_b = vec![0.0f64; lanes];
 
+    let mut pair_even = vec![0.0f64; lanes];
+    let mut pair_odd = vec![0.0f64; lanes];
+
     // SAFETY: caller gates on the required target features for `A`.
     unsafe {
         let a = A::load_unaligned(a_vals.as_ptr());
@@ -499,6 +531,10 @@ fn check_permutes_f64<A: SimdKernel<f64>>() {
         let (r_a, r_b) = A::deinterleave(i_lo, i_hi);
         A::store_unaligned(rt_a.as_mut_ptr(), r_a);
         A::store_unaligned(rt_b.as_mut_ptr(), r_b);
+
+        let (p_even, p_odd) = A::deinterleave_pairs(a, b);
+        A::store_unaligned(pair_even.as_mut_ptr(), p_even);
+        A::store_unaligned(pair_odd.as_mut_ptr(), p_odd);
     }
 
     let mut expected_rev = a_vals.clone();
@@ -506,6 +542,28 @@ fn check_permutes_f64<A: SimdKernel<f64>>() {
     assert_eq!(rev, expected_rev, "f64 reverse mismatch ({lanes} lanes)");
     assert_eq!(rt_a, a_vals, "f64 round-trip lost the first operand");
     assert_eq!(rt_b, b_vals, "f64 round-trip lost the second operand");
+
+    let concat: Vec<f64> = a_vals.iter().chain(b_vals.iter()).copied().collect();
+    let pairs: Vec<&[f64]> = concat.chunks_exact(2).collect();
+    let expected_pair_even: Vec<f64> = pairs
+        .iter()
+        .step_by(2)
+        .flat_map(|p| p.iter().copied())
+        .collect();
+    let expected_pair_odd: Vec<f64> = pairs
+        .iter()
+        .skip(1)
+        .step_by(2)
+        .flat_map(|p| p.iter().copied())
+        .collect();
+    assert_eq!(
+        pair_even, expected_pair_even,
+        "f64 deinterleave_pairs even mismatch"
+    );
+    assert_eq!(
+        pair_odd, expected_pair_odd,
+        "f64 deinterleave_pairs odd mismatch"
+    );
 }
 
 #[test]
