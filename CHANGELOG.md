@@ -6,6 +6,14 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch][HS-THEMIS-AFFINITY-CONSUMER] Route Windows NUMA-group selection and
+  exact-processor mask construction through Themis's processor-affinity value
+  types. Hermes retains active-host validation plus the thread-bound Win32
+  bind/restore mechanism, while deleting its duplicate flattened-processor
+  division, remainder, bit construction, grouping, and tie-breaking logic.
+  Public binding, coverage, restoration, and unsupported-target contracts are
+  unchanged.
+
 - [minor][HS-NUMA-BINDING-THEMIS-QUERY] Read the NUMA node's processor set from
   Themis instead of asking Windows a second time. `NumaBinding::bind` used the
   legacy `GetNumaNodeProcessorMask`, which reports a single group-0 mask and

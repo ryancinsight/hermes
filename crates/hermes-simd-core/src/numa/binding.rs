@@ -163,20 +163,10 @@ impl Drop for NumaBinding {
 #[cfg(all(target_os = "windows", feature = "std"))]
 mod windows {
     use super::NumaBindingCoverage;
-    use crate::numa::affinity::{active_mask, PROCESSORS_PER_GROUP};
+    use crate::numa::affinity::active_mask;
+    use themis::{ProcessorAffinityGroups, ProcessorGroupAffinity};
 
     pub(super) use crate::numa::affinity::{restore_on_drop, GroupAffinity};
-
-    /// The processor group chosen to represent a NUMA node.
-    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    pub(super) struct GroupSelection {
-        /// Chosen processor group.
-        pub(super) group: u32,
-        /// Node processors within that group, as a group-relative mask.
-        pub(super) mask: u64,
-        /// Processor groups the node's processors span.
-        pub(super) groups: u32,
-    }
 
     /// Choose the processor group holding the largest share of `processors`.
     ///
@@ -187,48 +177,15 @@ mod windows {
     /// the lowest group number, so the choice is deterministic rather than
     /// dependent on the order the topology happened to list processors in.
     ///
-    /// Returns `None` for an empty processor list.
-    pub(super) fn select_group(processors: &[u32]) -> Option<GroupSelection> {
-        let mut candidate = processors
-            .iter()
-            .map(|processor| processor / PROCESSORS_PER_GROUP)
-            .min()?;
-        let mut groups = 0u32;
-        let mut best = GroupSelection {
-            group: candidate,
-            mask: 0,
-            groups: 0,
-        };
-
-        // Walk the occupied groups in ascending order. Sweeping the list once
-        // per occupied group keeps the scan allocation-free, and a node spans
-        // very few groups in practice.
-        loop {
-            let mut mask = 0u64;
-            let mut following: Option<u32> = None;
-            for &processor in processors {
-                let group = processor / PROCESSORS_PER_GROUP;
-                if group == candidate {
-                    mask |= 1u64 << (processor % PROCESSORS_PER_GROUP);
-                } else if group > candidate && following.is_none_or(|next| group < next) {
-                    following = Some(group);
-                }
-            }
-            groups += 1;
-            if mask.count_ones() > best.mask.count_ones() {
-                best = GroupSelection {
-                    group: candidate,
-                    mask,
-                    groups: 0,
-                };
-            }
-            match following {
-                Some(next) => candidate = next,
-                None => break,
-            }
+    /// Returns `None` for an empty processor list or a processor identity that
+    /// the native Windows group-mask representation cannot express.
+    pub(super) fn select_group(processors: &[u32]) -> Option<(ProcessorGroupAffinity, u32)> {
+        let affinities = ProcessorAffinityGroups::from_processors(processors.iter().copied());
+        if !affinities.is_complete() {
+            return None;
         }
-
-        Some(GroupSelection { groups, ..best })
+        let groups = u32::try_from(affinities.groups().len()).ok()?;
+        Some((affinities.largest_group()?, groups))
     }
 
     /// Confine the calling thread to the processors reported for `node`.
@@ -242,10 +199,10 @@ mod windows {
             .iter()
             .find(|candidate| candidate.id.get() == node)?;
         let node_processors = u32::try_from(numa_node.processors.len()).ok()?;
-        let selection = select_group(&numa_node.processors)?;
+        let (selection, node_groups) = select_group(&numa_node.processors)?;
 
-        let group = u16::try_from(selection.group).ok()?;
-        let mask = usize::try_from(selection.mask & active_mask(group)?).ok()?;
+        let group = selection.group();
+        let mask = selection.mask() & active_mask(group)?;
         if mask == 0 {
             return None;
         }
@@ -253,14 +210,14 @@ mod windows {
         let previous = crate::numa::affinity::bind(&GroupAffinity::new(group, mask))?;
 
         let bound_processors = mask.count_ones();
-        let coverage = if selection.groups == 1 && bound_processors == node_processors {
+        let coverage = if node_groups == 1 && bound_processors == node_processors {
             NumaBindingCoverage::Complete
         } else {
             NumaBindingCoverage::Partial {
                 bound_group: group,
                 bound_processors,
                 node_processors,
-                node_groups: selection.groups,
+                node_groups,
             }
         };
         Some((previous, coverage))
@@ -282,20 +239,22 @@ mod binding_tests {
     fn multi_group_node_selects_the_group_the_legacy_query_could_not_name() {
         let processors = [0u32, 1, 64, 65, 66];
 
-        let selection = windows::select_group(&processors).expect("a non-empty node selects");
+        let (selection, groups) =
+            windows::select_group(&processors).expect("a non-empty node selects");
 
-        assert_eq!(selection.group, 1);
-        assert_eq!(selection.mask, 0b111);
-        assert_eq!(selection.groups, 2);
+        assert_eq!(selection.group(), 1);
+        assert_eq!(selection.mask(), 0b111);
+        assert_eq!(groups, 2);
     }
 
     #[test]
     fn single_group_node_selects_every_processor() {
-        let selection = windows::select_group(&[0u32, 1, 2, 3]).expect("a non-empty node selects");
+        let (selection, groups) =
+            windows::select_group(&[0u32, 1, 2, 3]).expect("a non-empty node selects");
 
-        assert_eq!(selection.group, 0);
-        assert_eq!(selection.mask, 0b1111);
-        assert_eq!(selection.groups, 1);
+        assert_eq!(selection.group(), 0);
+        assert_eq!(selection.mask(), 0b1111);
+        assert_eq!(groups, 1);
     }
 
     #[test]
@@ -306,14 +265,19 @@ mod binding_tests {
         let descending = windows::select_group(&[321u32, 320, 129, 128]).expect("selects");
 
         assert_eq!(ascending, descending);
-        assert_eq!(ascending.group, 2);
-        assert_eq!(ascending.mask, 0b11);
-        assert_eq!(ascending.groups, 2);
+        assert_eq!(ascending.0.group(), 2);
+        assert_eq!(ascending.0.mask(), 0b11);
+        assert_eq!(ascending.1, 2);
     }
 
     #[test]
     fn empty_node_selects_nothing() {
         assert_eq!(windows::select_group(&[]), None);
+    }
+
+    #[test]
+    fn unrepresentable_node_processor_rejects_the_whole_selection() {
+        assert_eq!(windows::select_group(&[0, u32::MAX]), None);
     }
 
     /// End-to-end against the live host: the mask the guard applies is the one
@@ -327,15 +291,15 @@ mod binding_tests {
             .iter()
             .find(|candidate| candidate.id == current)
             .expect("the current node appears in the topology table");
-        let selection =
+        let (selection, node_groups) =
             windows::select_group(&numa_node.processors).expect("a live node reports processors");
-        let group = u16::try_from(selection.group).expect("a processor group fits u16");
+        let group = selection.group();
         let node_processors =
             u32::try_from(numa_node.processors.len()).expect("a node's processor count fits u32");
         // Derived from the topology table and the live group inventory, both
         // read here independently of the guard.
         let expected_mask =
-            selection.mask & active_mask(group).expect("the node's group is active");
+            selection.mask() & active_mask(group).expect("the node's group is active");
         assert_ne!(expected_mask, 0);
 
         let before = thread_affinity().expect("current affinity is queryable");
@@ -345,21 +309,20 @@ mod binding_tests {
 
         assert_eq!(bound.group, group);
         assert_eq!(
-            u64::try_from(bound.mask).expect("a group mask fits u64"),
-            expected_mask,
+            bound.mask, expected_mask,
             "the applied mask must be exactly the node's processors in this group"
         );
-        let expected_coverage =
-            if selection.groups == 1 && expected_mask.count_ones() == node_processors {
-                NumaBindingCoverage::Complete
-            } else {
-                NumaBindingCoverage::Partial {
-                    bound_group: group,
-                    bound_processors: expected_mask.count_ones(),
-                    node_processors,
-                    node_groups: selection.groups,
-                }
-            };
+        let expected_coverage = if node_groups == 1 && expected_mask.count_ones() == node_processors
+        {
+            NumaBindingCoverage::Complete
+        } else {
+            NumaBindingCoverage::Partial {
+                bound_group: group,
+                bound_processors: expected_mask.count_ones(),
+                node_processors,
+                node_groups,
+            }
+        };
         assert_eq!(coverage, expected_coverage);
 
         windows::restore_on_drop(&previous);
