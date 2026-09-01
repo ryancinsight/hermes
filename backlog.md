@@ -1,6 +1,6 @@
 # Backlog — hermes-simd
 
-## HS-THEMIS-AFFINITY-CONSUMER-2026-09-01 [patch] — in progress
+## HS-THEMIS-AFFINITY-CONSUMER-2026-09-01 [patch] — review
 
 - **Outcome.** Consume Themis's processor-group affinity values in the Windows
   NUMA-node and exact-processor guards, deleting Hermes's duplicate flattened
@@ -17,10 +17,16 @@
   deterministic tie, unavailable-processor, live bind, restore, no-default,
   host, and AArch64 checks remain value-semantic and warning-clean. The lock
   resolves Themis merge `64ac8ccee8a916b264f0f933de3f642b69ed5434`.
+- **Evidence / closure.** Source `bf48f97` pins Themis merge
+  `64ac8ccee8a916b264f0f933de3f642b69ed5434`; full workspace Nextest passed
+  544/544 in 4.173 s, warning-denied workspace all-target Clippy and Rustdoc,
+  26 runnable doctests, no-default all-target checking, and warning-denied
+  AArch64 Windows all-target checking are green. This cold-path consolidation
+  makes no timing or node-binding allocation claim; exact processor binding
+  remains allocation-free. Independent review and PR merge remain.
 - **Integrator / lease.** Codex `01a0253c-6013-7552-99cc-36bbbcf77f6d`;
-  branch=`refactor/hermes-affinity-provider`; lease=`crates/hermes-simd-core/
-  src/numa/{affinity,binding,processor}.rs`, their focused tests, lock,
-  CHANGELOG, and this item; last-update=2026-09-01.
+  branch=`refactor/hermes-affinity-provider`; lease=none;
+  last-update=2026-09-01.
 
 ## HS-ADR-INDEX-GENERATOR-ABSENT-2026-09-01 [patch] — todo
 
