@@ -1,6 +1,6 @@
 # Backlog — hermes-simd
 
-## HS-COMPLEX-TRANSPOSE-2026-08-31 — Register-resident complex square transpose [minor] [perf] — in progress
+## HS-COMPLEX-TRANSPOSE-2026-08-31 — Register-resident complex square transpose [minor] [perf] — review
 
 - **Outcome.** Add one pair-preserving square-transpose operation to
   `ComplexReg`, allowing fixed complex codelets to change radix orientation
@@ -24,13 +24,15 @@
   the unchanged consumer comparison.
 - **Candidate evidence.** Exact sample-pair and involution oracles pass for the
   scalar, AVX2, AVX-512, and f32/f64 monomorphizations; the safe wrapper rejects
-  the wrong row count. Warning-denied all-target package Clippy is green.
-  Criterion reports 2.857 ns for native AVX2 f32 versus 98.242 ns for the
-  forced generic default on a Core Ultra 9 285K. Apollo consumption and the
-  remaining provider gates are open.
-- **Integrator / lease:** `/root`; lease `/root` permutation role,
-  `ComplexReg`, AVX2 f32, conformance tests, ADR 004, benchmark, PM. Last update
-  2026-08-31.
+  the wrong row count. Criterion reports 2.857 ns for native AVX2 f32 versus
+  98.242 ns for the forced generic default on a Core Ultra 9 285K. Apollo's
+  unchanged processor-2 comparison reduces f32 N = 96 from the 222.935 ns entry
+  median to 128.429/128.359 ns in two adjacent runs while f64 and N = 64/128
+  controls retain their established bands. Provider source `42a0d4c` passes
+  formatting, warning-denied host and AArch64 checks, focused 112/112 and release
+  420/420 Nextest, 5/5 doctests, and warning-denied Rustdoc. Hosted review and
+  merge remain open.
+- **Integrator / lease:** `/root`; lease none. Last update 2026-09-01.
 
 ## HS-HARDWARE-LANE-DISPATCH-2026-09-01 — Exact width without portable emulation [minor] [perf] — review
 

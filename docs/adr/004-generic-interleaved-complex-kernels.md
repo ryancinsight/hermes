@@ -86,6 +86,7 @@ network.
 - On the same machine, the bounded `permute` Criterion instrument reports
   2.857 ns for AVX2 f32's native four-register complex transpose versus
   98.242 ns when the exact implementation is compiled through the portable
-  default. This establishes the primitive's backend specialization, not an
-  Apollo FFT throughput claim; the consumer retains its own unchanged
-  benchmark gate.
+  default. Apollo's separate unchanged processor-2 comparison then reduces its
+  f32 N = 96 complete-path median from 222.935 ns at entry to
+  128.429/128.359 ns in two adjacent runs. The provider number establishes the
+  primitive specialization; the consumer number remains Apollo-owned evidence.
