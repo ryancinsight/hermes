@@ -6,6 +6,22 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [minor][HS-NUMA-BINDING-THEMIS-QUERY] Read the NUMA node's processor set from
+  Themis instead of asking Windows a second time. `NumaBinding::bind` used the
+  legacy `GetNumaNodeProcessorMask`, which reports a single group-0 mask and
+  truncates the node index to `u8`, so on a host with more than 64 processors it
+  disagreed with the membership Themis parses from
+  `GetLogicalProcessorInformationEx`. The guard now takes
+  `CpuTopology::numa_nodes()[i].processors` and applies it with
+  `SetThreadGroupAffinity`, the same group-aware call `ProcessorBinding` already
+  used; the shared `GROUP_AFFINITY` layout and `kernel32` declarations are now
+  declared once for both guards. Because one call names one processor group, a
+  node spanning several groups binds to the group holding the largest share and
+  reports the shortfall through the new `NumaBindingCoverage`, which also
+  distinguishes a complete binding from no binding at all. The Windows backend
+  now requires the `std` feature, which is what activates Themis' real topology
+  detection; without it the guard reports `Unbound` rather than binding a
+  fabricated single-node processor list.
 - [minor][HS-REAL-WINDOW-INTERLEAVE] Add the allocation-free
   `real_mul_to_interleaved_complex` operation and its runtime-selected entry.
   It validates both real inputs and the doubled output length before mutation,

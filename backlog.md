@@ -55,7 +55,20 @@
   outputs (4 assertion failures) then restored. fmt, clippy `-D warnings`,
   519/519 nextest, doctests, warning-clean AArch64 cross-compilation.
 
-## HS-NUMA-BINDING-THEMIS-QUERY-2026-09-01 [patch] — todo
+## HS-NUMA-BINDING-THEMIS-QUERY-2026-09-01 [minor] — review 2026-09-01
+
+- **Delivered.** `NumaBinding::bind` reads the node's processors from
+  `themis::CpuTopology` and applies them with `SetThreadGroupAffinity`; the
+  shared `GROUP_AFFINITY` layout and `kernel32` declarations move to
+  `numa::affinity` so both guards declare them once. A node spanning several
+  processor groups binds the largest share and reports the shortfall through
+  the new `NumaBindingCoverage`. Reclassified `[patch]` -> `[minor]`: the
+  coverage report is additive public surface. ADR 010 §2 revised with a dated
+  revision note; ADR 021 unchanged and its ownership split intact. Six Windows
+  tests added where there were none, liveness-proved against two deliberate
+  regressions.
+
+### Earlier state
 
 - **Finding (stack audit 2026-09-01):** `crates/hermes-simd-core/src/numa/
   binding.rs` `NumaBinding::bind` asks the OS for the node's processor mask

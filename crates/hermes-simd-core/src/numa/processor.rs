@@ -180,16 +180,9 @@ impl Drop for ProcessorBinding {
 #[cfg(target_os = "windows")]
 mod windows {
     use super::{ProcessorBindingError, ProcessorIndex};
+    use crate::numa::affinity::{self, GetActiveProcessorCount, GetActiveProcessorGroupCount};
 
-    const PROCESSORS_PER_GROUP: u32 = 64;
-
-    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    #[repr(C)]
-    pub(super) struct GroupAffinity {
-        pub(super) mask: usize,
-        pub(super) group: u16,
-        reserved: [u16; 3],
-    }
+    pub(super) use crate::numa::affinity::{restore_on_drop, GroupAffinity, PROCESSORS_PER_GROUP};
 
     #[repr(C)]
     struct ProcessorNumber {
@@ -198,27 +191,11 @@ mod windows {
         reserved: u8,
     }
 
-    const _: () =
-        assert!(core::mem::size_of::<GroupAffinity>() == core::mem::size_of::<usize>() + 8);
     const _: () = assert!(core::mem::size_of::<ProcessorNumber>() == 4);
 
     #[link(name = "kernel32")]
     unsafe extern "system" {
-        fn GetActiveProcessorCount(group_number: u16) -> u32;
-        fn GetActiveProcessorGroupCount() -> u16;
         fn GetCurrentProcessorNumberEx(processor_number: *mut ProcessorNumber);
-        fn GetCurrentThread() -> *mut core::ffi::c_void;
-        fn GetLastError() -> u32;
-        fn SetThreadGroupAffinity(
-            thread: *mut core::ffi::c_void,
-            group_affinity: *const GroupAffinity,
-            previous_group_affinity: *mut GroupAffinity,
-        ) -> i32;
-        #[cfg(test)]
-        fn GetThreadGroupAffinity(
-            thread: *mut core::ffi::c_void,
-            group_affinity: *mut GroupAffinity,
-        ) -> i32;
     }
 
     pub(super) fn current_processor() -> ProcessorIndex {
@@ -261,61 +238,19 @@ mod windows {
             return Err(unavailable(processor));
         };
 
-        let requested = GroupAffinity {
-            mask,
-            group,
-            reserved: [0; 3],
-        };
-        let mut previous = GroupAffinity {
-            mask: 0,
-            group: 0,
-            reserved: [0; 3],
-        };
-        // SAFETY: both affinity pointers are valid for the call; the current
-        // thread pseudo-handle is valid in the calling thread, and validation
-        // above proves the requested single-bit group affinity is active.
-        let bound = unsafe {
-            SetThreadGroupAffinity(
-                GetCurrentThread(),
-                core::ptr::addr_of!(requested),
-                core::ptr::addr_of_mut!(previous),
-            )
-        };
-        if bound == 0 {
-            Err(platform_error("bind current thread"))
-        } else {
-            Ok(previous)
-        }
+        // Validation above proves the requested single-bit group affinity is
+        // active, so a failure here is a platform fault rather than a bad mask.
+        affinity::bind(&GroupAffinity::new(group, mask))
+            .ok_or_else(|| platform_error("bind current thread"))
     }
 
     pub(super) fn restore(previous: &GroupAffinity) -> Result<(), ProcessorBindingError> {
-        // SAFETY: `previous` was initialized by a successful bind on this same
-        // thread. `ProcessorBinding` is not Send, so restoration cannot move to
+        // `previous` was initialized by a successful bind on this same thread,
+        // and `ProcessorBinding` is not Send, so restoration cannot move to
         // another thread.
-        let restored = unsafe {
-            SetThreadGroupAffinity(
-                GetCurrentThread(),
-                core::ptr::from_ref(previous),
-                core::ptr::null_mut(),
-            )
-        };
-        if restored == 0 {
-            Err(platform_error("restore current thread"))
-        } else {
-            Ok(())
-        }
-    }
-
-    pub(super) fn restore_on_drop(previous: &GroupAffinity) {
-        // SAFETY: same invariant as `restore`. Drop cannot return a platform
-        // error; callers that require that signal use `ProcessorBinding::restore`.
-        unsafe {
-            SetThreadGroupAffinity(
-                GetCurrentThread(),
-                core::ptr::from_ref(previous),
-                core::ptr::null_mut(),
-            );
-        }
+        affinity::bind(previous)
+            .map(|_| ())
+            .ok_or_else(|| platform_error("restore current thread"))
     }
 
     const fn unavailable(processor: ProcessorIndex) -> ProcessorBindingError {
@@ -323,28 +258,15 @@ mod windows {
     }
 
     fn platform_error(operation: &'static str) -> ProcessorBindingError {
-        // SAFETY: captures the calling thread's last-error value immediately
-        // after the failed platform call.
-        let code = unsafe { GetLastError() };
-        ProcessorBindingError::Platform { operation, code }
+        ProcessorBindingError::Platform {
+            operation,
+            code: affinity::last_error(),
+        }
     }
 
     #[cfg(test)]
     pub(super) fn thread_affinity() -> Result<GroupAffinity, ProcessorBindingError> {
-        let mut affinity = GroupAffinity {
-            mask: 0,
-            group: 0,
-            reserved: [0; 3],
-        };
-        // SAFETY: the output pointer names writable `GROUP_AFFINITY` storage.
-        let queried = unsafe {
-            GetThreadGroupAffinity(GetCurrentThread(), core::ptr::addr_of_mut!(affinity))
-        };
-        if queried == 0 {
-            Err(platform_error("query current thread affinity"))
-        } else {
-            Ok(affinity)
-        }
+        affinity::thread_affinity().ok_or_else(|| platform_error("query current thread affinity"))
     }
 }
 
