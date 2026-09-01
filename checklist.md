@@ -11,8 +11,9 @@
       two controlled same-provider pairs improve N = 128/256 with mixed,
       sub-1% N = 64 control movement, and the first-use census proves one
       retained weight buffer instead of two buffers.
-- [ ] Pass exact provider/consumer gates, independent review, and merge without
-      squash; otherwise remove the candidate and record the negative result.
+- [x] Pass exact provider/consumer gates and independent review; merge provider
+      head `59c89431` through PR #113 as `2e993503`. Hosted run `33492225619`
+      passes every repository gate, including bounded benchmarks.
 
 ## HS-COMPLEX-TRANSPOSE-2026-08-31 [minor] [perf]
 
