@@ -12,100 +12,6 @@
 - **Outcome:** one allocation-free generic/runtime real-by-interleaved-complex dot lets Apollo Mellin remove its retained 16N-byte real-lane materialization while preserving target safety, exact shape validation, and ragged tails.
 - **Evidence:** two primitive pairs improve 31–53%; two Apollo public-plan pairs improve N = 128 by 1.96%/1.49% and N = 256 by 1.46%/0.83% with a neutral N = 64 control. Source hosted run `33492225619` passes every repository gate. The corrected exact-head review, PR #114 hosted gates, and merge remain open.
 
-## HS-COMPLEX-TRANSPOSE-2026-08-31 — Register-resident complex square transpose [minor] [perf] — done 2026-09-01
-
-- **Delivery:** provider `42a0d4c`; PR #111 merged without squash as `9ac23fa4`; lease none.
-- **Outcome:** `ComplexReg::transpose_square` provides one pair-preserving allocation-free tile transpose; AVX2 f32 uses the native register network and other backends retain the portable default.
-- **Evidence:** 2.857 ns native versus 98.242 ns portable locally; Apollo N = 96 falls from 222.935 ns to 128.429/128.359 ns. Exact-baseline SemVer passes 196/196 checks; hosted run `33470056453` is green across x86, native AArch64, AVX-512 SDE, Miri, dependency policy, lock integrity, and bounded benchmarks.
-
-## HS-HARDWARE-LANE-DISPATCH-2026-09-01 — Exact width without portable emulation [minor] [perf] — done 2026-09-01
-
-- **Delivery:** provider `141b7e1`; PR #110 merged without squash as `363c407d`; lease none.
-- **Outcome:** `vectorize_hardware_lanes` shares the exact-width hardware ladder and declines before kernel invocation when only portable emulation matches; Apollo removes the unused exact-four scalar monomorph.
-- **Evidence:** Apollo's optimized executable shrinks 7,680 bytes with no latency claim. Hosted run `33458750515` is green across x86, native AArch64, AVX-512 SDE, Miri, dependency policy, lock integrity, and bounded benchmarks.
-
-## HS-F16C-SCALAR-FRAME-2026-08-31 — The scalar fallback stays unframed for F16C scalars [patch] [perf] — done 2026-08-31
-
-- **Outcome:** decide, on measurement, whether `dispatch_lane_count`'s
-  `!REQUIRES_F16C` guard on the framed scalar fallback should be removed. A
-  recorded negative closes the item just as validly as a landed change.
-- **Finding.** HS-SCALAR-FALLBACK-FRAME-2026-08-30 runs the scalar fallback
-  inside the AVX2+FMA frame, but excludes `REQUIRES_F16C` scalars, so `F16` at
-  the scalar backend's eight-lane width still reaches `dispatch_scalar` with no
-  frame at all. `vectorize_lanes::<8, F16, _>` is the reachable hole: AVX-512
-  carries 32 `F16` lanes and AVX2 carries 16, so eight matches neither.
-- **Acceptance oracle:** pinned single-P-core criterion medians with intervals
-  on an FMA-dense `F16` kernel at exactly eight lanes, against the unchanged
-  `f32`@4 and `f64`@4 rows as instrument controls; values bit-identical either
-  way.
-- **Scope / non-goals:** do not change any backend, lane count, or arithmetic;
-  do not add a public API; do not enter a target-feature frame without a
-  runtime probe proving every feature it enables.
-- **The exclusion was not load-bearing, and the reason is a category error.**
-  The guard reads `<Avx2 as SimdStorage<T>>::REQUIRES_F16C` — a property of the
-  *AVX2* backend — to veto entering a frame around a body that runs the
-  *scalar* backend. `dispatch_scalar` constructs `Simd<T, ScalarArch>`, and
-  `ScalarArch` requires no feature on any host, so the question the guard asks
-  has no bearing on the arm it guards. What the frame must cover is what the
-  framed body executes, and `Avx2::is_runtime_supported()` already probes
-  exactly `avx2 && fma`, exactly what `call_scalar_in_avx2_frame` enables. The
-  guard is removed; the probe is untouched.
-- **`f16c` is deliberately not added to the frame.** `ScalarArch`'s `F16`
-  arithmetic goes through `eunomia::F16`'s `to_f32`/`from_f32`, which are
-  `widen::<5,10>`/`narrow::<5,10>` — integer bit manipulation, not
-  `fptrunc`/`fpext` — so no F16C instruction is selectable in this body.
-  Enabling the feature would add a probe for no reachable instruction and
-  would exclude AVX2-without-F16C hosts from the gain.
-- **Measured.** New `Exact Lane FMA` group in `simd_bench` (the exact-lane
-  entry had no instrument); same probe source built against each tree, run
-  pinned to one P-core (`ProcessorAffinity = 1`, High priority), 1 s warm-up /
-  5 s measurement / 30 samples, two interleaved rounds. Medians with 95%
-  intervals, `F16` at eight lanes — the changed path:
-
-  | n | unframed (round 1 / 2) | framed (round 1 / 2) | change |
-  |---|---|---|---|
-  | 256 | 4.2260 / 4.2315 us | 4.0100 / 4.0135 us | −5.1% |
-  | 1024 | 16.911 / 16.890 us | 16.014 / 16.021 us | −5.3% |
-  | 4096 | 67.988 / 68.587 us | 64.019 / 64.933 us | −5.8% / −5.3% |
-
-  Every interval is non-overlapping and every row repeats in both rounds.
-  Controls: `f32`@4 reaches the same fallback arm and was already framed —
-  30.211 / 29.949 / 30.263 / 30.180 ns at 256, flat; `f64`@4 matches AVX2
-  exactly and never reaches the fallback. The `f64`@4 4096 row moved 713 ->
-  524 ns *between rounds in both binaries*, a host-state shift that is exactly
-  why the comparison is read within a round rather than across.
-- **Why 5%, not the sibling path's 2.31–2.74x.** For `f32` the frame converted
-  a `fmaf` libcall into an instruction inside an otherwise cheap body. For
-  `F16` the body is dominated by the software widen/narrow bit manipulation,
-  which runs either way and only gains VEX encoding; the multiply-add is a
-  small share of it. Codegen confirms the mechanism: the framed build gains
-  one `vfmadd231ss` site whose surrounding widen/narrow is fully inlined and
-  call-free, and the unframed build has no such site. The pre-existing
-  call-per-widen `vfmadd231ss` site elsewhere in the binary is byte-identical
-  in both builds.
-- **Verdict: land.** A repeated, interval-separated 5.1–5.8% on every size of
-  the changed path, at the cost of one removed const-bool test in the
-  dispatch. Backend, lane count, and every value are unchanged.
-- **Gates:** `cargo fmt --all -- --check` clean; workspace all-target Clippy
-  `-D warnings` clean; nextest 507/507 across `hermes-simd`,
-  `hermes-simd-core`, `hermes-simd-intrinsics`; doctests 6 + 16 + 0 passed.
-- **Residual.** The measurement is one host (Arrow Lake Core Ultra 9 285K,
-  `avx512f: false`). No AArch64 path is touched — `dispatch_lane_count`'s
-  aarch64 arm has no scalar frame and is unchanged.
-- **Review correction.** Benchmark registration now runs the same exact-lane
-  dispatch once before creating its Criterion group and skips unsupported
-  host/type/lane combinations. Supported cases keep the fail-closed timed
-  assertion. The CHANGELOG item reference resolves to this record. Workspace
-  all-target/all-feature Clippy, AArch64 Windows all-target compilation, the
-  complete `simd_bench --test` smoke (including all nine exact-lane cases on
-  this host), formatting, and diff checks pass; standalone lock validation is
-  deferred to hosted CI because the Atlas development overlay rewrites Git
-  sources to the local trees.
-- **Integrator:** Codex `/root`, stale-claim takeover from claude-fable session
-  5050c72a. **Lease:** none. **Delivered:** source `91cae6a`, review correction
-  `3c9623d`, independent GREEN, hosted run `33442609342`, PR #108, merge
-  `54d05f6`. **Last update:** 2026-08-31.
-
 ## HS-EXACT-PROCESSOR-BINDING-2026-08-31 — Exact thread placement for reproducible consumer measurements [minor] [arch] — review
 
 - **Outcome:** add one public, typed, allocation-free RAII guard that binds the
@@ -136,61 +42,6 @@
   first-party Git sources, formatting, diff, and unchanged Atlas conformance
   counts. Independent exact-head review, hosted gates, provider merge, and
   Apollo adoption remain. Last update 2026-08-31.
-
-## HS-NO-STD-PACKED-MASK-IMPORTS-2026-08-29 — Restore alloc imports [patch] — done 2026-08-29
-
-- **Outcome:** restored the explicit `alloc::Box` and `vec!` imports required
-  by packed-mask storage without the standard prelude; behavior and layout are
-  unchanged. **Lease:** none.
-- **Evidence:** warning-denied `hermes-simd-core` `no_std` library check, host
-  all-feature Clippy, formatting, and diff checks pass.
-
-## HS-SCALAR-FALLBACK-FRAME-2026-08-30 — The scalar fallback compiled at baseline ISA [patch] [perf] — done 2026-08-31
-
-- **Finding.** `dispatch_lane_count` enters AVX-512 and AVX2 through
-  `#[target_feature]` frames, but reaches `dispatch_scalar` through no frame at
-  all. A scalar whose native width misses every exact-width backend therefore
-  ran the *caller's whole kernel* at baseline x86-64 — SSE2, no FMA.
-- **Who lands there.** Any `vectorize_lanes::<N, T>` whose `N` matches no
-  backend's `LANE_COUNT`. AVX2 carries 8 lanes of a four-byte scalar and 4 of
-  an eight-byte one, so a request for exactly 4 matches AVX2 for the wide
-  scalar and nothing for the narrow one. Every one of apollo-fft's 15 SIMD
-  entry points requests exactly 4.
-- **What it cost.** The scalar backend implements `fmadd` with `f32::mul_add`,
-  which is *correctly-rounded fused*. Outside an FMA frame that is a libm
-  `fmaf` call, not an instruction — and an FFT butterfly is FMA-dense, so each
-  one was a function call into software FMA.
-- **Fix.** When the exact-width match fails and the host has AVX2, run the same
-  fallback inside the AVX2+FMA frame. Same backend, same lane count, same
-  values; only the instruction selection the compiler may use changes.
-- **Measured** through apollo, interleaved in one process, best of 200 blocks
-  of 200 transforms, framed against unframed on one build:
-
-  | n | four-byte unframed | framed | change |
-  |---|---|---|---|
-  | 128 | 457.5 ns | 167.0 ns | 2.74x |
-  | 256 | 1066.0 ns | 438.5 ns | 2.43x |
-  | 512 | 2122.5 ns | 919.0 ns | 2.31x |
-
-  Controls: the eight-byte scalar held flat (85.0 -> 85.5 ns at 128), because
-  it matches AVX2 exactly and never reaches this path; and n = 64, which apollo
-  routes away from the affected kernel, held at 126.0 ns both ways.
-- **Values are unchanged, by construction and by test.** Rust does not contract
-  `a*b + c` into an FMA without explicit request, so widening the frame cannot
-  re-associate arithmetic; `mul_add` is correctly rounded whether it lands on
-  software or hardware FMA, so it returns the same value either way. Verified:
-  hermes 524/524, apollo 1122/1122 including its DFT oracle sweep and
-  backend-differential cases, leto 900/900.
-- **Deliberately narrow.** The `REQUIRES_F16C` scalars keep the unframed path;
-  their frame is selected by a separate probe above and this change does not
-  touch it. Hosts without AVX2 are unaffected.
-- **Closed 2026-08-31.** Verified against the current tree, not against the
-  report: `call_scalar_in_avx2_frame` is live in
-  `crates/hermes-simd/src/vectorize.rs` under `#[target_feature(enable =
-  "avx2")]`/`"fma"`, reached from `dispatch_lane_count`'s fallback arm, and
-  PR #107 is merged at `c4f931c`. The named residual — the `REQUIRES_F16C`
-  hole this item left open — is carried forward by
-  HS-F16C-SCALAR-FRAME-2026-08-31, not by this item.
 
 ## HS-GEMM-PANEL-REUSE-2026-08-29 — Reuse bounded packed-B scratch [patch] [perf] — rejected 2026-08-29 on measurement
 
@@ -238,47 +89,11 @@
 - **Outcome:** rejected software prefetch because two paired median wins were not established; retained the corrected five-case sparse Criterion instrument and restored production source unchanged ([ADR 020](docs/adr/020-backend-owned-read-prefetch.md)).
 - **Evidence:** provider `335c3f8`, independent GREEN review, PR #104 merged as `232d167`, and hosted run `33273062108` passed every job, including the bounded benchmark suite. **Lease:** none.
 
-## HS-COMPLEXREG-ZERO-PROBE-2026-08-29 — Rotations re-probed the host inside the hot loop [patch] — done 2026-08-29
-
-- **Defect:** `ComplexReg::mul_i` and `mul_neg_i` built their operands with
-  `Vector::zero()`, a public constructor that asks whether the host supports
-  `Arch` before handing one out. Inside a method taking `self` that question
-  is already answered — a `ComplexReg` cannot exist without a `Vector`, and a
-  `Vector` cannot exist without proof.
-- **Why it was expensive, not merely redundant:** the probe is a *call*, so
-  the register allocator spills every live vector around it. Apollo's
-  128-point base kernel uses these rotations in an inner butterfly loop, and
-  its disassembly carried **28 feature-detection call sites and 494 stack
-  moves against 978 vector instructions** — over half the kernel's vector
-  instructions were spill traffic for a question already answered at
-  dispatch.
-- **Fix:** a private `zero_proved()` that constructs the register directly,
-  with the safety argument recorded at the site.
-- **Verified:** workspace clippy `-D warnings` clean, 448/448 hermes-simd,
-  `cargo fmt --all --check` clean.
 ## HS-REDUCTION-UNROLL-2026-08-29 — Measure backend-specific reduction depth [patch] [perf] — done 2026-08-29
 
 - **Outcome:** rejected eight accumulators; production and the 48-row dense benchmark remain unchanged.
 - **Evidence:** two pinned-core, same-binary Criterion runs covered f32/f64 sum and dot at 256/1024/4096/16384 elements with exact dyadic value gates. Only f64 sum at 4096 repeated materially (15.1–15.2% versus four); f32 had no repeated material win and other f64 rows were flat, unstable, or already slower than production.
 - **Closure:** the measurement threshold failed before production editing or codegen qualification; no API, arithmetic, allocation, workload, timeout, or cache-policy change landed. Lease discharged in the closure commit.
-## HS-SIMD-CAPABILITY-COPY-2026-08-28 — The capability token is a proof, not a resource [patch] — done 2026-08-28
-
-- **Delivered:** `Simd<T, Arch>` derives `Clone, Copy`. It is a `PhantomData`
-  ZST asserting the host supports `Arch`, and the host does not stop
-  supporting it because the proof was used once.
-- **Why it mattered:** without `Copy`, a kernel wanting to run its body over
-  several inputs cannot — the token moves on first use — so it must re-enter
-  the dispatcher per input, paying a capability probe and an indirect call
-  each time. That is exactly the placement ADR 016 exists to prevent, and
-  the type was enforcing it against itself. The alternative was
-  `assume_supported`, unsafe for a reason that does not apply to duplicating
-  a capability already held.
-- **Driver:** apollo's small-size split calls the 128-point base once per
-  block and could not hoist the dispatch out of the block loop.
-- **Verified:** workspace check and clippy `-D warnings` clean, 448/448
-  hermes-simd tests, `cargo fmt --all --check` clean. Deriving `Copy` on a
-  ZST proof adds no representation and no runtime cost.
-
 ## HS-SIMD-PERF-2026-08-28 — AVX-512 f32 transpose network and bit-exact oracle [patch] — done 2026-08-31, residual: hosted AVX-512 runtime confirmation
 
 - **Outcome:** closed the last hole in the `transpose_square` override
@@ -286,15 +101,6 @@
   follow-on of HS-AVX512-TRANSPOSE-2026-08-28 — replaces the stack-capture
   default with four stages of 64 shuffles, and the generic default's override
   roster no longer claims AVX-512 takes the default.
-- **Re-verification of the 2026-08-27 audit findings:** both were already
-  delivered and are confirmed against current source. HS-TRANSPOSE-NETWORKS
-  landed AVX2 f32 and NEON f32 (PR #94) and HS-AVX512-TRANSPOSE landed
-  AVX-512 f64 (PR #98); NEON f64 correctly stays on the default, which
-  measured faster. HS-F16-DISPATCH-PROBE-HOIST landed as PR #95: the
-  `Avx2F16Frame` marker proves F16C at construction so the dispatched body is
-  probe-free and call-free. The `f16c_fma_available()` probes remaining in
-  `avx2_f16.rs` are the direct-`Avx2` path, which has no F16C proof and
-  retains its cached probe and software fallback by design. No work remained.
 - **Evidence — feature budget:** every instruction in the new network is
   AVX512F in its zmm form (`vunpcklps`, `vunpckhps`, `vshufps`,
   `vshuff32x4`), so the dispatcher's `avx512f`-only probe is sufficient and
@@ -437,43 +243,6 @@
   than 24 and stays on the default. Its property instantiation already
   exists, so it would be covered when written.
 
-## HS-SPARSE-SAFETY-2026-08-27 — Sparse OOB guards, F-only AVX-512, mask contract [patch] — done 2026-08-27
-
-- **Delivered:** PR #92 merged (12 commits, tip `50256f9`); integrator review
-  confirmed the hoisted two-arm guard (exact `i32::MAX + 1` bound) and the
-  F-only `vinsertf64x4` replacement. Post-merge: aarch64 NEON runtime job and
-  miri green; SDE AVX-512 conclusion collected by the atlas sweep.
-- **Integrator:** claude-fable session 03d80d33.
-- **Outcome:** closed two safe-code OOB holes in sparse dense-operand guards
-  (SELL-P missing dense-extent assert plus i32 flat-index bound; BlockedCoo
-  wrapping dimension products, checked in the elementwise guard and both
-  validators); replaced the AVX512DQ `_mm512_insertf32x8` in the F-only
-  `avx512_f32` popcount with an F-only `vinsertf64x4` merge; defined
-  mask-active = sign bit once (generic blend, `Vector::to_bitmask`, NEON
-  blend/vector_to_mask canonicalization, NEON compress/expand/gather_masked
-  keyed on bit 31/63); fused `generic_alternating_fma` and the interleaved
-  complex scalar tail to the vector evaluation shape (single rounding, exact
-  negation); made gather/scatter and column validators bound i32 indices in
-  the usize domain (exact for 2^31+ lengths); added register-only
-  `mask_from_bitmask` overrides (AVX-512 k-register truncation, AVX2
-  broadcast+cmpeq, NEON vtst) with construction-equivalence property tests;
-  shrank the transpose_square default frame from `MAX_SIMD_LANES²` (16–32
-  KiB) to two lane-sized row buffers.
-- **Evidence:** host (AVX2+FMA+F16C; no AVX-512) all-target Clippy clean,
-  nextest 511/511, doctests 22 pass / 0 fail, aarch64-unknown-linux-gnu
-  all-target check clean (CI-mirror). AVX-512 and NEON changes are
-  compile-verified locally; hosted SDE and aarch64 jobs execute them on the
-  PR. New regression tests: SELL-P short-dense / dimension-overflow /
-  i32-range panics, BlockedCoo overflow panic and validator rejection,
-  sign-bit blend/to_bitmask conformance on non-canonical masks, fused
-  fmaddsub/fmsubadd bit-exactness, bitmask-vs-bools mask construction
-  equivalence.
-- **Risk / change class:** [patch] — no public signature changes; behavioral
-  changes are panic-on-invalid (documented contract), mask-contract
-  unification on non-canonical masks, and tighter (fused) alternating-FMA
-  rounding.
-  **Last update:** 2026-08-27.
-
 ## HS-TRANSPOSE-NETWORKS-2026-08-27 — In-register transpose_square permute networks [patch] — done 2026-08-27
 
 - **Delivery:** provider `4af1b25`; PR #94 merged as `93ba7ce`; lease none.
@@ -483,36 +252,6 @@
 - **Evidence:** exact hosted run `33139847261` is green across bounded
   benchmarks, x86, native AArch64, SDE, Miri, no-std, dependency policy, and
   lock integrity; local codegen and timings are recorded in [gap_audit](gap_audit.md#square-transpose-networks-hs-transpose-networks-2026-08-27).
-
-## HS-F16-DISPATCH-PROBE-HOIST-2026-08-27 — Hoist F16 F16C probe to the dispatch boundary [minor] — done 2026-08-28
-
-- **Delivery:** provider `81bc9b6`; PR #95 merged as `0115b4e`; lease none.
-- **Outcome:** runtime dispatch now selects a complete `avx2,fma,f16c` frame
-  once for F16 and monomorphizes the whole kernel with a private proven marker.
-  Direct `Avx2` F16 arithmetic retains its cached probe and software fallback;
-  f32/f64 retain the ordinary `avx2,fma` route. The proc-macro growth was split
-  into 323/364/311-line entry, frame, and dispatcher modules.
-- **Acceptance oracle:** optimized codegen shows one boundary probe and
-  probe-free lane-op bodies; existing F16 differential suites stay green.
-- **Scope / non-goals:** preserve AVX2 behavior for f32/f64 and the safe F16
-  software fallback on hosts without F16C; do not add a public backend marker,
-  duplicate lane surface, or change arithmetic semantics.
-- **Evidence:** release helper assembly has zero feature-cache references and
-  zero fallback arithmetic calls; two unchanged 16,384-element F16 dot runs
-  measure 1.086–1.099 µs versus the 2.489–2.554 µs entry baseline. Release
-  Nextest 519/519, warning-denied all-target/all-feature Clippy, workspace
-  no-default-features, warning-denied AArch64 Windows consumer cross-check,
-  22 runnable doctests, rustdoc, and 196/196 SemVer checks on each affected
-  library pass. Independent artifact review is green.
-- **Dependencies / risk:** ADR 009 revision records the scalar-specific frame.
-  [minor] because doc-hidden public macro-plumbing traits and a defaulted public
-  capability constant are additive surface. Hosted run `33144748464` passed
-  every reported Hermes gate except the AArch64 runtime job: its test oracle
-  still expected three F16 lanes instead of deriving the backend's eight-lane
-  width. The provider behavior was correct; the oracle correction is carried
-  by HS-MASKED-TAIL-PARTIAL-LOAD and passes the warning-denied AArch64 Windows
-  cross-check.
-  **Last update:** 2026-08-28.
 
 ## HS-MASKED-TAIL-PARTIAL-LOAD-2026-08-27 — Partial masked load/store seam for dispatch tails [minor] — done 2026-08-31, residual: hosted AVX-512/NEON runtime confirmation
 
@@ -599,172 +338,6 @@
   vector reduction plus locating/NaN scan was faster of the two measured
   designs.
 
-## HS-EXACT-LANE-DISPATCH-2026-08-27 — Dispatch consumer kernels by exact lane count [minor] [arch] — done 2026-08-31
-
-- **Integrator:** Codex task `01a0253c-6013-7552-99cc-36bbbcf77f6d`.
-  **Lease:** discharged by the AArch64 warning fix commit.
-- **Outcome:** add one const-generic consumer entry that selects the widest
-  host-supported backend whose scalar lane count equals the requested count,
-  enters that backend's target-feature scope once, and returns `None` without
-  invoking or mutating the kernel when no backend matches. Existing
-  widest-native `vectorize` behavior remains unchanged.
-- **Driver:** Apollo's verified 128-point base requires four scalar lanes. Its
-  f64 path must select AVX2 even on an AVX-512 host; its f32 path selects NEON
-  or the portable packed backend at the same width. Apollo commit `c6f4b639`
-  records the consumer evidence and corrected timing.
-- **Acceptance oracle:** consumer code under `#![forbid(unsafe_code)]` observes
-  the exact requested count, a non-matching count never calls the kernel, the
-  portable fallback's actual packed widths remain available, widest dispatch
-  is unchanged, host and cross-target gates pass, and codegen contains one
-  operation-boundary dispatch with no feature probes inside the kernel.
-- **Risk / change class:** additive public [minor] and dispatch-policy [arch].
-  ADR 018 owns selection order, absence semantics, safety obligations, and the
-  rejection of a new fixed-vector type family. Host all-feature Clippy and
-  435/435 nextest tests pass; docs/doctests, 196 SemVer checks, and AArch64
-  Windows std/no-std strict-warning builds pass. Optimized x86 codegen retains
-  one boundary probe and a call/probe/branch-free specialized kernel body.
-  **Last update:** 2026-08-27.
-- **Closed 2026-08-31.** Verified against the current tree: `vectorize_lanes`
-  and its per-architecture `dispatch_lane_count` ladder are live in
-  `crates/hermes-simd/src/vectorize.rs`, reachable through
-  `LaneScalar::run_lane_kernel_for`, and return `None` without invoking the
-  kernel when no backend matches the requested count; the exact-count
-  behaviour is pinned by the `vectorize_lanes` doctest and
-  `crates/hermes-simd/tests/host_capability_tests.rs`, and
-  `docs/adr/018-exact-lane-consumer-dispatch.md` is present and indexed. No
-  residual.
-
-## HS-NATIVE-CAST-THROUGHPUT-2026-08-27 — Remove supported cross-type cast stack round-trip [minor] — done 2026-08-27 (PR #86, merge 5734b85; fix-forward PR #87, merge 4f6a1eb)
-
-- **Outcome:** AVX2 `f32` to `i32` now uses one packed `vcvttps2dq` plus vector
-  boundary corrections; the public signature and scalar default for every
-  other type/backend pair are unchanged.
-- **Evidence:** boundary and arbitrary-bit tests exactly match Rust `as`, and
-  final disassembly contains the packed conversion without scalar
-  `vcvttss2si`. Repeated same-source measurements from `ff93be1` to provider
-  `18da238` report 6.9–11.4x public-path gains across 256–4096 elements. Host
-  load prevents a Hermes/Fearless parity claim.
-- **Delivery:** local debug/release 500/500 tests, Clippy, docs, doctests,
-  no-default, benchmark smoke, SemVer, AArch64, and independent review pass.
-  Hosted fix-forward run `33120584552` is green across x86, AArch64, Miri
-  boundary checks, SDE, dependency policy, and bounded benchmarks; the AVX2
-  sanitizer limit is recorded in `gap_audit.md`.
-
-## HS-PACKED-MASK-SHAPE-SAFETY-2026-08-27 — Enforce packed-mask and matrix shape bounds [patch] — done 2026-08-27 (PR #85, merge 7e342cd)
-
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** none.
-- **Outcome:** make public `PackedMask` extraction reject every out-of-range
-  request in release builds, make `DenseWithMask` validation reject arithmetic
-  overflow and every non-exact logical shape, and keep validated sparse kernels
-  free of repeated public bounds checks.
-- **Scope / non-goals:** preserve the public storage and sparse-operation
-  signatures; validate once at each raw sparse operation boundary and use a
-  crate-private prevalidated extraction path inside loops. Do not introduce a
-  compatibility layer or expand this patch into a breaking `ValidatedData`
-  migration.
-- **Acceptance oracle:** release and debug tests cover `bit(len)`, windows over
-  64 bits, offsets beyond `len`, overflow-sized offsets, and the allowed empty
-  window at `len`; exact, short, oversized, and overflowed `DenseWithMask`
-  shapes produce value-semantic results or the specified `LengthMismatch`.
-  Existing sparse dense-reference laws remain green. An unchanged bounded
-  before/after sparse measurement plus exact AVX2 inspection must show that the
-  public contract checks did not enter the vector loop.
-- **Risk / change class:** [patch], malformed-input correctness on a hot sparse
-  path; no public API change. **Dependencies:** the packed representation merged
-  in PR #81 (`e1bd5e0`).
-- **Evidence:** the exact final code passes 498/498 workspace tests and 117/117
-  focused all-feature release tests, including release-mode extraction and
-  independently isolated exact-shape rejection. Workspace Clippy with
-  `-D warnings`, doctests, warning-clean docs, no-default-features, the sparse
-  benchmark smoke, and 223/223 semver checks per affected public crate pass.
-  The independent static judge is GREEN after its diagnostic-overflow and
-  test-isolation findings were resolved. Exact AVX2
-  inspection shows the added checked multiplication and two length comparisons
-  before the row loop while the packed vector loop is unchanged. A fresh
-  exact-source run against the unchanged pre-change baseline reports no detected
-  change (407.11 us median; change interval -4.32% to +3.55%, p=0.83). An
-  old-versus-old control moved 3.9%, so the timing claim is limited to excluding
-  a stable regression on this variable-load host; code generation supplies the
-  mechanism evidence. Provider commit `af73e6a`; PR #85 merged as `7e342cd`.
-  Hosted x86, Miri, AArch64 NEON, AVX-512 best-effort, Intel SDE, bounded
-  benchmark, dependency-policy, lock-integrity, and review gates are green.
-  RecurseML reports only an external analysis-service error and produced no
-  code diagnostic.
-
-## HS-NATIVE-COMPARISON-MASK-2026-08-27 — Remove comparison-mask stack round-trip [patch] — done 2026-08-27 (PR #84, merge 6efa67b)
-
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** none.
-- **Outcome:** route the six `Vector::cmp_*_mask` methods directly from the
-  backend comparison result through `vector_to_mask`, eliminating the current
-  register-to-stack scalar scan and mask reconstruction when the measured
-  comparison confirms that mechanism is material.
-- **Scope / non-goals:** add one input-sensitive f32/f64 equality-mask group to
-  the existing bounded same-binary instrument. Compare current public Hermes,
-  the direct backend route, and Fearless SIMD 0.7 at equal native widths and
-  exact lane outcomes. Do not change `Vector::to_bitmask` or the separately
-  recorded cross-type `cast` implementation in this increment.
-- **Acceptance oracle:** scalar equality supplies the value oracle; every
-  provider returns the same accumulated mask bits. Two unchanged Criterion
-  runs must show a repeatable current-versus-direct deficit and exact emitted
-  code must identify the stack/scalar mechanism before production changes.
-  The correction must remove that mechanism for all six comparisons, preserve
-  f32/f64 and NaN semantics on every shipped backend, and introduce no public
-  API change or allocation.
-- **Risk / change class:** [patch], hot register path; no public contract
-  change. **Dependencies:** `HS-DISPATCH-CACHE-THROUGHPUT-2026-08-27` is merged
-  at `99910ad`; its complete hosted matrix is green.
-- **Evidence / decision:** two unchanged pre-change runs separate the public
-  and direct 95% confidence intervals at 1024 elements: f32 421.09–429.05 ns
-  versus 66.353–67.094 ns, then 423.57–441.54 ns versus 66.666–70.173 ns;
-  f64 167.53–182.82 ns versus 125.37–139.88 ns, then 205.66–239.44 ns versus
-  126.48–140.47 ns. Exact AVX2 disassembly attributes the public deficit to
-  stack storage, lane-wise scalar tests, and mask reconstruction; the direct
-  route is `vcmpeq*` → `vmovmsk*` → `popcnt`. The production path now uses the
-  native backend conversion for all six comparisons.
-- **Delivery:** provider commit `f45062d`; exact integrated head `47380dd`;
-  PR #84 merged as `6efa67b`. The hosted matrix passed x86, AArch64 NEON,
-  AVX-512/AMX under SDE, Miri, docs, dependency policy, lock integrity, and the
-  12m30s bounded benchmark gate.
-
-## HS-CI-RUNNER-CLASS-SELECTION-2026-08-27 — Compile capability-gated configurations on every runner [patch] — done 2026-08-27 (PR #88, merge 07a88ec)
-
-- **Outcome:** the ordinary x86 job compiles the generic-default SIMD
-  configuration with warnings denied before any runtime AVX-512 selection.
-- **Evidence:** reintroducing the two import-guard defects fixed by `6b32676`
-  fails the new gate for AVX2 f32 and f64; the corrected tree passes. Hosted
-  run `33121349588` passed the new step on a runner whose AVX-512 benchmark
-  skipped, proving configuration coverage no longer depends on runner class.
-- **Delivery:** provider `8a48825`; PR #88 merged as `07a88ec`. The same hosted
-  run is green across x86, AArch64, Miri, SDE, dependency policy, lock
-  integrity, and bounded benchmarks.
-## HS-TRANSPOSE-SQUARE-2026-08-27 — In-register square-tile transpose [patch] — done 2026-08-27
-
-- **Delivered:** `transpose_square` on the backend seam and the
-  `SimdPermute` facet, with the safe `Vector::transpose_square(&mut [Self])`
-  surface: transposes a `LANE_COUNT x LANE_COUNT` tile in registers.
-  Overrides: AVX2 f64 (the canonical eight-shuffle unpack + cross-half
-  permute network) and NEON f64 (`trn1`/`trn2`); stack-capture default
-  elsewhere. Verified by a new index-coded flat-reference law plus the
-  involution identity, per backend. Driver: apollo's batched movement
-  burn-down (`ATLAS-APOLLO-BASE-BUTTERFLY-128`) — its plane transpose is
-  1659 TSC at N = 1024 pinned, and the flat-interleave composition costs
-  16 shuffles per 4x4 tile where this network costs 8. Integrator: Claude
-  session d791281c.
-
-## HS-DENSEMASK-BITPACK-2026-08-27 — Bit-pack the DenseWithMask lane mask [minor] — done 2026-08-27 (PR #81, merge e1bd5e0)
-
-- **Outcome:** `DenseWithMask` stores one bit per element, reducing its mask
-  footprint 8x, and sparse kernels consume packed lane windows without the
-  former per-chunk boolean conversion.
-- **Evidence:** dense-reference sparse laws plus empty, all-set/all-clear,
-  non-multiple-of-64, word-boundary, round-trip, and construction-rejection
-  tests pass; the superseded `[bool]` representation and unused partial variant
-  are deleted.
-- **Delivery:** PR #81 merged as `e1bd5e0`; hosted run `33107185117` is green
-  across x86, AArch64, Miri, SDE, dependency policy, lock integrity, docs, and
-  bounded benchmarks.
 ## HS-AVX2-INTERLEAVE-OVERRIDES-2026-08-27 — Native AVX2 interleave/deinterleave [patch] — done 2026-08-27
 
 - **Delivered:** AVX2 f64 and f32 `interleave`/`deinterleave` overrides
@@ -776,28 +349,6 @@
   oracles and round-trip property tests; `hermes_benchmark_generic_default`
   cfg preserved for instrument comparisons. Integrator: Claude session
   d791281c.
-
-## HS-VECTORIZE-LARGE-KERNEL-2026-08-28 — Large kernel bodies fall out of the target-feature frame [patch] — fixed 2026-08-28
-
-- **Integrator:** Claude session d791281c. **Defect (asm-evidenced from
-  apollo's register-resident FFT reproducer):** the `#[runtime_dispatch]`
-  expansion kept the annotated inner fn with no inline attribute. The
-  generated `#[target_feature]` helper is the only feature-carrying frame,
-  and a large kernel body (a fully unrolled 32-sample FFT row pass) makes
-  LLVM decline the helper → inner inline: the body codegens in the inner
-  symbol at baseline — zero FMA, per-operation feature detection — and runs
-  ~30x slow. `#[inline(always)]` on the consumer's `LaneKernel::call` cannot
-  cure it because `call` inlines into the unattributed inner fn. Small
-  kernels always inlined, which is why ADR 009/016 evidence never hit this.
-- **Fix:** the macro now emits the retained inner fn with `#[inline(always)]`
-  (LLVM `alwaysinline`, honored regardless of body size) unless the author
-  wrote an inline attribute; expansion tests pin both behaviors.
-  `LaneKernel` docs now state the consumer half: mark large `call` bodies
-  `#[inline(always)]` — the same contract pulp documents for
-  `WithSimd::with_simd`.
-- **Acceptance oracle:** apollo's resident reproducer regains FMA codegen and
-  its row passes drop from ~5000 to register-resident cost; re-measured by
-  apollo's pinned four-engine probe.
 
 ## HS-DISPATCH-CACHE-THROUGHPUT-2026-08-27 — Measure cached dispatch boundary [patch] — done 2026-08-27 (PR #82, merge 99910ad)
 
@@ -899,31 +450,6 @@
   unless the measurement falsifies the zero-cost/parity hypotheses.
   **Dependencies:** merged `ComplexReg` PRs 73–74 and Fearless 0.7.0.
 
-## HS-COMPLEX-REG-2026-08-27 — Interleaved complex register vocabulary [minor] — done 2026-08-27
-
-- **Outcome:** `ComplexReg<T, Arch>` in `hermes-simd-core::view`, re-exported
-  from the facade: a `#[repr(transparent)]` newtype over `Vector` whose lanes
-  carry `[re, im, ...]`, with sample-wise complex `Mul`, `mul_conj`, `mul_i`,
-  `mul_neg_i`, `splat`, `swap_samples`, `butterfly`, and `Add`/`Sub`. Every
-  method composes the existing adjacent-pair shuffle and alternating-FMA
-  primitives, so the type is vocabulary, not new codegen — the multiply is
-  three shuffles and one multiply feeding one alternating FMA.
-- **One new backend primitive:** `swap_pairs` (adjacent lane-pair exchange, the
-  operand pairing of a distance-one butterfly held in registers) — scalar
-  default plus AVX2/AVX-512/NEON-f32 overrides; a lone trailing pair passes
-  through unchanged, extending the documented lone-lane convention. NEON f64's
-  two-lane register takes the default and is identity by that rule.
-- **Driver:** Apollo's small-N gap. Its planar kernels pay double register
-  pressure (separate re/im registers), which caps them at radix-4 where
-  RustFFT's interleaved kernels run radix-8 with six stages in two memory
-  passes. This vocabulary is the substrate for interleaved register-resident
-  codelets; the codelets themselves are transform logic and land in Apollo.
-- **Verification:** consumer-shaped conformance under `forbid(unsafe_code)`
-  through `vectorize`, two oracle tiers — bitwise on exactly-representable
-  inputs (a layout defect cannot hide in a tolerance that does not exist) and
-  2-ULP against a fused-shape scalar reference on rounded inputs; permutations
-  and sign flips asserted bitwise always. 34 workspace suites, 0 failures.
-
 ## HS-FEARLESS-PERMUTE-THROUGHPUT-2026-08-26 — Measure shared cross-lane parity [patch] — complete 2026-08-26
 
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`. **Lease:** none. Implementation `4ef5145`.
@@ -935,147 +461,6 @@
 - **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`. **Lease:** none. Implementation `937c120`.
 - **Outcome:** one same-address generic f32/f64 instrument retains the f64 identity; exact locked f32 intervals overlap at 256, 1,024, and 4,096 scalars, so no production correction is justified.
 - **Evidence:** workspace Clippy, 475/475 nextest, 19 runnable doctests, examples, Rustdoc, no-default-features, 21-case bench smoke, bounded timing, and AVX2 assembly are green; full measurements and limits are in `gap_audit.md#lane-throughput-2026-08-25`.
-
-## HS-LANE-THROUGHPUT-2026-08-25 — Locate the gap between the lane surface and fearless_simd [arch] — complete 2026-08-26
-
-- **Integrator:** Codex task `01a0253c-6013-7552-99cc-36bbbcf77f6d`.
-- **Lease:** none. Provider PR 68 merged as `ae4e8efa`; Apollo consumer PR 120
-  merged the exact `4abbde8f` provider pin as `e3bdd7c3`.
-
-- **Outcome:** a consumer kernel written against Hermes' lane surface reaches
-  arithmetic rates comparable to `fearless_simd` on the same host and workload,
-  or the reason it cannot is understood and recorded.
-- **Resolution:** the deficit came from capability provenance that was not
-  preserved across operations, repeated support probes, non-exact chunk values,
-  and bounds-heavy consumer iteration. `Simd<T, A>` now carries the proven host
-  capability into `LaneKernel`; exact-width chunks, grouped planar I/O, fused
-  multiply-subtract, and probe-free operations preserve that proof through the
-  hot loop. Immutable iterator `Send` bounds and child alignment semantics were
-  corrected while making the capability contract sound.
-- **Provider evidence:** a same-binary planar f64 butterfly reuses identical
-  output addresses for Hermes and `fearless_simd` 0.7. At 256, 1024, and 4096
-  elements the pinned Hermes medians are 77.024 ns, 1.0134 us, and 3.9417 us;
-  Fearless medians are 76.687 ns, 1.0022 us, and 3.9392 us. Every 95% confidence
-  interval overlaps. Both AVX2 hot loops contain one loop branch, six loads,
-  four stores, fused arithmetic, and no calls, support probes, bounds checks, or
-  panic paths. Full entry-baseline and resolved evidence is in
-  `gap_audit.md#lane-throughput-2026-08-25`.
-- **Consumer closure:** Apollo's exact-Git `cargo check --locked --offline -p
-  apollo-fft --all-targets` and all six batched analytical tests pass at
-  `e3bdd7c3`. Its corrected census keeps complex transforms at zero transient
-  allocations and localizes the remaining end-to-end gap to Apollo's
-  algorithm, layout, and pass structure rather than Hermes lane overhead.
-- **Non-goals:** adopting `fearless_simd`, which would re-fork the dimension
-  Hermes owns; changing Apollo inside this provider increment. Apollo adoption
-  and its remaining allocation/kernel work are the next consumer increment.
-- **Acceptance oracle:** a consumer-shaped kernel in this repository reaching a
-  recorded arithmetic rate within a stated factor of `fearless_simd` on the same
-  host, or a recorded explanation of the residual with codegen evidence.
-- **Risk / change class:** [arch][major]; `LaneKernel::call` gains the
-  capability argument and raw register constructors become crate-private.
-  **Dependencies:** none.
-- **Why this is Hermes' item:** the consumer eliminated every lever available to
-  it. What separates 3.4-6.1 from 33-38 is not reachable from an algorithm
-  choice; it is a property of the lane operations, which is this crate's bounded
-  context. That a *safe* abstraction reaches 32.8 also removes safety as the
-  explanation.
-
-## HS-NUMA-GEN-ISOLATION-2026-08-25 — Assert the property, not the global counter [patch] — done 2026-08-26
-
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-- **Outcome:** `test_numa_locality_caching_correctness_and_invalidation` verifies
-  that allocation does not bump the NUMA allocation generation and deallocation
-  does, without asserting an absolute value of a process-global counter.
-- **Finding:** the test asserts `gen_after_alloc == gen_start` on a counter that
-  any `AlignedVec` deallocation anywhere in the process bumps. Nextest's
-  process-per-test isolation makes that hold; under a shared-process runner the
-  three sibling NUMA tests race it. Reproduced: one failure, passing on
-  immediate re-run. Details in `gap_audit.md`.
-- **Scope:** that test. **Non-goals:** changing `get_alloc_generation`,
-  `AlignedVec`, or the runner.
-- **Acceptance oracle:** the test passes under both `cargo nextest run` and a
-  shared-process run of the whole suite, and still fails if the generation bump
-  is removed from the deallocation path — so it keeps testing the behavior
-  rather than becoming unfalsifiable.
-- **Risk / change class:** [patch], test-only. **Dependencies:** none.
-- **Driver:** `gap_audit.md`, NUMA generation-counter test isolation.
-- **Delivered:** The contract test now runs its assertions in a child test
-  process when invoked normally, using an environment marker to avoid recursive
-  spawning. The child preserves the exact allocation-neutrality,
-  deallocation-invalidation, manual-bump, and concurrent-cache assertions;
-  unrelated sibling tests can no longer mutate the process-global counter
-  between reads. Focused nextest execution and the complete 28-test
-  shared-process integration binary pass within the standard test budget; no
-  sleep, retry, timeout, runner, allocator, or production-cache behavior
-  changed.
-- **Acceptance:** satisfied for the focused shared-process failure mode; the
-  child-process boundary is deliberately local to this test and does not alter
-  the sanctioned nextest topology.
-
-## HS-FEARLESS-TOKEN-2026-08-25 — Consumer target-feature entry and safe FMA/permute surface [minor] — done 2026-08-25
-
-- **Outcome:** a crate outside `hermes-simd` writes one generic lane kernel with
-  safe operation calls, hands it to Hermes, and the kernel body is monomorphized
-  inside the selected backend's `#[target_feature]` scope. Today that route does
-  not exist: `#[runtime_dispatch]` is applied only within
-  `crates/hermes-simd/src/dispatch/` and `hermes-simd` re-exports no path to it,
-  so a consumer either writes its own `#[target_feature]` trampolines and raw
-  intrinsics or accepts baseline codegen for the generic body.
-- **Scope:** a value-carrying capability token per public backend, its
-  construction path (runtime probe plus the forced-target route already
-  available as `TargetId`), a `vectorize`-class entry that runs a consumer
-  `#[inline(always)]` kernel inside that scope, and a safe operation surface on
-  the token delegating to the existing `BackendKernel<T>` facets. ADR 011's
-  recorded exclusion of `SimdKernel` from the safe-surface argument is revised
-  in the same change with the mechanism that changed it — safe
-  `#[target_feature]` functions (RFC 2396) are stable since Rust 1.86 and the
-  workspace floor is 1.95.
-- **Non-goals:** removing or unsealing the `BackendKernel<T>` facets, which stay
-  as the implementation seam backends implement; adding `fearless_simd` as a
-  dependency; any change to sparse, packed, AMX, tensor, or COW surfaces;
-  migrating a consumer, which is that consumer's own item.
-- **Acceptance oracle:**
-  1. A consumer-shaped integration test defines one generic butterfly-style
-     kernel using only safe token operations and executes it through the entry
-     for every host-supported `TargetId`, asserting value-semantic equality
-     against the scalar target.
-  2. Codegen evidence: the kernel body compiled through the AVX2 entry emits
-     256-bit vector instructions with no call boundary to the facet operations,
-     and the same body compiled without the entry does not. This is the
-     measurement ADR 009 asserts and this item must confirm rather than assume.
-  3. The safe surface adds no `unsafe` at consumer call sites: the test compiles
-     under `#![forbid(unsafe_code)]`.
-- **Dependencies:** none. ADR 009 (target-feature inlining) and ADR 011
-  (bitboard safe surface) are the governing decisions; ADR 011 is revised by
-  this item and ADR 009 is extended, not contradicted.
-- **Risk / change class:** [minor] — additive public surface. `cargo-semver-checks`
-  is authoritative and reclassifies upward if the ADR 011 revision changes an
-  existing signature.
-- **Required authority:** Change on an allowlisted repository; no release.
-- **Verification plan:** workspace Clippy at the pedantic floor, Nextest
-  including the new conformance test, doctests on the new surface, Rustdoc,
-  `cargo-semver-checks`, and the codegen inspection above.
-- **Driver:** `gap_audit.md#fearless-simd-2026-08-25`.
-- **Delivered 2026-08-25:** `hermes_simd::vectorize` plus the `LaneKernel<T>`
-  trait, generated by the same `#[runtime_dispatch]` attribute as every other
-  dispatcher; nine safe operations added to `Vector` (`mul_add`, `reverse`,
-  `interleave`, `deinterleave`, `swap_adjacent`, `dup_even`, `dup_odd`,
-  `fmaddsub`, `fmsubadd`); ADR 016. Scope narrowed from the filed version: the
-  safe surface already existed on `Vector` and only FMA plus the cross-lane
-  permutes were missing, and ADR 011 needed no revision — see the audit
-  amendment. `#[runtime_dispatch]` now forwards doc comments, which retires the
-  `#![expect(missing_docs)]` in `dispatch/popcount.rs`.
-- **Evidence:** codegen through the AVX2 entry emits 41 ymm-bearing
-  instructions including `vfmadd213ps` with no call into the backend
-  operations; the same body without the entry emits zero ymm in the caller and
-  five calls into `hermes-simd-intrinsics`. Conformance test compiles under
-  `#![forbid(unsafe_code)]` and matches the scalar reference at every length.
- The measured consumer is
-  Apollo at revision `424ce431`: 28 files importing `core::arch`, 90
-  `#[target_feature]` attributes, 429 `unsafe` blocks, and one `hermes-simd`
-  call site in `apollo-fft`; and `apollo-fwht`, which does write a generic
-  Hermes kernel and calls it from a function carrying no `#[target_feature]`
-  attribute anywhere in that crate.
 
 ## ATLAS-HERMES-CODEGEN-SSOT-2026-08-21 — Resolve SIMD codegen source of truth [arch] [minor] — in-progress (hosted verification pending)
 
@@ -1104,244 +489,18 @@
   provider lock during unlocked local commands; its derived lock changes were
   discarded. Hosted locked CI remains the delivery gate.
 
-## ATLAS-HERMES-BOOK-TEST-2026-08-20 — Enable executable book samples [patch] — done 2026-08-20
+## HS-BOARD-COMPACTION-TOOLING-2026-09-01 — Stack compactor cannot compact this board [patch] — todo
 
-- Owner: Atlas integration. Scope is `.github/workflows/book-pages.yml`, the
-  four included example sources, `docs/book/simd_arch.md`, and this PM record.
-  The active orphan-module item and existing peer-owned `Cargo.lock` remain
-  outside scope.
-- Acceptance: call the pinned Atlas Pages workflow with `mdbook-test: true`,
-  stage `hermes-simd` as `hermes_simd`, declare every directly referenced
-  staged crate, and pass the four end-to-end examples plus the architecture
-  snippet through the real mdBook rustdoc path.
-- Local evidence: Rust 1.97.0 formatting and diff checks pass; the four
-  included examples compile and run with value assertions; direct rustdoc
-  executes the architecture snippet 1/1. Normal `--locked` Cargo gates stop
-  before compilation because the Atlas development overlay requires lockfile
-  updates; the peer-owned dirty lock is preserved.
-- Hosted evidence: source `932468dac5ef4abadea4bdd12d62b420a4225ba7`, PR #56,
-  and merged default `3a39ef16d679dbac9c1a479b2b9c44135e262af3`. Exact PR CI
-  `32340240365` and Pages build `32340240860` pass, including the benchmark
-  runtime gate. Post-merge CI `32341395485`, Deploy mdBook `32341395955`, and
-  dynamic Pages `32341394367` pass; live Pages returns HTTP 200 with the
-  expected Hermes title.
-- Delivery: the Atlas gitlink records the merged default and this provider item
-  is closed.
-- Re-open trigger: a hosted exact-head source or Pages failure, or a second
-  Hermes package that requires multi-package book staging.
+- **Defect.** `scripts/atlas-board-compact.py` hardcodes `ROOT` to the meta-repo,
+  splits items on `##` headings only, and drops indented `- [x]` bullets
+  (`HS-436`). Run here it would collapse the whole legacy HS-4xx era — every
+  measured-rejection record with it — into one archive line.
+- **Scope.** Take a root argument, recognise the checkbox-bullet form, then
+  re-run against this board and diff to nothing. Meta-repo change. **Lease:** none.
 
-## ATLAS-ORPHAN-MODULES-096-HERMES — Remove orphan tensor view [patch] — done 2026-08-19
+## Legacy HS-4xx record — open items and measured limits
 
-- Owner: Atlas integration; the provider change is limited to the unreferenced
-  `crates/hermes-simd-core/src/tensor/mut_view.rs` source file and this item’s
-  provider PM records. Existing peer edits to sparse/view implementations,
-  `Cargo.toml`, `Cargo.lock`, examples, and delivery notes are excluded.
-- Acceptance is met: no `mod`, `#[path]`, or `include!` edge reaches the
-  deleted file; the unreachable duplicate is removed; the direct orphan
-  detector returns zero; and the required provider matrix is green.
-- Source closure landed in `1fe438c`. The exact hosted provider matrix at the
-  merged code state passes in `31819198076`: formatting, warning-denied
-  Clippy, configured Nextest, doctests, Rustdoc, Miri, cross-compilation,
-  ARM NEON, Intel SDE, benchmark budgets, and supply-chain checks. Atlas
-  already records the merged provider head; this commit closes the stale PM
-  state without changing provider source or the peer-owned lockfile.
-
-- [x] [patch] **HS-434 — workspace lint floor.** The workspace had no
-  `[workspace.lints]` table at all, so the lint policy lived in three
-  overlapping per-crate `#![allow(..)]` blocks and four copies of
-  `#![deny(missing_docs)]`. The blanket suppressions were the real cost:
-  `clippy::missing_safety_doc` was off across the whole of
-  `hermes-simd-intrinsics` — the crate with ~1270 `unsafe` sites — so an
-  `unsafe` public function could ship with no `# Safety` section and nothing
-  would say so.
-  Delivered: one `[workspace.lints]` table (`clippy::pedantic` at warn, plus
-  denied `unwrap_used`/`dbg_macro`/`print_stdout`/`print_stderr` and
-  `allow_attributes` to drive `#[allow]` -> `#[expect]`), inherited by all
-  seven members with `[lints] workspace = true`; the per-crate blocks are
-  deleted and their still-valid entries consolidated into the one table, each
-  carrying the domain reason it is allowed. Fixed in the same change: the
-  `codegen` bin gained crate docs and propagates its file-I/O errors instead of
-  four `unwrap()`s, and the AMX downgrade notice carries a per-site `#[expect]`
-  (HS-433).
-  Measured floor: 2152 library-src pedantic findings remain at warn; they are
-  the HS-435 ratchet, not a silent allow.
-
-- [x] [patch] **HS-433 — AMX downgrade notice writes to stderr.** The
-  cross-NUMA-node AMX -> AVX-512 re-route now emits one release-visible
-  `tracing::warn!` event with the NUMA node, source backend, destination
-  backend, and trigger reason. The event is subscriber-owned and the
-  `no_std` facade keeps `tracing` default features disabled; the old stderr
-  path and its suppression are deleted. The same change removes the unsound
-  no-std global `Cell` substitute for AMX session state: no-std sessions now
-  reject safely because portable no-std Rust has no thread-local storage
-  primitive. ADR 012 records the boundary and alternatives. Evidence:
-  subscriber-backed value assertions, default-feature compilation, and the
-  no-default-features check. Merged head `f4d444b5` passes the exact hosted
-  package matrix in run `31819198076`, including ARM NEON, Intel SDE, Miri,
-  cross-compilation, and supply-chain checks.
-
-- [x] [minor] **HS-435 — pedantic ratchet.** The lint floor (HS-434) is set to
-  warn against the remaining library-src findings. Non-increasing baseline,
-  burnt down by class rather than by file. Acceptance: each increment lowers
-  the recorded count and never raises it.
-  Measured by lint (`--message-format=json`, deduped by lint+file+line+col, so
-  these are exact rather than the earlier message-text estimates):
-
-  | count | lint | note |
-  |------:|------|------|
-  | **0** | `ptr_as_ptr` | **done** — was 171, see below |
-  | **0** | `unreadable_literal` | **done** — bitboard masks use grouped literals; the canonical generated magic table carries a local expectation because regrouping its published constants would obscure table review |
-  | **0** | `must_use_candidate` | **done** — 162 exact findings closed below |
-  | **0** | `elidable_lifetime_names` | **done** — 131 explicit lifetime names elided mechanically; relationships with independent input lifetimes remain explicit |
-  | **0** | `semicolon_if_nothing_returned` | **done** — 92 unit, example, benchmark, kernel, and AMX wrapper return statements now make their unit-value intent explicit |
-  | **0** | `missing_errors_doc` | **done** — all 47 public `Result` APIs document their error contracts |
-  | **0** | `cast_lossless` | **done** — swept with the consolidated mechanical fixes; prefer `From` over `as` where infallible |
-  | **0** | `doc_markdown` | **done** — backticks |
-  | **0** | `uninlined_format_args` | **done** — mechanical |
-  | **0** | `allow_attributes` | **done** — library source suppressions now use reasoned `#[expect]` or are deleted when unfulfilled; test/bench-only suppressions remain outside this library-source ratchet |
-  | **0** | `cast_ptr_alignment` | **done** — 21 deliberately unaligned intrinsic sites reviewed below |
-  | **0** | `missing_panics_doc` | **done** — 19 contract-bearing APIs documented below |
-  | **0** | `ref_as_ptr` | **done** — 13 reference-to-slice pointer sites use `from_ref`/`from_mut` |
-  | **0** | `ptr_cast_constness` | **done** — raw-pointer constness casts use typed pointer methods |
-  | **0** | `missing_safety_doc` | **done** — AMX raw preconditions documented below |
-
-  Sequence: the doc sections and `must_use` next (contract-bearing), then
-  `cast_ptr_alignment` reviewed individually rather than swept, cosmetics last.
-
-  **Claimed increment (2026-08-14, codex session):** burn down the
-  `must_use_candidate` class in `hermes-simd-core` only. The scope is public
-  value-returning core APIs, their co-located documentation, and focused
-  contract checks; unrelated lint classes, intrinsics, and peer-owned
-  `Cargo.lock` state are non-goals. Acceptance is a lower exact class count,
-  `cargo fmt --check`, focused core nextest, and a clean targeted Clippy run.
-
-  **`must_use_candidate` burned down: 162 -> 0 (2026-08-14).** The public
-  value-returning APIs in `hermes-simd-core` now carry `#[must_use]`, including
-  SIMD reductions and lane operations, views, aligned storage, sparse/COW
-  conversions, and scalar rounding. Clippy's targeted `must_use_candidate`
-  gate is clean after the mechanical fixes and the remaining contract-bearing
-  methods were annotated by hand. `cargo fmt --all -- --check` and the focused
-  `hermes-simd-core` nextest suite pass 16/16. The remaining HS-435 classes are
-  unchanged and stay in the table above.
-
-  **`missing_panics_doc` burned down: 19 -> 0 (2026-08-14).** The core API
-  docs now state the concrete panic conditions for alignment-preserving views,
-  mask lane-count checks, SIMD host support, chunk bounds, tensor invariants,
-  tile validation, and zero-sized-vector length overflow. The targeted
-  `clippy::missing_panics_doc` gate is clean; `cargo fmt --all -- --check` and
-  the focused `hermes-simd-core` nextest suite pass 16/16. The remaining
-  HS-435 classes are unchanged and stay in the table above.
-
-  **`cast_ptr_alignment` burned down: 21 -> 0 (2026-08-14).** The AVX2
-  F16C, AVX-VNNI, AVX-512 VNNI, and consumer unpack paths now carry precise
-  per-site expectations where the intrinsic is explicitly an unaligned
-  load/store. The workspace all-targets `clippy::cast_ptr_alignment` gate is
-  clean, and the focused intrinsics nextest suite passes 30/30. No alignment
-  promise was weakened; each expectation is attached to the matching
-  `_loadu`, `_loadl`, or `_storeu` intrinsic.
-
-  **`ref_as_ptr` burned down: 13 -> 0 (2026-08-14).** Slice-view and tensor
-  constructors now use `core::ptr::from_ref`/`from_mut` with explicit
-  const-to-mut pointer casts where their internal representation requires it.
-  The workspace all-targets `clippy::ref_as_ptr` gate is clean, and the
-  focused core nextest suite passes 16/16.
-
-  **`ptr_cast_constness` burned down: 9 -> 0 (2026-08-14).** The remaining
-  mutable-view and tile constructors now use `.cast_const()`/`.cast_mut()`
-  rather than `as` casts that changed only pointer constness. The workspace
-  all-targets gate is clean, and the focused core nextest suite passes 16/16.
-
-  **`missing_errors_doc` burned down: 83 -> 0 (2026-08-14).** Sparse
-  validation, tensor view, tiled-kernel, masked-operation, COW,
-  vector-register, facade-dispatch, complex, modular, and AMX-session `Result`
-  APIs now state their concrete error variants. The workspace all-targets audit
-  is clean for `clippy::missing_errors_doc`; the affected Hermes and intrinsics
-  suites pass 424/424 and the doctest gate passes. The same increment also
-  rejects zero NTT moduli with a typed error and canonicalizes input residues
-  before subtraction. The `SimdOps` trait facade is now 287 lines; its blanket
-  implementations and shared method macro live in the dedicated
-  `dispatch/simd_ops/blanket_impls.rs` leaf, with the package suite passing
-  408/408 after the structural split.
-
-  **`elidable_lifetime_names` burned down: 131 -> 0 (2026-08-14).** The
-  core view, sparse, COW, iterator, tensor, aligned-storage, and SIMD facade
-  implementations now use Rust's elided lifetime forms where the input
-  relationship is unambiguous. Independent input lifetimes remain named, so
-  the change removes syntax without changing the borrow contract. The
-  targeted Clippy audit is clean and the combined core/SIMD nextest suite
-  passes 424/424.
-
-  **`semicolon_if_nothing_returned` burned down: 92 -> 0 (2026-08-14).**
-  Unit-valued kernel, AMX wrapper, example, and benchmark statements now use
-  explicit semicolons. This is a syntax-only cleanup; the affected provider
-  and intrinsic suites pass 454/454, and the benchmark-target smoke gate
-  completes successfully.
-
-  **Strict all-target workspace gate restored (2026-08-14).** The provider
-  workspace now passes `cargo clippy --workspace --all-targets -- -D warnings`
-  after consolidating mechanical lint fixes and documenting the few domain
-  contracts that must remain explicit: exact manufactured floating-point
-  oracles, canonical magic tables, and structural kernel-size exceptions.
-  The bitboard public boundary also validates squares before shift arithmetic,
-  so the negative regression tests assert the domain error rather than an
-  incidental overflow panic. Verification: `cargo fmt --all -- --check`,
-  `cargo test --doc -p hermes-simd-core -p hermes-simd -p
-  hermes-simd-intrinsics`, nextest 454/454, and benchmark smoke pass.
-
-  **`cast_lossless` / `doc_markdown` / `uninlined_format_args` verified at 0
-  (2026-08-14).** The consolidated mechanical sweep in the strict-gate
-  increment had already cleared these three classes; the table lagged behind
-  the tree. Verified with a clean full-workspace measurement: `cargo clippy
-  --workspace --all-targets` after `cargo clean` emits zero diagnostics under
-  the workspace lint table, and a forced `-W clippy::pedantic` re-lint of all
-  seven crates yields only the curated-allow classes (inline_always,
-  cast_* precision/wrap/truncation/sign-loss, similar_names,
-  many_single_char_names — 1387 unique, matching the allowed set exactly), with
-  not one occurrence of the three formerly-pending classes. The strict gate
-  therefore holds; HS-435 is complete.
-
-  **`ptr_as_ptr` burned down: 171 -> 0.** 167 sites converted mechanically by
-  `cargo clippy --fix` restricted to that one lint; the remaining 4 were
-  inference-typed (`as *const _`) so carried no machine-applicable suggestion
-  and were done by hand. `.cast::<T>()` cannot change constness, which is the
-  point: `as` silently can. Net -77 lines, since the shorter form let rustfmt
-  collapse call sites that had been wrapped.
-  Note for whoever takes the next class: `--fix` obeys the *workspace* lint
-  table, not just the lint you pass, so `-A clippy::all -A clippy::pedantic
-  -A clippy::restriction` is required to keep the diff to one transform. Without
-  it the run also rewrote 26 `#[allow]` -> `#[expect]` and left 19 unfulfilled
-  expectations behind.
-
-  **`allow_attributes` burned down 26 -> 0 (2026-08-14).** The source sweep
-  replaced target-specific and macro-contract suppressions with reasoned
-  `#[expect]` attributes, deleted unfulfilled `unused_mut` and `dead_code`
-  suppressions, and made the aarch64-only unreachable-code expectation
-  conditional. A focused `clippy::allow_attributes` run over the affected
-  core, intrinsics, facade, and macro packages is clean; core nextest is 16/16.
-
- - [x] [major] [arch] **HS-436 — `SimdKernel` operation-family facets.** Owner:
-   ryan (agent, claimed 2026-08-14; ADR 013 accepted). The former monolithic
-   implementation seam is now `BackendKernel` under `kernel/backend.rs`, and
-   the public `SimdKernel` aggregate exposes the operation-family facets
-   `SimdLoadStore`, `SimdArith`, `SimdBitwise`, `SimdCompare`, `SimdReduce`,
-   `SimdMask`, `SimdGather`, and `SimdPermute` under `kernel/roles/`.
-   The facets are zero-sized public operation contracts with blanket forwarding
-   implementations over the sealed backend seam, so consumer bounds name one
-   family without exposing unrelated methods, duplicating generated ISA
-   implementations, or adding runtime dispatch. Shared register associations
-   are carried by `SimdStorage`; in-repository qualified projections were
-   migrated to the appropriate storage or backend seam. No compatibility
-   re-export is retained.
-   Completion evidence (2026-08-14): single-family consumer paths use the
-   narrowest applicable facet; composite algorithms retain the aggregate only
-   where they require several families. Exact-head gates pass: `cargo fmt
-   --all -- --check`, workspace Clippy with `-D warnings`, `cargo nextest run
-   --workspace --no-fail-fast` (465/465), workspace doctests, and warning-clean
-   workspace Rustdoc. `cargo-semver-checks` passes with `--release-type major`
-   for the intentional public migration, and release `cargo llvm-lines`
-   evidence shows backend monomorphizations with no separate `SimdReduce`
-   forwarding symbol. No compatibility re-export, runtime branch, or
-   allocation was added by the facet forwarding layer.
+In full: the open measurement items, the limits they rest on, and the rejected refactors. The rest of the era is one line each below.
 
 - [x] [minor] **HS-437 — lane scratch buffers are sized to the workspace
   maximum.** The `SimdKernel` default methods and `kernel_helpers` declare
@@ -1394,52 +553,6 @@
   Conclusion unchanged and now covering the default path on this host: the
   typed `LaneBuffer` refactor buys nothing measurable. Re-open only if a future
   backend's default-path frame shows a non-zero `sub rsp`.
-
-- [x] [minor] **HS-422 — scatter seam.** Add `SimdGather::scatter` and
-  `scatter_masked` as defaulted trait methods over a generic lane-sequential
-  helper, override them with native `vscatterdps`/`vscatterdpd` on AVX-512
-  f32/f64, and expose `SimdView::scatter` as the public dual of
-  `SimdView::gather`. Full vectors use the unmasked seam and the final partial
-  vector uses the masked seam, so no scalar tail remains. Indices are validated
-  before any write; duplicate indices are last-writer-wins. The native AVX-512
-  path executed under the SDE job; native silicon execution is best-effort on
-  the HS-429 `test-avx512-hosted` job when the hosted x86 runner carries
-  AVX-512.
-
-- [x] [minor] **HS-423 — rounding primitives.** The kernel trait has no
-  `floor`/`ceil`/`round`/`trunc` although every target ISA provides them
-  natively. Blocked on an upstream eunomia unit: `NumericElement` exposes no
-  rounding, so the Hermes default would have to widen through `to_f64` and
-  narrow back — a fake generic. Sequence: eunomia adds rounding to
-  `NumericElement` (identity on integer impls) and releases; Hermes bumps, adds
-  the defaults over `generic_unary_op`, and overrides on AVX2/AVX-512/NEON.
-  Acceptance: per-backend differential tests against the scalar reference,
-  covering negative values, halfway cases (the round-half-to-even contract must
-  be pinned explicitly), and the infinity/NaN contract.
-  Re-open trigger: the eunomia rounding release lands.
-  Delivered on `feat/hermes-rounding` (58c31a9 + df32296): trait defaults over
-  `generic_unary_op`; AVX2 (`vroundps`/`vroundpd`), AVX-512
-  (`_mm512_roundscale_ps/pd` — stdarch lacks `_mm512_floor/ceil_*`), and NEON
-  (`frintm`/`frintp`/`frintn`/`frintz`) overrides; `RoundTiesEven` sealed trait
-  routing `f32`/`f64` to inherent `round_ties_even` and the reduced-precision
-  wrappers to the exact round-narrow path; `Floor`/`Ceil`/`Round`/`Trunc`
-  UnaryOp strategies re-exported from `hermes_simd`. Differential coverage:
-  `rounding_matches_reference_all_backends` pins bit-exact equality against the
-  plain-scalar family over ties, straddling values, ±Inf, NaN, and signed
-  zeros on Scalar/SveArch/AVX2 (this host) and AVX-512/NEON (compile-only here,
-  exercised in CI); the UnaryOp seam is covered via `map_unary`/in-place.
-
-- [x] [minor] **HS-424 — cross-lane permute family.** `SimdKernel::reverse`,
-  `interleave`, and `deinterleave` join the trait as defaulted methods, so lane
-  reordering no longer requires leaving the vector domain and no backend impl
-  changed. All three are specified on the *flat* lane sequence, not per 128-bit
-  sub-lane — the distinction that makes x86 `unpack` unusable as a drop-in
-  override. `deinterleave` is the exact inverse of `interleave` and `reverse`
-  is an involution; both identities are tested. AVX2 overrides `reverse`
-  natively (`vpermps` by index vector for f32, `vpermpd` by immediate for f64),
-  verified on this host and confirmed non-vacuous by a deliberate-break check.
-  AVX-512 and NEON overrides, and native flat `interleave`/`deinterleave`, are
-  deferred to HS-427 rather than shipped as unexecutable index math.
 
 - [x] [patch] **HS-428 — identify and assert per-runner backend coverage.**
   Backend selection is automated from runtime probes, which is correct, but a
@@ -1516,33 +629,6 @@
   result, these may not pay either; they are kept as correctness-equivalent
   canonical lowerings, not as a speed claim. Follow-up HS-430.
 
-- [x] [patch] **HS-431 — repair the panicking compress benchmark.**
-  `compress_bench`'s scalar rows built a `BitMask::<1>` for a backend whose f32
-  lane count is 4, so `SimdView::compress`'s lane-count assertion aborted the
-  binary. Broken since 2afe675 (2026-07-07) and undetected because the
-  benchmark job runs only on pull requests and dispatches, and the one
-  intervening pull request failed earlier at the gates — the budget job never
-  reached it. The width now derives from
-  `<Scalar as SimdStorage<f32>>::LANE_COUNT` rather than a literal, so a backend
-  width change cannot silently rot it again. All thirteen bench targets smoke
-  clean locally.
-  Trigger-coverage finding: a job gated to pull requests is not a gate for work
-  that lands by direct push. Either the budget job runs on push too, or bench
-  rot is caught only when someone opens a pull request — filed as HS-432.
-
-- [x] [patch] **HS-432 — benchmark budget job never runs on pushed work.**
-  Owner: Codex on `codex/hermes-benchmark-trigger`; claimed 2026-08-12.
-  `benchmark-budgets` is gated to `pull_request` and `workflow_dispatch`, so
-  every commit that reaches `main` by direct push — which is how this stream
-  delivers — skips it entirely. HS-431's panic survived a month that way.
-  Resolution: the job now runs on push, pull request, and manual dispatch. The
-  compile and every-binary 60-second smoke run execute for all events; the two
-  300-second canonical measurements remain on pull requests and manual runs.
-  A bench that panics or breaches its smoke budget therefore fails CI on the
-  same event that introduced it. The push path does not claim full benchmark
-  performance evidence. Exact hosted run `31819198076` passes the compile,
-  60-second smoke, and bounded canonical benchmark steps.
-
 - [ ] [patch] **HS-430 — measure the AVX-512 and NEON permute overrides.**
   HS-427 shipped them on correctness alone. The AVX2 result — a hand-written
   native sequence losing 37% to the generic default — is the reason this cannot
@@ -1588,336 +674,6 @@
   respectively; their native overrides remain. The smaller rows were within
   Criterion's noise threshold. AVX-512 performance remains open under HS-429
   because SDE is semantic evidence only.
-
-- [x] [major] **HS-425 — `TargetId` omits the SVE backend.** Owner: ryan (agent,
-  claimed 2026-08-15; ADR 014 drafted). `SveArch` is a
-  first-class emulated backend exercised throughout the test suite, but
-  `TargetId` enumerates only Scalar/Avx2/Avx512/Neon. The public forced-dispatch
-  token API therefore cannot reach a backend the workspace ships, leaving a hole
-  in the cross-target conformance matrix. Acceptance: `TargetId::Sve` routed
-  through `dispatch_view_to`/`dispatch_view_mut_to` with conformance coverage,
-  and `dispatch_view` auto-selection left untouched — an emulated backend must
-  stay explicitly requested, never auto-selected.
-  Reclassified from [patch] on inspection: `TargetId` and `DispatchedView` are
-  both public enums without `#[non_exhaustive]`, so adding a variant breaks
-  every downstream exhaustive match. The item therefore needs an ADR covering
-  the variant addition, whether to apply `#[non_exhaustive]` to both enums in
-  the same break so this never recurs, and the pre-1.0 minor-bump migration
-  note. Precondition: that ADR drafted and the version decision made.
-  Delivered 2026-08-16 (closure takeover; the implementation merged via PR #49,
-  merge commit fb36e0f / feature commit dd4cc78, but the item was left open).
-  Acceptance verified on current `main`: `TargetId::Sve` routes through
-  `dispatch_view_to` (`target.rs:213`) and `dispatch_view_mut_to`
-  (`target.rs:282`, via `SimdView::<T, SveArch, …>::new_mut`); conformance
-  coverage exists in `tests/backend_coverage_tests.rs:138` and
-  `tests/host_capability_tests.rs:34-38/158/179`; `#[non_exhaustive]` is applied
-  to `TargetId` (`target.rs:22`); `dispatch_view` auto-selection
-  (`lib.rs:296-333`) has no `Sve` branch, so the emulated backend stays
-  explicitly requested. ADR 014 (Proposed) and the CHANGELOG **Breaking**
-  `[major][HS-425]` entry were part of the same merge.
-
-- [x] [patch] **HS-426 — ADR index hygiene.** `docs/adr/` carried two ADRs
-  numbered 007, eight of eleven with no `## Status` section (the generated index
-  rendered them `—`), and `Approved` rather than the canonical `Accepted` on the
-  three that had one. The later duplicate (`007-bitboard-kernel-safe-surface`,
-  added 2026-07-23) renumbered to 011 with its CHANGELOG and backlog references
-  updated; every ADR now carries a canonical status, and the index is
-  regenerated. All eleven are `Accepted`: the two feasibility studies (006 SSE2,
-  007 SME) record decisions *not* to build, which is an accepted decision, not a
-  rejected proposal.
-
-- [x] [patch] **HS-420 — mutable generic view tails.** Route the final
-  `SimdView::transform_in_place` partial vector through initialized local
-  operand/result buffers and the provider's generic `ElementOp` vector seam.
-  Only live result lanes are copied back, so Add/Sub/Mul/Div and future sealed
-  operations share one bounds-safe tail implementation. Forced emulated-SVE
-  coverage verifies an odd non-dyadic length.
-
-- [x] [arch] **HS-421 — native AVX-512 BF16 tile dispatch.** Add the exact
-  `avx512bf16` capability SSOT and route the existing `Bf16 × Bf16 → F32` tile
-  provider through native `DPBF16PS` when available, retaining the
-  AVX-512F/BW/VL conversion/FMA fallback on non-BF16 AVX-512 hosts. Native
-  coverage uses a nonzero `C` accumulation oracle and remains capability-gated
-  on ordinary hosts.
-
-- [x] [patch] **HS-419 — pairwise reduction tails.** Route the final partial
-  `SimdView::zip_reduce` vector through two initialized provider-local buffers
-  and the generic masked reduction seam. `Dot` now avoids its element-at-a-time
-  cleanup while preserving the full-width masked-memory contract; `Product` and
-  future non-opted-in operations retain their scalar pairwise contract. Forced
-  emulated-SVE coverage uses non-dyadic f32 inputs with a reassociation tolerance.
-
-- [x] [patch] **HS-418 — dense dot-product tails.** Route the final partial
-  `SimdView::dot` lanes through initialized provider-local buffers and the
-  existing masked-FMA seam. The full-width masked-memory contract remains
-  valid for every backend, only live lanes contribute to the final reduction,
-  and odd non-dyadic f32 coverage records the expected fused-rounding tolerance.
-
-- [x] [patch] **HS-417 — transposed GEMV column tails.** Route the final
-  `gemv_transpose` partial columns through initialized provider-local lane
-  buffers and the existing masked-FMA seam. The local buffers preserve the
-  full-width masked-memory contract for scalar, AVX2, AVX-512, NEON, and the
-  emulated SVE backend; only live tail elements are copied back. Non-dyadic f32
-  coverage uses the documented tolerance for fused-operation rounding. The
-  operation remains a single Hermes provider implementation; no consumer-local
-  SIMD copy was introduced.
-
-- [x] [patch] **HS-416 — generic reduction and view tails.** Route generic
-  `Sum`/`Min`/`Max` final partial vectors through the provider-owned masked
-  reduction seam, and consolidate `SimdView::sum` onto `reduce(Sum)` so there
-  is one reduction implementation. `masked_add`, `masked_mul`,
-  `masked_fmadd`, `elementwise_mul`, and generic `zip_into` now use initialized
-  local lane buffers plus a leading live-tail mask instead of element-at-a-time
-  tail loops. The operation preserves the existing Eunomia min/max NaN and
-  signed-zero contract; floating sums use the established SIMD grouping
-  envelope. Verification: scalar-contract and odd-length view differential
-  tests, warning-denied core/package Clippy, Nextest, rustfmt, and diff checks.
-
-- [x] [patch] **HS-415 — masked popcount tails.** Route the final partial
-  vectors in `reduce_popcount` and the shared binary `reduce_popcount_op` through
-  `SimdKernel::masked_sum_reduce`. Source lanes are copied into  initialized
-  provider-local buffers before full-width loads, and each masked tail count is
-  exact; the existing whole-reduction accumulator contract is unchanged.  The increment is limited to popcount reductions; generic sum/min/max and other view tails are covered by HS-416. Verification: multi-width integer differential tests, warning-denied core/package Clippy, Nextest, rustfmt, and diff checks.
-
-- [x] [patch] **HS-414 — masked absolute-reduction tails.** Route the final
-  partial vector for `AbsSum` and `AbsMax` through the generic provider-owned
-  masked reduction seam. The reduction strategy applies its transform before
-  merging inactive lanes with its neutral identity, while the view copies only
-  live elements into an initialized local buffer.  The increment is limited to absolute reductions; generic sum/min/max and broader views are covered by HS-416, while popcount and unrelated hot kernels remain separate follow-ups. Verification: f32/f64 odd-length value
-
-  regressions, warning-denied core/package Clippy, Nextest, rustfmt, and diff
-  checks.
-
-- [x] [patch] **HS-413 — masked row-update tails.** Route the final partial
-  vectors in `axpy_rows` and `axpy_rows_batch` through Hermes' provider-owned
-  `masked_fmadd` seam. The helpers copy only live elements into fully initialized
-  local lane buffers, preserving the AVX2 blend-based bounds proof; the batched
-  path retains its existing depth accumulation order. The increment is limited
-  to row updates; reductions, views, and other hot-kernel scalar tails remain
-  separate follow-ups. Verification: non-dyadic f32 row and depth-batched tail
-  regressions, warning-denied package Clippy, Nextest, rustfmt, and diff checks.
-
-- [x] [patch] **HS-406 follow-up — clean-worktree package gate.** Re-run the full
-  Hermes package gate after unrelated Cargo.lock/overlay dirt is reconciled;
-  focused provider slices must not claim this gate from a dirty worktree.
-  Owner: codex-session (claimed + delivered 2026-08-11); Cargo.lock overlay churn
-  restored to origin before the run. Evidence (rustc 1.97.0, x86_64, shared
-  `D:\atlas\target`): `cargo fmt --check` clean; `cargo clippy --workspace
-  --all-targets -- -D warnings` clean; `cargo nextest run --workspace` 443/443
-  within the committed 30s/60s budget; doctests pass (18 + 4, ignores excluded);
-  `cargo build --examples --workspace` clean; `cargo doc --no-deps` clean under
-  `RUSTDOCFLAGS=-D warnings`; `cargo check --workspace --no-default-features`
-  clean. Benchmark-budget, miri, and aarch64 jobs are CI-only (host lacks the
-  runners); they run on the merged branch's push.
-
-
-Strategic roadmap. Triage order: correctness → architecture → tests → docs → PM.
-Tags: `[patch]` / `[minor]` / `[major]` / `[arch]` per SemVer change class.
-Tactical breakdown of the active items lives in [checklist.md](checklist.md).
-External gap findings live in [gap_audit.md](gap_audit.md).
-
-- [x] [patch] **HS-412 — masked fused AXPY-mul tail boundary.** Route the final
-  partial `axpy_mul` vector through Hermes' provider-owned `masked_fmadd` seam
-  after register scaling, using initialized local lane buffers so blend-based
-  backends never read beyond the live slice. The increment is limited to
-  `axpy_mul`; row updates, reductions, views, and other hot-kernel scalar tails
-  remain separate follow-ups until each has its own bounds proof and
-  value-semantic coverage. Verification: focused f32/f64 tail tests including
-  fused-operation order, warning-denied package Clippy, Nextest, rustfmt, and
-  diff checks.
-
-- [x] [patch] **HS-411 — masked scale tail boundary.** Route the final partial
-  in-place `scale` vector through Hermes' provider-owned `masked_mul` seam while
-  using initialized local lane buffers so blend-based backends never read beyond
-  the live slice. The increment is limited to `scale`; reductions, views,
-  `axpy_mul`, row updates, and other hot-kernel scalar tails remain separate
-  follow-ups until each has its own bounds proof and value-semantic coverage.
-  Verification: focused f32/f64 tail tests, warning-denied package Clippy,
-  Nextest, rustfmt, and diff checks.
-
-- [x] [patch] **HS-410 — masked AXPY tail boundary.** Route the final partial
-  `axpy` vector through Hermes' provider-owned `masked_fmadd` seam while using
-  initialized local lane buffers so blend-based backends never perform a
-  full-width load beyond the live slice. The increment is limited to `axpy`;
-  `axpy_mul`, row, reduction, and other hot-kernel scalar tails remain separate
-  follow-ups until each has its own bounds proof and value-semantic coverage.
-  Verification: focused f32/f64 tail tests plus an f32 fused-operation-order
-  regression, warning-denied package Clippy, Nextest, rustfmt, and diff checks.
-
-- [x] [minor] **HS-409 — fused ternary AXPY provider facade.** Add the
-  Hermes-owned `axpy_mul` public operation for `out[i] += alpha * a[i] * b[i]`
-  without a temporary. Reuse the existing `SimdKernel::mul`/`fmadd` seam and
-  runtime-dispatch ladder; keep length validation and scalar-tail semantics in
-  the provider. The capability is now available for Kwavers' documented
-  `c += multiplier * a * b` residual, but downstream adoption remains a
-  separate consumer increment until its tree is free and its focused gates pass.
-
-- [x] [patch] **HS-REL-001 — crates.io publication.** Make the five reusable
-  workspace packages independently packageable, preserve the benchmark and
-  example harnesses as non-publishable, and publish in dependency order through
-  the repository trusted-publishing workflow.
-
-- [x] [patch] **HERMES-MNEMOSYNE-PACKAGE-1 — restore Mnemosyne resolution.**
-  Bind the existing Rust crate alias to package `mnemosyne-memory` 0.6.0,
-  refresh the lockfile, and pass the focused core check.
-
-- [x] [patch] **HERMES-THEMIS-PACKAGE-1 — restore Themis resolution.** Owner:
-  Codex on `codex/hermes-themis-package`. Bind the existing Rust crate alias to
-  upstream package `themis-topology` 0.10.1; refresh the lockfile; pass focused
-  checks; merge before dependent Hephaestus provider CI is retried.
-
-- [x] [patch] **HS-407 — no `&mut [T]` spans uninitialized elements.**
-  The `cow` constructors allocate with `with_capacity`, call `set_len`, and hand
-  the buffer to a filler as `&mut [T]` while its tail is still unwritten
-  (`extensions.rs` map/`splat_fill`/`gather`/`prefix_scan`, `unary.rs`,
-  `combinators.rs`). Every element is initialized before anything reads it, so
-  no wrong value is observable, but forming a `&mut [T]` over uninitialized
-  elements is not a reference the language permits, and `AlignedVec` allocates
-  with `alloc`, not `alloc_zeroed`. Fix by exposing a `spare_capacity_mut`-style
-  `&mut [MaybeUninit<T>]` on `AlignedVec` and filling through it, keeping the
-  zero-fill-free property the perf budget depends on. Acceptance: no `&mut [T]`
-  spans uninitialized elements, miri covers the constructors, and the
-  `dense`/`cow` benchmarks show no regression.
-  Delivered: the four pointer-writing constructors (`map_cow`, `fma_cow`,
-  `splat_fill`, `broadcast_op`) write their tail through the same raw pointer as
-  their vector body and raise the length last, which removes the bounds checks
-  the slice tail carried; `gather` and `prefix_scan` feed a view routine that
-  needs an initialized slice, so they use the new
-  `AlignedVec::with_capacity_zeroed`. `map_unary` was a duplicate of `map_cow`
-  and now delegates to it. Miri covers every constructor across lengths
-  straddling the vector body. No cow-surface benchmark exists to measure the
-  zeroing pass — filed as HS-408.
-
-- [x] [patch] **HS-405 — safe code could execute an unsupported ISA.** A
-  `SimdView`, `SparseView`, or owned `SimdCow` could be built for any `Arch`
-  marker regardless of host support, after which every operation invoked
-  `#[target_feature]`-gated kernels — undefined behavior, reproduced as a hard
-  `SIGILL` from a program containing no `unsafe`. Delivered: construction is now
-  the checkpoint (`SimdView::new`/`new_mut` return `None`; the sparse and owned
-  copy-on-write constructors assert), so possessing one of these values proves
-  its kernels are callable. Runtime dispatch was never affected. Covered by
-  tests asserting availability tracks the platform probe; no measured benchmark
-  change.
-
-- [x] [patch] **HS-408 — benchmark the copy-on-write surface.** No Criterion
-  target covers `map_cow`, the scalar-broadcast ops, `splat_fill`, `gather`, or
-  `prefix_scan`, so HS-407's claim that the pointer-tail rewrite adds no work
-  rests on reasoning (unchecked stores replacing bounds-checked ones) rather
-  than measurement, and the zeroing pass `gather`/`prefix_scan` now pay is
-  unquantified. Add a `cow` group to the dense suite within the committed 60s
-  smoke and 300s full budgets. Acceptance: baselines stored for each op, the
-  zeroing cost quantified, and a decision recorded on whether it justifies
-  teaching the view routines to fill `&mut [MaybeUninit<T>]`.
-  Delivered: a `cow_f32` group (map_cow, mul_scalar_cow, splat_fill, fma_cow,
-  gather, prefix_scan) at the four dense sizes measured the zeroing pass at
-  12-59% on gather/prefix_scan, so the view gained `gather_into_uninit` /
-  `prefix_scan_into_uninit` filling `AlignedVec::spare_capacity_mut`; those
-  constructors now skip the zero-fill (-5% to -31% vs the zeroed version) and
-  `with_capacity_zeroed` is removed. Miri covers the uninit fill.
-
-- [x] [patch] **HS-406 — per-site `SAFETY` comments for pointer obligations.**
-  Progress: `bitboard.rs` is closed — auditing it found the `unsafe` unjustified
-  rather than undocumented, so `BitBoardKernel` became a safe trait (ADR 011)
-  and the module went from seven blocks to two, both documented. The six `cow`
-  modules now carry module-level `# Safety` sections plus per-site comments on
-  their `with_capacity`/`set_len` buffers. Remaining:
-  With HS-405 making the target-feature obligation an enforced invariant, the
-  six arch-generic modules state it once in a module-level `# Safety` section.
-  What remains is the *site-specific* half: the raw-pointer arithmetic in
-  `view/reduce.rs` (66 blocks), `sparse/spmv.rs` (69), `sparse/ops.rs` (35),
-  `tiling/` (65), and `view/vector_reg.rs` (46) still needs per-block comments
-  stating the bounds and provenance argument. Scope: one module per increment,
-  pointer-manipulating modules first (`bitboard.rs`, `cow/`). Acceptance: every
-  `unsafe` block in the module carries an obligation-specific comment, or is
-  removed because the invariant makes it unnecessary; warning-denied Clippy and
-  Nextest stay green.
-  Progress: `bitboard.rs` and `cow/` closed earlier; `sparse/spmv.rs` now done —
-  its ~30 single-call unsafe blocks consolidated to 9, each documented, a missing
-  `# Safety` doc added to `sellp_spmv_vectorized`, and a miri differential test
-  added over all four formats. Remaining: `view/reduce.rs`, `sparse/ops.rs`,
-  `tiling/`, `view/vector_reg.rs`.
-  `sparse/ops.rs` now done too — its 35 undocumented unsafe blocks consolidated
-  to 7 documented ones, and the audit found a reachable OOB in the CSR
-  `elementwise_mul_dense` gather (unvalidated view, no dense-length guard; miri
-  confirmed the UB) now fixed with validate + length asserts. Remaining:
-  `view/reduce.rs`, `tiling/`, `view/vector_reg.rs`.
-  `view/vector_reg.rs` now done — module `# Safety` section added, the six
-  `pub unsafe fn` docs corrected to state the target-feature obligation, and
-  per-site comments added to the MaybeUninit and lane-guard blocks (6 to 23
-  SAFETY comments); the code was already well-guarded, so this is
-  documentation-only. `view/reduce.rs` now done — its 66 fragmented unsafe blocks
-  consolidated to 35 documented ones (behavior-preserving code motion, verified
-  codegen-neutral against benchmark noise, miri-covered). `tiling/` now done —
-  its four kernels gain module `# Safety` sections, 65 unsafe blocks consolidate
-  to 32 documented ones, and a miri differential test covers all four (audit
-  found no defect; the kernels already validate dims with overflow rejection).
-  **HS-406 complete** — the whole `hermes-simd-core` unsafe surface is now
-  documented (module invariants + per-site obligations).
-  Verified 2026-08-12: full-source scan of all 48 unsafe-bearing files found no
-  undocumented `unsafe {` (flagged sites were scanner false positives — SAFETY
-  comments sit above the enclosing closures/functions, e.g. `view/reduce.rs:64`,
-  `tiling/gemv.rs:117`); CI miri job green on main (run 31546997718), clippy
-  `-D warnings` green in the same run.
-
-- [x] [patch] **HS-404 — `cmp_ne` NaN semantics diverged across backends.** The
-  trait default returns all-ones for `NaN != NaN` (Rust `!=` is true), while the
-  AVX2 and AVX-512 backends use the ordered `_CMP_NEQ_OQ` predicate, which
-  returns zero. A caller comparing NaN-bearing data therefore gets
-  backend-dependent results — the same defect class HS-403 removed from
-  `argmin`/`argmax`. Found while vectorizing the extremum scan, which avoids the
-  divergence by testing `cmp_eq(v, v)` instead (false for NaN under both the
-  ordered hardware predicates and the scalar default). Decide the intended
-  contract — unordered `_CMP_NEQ_UQ` to match the scalar default, or an ordered
-  contract documented on the trait and mirrored by the default — apply it to
-  every backend, and pin it with a cross-backend property test beside
-  `check_vector_to_mask_matches_cmp`. Acceptance: one documented NaN contract,
-  differential scalar-versus-native coverage, warning-denied Clippy and Nextest.
-  Delivered: the x86 backends adopt the unordered `_CMP_NEQ_UQ`, the exact
-  complement of `cmp_eq`'s `_CMP_EQ_OQ`, so `cmp_ne` is the lane-wise negation
-  of `cmp_eq` on every backend. Tracing the shared predicate also exposed
-  AVX-512 `blend` testing its mask against zero — rejecting every active lane,
-  whose `ALL_ONES` pattern is a NaN — now fixed to extract the sign bit through
-  `vector_to_mask` per its documented contract. Both are pinned by cross-backend
-  property tests; the `cmp_ne` one reproduces the defect on AVX2 hardware.
-
-- [x] [patch] **HS-403 — deterministic extrema and benchmark budgets.** Reject
-  NaN-containing `argmin`/`argmax` inputs, preserve
-  the first slice element's signed-zero representation, and exercise every
-  workspace Criterion binary under a committed 60-second smoke budget and run
-  the changed canonical dense and SIMD instruments under 300-second full-run
-  budgets. The first hosted smoke exposed an invalid signed-byte ZMM instruction
-  in AVX-512 VNNI dispatch; replace it with exact `VPDPBUSD` bias correction.
-  Acceptance: scalar/runtime-dispatch value tests, warning-denied Clippy,
-  Nextest, and exact-head hosted CI pass.
-
-- [x] [patch] **HS-402 — delivered 2026-07-19 in PR #10.** Regenerate the Hermes provider lock
-  against merged Eunomia 0.6 after Eunomia retired its production raw-half
-  trait surface. Acceptance: one Eunomia 0.6 identity, no normal `half` edge
-  introduced by Eunomia, and the full Hermes verification gate remains green.
-  Atlas gitlink publication is tracked by ATLAS-INTEGRATION-027.
-
-- [x] [patch] Close standalone Git provider resolution on the
-  Mnemosyne, Eunomia, and Themis default branches; remove local patch
-  overrides and prove a single locked provider identity for `hermes-simd`.
-  Delivered 2026-07-15: locked graph inspection plus package-scoped fmt,
-  warning-denied Clippy, nextest, rustdoc, and `cargo deny check` gates pass.
-  CI removes its obsolete sibling checkouts and allowlists the reviewed provider
-  Git sources.
-
-## Delivered (2026-07-18)
-
-- [x] [arch] **HS-401 — delivered 2026-07-18 in PR #8.** Takeover of
-  `feat/eunomia-f16-migration`. Replace raw `half::f16`/`half::bf16` across
-  Hermes' scalar, ISA, tiled-matrix, tests, and benchmark contracts with
-  Eunomia's native `F16`/`Bf16`; remove every direct Hermes `half` dependency.
-  Scope: workspace/member manifests, reduced-precision source/tests/benches,
-  lockfile resolution, and PM artifacts. Acceptance: zero raw-half source or
-  direct-dependency residue, one Eunomia identity, warning-denied all-feature
-  Clippy, full Nextest, doctests, rustdoc, no-default-feature checks, and an
-  explicit semver classification. Local gates and PR #8's x86, AArch64
-  cross-compile, native AArch64 NEON, Miri, cargo-deny, and CodeRabbit gates
-  pass. `half` remains transitive through Eunomia's temporary raw-trait surface
-  and Criterion's Ciborium dependency.
 
 ## Open
 
@@ -2012,161 +768,6 @@ External gap findings live in [gap_audit.md](gap_audit.md).
   number in use is not necessarily near the top. `grep -o 'HS-[0-9]\+' backlog.md
   | sort -u | sort -t- -k2 -n | tail -1` gives it.
 
-## Delivered (2026-06-11)
-
-- [x] [minor] (2026-07-05) Sparse `Validated` typestate follow-up. CSR,
-  SELL-p, and Blocked-COO SpMV now require `ValidatedData` storage; malformed
-  sparse structures fail at validated view/COW/public-dispatch construction, and
-  hot `SparseSpMv` impls run only on `SparseView<Validated<_>>` without per-call
-  structural scans. Regression/property coverage checks construction-time
-  rejection plus value-semantic SpMV for all three formats. Evidence tier:
-  type-level typestate + property tests; local compile/nextest pending shared
-  Cargo target lock clearance.
-- [x] [minor] (2026-07-05) Safe-code ISA fault hardening. `SimdArch` now owns
-  runtime-support probing for safe wrappers and forced dispatch; safe AVX-512
-  vector constructors/checked slice wrappers return `SimdError::UnsupportedTarget`
-  on unsupported hosts before executing target-feature code, while infallible
-  conveniences panic before ISA execution. `AmxSession::new` and
-  `AmxBatchSession::begin` return `AmxSessionError::UnsupportedTarget` before
-  `ldtilecfg`; `release` guards `tilerelease`. Evidence: unsupported-host
-  regression coverage plus focused package verification.
-- [x] [patch] (2026-07-02) AMX auto-dispatch mitigation. `hermes-simd`
-  conservatively reports no AMX support until the permission-aware probe above
-  exists, avoiding unstable Rust AMX feature-detection macros and preventing
-  CPUID-only dispatch into AMX tile instructions. AVX-512 tile probes keep exact
-  stable feature checks. Evidence: `cargo check -p hermes-simd`; `cargo clippy
-  -p hermes-simd --all-targets -- -D warnings`.
-- [x] [patch] (2026-06-28) `recip_sqrt` full native precision. The f64 SIMD paths
-  and NEON f32 under-refined a low-bit hardware `rsqrt` seed (one Newton step),
-  giving backend-dependent accuracy from ~1e-16 (scalar) to ~1.5e-5 (NEON) —
-  masked by perfect-square test inputs + magic tolerances. Now ~1 ulp everywhere:
-  f32 fast `rsqrt`+Newton (NEON two steps), f64 hardware `sqrt`+divide. New
-  cross-backend differential test with derived bounds (`8·ε_f32`/`4·ε_f64`) over
-  non-perfect-square inputs; old tests de-gamed. x86 verified locally, NEON on
-  aarch64 CI. 380 tests + clippy/fmt/doc clean. See [gap_audit](gap_audit.md#resolved).
-- [x] [patch] (2026-06-28) Integer `sqrt` exactness. `NumericElement::sqrt` for
-  integers used a lossy `(self as f64).sqrt() as Self` roundtrip (wrong for large
-  `i64`/`u64`); now exact `isqrt` with a documented negative contract. New
-  value-semantic tests (large-operand regressions + `r²≤n<(r+1)²` invariant +
-  negatives) over all 8 integer types — sqrt previously had zero coverage. 379
-  tests + clippy/fmt clean. See [gap_audit](gap_audit.md#resolved).
-- [x] [patch] (2026-06-28) Memory-safety: tiling dimension-product overflow.
-  GEMV/GEMM operand-length checks used unchecked `usize` products
-  (`(nrows−1)·lda+ncols`, `m·k`, …) as the sole guard before unsafe SIMD loads;
-  an adversarial dim from the public dispatch API (`lda=usize::MAX`) wrapped under
-  release `overflow-checks=false` → OOB read. Fixed via SSOT `tiling::dims`
-  checked-span helpers (also dedups the forward/transpose span math) +
-  `[profile.dev] overflow-checks=true`. Exact-variant overflow regressions on all
-  three dispatchers pass in dev AND release; 377 tests + clippy/fmt/doc clean.
-  See [gap_audit](gap_audit.md#resolved).
-- [x] [minor] (2026-06-28) Masked-merge `SimdKernel` defaults — SIMD-capability
-  monomorphization. Investigation found the kernel seam already mature (rsqrt,
-  popcount, horizontal-bitwise, reductions, scans are all defaulted methods or
-  ZST strategies = one generic addition each). Closed the last `required`-on-every
-  -impl family: the six masked-merge methods (`masked_{load,store}_unaligned`,
-  `masked_{add,mul,fmadd}`, `masked_sum_reduce`, the NumKong P1 tail-free set) now
-  have scalar-emulated trait defaults (`blend(mask_to_vector(mask), …)` +
-  `kernel_helpers::generic_masked_{load,store}`), removed from
-  `impl_emulated_kernel!` (~66 lines, ~24 backends inherit). New backends/types
-  inherit the family free. Cross-backend differential property test (Scalar/SveArch
-  defaults vs AVX2/AVX-512 natives); 371 tests + clippy/fmt/doc clean. `gather`/
-  `compress`/`expand` stay required (no generic index/lane-introspection primitive).
-  See [gap_audit](gap_audit.md#resolved).
-- [x] [patch] (2026-06-26) Audit round 5 — monomorphization + sparse defect fix.
-  Fixed `spmv_bcoo` (was hardcoded to ScalarArch → SIMD BlockedCoo kernels dead;
-  now runtime-dispatched, + differential SIMD-branch test). Extracted
-  `axpy_rows_batch` extent validation to a non-generic `#[inline(never)]` fn
-  (emitted once, not per `(T, Arch)`). 369 tests + clippy/fmt/doc clean.
-  Mnemosyne page-list inner-fn dedup deferred (hot-path size/speed tradeoff
-  needing measurement). See [gap_audit](gap_audit.md#audit-2026-06-26-r5).
-- [x] [patch] (2026-06-26) Audit round 4 — numeric DRY, AMX safety, allocator
-  contention. Collapsed signed-integer `NumericElement` impls into one macro +
-  removed dead `min_scalar`/`max_scalar` overrides (~275 lines); AMX raw wrappers
-  panic loudly on bad tile index + documented the AMX-availability precondition.
-  Upstream Mnemosyne (`perf/segment-purge-batch-detach`): batch-detach segment
-  purge/reset (one lock per node, not per segment) + `NUMA_BUCKETS` SSOT node
-  arrays. 368 hermes + 211 Mnemosyne tests green; clippy/fmt/doc clean. See
-  [gap_audit](gap_audit.md#audit-2026-06-26-r4).
-- [x] [patch] (2026-06-26) Audit round 3 — SSOT, hierarchy, allocator retention.
-  Finished the `MAX_SIMD_LANES` SSOT migration in `view/vector_reg.rs` (dead
-  runtime asserts → compile-time `LANE_BOUND_CHECK`, 128→64 buffers); split
-  `tensor/view.rs` into a vertical `tensor/view/{mod,rank_ops,simd_bridge}`
-  hierarchy (SoC). Upstream Mnemosyne (`perf/huge-pool-byte-cap`): byte-bounded
-  huge-pool retention (~16 GiB→~256 MiB/bucket) + removed a redundant per-pop
-  atomic reload. 367 hermes tests + 210 Mnemosyne tests green; clippy/fmt/doc
-  clean. See [gap_audit](gap_audit.md#audit-2026-06-26-r3).
-- [x] [patch] (2026-06-26) Memory-efficiency cross-repo fix. Root-caused
-  `AlignedVec<_, Aligned<64>>` small allocations costing ~2 MiB each (Mnemosyne
-  routed `align > 16` to its huge path). Fixed upstream in Mnemosyne
-  (`perf/aligned-small-alloc-tcache`: alignment-aware size-class selection) and
-  removed the counterproductive hermes `adjust_layout_for_mnemosyne` 8 KiB
-  padding + no-op dealloc NUMA bind. Measured 512 × 256B/64-aligned `AlignedVec`:
-  **~1056 MiB → ~4 MiB** mapped. Plus O(nblocks) bounds guards on the BlockedCoo
-  `spmv`/`elementwise_mul_dense` SIMD column loads (safety). See
-  [gap_audit](gap_audit.md#alloc-audit-2026-06-26). 367 tests green; Mnemosyne
-  98+23 tests green.
-- [x] [minor] (2026-06-26) Audit sprint — safety, contention-free perf, memory.
-  `NumericElement` extended to `i64`/`u8`/`u16`/`u32`/`u64` (+ first
-  `hermes-numeric` tests). `MAX_SIMD_LANES` 128→64 (true max) halving fallback
-  buffers, with `reduction.rs`/bitmask buffers folded onto the SSOT under the
-  compile-time `LANE_BOUND_CHECK`. NUMA alloc-generation hardened
-  (Relaxed→Release/Acquire + single-capture, closing a stale-cache/TOCTOU
-  window). `build_index_vector` layout invariant made a `const` assert;
-  `#![forbid(unsafe_code)]` on `hermes-simd-macros`; magic-table CAS ordering
-  relaxed. Triplicated `SimdOps` impls collapsed to one macro (mod.rs
-  1217→845); `flush_limit` deduped to a `const fn`; `axpy`/`scale` 4×-unrolled.
-  367 tests + clippy `-D warnings` + fmt green.
-- [x] [patch] (2026-06-24) Compile-time `LANE_COUNT <= MAX_SIMD_LANES` guard on
-  the scalar-fallback `[MaybeUninit<T>; 128]` stack buffers (kernel + kernel_helpers):
-  named SSOT constant + `SimdKernel::LANE_BOUND_CHECK` asserted per backend,
-  replacing the unasserted/misleadingly-half-guarded magic 128. Prevents a silent
-  stack overflow if a future wide backend (e.g. native SVE) uses the defaults.
-  Validated by a lower-the-bound build failing AVX-512 compilation. Plus a
-  rust-1.95 workspace clippy cleanup. 357 tests + clippy `-D warnings` green.
-- [x] [minor] AXPY provider: `SimdOps::axpy` / dispatched `axpy` free fn —
-  fused row update `out[i] += alpha * x[i]` via the `fmadd` primitive with
-  scalar tail, no temporaries, length-mismatch error. Driver: leto matmul SIMD
-  dispatch (its Stage C2 gate). Value tests across all tail sizes, f32/f64,
-  zero-alpha identity, mismatch rejection.
-- [x] [minor] Batched AXPY rows: `SimdOps::axpy_rows_batch` / dispatched
-  `axpy_rows_batch` free fn — fused depth-major dense row-panel accumulation
-  via one runtime-dispatched kernel, no temporaries, length-mismatch error.
-  Driver: leto/coeus dense-panel accumulation. Delivered 2026-06-15 with
-  repeated-`axpy_rows` differential coverage, invalid-extent tests, and
-  register accumulation that stores each output lane once per call. Criterion
-  coverage: `axpy_rows_batch_f32` compares the fused kernel against repeated
-  public `axpy_rows` calls on depth-major row panels.
-- [x] [patch] Dense/AXPY error-contract hardening: selected public dense
-  facade and AXPY length-mismatch tests assert exact
-  `SimdError::LengthMismatch` values instead of existence-only failures.
-- [x] [patch] Select/unary error-contract hardening: select, unary-map, and
-  COW FMA tests assert exact `SimdError` variants for length mismatch and
-  insufficient output capacity.
-- [x] [patch] Operation-family error-contract hardening: new operation,
-  strategy, complex, and COW math tests assert exact `SimdError` variants for
-  short outputs, length mismatch, and invalid gather indices.
-- [x] [patch] COW unary invariant cleanup: `SimdCow::map_unary` now asserts
-  its internally constructed output-length invariant instead of discarding the
-  `SimdView::map_unary` result.
-- [x] [patch] GEMM tiling rustdoc cleanup: module theorem prose now references
-  private implementation details as code text instead of public intra-doc
-  links.
-- [x] [patch] Runtime FMA capability probe: `has_fma3` / `FmaSupport` now
-  route through Rust's platform-aware runtime detector and are covered by
-  host-capability tests.
-- [x] [patch] GEMV rustdoc link cleanup: same-named dispatch modules and
-  functions are disambiguated in public docs.
-- [x] [minor] Const-generic Blocked-COO dispatch: replaced fixed public
-  `spmv_bcoo4x4`/`spmv_bcoo8x8` dispatch and fixed
-  `SparseView::from_blocked_coo_4x4`/`from_blocked_coo_8x8` constructors with
-  one `spmv_bcoo::<T, BM, BN>` public API and the existing generic
-  `from_blocked_coo` constructor. Driver: structural duplication audit.
-- [x] [minor] Const-generic SELL-p dispatch: replaced fixed public
-  `spmv_sellp4`/`spmv_sellp8` dispatch and fixed
-  `SparseView::from_sellp4`/`from_sellp8` constructors with one
-  `spmv_sellp::<T, C>` public API and the existing generic `from_sellp`
-  constructor. Driver: structural duplication audit.
-
 ## Atlas in-house replacement roadmap — hermes slice [arch]
 
 hermes is the Atlas **SIMD SSOT** (data-parallel lanes), replacing std::simd / packed_simd
@@ -2206,39 +807,13 @@ complete SIMD substrate for leto-ops/coeus hot kernels:
 
 ## External reference audits <a id="external-reference-audits"></a>
 
-- [x] **[patch] Highway comparison audit** (2026-06-14): audited
-      `https://github.com/NikoMalik/highway.git` at
-      `0984271e74db124cf5e200de542e745348eb0b9e` and recorded Hermes-native
-      gaps in [gap_audit.md](gap_audit.md#highway-2026-06-14).
-- [x] **[patch] NumKong comparison audit** (2026-06-17): audited
-      `https://github.com/ashvardanian/NumKong` and recorded Hermes-native
-      gaps in [gap_audit.md](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17).
-- [x] **[minor] Target-token forced dispatch**: add a Hermes `TargetId` and
-      `dispatch_to`-style test/benchmark surface that checks CPU support before
-      entering target-feature trampolines. Driver:
-      [gap_audit.md#highway-2026-06-14](gap_audit.md#highway-2026-06-14).
-      Delivered 2026-06-14 as `TargetId`, `dispatch_view_to`, and
-      `dispatch_view_mut_to` with value-semantic host capability tests.
-- [x] **[minor] Safe one-vector slice wrappers**: add bounds-checked and
-      alignment-checked wrappers over `load_aligned`, `load_unaligned`,
-      `store_aligned`, and `store_unaligned` for one-vector use cases,
-      preserving raw-pointer kernels for hoisted hot loops. Driver:
-      [gap_audit.md#highway-2026-06-14](gap_audit.md#highway-2026-06-14).
-      Delivered 2026-06-14 on `Vector<T, Arch>` with exact failure tests.
-- [x] **[arch] SSE2 backend feasibility ADR** (delivered 2026-06-21): evaluated a 128-bit
-      x86_64 backend between Scalar and AVX2, resulting in ADR 006 recommending
-      relying on compiler auto-vectorization or evaluating SSE4.1/SSSE3 as a modern baseline.
-- [x] **[minor] Public dense facade cross-target matrix**: force every
-      supported target available on the host and compare public dense facade
-      results against Scalar for representative arithmetic, mask, reduction,
-      gather, and shuffle paths. Driver:
-      [gap_audit.md#highway-2026-06-14](gap_audit.md#highway-2026-06-14).
-      Delivered 2026-06-15 with host-supported `TargetId` checks over sum,
-      dot, elementwise arithmetic, gather, and select.
-- [x] **[patch] Operation-family coverage map**: expanded the coarse Stage C2
-      row into per-family entries in README and this backlog. Evidence tier:
-      source audit over the current public surface and Highway reference audit;
-      no performance or correctness claim is made for unimplemented families.
+- **[patch] Highway comparison audit** (2026-06-14): audited `https://github.com/NikoMalik/highway.git` at … — `0984271e74db124cf5e200de542e745348eb0b9e`
+- **[patch] NumKong comparison audit** (2026-06-17): audited `https://github.com/ashvardanian/NumKong` and recorded Hermes-native …
+- **[minor] Target-token forced dispatch**: add a Hermes `TargetId` and `dispatch_to`-style test/benchmark surface that checks CPU …
+- **[minor] Safe one-vector slice wrappers**: add bounds-checked and alignment-checked wrappers over `load_aligned` …
+- **[arch] SSE2 backend feasibility ADR** (delivered 2026-06-21): evaluated a 128-bit x86_64 backend between Scalar and AVX2 …
+- **[minor] Public dense facade cross-target matrix**: force every supported target available on the host and compare public dense …
+- **[patch] Operation-family coverage map**: expanded the coarse Stage C2 row into per-family entries in README and this backlog. …
 
 ### Operation-family coverage map <a id="operation-family-coverage-map"></a>
 
@@ -2280,169 +855,146 @@ marked delivered.
   consumer requires lane-parallel primitive support; no implementation is
   claimed.
 
-## Stage assessment (2026-06-10)
-
-Phase: **Execution → Closure transition for 0.2.0.** Canonical trait surfaces
-(`Scalar`, `SimdKernel`, `SparseFormat`/`CowFormat`, op-strategy ZSTs,
-`#[runtime_dispatch]`) are defined with one-or-more concrete implementations
-each; 278 workspace tests green; clippy/doc/fmt gates clean; aarch64
-cross-compile verified. The dominant remaining risks are *infrastructure*
-(no CI, no toolchain pin, no changelog) and *unverified hardware paths*
-(AVX-512, NEON, AMX run compile-checked but not runtime-validated locally).
-
 ## P0 — Release engineering for 0.2.0 <a id="p0"></a>
 
-- [x] **[patch] CI pipeline** (delivered 0.2.0; AVX-512 runner still open) (highest risk reducer): GitHub Actions running
-      fmt → clippy `-D warnings` → `cargo test --workspace` → doc build →
-      `cargo check --target aarch64-unknown-linux-gnu`. Add an ARM runner
-      (or QEMU) job to runtime-validate the NEON complex/dense paths, and an
-      AVX-512-capable runner if available for the `Avx512` differential tests.
-- [x] **[patch] Toolchain pin + supply chain** (delivered 0.2.0; cargo-audit covered by cargo-deny in CI): `rust-toolchain.toml`, declared
-      MSRV, `cargo audit` + `cargo deny check` in CI.
-- [x] **[minor] 0.2.0 release** (semver-checks scoped per crate; see checklist): CHANGELOG sections (Added/Changed/Breaking —
-      includes `InterleavedComplexLane` removal and per-format sparse-Cow type
-      removal), `cargo-semver-checks` run, version bump committed atomically.
+- **[patch] CI pipeline** (delivered 0.2.0; AVX-512 runner still open) (highest risk reducer): GitHub Actions running fmt → clippy …
+- **[patch] Toolchain pin + supply chain** (delivered 0.2.0; cargo-audit covered by cargo-deny in CI): `rust-toolchain.toml` …
+- **[minor] 0.2.0 release** (semver-checks scoped per crate; see checklist): CHANGELOG sections (Added/Changed/Breaking — includes …
 
 ## P1 — Correctness hardening <a id="p1"></a>
 
-- [x] **[patch] Reduced-precision complex coverage** (delivered 0.2.0): property/differential
-      tests for `f16`/`bf16` interleaved complex kernels (currently exercised
-      only via emulated defaults, asserted only for f32/f64).
-- [x] **[patch] Mask/gather/compress property suite** (delivered 0.2.0): proptest invariants —
-      `compress`∘`expand` identity under fixed mask, `mask_to_bitmask` ∘
-      `mask_from_bitmask` round-trip, gather with permuted indices vs scalar
-      reference, `leading_k_mask` boundary cases (k=0, k=LANE_COUNT, k>LANE_COUNT).
-- [x] **[patch] `cargo miri` pass** (delivered post-0.2.0: core unit tests green under Miri; rkyv 0.7 tests excluded as upstream Stacked Borrows violations; CI job added) over crates containing `unsafe`
-      (intrinsics excluded where Miri lacks ISA support; cover the
-      view/cow/sparse pointer logic in hermes-simd-core).
-- [x] **[patch] no_std + feature matrix** (delivered post-0.2.0: runtime_dispatch std-gating fixed, --no-default-features green + CI step; broader feature-combination sweep remains open): verify `--no-default-features` and
-      key feature combinations build and pass.
-- [x] **[minor] Fast reciprocal square root** (delivered 2026-06-21): implement `ops::RecipSqrt` (or `rsqrt`)
-      with a Newton-Raphson refinement step for floating-point scalars, enabling Leto
-      to avoid standard `sqrt` latency in normalized vector operations. Driver:
-      [gap_audit.md](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17).
-- [x] **[arch] Masked tail-load/store API infrastructure** (delivered 2026-06-21): expose active-lane masked
-      load and store helpers in `SimdKernel` and `Vector<T, Arch>`/`Mask<T, Arch>`
-      for `Avx512` and `SveArch` so Leto can run tail-free kernels. Driver:
-      [gap_audit.md](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17).
+- **[patch] Reduced-precision complex coverage** (delivered 0.2.0): property/differential tests for `f16`/`bf16` interleaved complex …
+- **[patch] Mask/gather/compress property suite** (delivered 0.2.0): proptest invariants — `compress`∘`expand` identity under fixed …
+- **[patch] `cargo miri` pass** (delivered post-0.2.0: core unit tests green under Miri; rkyv 0.7 tests excluded as upstream Stacked …
+- **[patch] no_std + feature matrix** (delivered post-0.2.0: runtime_dispatch std-gating fixed, --no-default-features green + CI …
+- **[minor] Fast reciprocal square root** (delivered 2026-06-21): implement `ops::RecipSqrt` (or `rsqrt`) with a Newton-Raphson …
+- **[arch] Masked tail-load/store API infrastructure** (delivered 2026-06-21): expose active-lane masked load and store helpers in …
 
 ## P2 — Performance & memory <a id="p2"></a>
 
-- [x] **[minor] Criterion regression thresholds** (delivered 2026-06-12):
-      `benchmarks/benchmarks_baseline.json` records structured Criterion point estimates;
-      `run-benches --check-regressions` fails on missing baseline rows or rows
-      exceeding the configured ratio threshold. The runner is split into
-      cohesive modules for CLI parsing, result discovery, host metadata,
-      threshold comparison, and Markdown report rendering.
-- [x] **[minor] SpMV scalability sweep** (delivered 2026-06-12): bench row
-      counts ∈ {1K, 10K, 100K} at structural non-zero density {0.1%, 1%, 10%}
-      across CSR/SELL-p/BCOO with 1024 columns; Dense-with-mask is capped at
-      10K rows because it stores full dense values and masks. Sparse module
-      docs now record format-selection guidance.
-- [x] **[minor] Packed4 unpack generalization** (delivered 2026-06-12):
-      `Packed4CowExt` delegates to `Packable4::unpack_slice_packed`, reusing
-      the hermes-numeric AVX-512/AVX2/scalar dispatcher and removing the
-      facade-local Bf4/F4 hardware-unpack impl pair. Criterion now includes a
-      focused packed COW unpack benchmark.
-- [x] **[minor] Complex mul_assign unroll** (delivered 2026-06-12):
-      `interleaved_complex_mul_assign` processes two SIMD registers per loop
-      iteration before the single-register and scalar tails. Criterion
-      validation on this host showed runtime improvement across 256, 1K, 4K,
-      and 16K complex-pair inputs.
-- [x] **[patch] Compress scratch-hoist benchmark** (delivered 2026-07-05):
-      add a focused `SimdView compress` Criterion group for the public
-      compaction path, covering scalar all-active and host-AVX2 all/half/quarter
-      masks at 1K, 16K, and 256K elements. `run-benches --parse-only
-      --write-baseline --check-regressions` refreshed the committed benchmark
-      report/baseline and checked 102 Hermes rows.
-- [x] **[minor] Expose popcount and horizontal reductions** (delivered 2026-06-21): add SIMD population
-      count (`popcnt`) and bitwise horizontal fold/reduction primitives to the facade,
-      enabling Leto/Hephaestus to implement Jaccard and Hamming distance metrics. Driver:
-      [gap_audit.md](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17).
-- [x] **[minor] Sub-byte sign-extension and unpacking/widening** (delivered 2026-06-21): implement vector
-      sign-extension and unpacking primitives for `Bf4`/`F4`/`I8` types to support
-      quantized dot product optimizations in Leto. Driver:
-      [gap_audit.md](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17).
+- **[minor] Criterion regression thresholds** (delivered 2026-06-12): `benchmarks/benchmarks_baseline.json` records structured …
+- **[minor] SpMV scalability sweep** (delivered 2026-06-12): bench row counts ∈ {1K, 10K, 100K} at structural non-zero density {0.1% …
+- **[minor] Packed4 unpack generalization** (delivered 2026-06-12): `Packed4CowExt` delegates to `Packable4::unpack_slice_packed` …
+- **[minor] Complex mul_assign unroll** (delivered 2026-06-12): `interleaved_complex_mul_assign` processes two SIMD registers per …
+- **[patch] Compress scratch-hoist benchmark** (delivered 2026-07-05): add a focused `SimdView compress` Criterion group for the …
+- **[minor] Expose popcount and horizontal reductions** (delivered 2026-06-21): add SIMD population count (`popcnt`) and bitwise …
+- **[minor] Sub-byte sign-extension and unpacking/widening** (delivered 2026-06-21): implement vector sign-extension and unpacking …
 
 ## P3 — Architecture & maintenance <a id="p3"></a>
 
-- [x] [patch] (2026-08-15) Reduction hierarchy cleanup: moved the
-  multiplicative `Product` strategy from the 546-line reduction module into
-  `ops/reduction/product.rs`. The parent is now 442 lines with the same
-  sealed generic `ReductionOp` contract; `cargo check`, clippy, fmt, and
-  `hermes-simd` nextest (410/410) pass. See
-  [gap_audit.md#hermes-2026-08-15](gap_audit.md#hermes-2026-08-15).
-
-- [x] **[patch] x86 VNNI asm form** (delivered post-0.2.0): factor repeated
-      `vpdpbssd` inline assembly into one internal instruction macro with
-      explicit target-feature contract. The portable surface remains
-      `TileMatrixMultiply`/runtime dispatch; asm is not promoted to a separate
-      public abstraction.
-- [x] **[arch] Per-type x86 kernel dedup** (delivered 2026-06-21; ADR 005
-      revised 2026-08-21): the initial build-time-generator decision was
-      retired after the freshness audit found destructive coverage drift. The
-      checked-in ISA files are now the canonical sources.
-- [x] **[patch] SVE callable fallback**: removed `unimplemented!()` SVE
-      `SimdKernel` methods and routed `SveArch` f32/f64 through the existing
-      lane-emulated kernel macro with value-semantic tests.
-- [x] **[minor] SVE property coverage**: `hermes-simd` re-exports `SveArch`,
-      and `kernel_property_tests` now exercises its mask round-trip,
-      compress/expand, gather, and leading-tail invariants on every host.
+- [patch] (2026-08-15) Reduction hierarchy cleanup: moved the multiplicative `Product` strategy from the 546-line reduction module …
+- **[patch] x86 VNNI asm form** (delivered post-0.2.0): factor repeated `vpdpbssd` inline assembly into one internal instruction …
+- **[arch] Per-type x86 kernel dedup** (delivered 2026-06-21; ADR 005 revised 2026-08-21): the initial build-time-generator decision …
+- **[patch] SVE callable fallback**: removed `unimplemented!()` SVE `SimdKernel` methods and routed `SveArch` f32/f64 through the …
+- **[minor] SVE property coverage**: `hermes-simd` re-exports `SveArch`, and `kernel_property_tests` now exercises its mask …
 - [ ] **[minor] Native SVE backend**: hardware intrinsic implementation remains
       blocked on stable `core::arch::aarch64` SVE vector types; revisit on
       toolchain updates. The delivered `SveArch` path is emulated and its
       hardware capability probe is separate from `SimdArch::is_runtime_supported`.
-- [x] **[minor] Arm SME target feasibility study**: evaluate outer-product based
-      tiled matrix multiplication kernels for Apple M4/M5 platforms. Driver:
-      [gap_audit.md](file:///d:/atlas/repos/hermes/gap_audit.md#numkong-2026-06-17).
-      Delivered 2026-06-21 as ADR 007 feasibility study.
-- [x] **[minor] NUMA module status** (audited 2026-06-11): `numa.rs` IS
-      integrated — `hermes-simd::dispatcher` uses Themis topology queries /
-      `verify_numa_locality`, `vec` uses `NumaAllocator`, and types_tests
-      cover Mnemosyne allocation plus Themis topology ownership. Finding: it reimplements platform NUMA
-      detection (`GetNumaHighestNodeNumber` on Windows, sysfs on Linux) that
-      **themis `CpuTopology` owns**, and its `MnemosyneNumaAllocator` names
-      mnemosyne's allocation responsibility — a structural duplication across
-      the stack SSOT map (themis=topology law, mnemosyne=allocation).
-- [x] **[patch] Default provider feature policy**: every Hermes package
-      defaults `parallel` and `mnemosyne-memory`; the default
-      `MnemosyneNumaAllocator` path now uses Mnemosyne allocation instead of a
-      name-only std/platform allocator branch. The broader Themis topology
-      replacement below remains open.
-- [x] **[arch] NUMA consolidation onto themis/mnemosyne** (delivered
-      2026-06-12): `numa.rs` detection now delegates to themis —
-      `current_numa_node` → `themis::try_current_numa_node` (Option-honest,
-      added in themis 0.7.0), public topology facades were removed in favor of
-      direct consumer use of `themis::current_processor` / process-cached
-      `CpuTopology::detect()` distance tables. The duplicated libnuma /
-      GetNumaHighestNodeNumber / sched_getcpu platform blocks are deleted, and
-      `MnemosyneNumaAllocator` no longer owns direct `numa_alloc_onnode`,
-      `numa_free`, or `VirtualAllocExNuma` allocation branches.
-      Allocation already routes through mnemosyne (`MnemosyneNumaAllocator`
-      with `NumaBinding`). Kept in hermes by design: `NumaAllocator` trait,
-      `NumaBinding` thread-affinity RAII, and `verify_numa_locality` —
-      SIMD-specific concerns the topology SSOT should not own.
+- **[minor] Arm SME target feasibility study**: evaluate outer-product based tiled matrix multiplication kernels for Apple M4/M5 …
+- **[minor] NUMA module status** (audited 2026-06-11): `numa.rs` IS integrated — `hermes-simd::dispatcher` uses Themis topology …
+- **[patch] Default provider feature policy**: every Hermes package defaults `parallel` and `mnemosyne-memory`; the default …
+- **[arch] NUMA consolidation onto themis/mnemosyne** (delivered 2026-06-12): `numa.rs` detection now delegates to themis …
 
 ## P4 — Documentation <a id="p4"></a>
 
-- [x] **[patch] Doctest coverage**: `cargo doc` is warning-clean; extended
-      runnable doctests to the complex, sparse-Cow, and tensor public surfaces.
-- [x] **[patch] Runnable core examples**: converted kernel, compute, and tiling
-      public Rustdoc examples from compile-only `no_run` to executable
-      value-semantic doctests.
-- [x] **[patch] Runnable `BitMask` examples**: converted native-mask conversion
-      and active-lane iteration examples from ignored snippets to executable
-      value-semantic doctests.
-- [x] **[patch] `#![deny(missing_docs)]`** (delivered post-0.2.0: all six public crates) on all public crates (currently
-      `warn` in hermes-simd-core).
+- **[patch] Doctest coverage**: `cargo doc` is warning-clean; extended runnable doctests to the complex, sparse-Cow, and tensor …
+- **[patch] Runnable core examples**: converted kernel, compute, and tiling public Rustdoc examples from compile-only `no_run` to …
+- **[patch] Runnable `BitMask` examples**: converted native-mask conversion and active-lane iteration examples from ignored snippets …
+- **[patch] `#![deny(missing_docs)]`** (delivered post-0.2.0: all six public crates) on all public crates (currently `warn` in …
 
-## Completed (recent)
+## Archive — closed items
 
-- [x] [minor] Generic vectorized interleaved complex kernels + runtime dispatch
-      (ADR-004; commits 33ce1b8, 3aa963e).
-- [x] [minor] NEON adjacent-pair primitive overrides, aarch64 compile-verified (3aa963e).
-- [x] [arch] Sparse Cow consolidation → generic `SparseCow<T, F, Arch>` + `CowFormat` (3aa963e).
-- [x] [patch] Native-precision histogram binning fix + regression test (8b4a796).
-- [x] [patch] Vectorized in-place prefix scan, single authoritative impl (8b4a796).
-- [x] [patch] Complex-kernel property tests with analytical tolerances (8b4a796).
-- [x] [patch] Workspace fmt normalization; rustdoc warning cleanup (fc34e6a, 3aa963e).
+Closed items, one line each. Full prose is in this file's git history; the commit SHAs and PR numbers below are the entry points.
+
+- **HS-434 — workspace lint floor**
+- **HS-433 — AMX downgrade notice writes to stderr** — `f4d444b5`
+- **HS-435 — pedantic ratchet** (2026-08-14)
+- **HS-436 — `SimdKernel` operation-family facets** (2026-08-14)
+- **HS-422 — scatter seam**
+- **HS-423 — rounding primitives** — `58c31a9`, `df32296`
+- **HS-424 — cross-lane permute family**
+- **HS-431 — repair the panicking compress benchmark** (2026-07-07) — `2afe675`
+- **HS-432 — benchmark budget job never runs on pushed work** (2026-08-12)
+- **HS-425 — `TargetId` omits the SVE backend** (2026-08-16) — PR #49, `fb36e0f`, `dd4cc78`
+- **HS-426 — ADR index hygiene** (2026-07-23)
+- **HS-420 — mutable generic view tails**
+- **HS-421 — native AVX-512 BF16 tile dispatch**
+- **HS-419 — pairwise reduction tails**
+- **HS-418 — dense dot-product tails**
+- **HS-417 — transposed GEMV column tails**
+- **HS-416 — generic reduction and view tails**
+- **HS-415 — masked popcount tails**
+- **HS-414 — masked absolute-reduction tails**
+- **HS-413 — masked row-update tails**
+- **HS-406 follow-up — clean-worktree package gate** (2026-08-11)
+- **HS-412 — masked fused AXPY-mul tail boundary**
+- **HS-411 — masked scale tail boundary**
+- **HS-410 — masked AXPY tail boundary**
+- **HS-409 — fused ternary AXPY provider facade**
+- **HS-REL-001 — crates.io publication**
+- **HERMES-MNEMOSYNE-PACKAGE-1 — restore Mnemosyne resolution**
+- **HERMES-THEMIS-PACKAGE-1 — restore Themis resolution**
+- **HS-407 — no `&mut [T]` spans uninitialized elements**
+- **HS-405 — safe code could execute an unsupported ISA**
+- **HS-408 — benchmark the copy-on-write surface**
+- **HS-406 — per-site `SAFETY` comments for pointer obligations** (2026-08-12)
+- **HS-404 — `cmp_ne` NaN semantics diverged across backends**
+- **HS-403 — deterministic extrema and benchmark budgets**
+- **HS-402 — delivered 2026-07-19 in PR #10** (2026-07-19) — PR #10
+- **Close standalone Git provider resolution on the** (2026-07-15)
+- **HS-COMPLEX-TRANSPOSE-2026-08-31** Register-resident complex square transpose [minor] [perf] (2026-09-01) — PR #111, `42a0d4c`, `9ac23fa4`
+- **HS-HARDWARE-LANE-DISPATCH-2026-09-01** Exact width without portable emulation [minor] [perf] (2026-09-01) — PR #110, `141b7e1`, `363c407d`
+- <a id="hs-f16c-scalar-frame-2026-08-31"></a>**HS-F16C-SCALAR-FRAME-2026-08-31** The scalar fallback stays unframed for F16C scalars [patch] [perf] (2026-08-31) — PR #108, `5050c72a`, `91cae6a`, `3c9623d`
+- **HS-NO-STD-PACKED-MASK-IMPORTS-2026-08-29** Restore alloc imports [patch] (2026-08-29)
+- **HS-SCALAR-FALLBACK-FRAME-2026-08-30** The scalar fallback compiled at baseline ISA [patch] [perf] (2026-08-31) — PR #107, `c4f931c`
+- **HS-COMPLEXREG-ZERO-PROBE-2026-08-29** Rotations re-probed the host inside the hot loop [patch] (2026-08-29)
+- **HS-SIMD-CAPABILITY-COPY-2026-08-28** The capability token is a proof, not a resource [patch] (2026-08-28)
+- **HS-SPARSE-SAFETY-2026-08-27** Sparse OOB guards, F-only AVX-512, mask contract [patch] (2026-08-27) — PR #92, `50256f9`, `03d80d33`
+- **HS-F16-DISPATCH-PROBE-HOIST-2026-08-27** Hoist F16 F16C probe to the dispatch boundary [minor] (2026-08-28) — PR #95, `81bc9b6`, `0115b4e`
+- **HS-EXACT-LANE-DISPATCH-2026-08-27** Dispatch consumer kernels by exact lane count [minor] [arch] (2026-08-31) — `01a0253c`, `36bbbcf77f6d`, `c6f4b639`
+- **HS-NATIVE-CAST-THROUGHPUT-2026-08-27** Remove supported cross-type cast stack round-trip [minor] (2026-08-27) — PR #86, PR #87, `5734b85`, `4f6a1eb`, `ff93be1`
+- **HS-PACKED-MASK-SHAPE-SAFETY-2026-08-27** Enforce packed-mask and matrix shape bounds [patch] (2026-08-27) — PR #85, PR #81, `7e342cd`, `01a03eb2`, `55b918675e48`
+- **HS-NATIVE-COMPARISON-MASK-2026-08-27** Remove comparison-mask stack round-trip [patch] (2026-08-27) — PR #84, `6efa67b`, `01a03eb2`, `55b918675e48`
+- **HS-CI-RUNNER-CLASS-SELECTION-2026-08-27** Compile capability-gated configurations on every runner [patch] (2026-08-27) — PR #88, `07a88ec`, `6b32676`, `8a48825`
+- **HS-TRANSPOSE-SQUARE-2026-08-27** In-register square-tile transpose [patch] (2026-08-27) — `d791281c`
+- **HS-DENSEMASK-BITPACK-2026-08-27** Bit-pack the DenseWithMask lane mask [minor] (2026-08-27) — PR #81, `e1bd5e0`
+- **HS-VECTORIZE-LARGE-KERNEL-2026-08-28** Large kernel bodies fall out of the target-feature frame [patch] (2026-08-28) — `d791281c`
+- **HS-COMPLEX-REG-2026-08-27** Interleaved complex register vocabulary [minor] (2026-08-27)
+- **HS-LANE-THROUGHPUT-2026-08-25** Locate the gap between the lane surface and fearless_simd [arch] (2026-08-26) — `01a0253c`, `36bbbcf77f6d`, `ae4e8efa`
+- **HS-NUMA-GEN-ISOLATION-2026-08-25** Assert the property, not the global counter [patch] (2026-08-26) — `01a03eb2`, `55b918675e48`
+- **HS-FEARLESS-TOKEN-2026-08-25** Consumer target-feature entry and safe FMA/permute surface [minor] (2026-08-25) — `424ce431`
+- **ATLAS-HERMES-BOOK-TEST-2026-08-20** Enable executable book samples [patch] (2026-08-20) — PR #56, `932468dac5ef4abadea4bdd12d62b420a4225ba7`, `3a39ef16d679dbac9c1a479b2b9c44135e262af3`
+- **ATLAS-ORPHAN-MODULES-096-HERMES** Remove orphan tensor view [patch] (2026-08-19) — `1fe438c`
+- [arch] **HS-401 — delivered 2026-07-18 in PR #8.** Takeover of `feat/eunomia-f16-migration`. Replace raw `half::f16`/`half::bf16` … — PR #8
+- [minor] (2026-07-05) Sparse `Validated` typestate follow-up. CSR, SELL-p, and Blocked-COO SpMV now require `ValidatedData` storage …
+- [minor] (2026-07-05) Safe-code ISA fault hardening. `SimdArch` now owns runtime-support probing for safe wrappers and forced …
+- [patch] (2026-07-02) AMX auto-dispatch mitigation. `hermes-simd` conservatively reports no AMX support until the permission-aware …
+- [patch] (2026-06-28) `recip_sqrt` full native precision. The f64 SIMD paths and NEON f32 under-refined a low-bit hardware `rsqrt` …
+- [patch] (2026-06-28) Integer `sqrt` exactness. `NumericElement::sqrt` for integers used a lossy `(self as f64).sqrt() as Self` …
+- [patch] (2026-06-28) Memory-safety: tiling dimension-product overflow. GEMV/GEMM operand-length checks used unchecked `usize` …
+- [minor] (2026-06-28) Masked-merge `SimdKernel` defaults — SIMD-capability monomorphization. Investigation found the kernel seam …
+- [patch] (2026-06-26) Audit round 5 — monomorphization + sparse defect fix. Fixed `spmv_bcoo` (was hardcoded to ScalarArch → SIMD …
+- [patch] (2026-06-26) Audit round 4 — numeric DRY, AMX safety, allocator contention. Collapsed signed-integer `NumericElement` impls …
+- [patch] (2026-06-26) Audit round 3 — SSOT, hierarchy, allocator retention. Finished the `MAX_SIMD_LANES` SSOT migration in …
+- [patch] (2026-06-26) Memory-efficiency cross-repo fix. Root-caused `AlignedVec<_, Aligned<64>>` small allocations costing ~2 MiB …
+- [minor] (2026-06-26) Audit sprint — safety, contention-free perf, memory. `NumericElement` extended to `i64`/`u8`/`u16`/`u32`/`u64` …
+- [patch] (2026-06-24) Compile-time `LANE_COUNT <= MAX_SIMD_LANES` guard on the scalar-fallback `[MaybeUninit<T>; 128]` stack buffers …
+- [minor] AXPY provider: `SimdOps::axpy` / dispatched `axpy` free fn — fused row update `out[i] += alpha * x[i]` via the `fmadd` …
+- [minor] Batched AXPY rows: `SimdOps::axpy_rows_batch` / dispatched `axpy_rows_batch` free fn — fused depth-major dense row-panel …
+- [patch] Dense/AXPY error-contract hardening: selected public dense facade and AXPY length-mismatch tests assert exact …
+- [patch] Select/unary error-contract hardening: select, unary-map, and COW FMA tests assert exact `SimdError` variants for length …
+- [patch] Operation-family error-contract hardening: new operation, strategy, complex, and COW math tests assert exact `SimdError` …
+- [patch] COW unary invariant cleanup: `SimdCow::map_unary` now asserts its internally constructed output-length invariant instead of …
+- [patch] GEMM tiling rustdoc cleanup: module theorem prose now references private implementation details as code text instead of …
+- [patch] Runtime FMA capability probe: `has_fma3` / `FmaSupport` now route through Rust's platform-aware runtime detector and are …
+- [patch] GEMV rustdoc link cleanup: same-named dispatch modules and functions are disambiguated in public docs.
+- [minor] Const-generic Blocked-COO dispatch: replaced fixed public `spmv_bcoo4x4`/`spmv_bcoo8x8` dispatch and fixed …
+- [minor] Const-generic SELL-p dispatch: replaced fixed public `spmv_sellp4`/`spmv_sellp8` dispatch and fixed …
+- [minor] Generic vectorized interleaved complex kernels + runtime dispatch (ADR-004; commits 33ce1b8, 3aa963e). — `33ce1b8`, `3aa963e`
+- [minor] NEON adjacent-pair primitive overrides, aarch64 compile-verified (3aa963e). — `3aa963e`
+- [arch] Sparse Cow consolidation → generic `SparseCow<T, F, Arch>` + `CowFormat` (3aa963e). — `3aa963e`
+- [patch] Native-precision histogram binning fix + regression test (8b4a796). — `8b4a796`
+- [patch] Vectorized in-place prefix scan, single authoritative impl (8b4a796). — `8b4a796`
+- [patch] Complex-kernel property tests with analytical tolerances (8b4a796). — `8b4a796`
+- [patch] Workspace fmt normalization; rustdoc warning cleanup (fc34e6a, 3aa963e). — `fc34e6a`, `3aa963e`
