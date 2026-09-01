@@ -2,14 +2,18 @@
 
 ## HS-HARDWARE-LANE-DISPATCH-2026-09-01 [minor] [perf]
 
-- [ ] Refactor exact-width dispatch so hardware selection is one implementation
+- [x] Refactor exact-width dispatch so hardware selection is one implementation
       shared by the existing portable-fallback and new hardware-only entries.
-- [ ] Prove hardware-only absence does not invoke the kernel while existing
+- [x] Prove hardware-only absence does not invoke the kernel while existing
       portable exact-width behavior and AVX2/AArch64 selection stay unchanged.
-- [ ] Migrate Apollo's combine boundary and show the unused f32 exact-four
-      scalar monomorph disappears before accepting any latency claim.
+- [x] Migrate Apollo's combine boundary: the optimized executable shrinks
+      7,680 bytes. Processor-pinned timing does not establish a latency win, so
+      the evidence is limited to linked code size.
 - [ ] Pass warning-denied host/AArch64/no-std, Nextest, doctest, Rustdoc,
       SemVer, format, independent review, hosted, and non-squash merge gates.
+      Local source gates are green: host Clippy; 450/450 Nextest; 7/7 doctests;
+      Rustdoc; no-default-features; AArch64 Windows; SemVer 196/196; format and
+      diff checks. Independent/hosted/merge remain open.
 
 ## HS-F16C-SCALAR-FRAME-2026-08-31 [patch] [perf]
 

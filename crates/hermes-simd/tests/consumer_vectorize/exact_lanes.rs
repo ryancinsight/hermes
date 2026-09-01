@@ -5,7 +5,8 @@ use core::cell::Cell;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use hermes_simd::TargetId;
 use hermes_simd::{
-    vectorize_lanes, LaneKernel, Simd, SimdArch, SimdKernel, SimdScalar, SimdStorage,
+    vectorize_hardware_lanes, vectorize_lanes, LaneKernel, Simd, SimdArch, SimdKernel, SimdScalar,
+    SimdStorage,
 };
 
 struct SelectionProbe<'a>(&'a Cell<usize>);
@@ -24,6 +25,14 @@ fn unavailable_width_does_not_invoke_kernel() {
     let calls = Cell::new(0);
     assert_eq!(vectorize_lanes::<0, f64, _>(SelectionProbe(&calls)), None);
     assert_eq!(vectorize_lanes::<3, f64, _>(SelectionProbe(&calls)), None);
+    assert_eq!(
+        vectorize_hardware_lanes::<0, f64, _>(SelectionProbe(&calls)),
+        None
+    );
+    assert_eq!(
+        vectorize_hardware_lanes::<3, f64, _>(SelectionProbe(&calls)),
+        None
+    );
     assert_eq!(calls.get(), 0);
 }
 
@@ -40,11 +49,14 @@ fn portable_width_invokes_kernel_once() {
 fn four_f64_lanes_select_avx2_even_when_avx512_exists() {
     let calls = Cell::new(0);
     let actual = vectorize_lanes::<4, f64, _>(SelectionProbe(&calls));
+    let hardware = vectorize_hardware_lanes::<4, f64, _>(SelectionProbe(&calls));
     if TargetId::Avx2.is_supported() {
         assert_eq!(actual, Some(("avx2", 4)));
-        assert_eq!(calls.get(), 1);
+        assert_eq!(hardware, Some(("avx2", 4)));
+        assert_eq!(calls.get(), 2);
     } else {
         assert_eq!(actual, None);
+        assert_eq!(hardware, None);
         assert_eq!(calls.get(), 0);
     }
 }
@@ -58,6 +70,25 @@ fn four_f32_lanes_select_portable_backend() {
         Some(("scalar", 4))
     );
     assert_eq!(calls.get(), 1);
+    assert_eq!(
+        vectorize_hardware_lanes::<4, f32, _>(SelectionProbe(&calls)),
+        None
+    );
+    assert_eq!(calls.get(), 1);
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[test]
+fn eight_f32_hardware_lanes_select_avx2() {
+    let calls = Cell::new(0);
+    let actual = vectorize_hardware_lanes::<8, f32, _>(SelectionProbe(&calls));
+    if TargetId::Avx2.is_supported() {
+        assert_eq!(actual, Some(("avx2", 8)));
+        assert_eq!(calls.get(), 1);
+    } else {
+        assert_eq!(actual, None);
+        assert_eq!(calls.get(), 0);
+    }
 }
 
 #[cfg(target_arch = "aarch64")]
@@ -68,7 +99,11 @@ fn four_f32_lanes_select_neon() {
         vectorize_lanes::<4, f32, _>(SelectionProbe(&calls)),
         Some(("neon", 4))
     );
-    assert_eq!(calls.get(), 1);
+    assert_eq!(
+        vectorize_hardware_lanes::<4, f32, _>(SelectionProbe(&calls)),
+        Some(("neon", 4))
+    );
+    assert_eq!(calls.get(), 2);
 }
 
 #[cfg(target_arch = "aarch64")]
@@ -76,5 +111,9 @@ fn four_f32_lanes_select_neon() {
 fn unavailable_four_f64_lanes_do_not_substitute_neon() {
     let calls = Cell::new(0);
     assert_eq!(vectorize_lanes::<4, f64, _>(SelectionProbe(&calls)), None);
+    assert_eq!(
+        vectorize_hardware_lanes::<4, f64, _>(SelectionProbe(&calls)),
+        None
+    );
     assert_eq!(calls.get(), 0);
 }

@@ -209,7 +209,7 @@ pub mod dispatcher;
 // `[`vectorize`]` doc link ambiguous, and the module carries nothing else worth
 // a separate path.
 mod vectorize;
-pub use vectorize::{vectorize, vectorize_lanes, LaneKernel, LaneScalar};
+pub use vectorize::{vectorize, vectorize_hardware_lanes, vectorize_lanes, LaneKernel, LaneScalar};
 
 /// Tiled matrix multiplication dispatch and kernel interfaces.
 pub mod tile_matmul;

@@ -47,6 +47,13 @@ Adopt option 4 as `vectorize_lanes::<LANES, T, K>(kernel) -> Option<K::Output>`.
 types. `vectorize` remains unchanged and continues to select the widest native
 backend.
 
+Consumers that already own a scalar algorithmic fallback may instead call
+`vectorize_hardware_lanes::<LANES, T, K>`. It uses the same exact-width native
+selection ladder but declines before instantiating or invoking `ScalarArch`.
+This distinction prevents a consumer from carrying both its scalar loop and a
+portable fixed-array specialization that can never run on the target hardware.
+It does not change `vectorize_lanes` or make portable execution unavailable.
+
 Selection follows the existing architecture order while filtering by the
 requested scalar lane count:
 
@@ -74,6 +81,9 @@ width or feature branch.
 - Apollo can request four lanes without naming AVX2 or NEON. f64 selects AVX2
   even when AVX-512 is also present; f32 selects NEON on AArch64 and the
   portable packed backend on current x86 targets.
+- A consumer with its own scalar path can request the same native widths through
+  `vectorize_hardware_lanes`; absence then reaches that single fallback without
+  linking a second portable implementation of the kernel.
 - Existing callers and code generation through `vectorize` do not change. The
   new public entry is additive [minor]; the selection policy is [arch].
 - No fixed-width vector aliases, conversion layer, compatibility shim, or
@@ -91,5 +101,9 @@ width or feature branch.
 
 ## Revision history
 
+- 2026-09-01: Add the hardware-only exact-width policy for
+  `HS-HARDWARE-LANE-DISPATCH-2026-09-01`. Apollo's planar combine already owns
+  a scalar loop; declining before `ScalarArch` removes its redundant portable
+  specialization while preserving the original exact-width policy.
 - 2026-08-27: Accepted for `HS-EXACT-LANE-DISPATCH-2026-08-27`, driven by
   Apollo's corrected base-128 evidence at commit `c6f4b639`.

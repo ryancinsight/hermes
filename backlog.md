@@ -1,6 +1,6 @@
 # Backlog — hermes-simd
 
-## HS-HARDWARE-LANE-DISPATCH-2026-09-01 — Exact width without portable emulation [minor] [perf] — in progress
+## HS-HARDWARE-LANE-DISPATCH-2026-09-01 — Exact width without portable emulation [minor] [perf] — review
 
 - **Outcome.** Add one public exact-width entry that selects only real ISA
   backends, allowing consumers to decline rather than monomorphize and carry a
@@ -18,11 +18,14 @@
 - **Risk / dependencies.** [minor] [perf]. Driven by Apollo PR #219's exact
   Linux artifacts: its new f32 exact-four fallback contributes a 5,080-byte
   unused monomorph while AVX2 executes exact eight. Local code-size and timing
-  evidence does not establish the hosted regression's mechanism until the
-  consumer comparison repeats.
-- **Integrator / lease:** `/root`; lease `/root` on `vectorize.rs`, facade
-  re-export, exact-lane consumer tests, ADR 018, CHANGELOG, gap audit, and this
-  item/checklist. Last update 2026-09-01.
+  evidence does not establish the hosted regression's mechanism.
+- **Candidate evidence.** The shared hardware ladder and additive public entry
+  pass warning-denied host Clippy, 450/450 package Nextest tests, 7/7 doctests,
+  warning-denied Rustdoc, no-default-features, AArch64 Windows compilation, and
+  cargo-semver-checks 196/196. Apollo's unchanged optimized benchmark executable
+  shrinks 8,192,512 to 8,184,832 bytes. Two pinned N=64/N=256 timing pairs do
+  not establish a latency win; no timing claim is accepted.
+- **Integrator / lease:** `/root`; lease none. Last update 2026-09-01.
 
 ## HS-F16C-SCALAR-FRAME-2026-08-31 — The scalar fallback stays unframed for F16C scalars [patch] [perf] — done 2026-08-31
 
