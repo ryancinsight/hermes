@@ -8,12 +8,10 @@
       register network through the existing permutation role.
 - [x] Measure the primitive and Apollo N=96 consumer on the unchanged pinned
       instruments; reject production promotion if either fails its baseline.
-- [ ] Run warning-denied host/AArch64/no-std, Nextest, doctest, Rustdoc,
-      SemVer, format, independent review, hosted, and non-squash merge gates.
-      Local source gates are green at `42a0d4c`: host/AArch64 checks; focused
-      112/112 and release 420/420 Nextest; 5/5 doctests; Rustdoc; formatting and
-      diff checks. The Apollo consumer records two adjacent 128.429/128.359 ns
-      medians from a 222.935 ns entry; independent/hosted/merge remain open.
+- [x] Pass 196/196 exact-baseline SemVer checks and merge source `42a0d4c`
+      through PR #111 as `9ac23fa4`; hosted run `33470056453` passes x86,
+      native AArch64, AVX-512 SDE, Miri, dependency, lock, documentation, and
+      bounded benchmark gates.
 
 ## HS-HARDWARE-LANE-DISPATCH-2026-09-01 [minor] [perf]
 
@@ -24,12 +22,9 @@
 - [x] Migrate Apollo's combine boundary: the optimized executable shrinks
       7,680 bytes. Processor-pinned timing does not establish a latency win, so
       the evidence is limited to linked code size.
-- [ ] Pass warning-denied host/AArch64/no-std, Nextest, doctest, Rustdoc,
-      SemVer, format, independent review, hosted, and non-squash merge gates.
-      Local source gates are green: host Clippy; 450/450 Nextest; 7/7 doctests;
-      Rustdoc; no-default-features; AArch64 Windows; SemVer 196/196; format and
-      diff checks at provider source `141b7e1`. Independent/hosted/merge remain
-      open.
+- [x] Merge source `141b7e1` through PR #110 as `363c407d`; hosted run
+      `33458750515` passes x86, native AArch64, AVX-512 SDE, Miri, dependency,
+      lock, documentation, and bounded benchmark gates.
 
 ## HS-F16C-SCALAR-FRAME-2026-08-31 [patch] [perf]
 

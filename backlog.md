@@ -1,66 +1,16 @@
 # Backlog — hermes-simd
 
-## HS-COMPLEX-TRANSPOSE-2026-08-31 — Register-resident complex square transpose [minor] [perf] — review
+## HS-COMPLEX-TRANSPOSE-2026-08-31 — Register-resident complex square transpose [minor] [perf] — done 2026-09-01
 
-- **Outcome.** Add one pair-preserving square-transpose operation to
-  `ComplexReg`, allowing fixed complex codelets to change radix orientation
-  without storing their register tile through scalar memory.
-- **Scope / non-goals.** Extend the existing permutation role, its safe
-  `ComplexReg` vocabulary, native AVX2 f32 implementation, portable default,
-  tests, ADR 004, and capability benchmark. Do not expose architecture types,
-  add a general dynamic shuffle, or change existing lane/scalar transposes.
-- **Acceptance.** A `COMPLEX_COUNT × COMPLEX_COUNT` tile transposes exact
-  interleaved samples for every shipped scalar/backend; invalid tile lengths
-  fail before backend entry; the AVX2 f32 route is an in-register shuffle
-  network with no memory probe or allocation; Apollo's unchanged N=96
-  instrument establishes whether the primitive closes the measured DFT-32
-  row bottleneck. Unsupported/native-unmeasured backends retain the correct
-  allocation-free default.
-- **Risk / dependencies.** [minor] [perf]. Driven by Apollo's exact processor-2
-  N=96 phase probe: f32 spends 157.18 ns of a 213.45 ns codelet in three
-  DFT-32 rows; planar cross-row, iterative, and bit-reversed resident
-  candidates lose at 193.51, 240.80, and 368.21 ns respectively. Promotion is
-  conditional on the pair-preserving transpose plus radix-4×8 codelet winning
-  the unchanged consumer comparison.
-- **Candidate evidence.** Exact sample-pair and involution oracles pass for the
-  scalar, AVX2, AVX-512, and f32/f64 monomorphizations; the safe wrapper rejects
-  the wrong row count. Criterion reports 2.857 ns for native AVX2 f32 versus
-  98.242 ns for the forced generic default on a Core Ultra 9 285K. Apollo's
-  unchanged processor-2 comparison reduces f32 N = 96 from the 222.935 ns entry
-  median to 128.429/128.359 ns in two adjacent runs while f64 and N = 64/128
-  controls retain their established bands. Provider source `42a0d4c` passes
-  formatting, warning-denied host and AArch64 checks, focused 112/112 and release
-  420/420 Nextest, 5/5 doctests, and warning-denied Rustdoc. Hosted review and
-  merge remain open.
-- **Integrator / lease:** `/root`; lease none. Last update 2026-09-01.
+- **Delivery:** provider `42a0d4c`; PR #111 merged without squash as `9ac23fa4`; lease none.
+- **Outcome:** `ComplexReg::transpose_square` provides one pair-preserving allocation-free tile transpose; AVX2 f32 uses the native register network and other backends retain the portable default.
+- **Evidence:** 2.857 ns native versus 98.242 ns portable locally; Apollo N = 96 falls from 222.935 ns to 128.429/128.359 ns. Exact-baseline SemVer passes 196/196 checks; hosted run `33470056453` is green across x86, native AArch64, AVX-512 SDE, Miri, dependency policy, lock integrity, and bounded benchmarks.
 
-## HS-HARDWARE-LANE-DISPATCH-2026-09-01 — Exact width without portable emulation [minor] [perf] — review
+## HS-HARDWARE-LANE-DISPATCH-2026-09-01 — Exact width without portable emulation [minor] [perf] — done 2026-09-01
 
-- **Outcome.** Add one public exact-width entry that selects only real ISA
-  backends, allowing consumers to decline rather than monomorphize and carry a
-  portable fixed-array kernel for a width the host hardware does not implement.
-- **Scope / non-goals.** Extend the existing `LaneKernel` dispatch family and
-  ADR 018; preserve `vectorize` and `vectorize_lanes` byte-for-byte in behavior,
-  including the latter's portable exact-width fallback. Do not add fixed-width
-  vector storage or expose backend marker types.
-- **Acceptance.** AVX-512/AVX2/NEON selection remains widest-first at the exact
-  requested lane count. When only `ScalarArch` matches, the new entry returns
-  `None` without invoking the kernel; the existing entry still invokes it once.
-  Runtime feature checks precede every target-feature frame, unsupported
-  targets decline, no allocation or public break is introduced, and Apollo's
-  f32 combine no longer links its unused exact-four scalar kernel.
-- **Risk / dependencies.** [minor] [perf]. Driven by Apollo PR #219's exact
-  Linux artifacts: its new f32 exact-four fallback contributes a 5,080-byte
-  unused monomorph while AVX2 executes exact eight. Local code-size and timing
-  evidence does not establish the hosted regression's mechanism.
-- **Candidate evidence.** Provider source `141b7e1` shares the hardware ladder;
-  the additive public entry passes warning-denied host Clippy, 450/450 package
-  Nextest tests, 7/7 doctests,
-  warning-denied Rustdoc, no-default-features, AArch64 Windows compilation, and
-  cargo-semver-checks 196/196. Apollo's unchanged optimized benchmark executable
-  shrinks 8,192,512 to 8,184,832 bytes. Two pinned N=64/N=256 timing pairs do
-  not establish a latency win; no timing claim is accepted.
-- **Integrator / lease:** `/root`; lease none. Last update 2026-09-01.
+- **Delivery:** provider `141b7e1`; PR #110 merged without squash as `363c407d`; lease none.
+- **Outcome:** `vectorize_hardware_lanes` shares the exact-width hardware ladder and declines before kernel invocation when only portable emulation matches; Apollo removes the unused exact-four scalar monomorph.
+- **Evidence:** Apollo's optimized executable shrinks 7,680 bytes with no latency claim. Hosted run `33458750515` is green across x86, native AArch64, AVX-512 SDE, Miri, dependency policy, lock integrity, and bounded benchmarks.
 
 ## HS-F16C-SCALAR-FRAME-2026-08-31 — The scalar fallback stays unframed for F16C scalars [patch] [perf] — done 2026-08-31
 
