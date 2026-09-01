@@ -1,32 +1,8 @@
 # Backlog — hermes-simd
 
-## HS-THEMIS-AFFINITY-CONSUMER-2026-09-01 [patch] — review
+## HS-THEMIS-AFFINITY-CONSUMER-2026-09-01 [patch] — complete
 
-- **Outcome.** Consume Themis's processor-group affinity values in the Windows
-  NUMA-node and exact-processor guards, deleting Hermes's duplicate flattened
-  processor division, remainder, checked-shift, grouping, and tie-breaking
-  logic while retaining Hermes ownership of the thread-affinity mechanism.
-- **Scope / non-goals.** `hermes-simd-core` Windows NUMA affinity leaves,
-  focused tests, the exact standalone Themis pin, CHANGELOG, and this item.
-  Preserve public types, coverage semantics, active-host validation,
-  `SetThreadGroupAffinity`, restoration, and unsupported-target behavior. Do
-  not move mutable binding into Themis or alter Linux affinity.
-- **Acceptance.** `NumaBinding` selects `ProcessorAffinityGroups::largest_group`;
-  `ProcessorBinding` uses `ProcessorGroupAffinity::from_processor`; no local
-  input decomposition or bit construction remains. Full/ragged multi-group,
-  deterministic tie, unavailable-processor, live bind, restore, no-default,
-  host, and AArch64 checks remain value-semantic and warning-clean. The lock
-  resolves Themis merge `64ac8ccee8a916b264f0f933de3f642b69ed5434`.
-- **Evidence / closure.** Source `bf48f97` pins Themis merge
-  `64ac8ccee8a916b264f0f933de3f642b69ed5434`; full workspace Nextest passed
-  544/544 in 4.173 s, warning-denied workspace all-target Clippy and Rustdoc,
-  26 runnable doctests, no-default all-target checking, and warning-denied
-  AArch64 Windows all-target checking are green. This cold-path consolidation
-  makes no timing or node-binding allocation claim; exact processor binding
-  remains allocation-free. Independent review and PR merge remain.
-- **Integrator / lease.** Codex `01a0253c-6013-7552-99cc-36bbbcf77f6d`;
-  branch=`refactor/hermes-affinity-provider`; lease=none;
-  last-update=2026-09-01.
+- PR #121 merged history-preserved as `92cbfcbc6f926e8e1fae689214dc4a604eb4275e` (source `bf48f97`; PM `9e1b9e4`), deleting duplicate Windows affinity decomposition/grouping while preserving binding contracts and all 544 workspace tests.
 
 ## HS-ADR-INDEX-GENERATOR-ABSENT-2026-09-01 [patch] — todo
 
