@@ -22,6 +22,7 @@ pub mod min;
 pub mod modular;
 mod ops;
 mod popcount;
+mod real_interleave;
 pub mod scale;
 /// Sealed SIMD dispatch trait and blanket implementations.
 pub mod simd_ops;
@@ -32,5 +33,8 @@ pub use ops::*;
 pub use popcount::{
     dispatch_reduce_popcount, dispatch_reduce_popcount_and, dispatch_reduce_popcount_or,
     dispatch_reduce_popcount_xor,
+};
+pub use real_interleave::{
+    real_mul_to_interleaved_complex, real_mul_to_interleaved_complex_runtime,
 };
 pub use simd_ops::SimdOps;

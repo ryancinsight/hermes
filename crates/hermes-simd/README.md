@@ -13,6 +13,8 @@ device execution to Hephaestus.
 
 - The sealed `SimdOps` extension trait over slices.
 - Runtime-dispatched free functions — `sum`, `dot`, `masked_dot`,
+  `interleaved_complex_*`, `real_mul_to_interleaved_complex_runtime`,
+  `spmv_*`, `axpy`, `axpy_rows`, `axpy_rows_batch`, `gemm`.
   `interleaved_complex_*`, `real_interleaved_complex_*`, `spmv_*`, `axpy`,
   `axpy_rows`, `axpy_rows_batch`, `gemm`.
 - `dispatch_view` CPUID routing, plus `TargetId` / `dispatch_view_to` for

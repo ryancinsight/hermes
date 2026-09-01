@@ -260,6 +260,8 @@ pub use dispatch::{
     ntt_butterfly_stage_u64,
     real_interleaved_complex_dot,
     real_interleaved_complex_dot_runtime,
+    real_mul_to_interleaved_complex,
+    real_mul_to_interleaved_complex_runtime,
     // Generic free functions — the primary public API.
     reduce_popcount,
     reduce_popcount_and,

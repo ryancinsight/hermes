@@ -4,7 +4,7 @@ use super::super::popcount::{
 };
 use super::super::{
     abs_reduce, argmax, argmin, axpy, binary, complex, dot, gemm, gemv, gemv_strided,
-    gemv_transpose, gemv_transpose_strided, masked, max, min, scale, sparse, sum,
+    gemv_transpose, gemv_transpose_strided, masked, max, min, real_interleave, scale, sparse, sum,
 };
 use super::{private, SimdOps};
 use hermes_simd_core::scalar::Scalar as ScalarTrait;
@@ -237,6 +237,16 @@ macro_rules! impl_simd_ops_methods {
             Self: core::ops::Neg<Output = Self>,
         {
             complex::dispatch_interleaved_complex_dot::<Self, CONJ_B>(a, b)
+        }
+        #[inline(always)]
+        fn real_mul_to_interleaved_complex(
+            input: &[Self],
+            factors: &[Self],
+            output: &mut [Self],
+        ) -> Result<(), SimdError> {
+            real_interleave::dispatch_real_mul_to_interleaved_complex::<Self>(
+                input, factors, output,
+            )
         }
         #[inline(always)]
         fn real_interleaved_complex_dot(

@@ -258,6 +258,17 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     ) -> Result<(Self, Self), SimdError>
     where
         Self: core::ops::Neg<Output = Self>;
+    /// Multiplies real lanes and writes `[product, zero]` complex pairs.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] unless the inputs have equal
+    /// lengths and the output has twice that length.
+    fn real_mul_to_interleaved_complex(
+        input: &[Self],
+        factors: &[Self],
+        output: &mut [Self],
+    ) -> Result<(), SimdError>;
     /// Computes `sum(real[k] * weights[k])` for interleaved complex weights.
     ///
     /// # Errors
