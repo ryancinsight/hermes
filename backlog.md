@@ -1,5 +1,51 @@
 # Backlog — hermes-simd
 
+## HS-F16C-FRAME-FOR-COMPUTE-SCALARS-2026-09-02 — A consumer computing in f32 over binary16 storage cannot reach the F16C frame [minor] [perf] — todo
+
+- **Consumer driver.** Apollo transforms half-precision buffers by promoting
+  them to `Complex32`, running the f32 kernel, and demoting: a `binary16` FFT
+  has no native arithmetic on x86-64 without AVX512-FP16, so the promotion is
+  the design, not a workaround. After moving both conversions onto eunomia's
+  F16C bulk converters the promotion stopped dominating, but at the lengths
+  whose whole transform is register-resident (n = 8, 16, 32) the buffer is
+  still walked three times: written by the widening, read and written by the
+  codelet, read by the narrowing. Fusing the widening onto the codelet's loads
+  and the narrowing onto its stores would leave one pass, measured worth about
+  **3.5 ns per transform at n = 16 (8.9 -> ~5.4, -39%)**, less at 32, nothing
+  at n >= 64 (apollo `gap_audit.md#half-fusion-blocked-upstream`).
+- **What blocks it.** Fusion needs the conversion and the codelet arithmetic in
+  one `#[target_feature]` frame with values never leaving registers. A consumer
+  writes its codelet as a `LaneKernel<f32>` body and hermes chooses the frame:
+  `dispatch_hardware_lane_count` enters `call_avx2_f16c` only when
+  `<Avx2 as SimdStorage<T>>::REQUIRES_F16C` holds, which is a property of the
+  *storage* scalar. A kernel computing in `f32` over `binary16` storage is
+  exactly the case that wants the F16C frame and cannot ask for it: inside the
+  plain `avx2,fma` frame an inlinable conversion loop cannot lower to
+  `vcvtph2ps`, and the alternatives are a cross-crate call whose own
+  target-feature body is opaque (what apollo does today) or x86 intrinsics in
+  the consumer, which is the per-ISA fork apollo's ADR 0045 is retiring.
+- **The shape of the fix, and its cost.** The frame already exists; only the
+  selection is narrow. Preferring `call_avx2_f16c` whenever the host reports
+  F16C — for every scalar, not only those with `REQUIRES_F16C` — is a few
+  lines in `dispatch_hardware_lane_count`. The cost is that every
+  `LaneKernel` body then has two AVX2 monomorphizations (with and without the
+  extended frame), which is binary size across all consumers, so it is a
+  contract decision rather than a patch: measure the size delta on a
+  representative consumer before choosing. An opt-in entry point
+  (`vectorize_hardware_lanes` variant that prefers the extended frame) trades
+  the size cost for a wider API and keeps existing callers untouched.
+- **Alternatives already closed** (apollo measured or examined each): a
+  `BackendKernel<T>` widen hook needs a portable `f32 -> T` that `Scalar`
+  (eunomia `NumericElement`) does not provide; a blanket-impl trait cannot be
+  overridden per backend without specialization; an inherent per-arch method
+  cannot be named from a `LaneKernel::call<A>` body; and inlining the F16C
+  sequence by hand in the consumer measured *slower* than eunomia's bulk
+  converters at every size, so there is no consumer-side shortcut.
+- **Acceptance.** A `LaneKernel<f32>` body containing a plain `binary16 -> f32`
+  conversion loop lowers to `vcvtph2ps` on an F16C host; the chosen shape's
+  binary-size effect is measured and recorded; apollo's fused small bases
+  reach the ceiling above or the attempt is recorded as falsified.
+
 ## HS-REDUCED-PRECISION-ELEMENTWISE-2026-09-01 — Elementwise SIMD ops for F16/Bf16 [minor] [perf] — done
 
 - **Integrator:** Codex atlas-session; **branch:** `perf/hermes-bf16-elementwise`;
