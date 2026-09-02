@@ -65,7 +65,7 @@ guard is still active.
 
 The API remains available in `no_std`: its state is fixed-size, errors borrow
 only static operation names, and the Windows backend calls the platform ABI
-directly. The current increment implements Windows because it is the measured
+directly. The first increment implemented Windows because it was the measured
 consumer requirement. Other targets keep the same public type and return the
 unsupported variant until a native backend lands with equivalent validation
 and restoration semantics.
@@ -87,6 +87,14 @@ and restoration semantics.
 
 ## Revision history
 
+- 2026-09-01: Add the Linux backend for `HS-PROCESSOR-BINDING-LINUX-2026-09-01`
+  — `sched_getaffinity`/`sched_setaffinity` on the calling thread and
+  `sched_getcpu`, declared directly like the Windows kernel32 calls. The
+  decision is unchanged: bind returns the previous affinity for
+  restore-on-drop, a processor outside the thread's allowed set is rejected
+  before any mutation, and the caller verifies exactness through
+  `ProcessorIndex::current`. Surfaced by apollo#252, where Linux CI benches
+  ran unpinned because selection (Themis) succeeded and binding refused.
 - 2026-09-01: Delegate flattened-index decomposition and native one-bit mask
   construction to Themis for `HS-THEMIS-AFFINITY-CONSUMER-2026-09-01`.
   Hermes still owns active-host validation and the thread-bound bind/restore
