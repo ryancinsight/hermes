@@ -69,6 +69,15 @@
   `[patch]`), then vendoring the generalized copy — which is option (b)'s
   first step, not an alternative to it. hermes `ci.yml` has no Python step
   today; the check fits as a job beside `lockfile` (`Lockfile integrity`).
+- **Second DoR fact (2026-09-01):** atlas also carries a `scripts/adr-index.py`
+  — a different program (208 lines, meta-repo-root-relative, driven by
+  `atlas-conformance.yml`, no target-directory argument), and kwavers a third
+  (179 lines). Three divergent generators for one concern. apollo #254
+  generalizes apollo's copy to three- or four-digit numbering; hermes vendors
+  *that* once merged (option a, unblocked now). Unifying all three behind an
+  atlas reusable workflow in the `lockfile-guard.yml` shape — caller
+  checkout, atlas checkout into `_atlas`, one generator taking `--root` — is
+  filed as the stack item, not folded into this one.
 - **Acceptance oracle:** `python scripts/adr-index.py check` runs in hermes CI
   and **fails on a deliberately desynchronised index** (prove it bites before
   claiming it works), then passes against the real one.
