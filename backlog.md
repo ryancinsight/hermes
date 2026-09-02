@@ -46,7 +46,7 @@
   lock advances; a hermes micro-benchmark of the split recorded before/after.
 - **Risk / change class:** [patch] [perf]; one backend method.
 
-## HS-HALF-INTERLEAVE-2026-09-02 — No lane movement at 128-bit-half granularity [minor] — todo
+## HS-HALF-INTERLEAVE-2026-09-02 — No lane movement at 128-bit-half granularity [minor] — done 2026-09-02
 
 - **Driver (apollo ADR 0045):** the remaining intrinsic Stockham
   specialisations pack two digits per register at the f32 width — a
@@ -67,6 +67,22 @@
 - **Acceptance oracle:** conformance green on scalar/AVX2/AVX-512 (and NEON
   where run); apollo's next slice consumes it with its own measurement.
 - **Risk / change class:** [minor] (additive API).
+- **Delivered 2026-09-02** by PR #138 (`Vector::interleave_halves`,
+  `_mm256_permute2f128_*` / `_mm512_shuffle_f32x4`/`f64x2` / `vcombine_f32`
+  / `vzip1q_f64` over a scalar-emulation default, property-tested on every
+  host backend) and PR #139, which the consuming slice showed it also
+  needed:
+  - `splat_pair` — `ComplexReg::splat` built `[re, im, re, im, ...]` by
+    interleaving two scalar broadcasts, two unpacks plus a cross-lane
+    `vperm2f128` per twiddle. Every ISA has a single pair-broadcast
+    instruction for it. Building three (pair) or seven (triple) twiddle
+    registers per stage iteration, the interleave form cost apollo
+    **+295% at f32 n = 1024**; the broadcast brings it to +4.6%.
+  - `blend_halves` — the half-granular *select* beside this item's
+    half-granular *gather*: each half keeps its position, so it is one
+    in-lane blend where the gather needs the cross-lane permute. It leaves
+    apollo's cell at +4.4%, so the residual there is not cross-lane
+    traffic (apollo ADR 0045, ninth slice).
 
 ## HS-GEMM-PANEL-REUSE-2026-08-29 — Reuse bounded packed-B scratch [patch] [perf] — rejected 2026-08-29 on measurement
 
