@@ -327,7 +327,13 @@ impl<T: Scalar> ReductionOp<T> for Min {
         acc: Arch::Vector,
         v: Arch::Vector,
     ) -> Arch::Vector {
-        Arch::min(acc, v)
+        // A NaN lane keeps the accumulator. `min` alone cannot be relied on
+        // for this: an ISA minimum returns one operand or the other when
+        // either is NaN, so a NaN in `v` could replace a real minimum already
+        // held in `acc` and the next element would then overwrite the NaN --
+        // the result depended on where the NaN sat. `v == v` is false only
+        // for NaN, and the accumulator never holds one.
+        Arch::blend(Arch::cmp_eq(v, v), Arch::min(acc, v), acc)
     }
     #[inline(always)]
     unsafe fn finalize<
@@ -357,7 +363,8 @@ impl<T: Scalar> ReductionOp<T> for Max {
         acc: Arch::Vector,
         v: Arch::Vector,
     ) -> Arch::Vector {
-        Arch::max(acc, v)
+        // NaN lanes keep the accumulator; see `Min::accumulate`.
+        Arch::blend(Arch::cmp_eq(v, v), Arch::max(acc, v), acc)
     }
     #[inline(always)]
     unsafe fn finalize<

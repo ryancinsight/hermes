@@ -14,6 +14,13 @@ pub fn sum<T: SimdOps>(data: &[T]) -> T {
 /// Computes the minimum element of the slice using runtime-dispatched SIMD.
 ///
 /// Returns `T::MAX_VALUE` for empty slices.
+///
+/// NaN is ignored, wherever it sits: the result is the minimum of the
+/// non-NaN elements, and a slice of only NaN reduces to the same identity an
+/// empty slice does (`+inf` for floats). This is `fmin` semantics, the same
+/// as [`f64::min`], and it holds identically on the scalar tail and every
+/// vector backend, so a caller gets one answer for one input regardless of
+/// length or dispatch.
 #[inline(always)]
 pub fn min<T: SimdOps>(data: &[T]) -> T {
     T::min(data)
@@ -22,6 +29,9 @@ pub fn min<T: SimdOps>(data: &[T]) -> T {
 /// Computes the maximum element of the slice using runtime-dispatched SIMD.
 ///
 /// Returns `T::MIN_VALUE` for empty slices.
+///
+/// NaN is ignored, wherever it sits, as for [`min`]: `fmax` semantics, and an
+/// all-NaN slice reduces to the empty-slice identity (`-inf` for floats).
 #[inline(always)]
 pub fn max<T: SimdOps>(data: &[T]) -> T {
     T::max(data)

@@ -92,14 +92,29 @@ where
         if unrolled_len >= chunk_size {
             // Seeds carry the per-element transform (identity for Sum/Min/Max,
             // abs for AbsSum/AbsMax) — a raw-load seed would skip it for the
-            // first chunk. Cross-accumulator merges use combine_vectors, which
-            // never re-applies the transform to already-transformed partials.
+            // first chunk — and fold it into the identity through `accumulate`
+            // so the first chunk passes the same lane guard as every later one:
+            // Min/Max ignore NaN lanes only inside `accumulate`, and a raw seed
+            // let a NaN in the first chunk poison its accumulator (NEON `vminq`
+            // propagates it; x86 `min` only drops it by operand order).
+            // Cross-accumulator merges use combine_vectors, which never
+            // re-applies the transform to already-transformed partials.
             let base = data.as_ptr();
             acc = unsafe {
-                let mut acc0 = Op::transform_vector::<Arch>(load(base));
-                let mut acc1 = Op::transform_vector::<Arch>(load(base.add(lane_count)));
-                let mut acc2 = Op::transform_vector::<Arch>(load(base.add(lane_count * 2)));
-                let mut acc3 = Op::transform_vector::<Arch>(load(base.add(lane_count * 3)));
+                let mut acc0 =
+                    Op::accumulate::<Arch>(acc, Op::transform_vector::<Arch>(load(base)));
+                let mut acc1 = Op::accumulate::<Arch>(
+                    acc,
+                    Op::transform_vector::<Arch>(load(base.add(lane_count))),
+                );
+                let mut acc2 = Op::accumulate::<Arch>(
+                    acc,
+                    Op::transform_vector::<Arch>(load(base.add(lane_count * 2))),
+                );
+                let mut acc3 = Op::accumulate::<Arch>(
+                    acc,
+                    Op::transform_vector::<Arch>(load(base.add(lane_count * 3))),
+                );
                 let mut ptr = base.add(chunk_size);
                 i = chunk_size;
 
