@@ -167,7 +167,17 @@
   cross-compilation on the delivered revision. AVX-512 and NEON overrides
   are compile evidence only on this host.
 
-## HS-REAL-WINDOW-INTERLEAVE-2026-09-01 — Fuse real windowing into complex layout [minor] [perf] — provider delivered; consumer closure open
+## HS-REAL-WINDOW-INTERLEAVE-2026-09-01 — Fuse real windowing into complex layout [minor] [perf] — done 2026-09-01 (consumer closed)
+
+- **Consumer closure (2026-09-01).** Apollo STFT adopts
+  `real_mul_to_interleaved_complex_runtime` for every interior frame, writing
+  `[x * w, 0]` from the signal slice straight into the complex frame. Both
+  forward real scratch pools are deleted (16 KiB per worker at frame 1024).
+  Isolated per-frame A/B: 0.71x-0.77x of the three-pass shape, bit-exact;
+  STFT-level rows moved favorably in two adjacent pairs and never regressed.
+  Apollo record: `ATLAS-APOLLO-STFT-WINDOW-INTERLEAVE-2026-09-01`
+  (re-adjudicated under the memory criterion). The provider surface has a
+  consumer.
 
 - **Delivery state (2026-09-01).** Provider source `c42571d` merged through PR
   #115 as `3c6feb4`, without squash. Collected by Claude session 03d80d33 under
