@@ -251,7 +251,7 @@
 - **Outcome:** one allocation-free generic/runtime real-by-interleaved-complex dot lets Apollo Mellin remove its retained 16N-byte real-lane materialization while preserving target safety, exact shape validation, and ragged tails.
 - **Evidence:** two primitive pairs improve 31–53%; two Apollo public-plan pairs improve N = 128 by 1.96%/1.49% and N = 256 by 1.46%/0.83% with a neutral N = 64 control. Source hosted run `33492225619` passes every repository gate. The corrected exact-head review, PR #114 hosted gates, and merge remain open.
 
-## HS-EXACT-PROCESSOR-BINDING-2026-08-31 — Exact thread placement for reproducible consumer measurements [minor] [arch] — review
+## HS-EXACT-PROCESSOR-BINDING-2026-08-31 — Exact thread placement for reproducible consumer measurements [minor] [arch] — done 2026-09-01
 
 - **Outcome:** add one public, typed, allocation-free RAII guard that binds the
   calling thread to an exact logical processor and restores its prior affinity,
@@ -281,6 +281,17 @@
   first-party Git sources, formatting, diff, and unchanged Atlas conformance
   counts. Independent exact-head review, hosted gates, provider merge, and
   Apollo adoption remain. Last update 2026-08-31.
+
+- **Independent review (2026-09-01, Claude; 1-node / 24-processor host):**
+  two deliberate regressions against the three Windows tests, both caught.
+  A `Drop` that restores nothing fails
+  `exact_binding_reports_processor_and_restores_on_drop`; a bind that
+  applies a wider mask than the single requested processor fails that test
+  and `explicit_restore_is_observable_and_idempotent`. Unlike the node guard
+  reviewed under `HS-NUMA-BINDING-THEMIS-QUERY-2026-09-01`, this suite reaches
+  the guard's own `drop` and pins the exact applied mask, so the RAII contract
+  is tested rather than assumed. Merged through PR #120's series; Apollo
+  consumes it for pinned probes.
 
 ## HS-GEMM-PANEL-REUSE-2026-08-29 — Reuse bounded packed-B scratch [patch] [perf] — rejected 2026-08-29 on measurement
 
