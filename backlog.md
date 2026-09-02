@@ -1,6 +1,31 @@
 # Backlog — hermes-simd
 
-## HS-F16C-FRAME-FOR-COMPUTE-SCALARS-2026-09-02 — A consumer computing in f32 over binary16 storage cannot reach the F16C frame [minor] [perf] — done 2026-09-02
+## HS-F16C-FRAME-FOR-COMPUTE-SCALARS-2026-09-02 — A consumer computing in f32 over binary16 storage cannot reach the F16C frame [minor] [perf] — closed 2026-09-02: built, consumer measured no gain, reverted
+
+- **Outcome.** The capability was designed, implemented, merged and then
+  reverted in the same session, because the consumer it existed for measured
+  no gain. The shape that fit — recorded for whoever revisits this — is a
+  defaulted associated const on `LaneKernel` (`CONVERTS_BINARY16`) read beside
+  the backend's `REQUIRES_F16C`, so the two fail differently: a backend that
+  *requires* F16C and does not find it falls through to another backend, while
+  a kernel that merely *prefers* it runs the same body in the ordinary frame.
+  Being a compile-time constant, it charges the extra monomorphization only to
+  kernels that ask. The two shapes this item originally posed are both worse:
+  widening the selection for every scalar charges two AVX2 monomorphizations
+  to consumers that never convert, and a separate entry point names a CPU
+  feature in a portable API.
+- **Why it went back out.** Apollo's fused half codelet — the driver, and the
+  only user — is correct but not faster: with both paths in one binary and the
+  arms alternating in one process, n = 16 ran 9.50/9.72 ns fused against
+  9.09/8.65 staged, n = 32 a wash (apollo
+  `gap_audit.md#half-fusion-not-established`). The ceiling that justified the
+  request assumed three trips to memory; at 128 to 256 bytes they are three
+  trips to L1, and the fused body costs more in register pressure than they
+  cost in traffic. A capability with no user is speculative generality however
+  small and however zero-cost when unused.
+- **Re-open trigger:** a consumer whose conversion buffer genuinely leaves L1,
+  or an AVX512-FP16 host where the compute type itself is `binary16` and the
+  question changes shape.
 
 - **Consumer driver.** Apollo transforms half-precision buffers by promoting
   them to `Complex32`, running the f32 kernel, and demoting: a `binary16` FFT
@@ -41,25 +66,6 @@
   cannot be named from a `LaneKernel::call<A>` body; and inlining the F16C
   sequence by hand in the consumer measured *slower* than eunomia's bulk
   converters at every size, so there is no consumer-side shortcut.
-- **Decision and delivery (2026-09-02).** Of the two shapes the item posed,
-  neither is what landed. Widening the selection for every scalar gives every
-  `LaneKernel` body two AVX2 monomorphizations — binary size charged to
-  consumers that never convert — and a separate entry point names a CPU
-  feature in a portable API and splits a call site that should read the same
-  everywhere. What landed instead is a defaulted associated const on
-  `LaneKernel`: `CONVERTS_BINARY16`, which a kernel sets when its body
-  converts between `binary16` storage and its compute lanes. The dispatcher
-  reads it beside the backend's own `REQUIRES_F16C`, and the two fail
-  differently — a backend that *requires* F16C and does not find it falls
-  through to another backend, while a kernel that merely *prefers* it runs the
-  same body in the ordinary frame. Because the preference is a compile-time
-  constant, a kernel that does not convert never instantiates the extended
-  frame: the cost is charged exactly to the kernels that asked. A test asserts
-  the neutrality that makes this safe — two kernels differing only in the
-  const must agree on backend, lane count and every value.
-- **Not claimed:** no consumer speedup is measured here. The apollo fusion
-  this unblocks is measured in that repository against its own baseline, and
-  the const stands or falls with it.
 - **Acceptance.** A `LaneKernel<f32>` body containing a plain `binary16 -> f32`
   conversion loop lowers to `vcvtph2ps` on an F16C host; the chosen shape's
   binary-size effect is measured and recorded; apollo's fused small bases
