@@ -34,7 +34,11 @@ impl ProcessorIndex {
         {
             Ok(windows::current_processor())
         }
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(target_os = "linux")]
+        {
+            linux::current_processor()
+        }
+        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
         {
             Err(ProcessorBindingError::UnsupportedPlatform)
         }
@@ -101,7 +105,9 @@ pub struct ProcessorBinding {
     processor: ProcessorIndex,
     #[cfg(target_os = "windows")]
     previous: windows::GroupAffinity,
-    #[cfg(target_os = "windows")]
+    #[cfg(target_os = "linux")]
+    previous: linux::CpuSet,
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
     active: bool,
     thread_bound: PhantomData<*mut ()>,
 }
@@ -129,7 +135,17 @@ impl ProcessorBinding {
                 thread_bound: PhantomData,
             })
         }
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(target_os = "linux")]
+        {
+            let previous = linux::bind(processor)?;
+            Ok(Self {
+                processor,
+                previous,
+                active: true,
+                thread_bound: PhantomData,
+            })
+        }
+        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
         {
             let _ = processor;
             Err(ProcessorBindingError::UnsupportedPlatform)
@@ -160,7 +176,15 @@ impl ProcessorBinding {
             }
             Ok(())
         }
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(target_os = "linux")]
+        {
+            if self.active {
+                linux::restore(&self.previous)?;
+                self.active = false;
+            }
+            Ok(())
+        }
+        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
         {
             Err(ProcessorBindingError::UnsupportedPlatform)
         }
@@ -172,6 +196,16 @@ impl Drop for ProcessorBinding {
     fn drop(&mut self) {
         if self.active {
             windows::restore_on_drop(&self.previous);
+            self.active = false;
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl Drop for ProcessorBinding {
+    fn drop(&mut self) {
+        if self.active {
+            linux::restore_on_drop(&self.previous);
             self.active = false;
         }
     }
@@ -270,6 +304,200 @@ mod windows {
     }
 }
 
+#[cfg(target_os = "linux")]
+mod linux {
+    use super::{ProcessorBindingError, ProcessorIndex};
+
+    /// glibc and musl `cpu_set_t`: `CPU_SETSIZE` (1024) bits as 16 machine words.
+    ///
+    /// Declared here rather than through a bindings crate for the same reason
+    /// the Windows module declares kernel32 directly: three calls do not earn
+    /// a dependency, and the layout is fixed by the C library ABI.
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    #[repr(C)]
+    pub(super) struct CpuSet {
+        bits: [u64; 16],
+    }
+
+    const _: () = assert!(core::mem::size_of::<CpuSet>() == 128);
+    const CPU_SETSIZE: u32 = 128 * 8;
+    /// `pid` 0 names the calling thread for the scheduler affinity calls.
+    const CALLING_THREAD: i32 = 0;
+
+    impl CpuSet {
+        const fn empty() -> Self {
+            Self { bits: [0; 16] }
+        }
+
+        pub(super) fn contains(&self, processor: u32) -> bool {
+            processor < CPU_SETSIZE
+                && self.bits[(processor / 64) as usize] & (1u64 << (processor % 64)) != 0
+        }
+
+        fn single(processor: u32) -> Option<Self> {
+            (processor < CPU_SETSIZE).then(|| {
+                let mut set = Self::empty();
+                set.bits[(processor / 64) as usize] |= 1u64 << (processor % 64);
+                set
+            })
+        }
+    }
+
+    unsafe extern "C" {
+        fn sched_getaffinity(pid: i32, cpusetsize: usize, mask: *mut CpuSet) -> i32;
+        fn sched_setaffinity(pid: i32, cpusetsize: usize, mask: *const CpuSet) -> i32;
+        fn sched_getcpu() -> i32;
+        fn __errno_location() -> *mut i32;
+    }
+
+    fn last_error() -> u32 {
+        // SAFETY: `__errno_location` returns the calling thread's errno slot,
+        // which is always valid and only read here.
+        let code = unsafe { *__errno_location() };
+        u32::try_from(code).unwrap_or(0)
+    }
+
+    fn platform_error(operation: &'static str) -> ProcessorBindingError {
+        ProcessorBindingError::Platform {
+            operation,
+            code: last_error(),
+        }
+    }
+
+    pub(super) fn current_processor() -> Result<ProcessorIndex, ProcessorBindingError> {
+        // SAFETY: `sched_getcpu` takes no arguments and only reads scheduler
+        // state for the calling thread.
+        let cpu = unsafe { sched_getcpu() };
+        u32::try_from(cpu)
+            .map(ProcessorIndex::new)
+            .map_err(|_| platform_error("query current processor"))
+    }
+
+    pub(super) fn thread_affinity() -> Result<CpuSet, ProcessorBindingError> {
+        let mut set = CpuSet::empty();
+        // SAFETY: `set` is a live, correctly sized `cpu_set_t` for the length
+        // passed alongside it, and the call writes only within it.
+        let rc = unsafe {
+            sched_getaffinity(CALLING_THREAD, core::mem::size_of::<CpuSet>(), &raw mut set)
+        };
+        if rc != 0 {
+            return Err(platform_error("query current thread affinity"));
+        }
+        Ok(set)
+    }
+
+    fn apply(set: &CpuSet, operation: &'static str) -> Result<(), ProcessorBindingError> {
+        // SAFETY: `set` is a live, correctly sized `cpu_set_t` read only for the
+        // duration of the call.
+        let rc = unsafe {
+            sched_setaffinity(
+                CALLING_THREAD,
+                core::mem::size_of::<CpuSet>(),
+                &raw const *set,
+            )
+        };
+        if rc != 0 {
+            return Err(platform_error(operation));
+        }
+        Ok(())
+    }
+
+    /// Bind the calling thread to `processor`; returns the affinity to restore.
+    ///
+    /// A processor outside the thread's current allowed set — including any
+    /// index past `CPU_SETSIZE` — is rejected before any mutation, so the
+    /// caller's affinity is untouched on error.
+    pub(super) fn bind(processor: ProcessorIndex) -> Result<CpuSet, ProcessorBindingError> {
+        let previous = thread_affinity()?;
+        let requested = CpuSet::single(processor.get())
+            .filter(|_| previous.contains(processor.get()))
+            .ok_or(ProcessorBindingError::ProcessorUnavailable { processor })?;
+        apply(&requested, "bind current thread")?;
+        Ok(previous)
+    }
+
+    pub(super) fn restore(previous: &CpuSet) -> Result<(), ProcessorBindingError> {
+        apply(previous, "restore current thread")
+    }
+
+    /// Best-effort restore for `Drop`: a destructor cannot report failure and
+    /// must not panic, so an error here is deliberately dropped.
+    pub(super) fn restore_on_drop(previous: &CpuSet) {
+        let _ = restore(previous);
+    }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod linux_processor_tests {
+    use super::{linux, ProcessorBinding, ProcessorBindingError, ProcessorIndex};
+
+    #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "sched_* are foreign scheduler calls miri cannot execute"
+    )]
+    fn exact_binding_reports_processor_and_restores_on_drop() {
+        let before = linux::thread_affinity().expect("current affinity must be queryable");
+        let processor = ProcessorIndex::current().expect("Linux supports processor queries");
+        {
+            let binding =
+                ProcessorBinding::bind(processor).expect("current processor must be bindable");
+            assert_eq!(binding.processor(), processor);
+            std::thread::yield_now();
+            assert_eq!(ProcessorIndex::current(), Ok(processor));
+            let exact = linux::thread_affinity().expect("bound affinity must be queryable");
+            assert!(exact.contains(processor.get()));
+            assert!(
+                (0..1024u32).filter(|&p| exact.contains(p)).count() == 1,
+                "the bound set must hold exactly the requested processor"
+            );
+        }
+        assert_eq!(
+            linux::thread_affinity().expect("restored affinity must be queryable"),
+            before
+        );
+    }
+
+    #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "sched_* are foreign scheduler calls miri cannot execute"
+    )]
+    fn explicit_restore_is_observable_and_idempotent() {
+        let before = linux::thread_affinity().expect("current affinity must be queryable");
+        let processor = ProcessorIndex::current().expect("Linux supports processor queries");
+        let mut binding =
+            ProcessorBinding::bind(processor).expect("current processor must be bindable");
+        binding.restore().expect("saved affinity must restore");
+        assert_eq!(
+            linux::thread_affinity().expect("restored affinity must be queryable"),
+            before
+        );
+        binding
+            .restore()
+            .expect("restoring an inactive guard must be a no-op");
+    }
+
+    #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "sched_* are foreign scheduler calls miri cannot execute"
+    )]
+    fn unavailable_processor_rejects_before_affinity_mutation() {
+        let before = linux::thread_affinity().expect("current affinity must be queryable");
+        let processor = ProcessorIndex::new(u32::MAX);
+        assert!(matches!(
+            ProcessorBinding::bind(processor),
+            Err(ProcessorBindingError::ProcessorUnavailable { processor: rejected })
+                if rejected == processor
+        ));
+        assert_eq!(
+            linux::thread_affinity().expect("unchanged affinity must be queryable"),
+            before
+        );
+    }
+}
+
 #[cfg(all(test, target_os = "windows"))]
 mod processor_tests {
     use super::{windows, ProcessorBinding, ProcessorBindingError, ProcessorIndex};
@@ -333,7 +561,7 @@ mod processor_tests {
     }
 }
 
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(all(test, not(any(target_os = "windows", target_os = "linux"))))]
 mod unsupported_processor_tests {
     use super::{ProcessorBinding, ProcessorBindingError, ProcessorIndex};
 

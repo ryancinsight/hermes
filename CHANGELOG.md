@@ -6,6 +6,12 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [minor][HS-PROCESSOR-BINDING-LINUX] `ProcessorBinding::bind`, `restore`, and
+  `ProcessorIndex::current` gain a Linux backend (`sched_setaffinity`,
+  `sched_getaffinity`, `sched_getcpu` on the calling thread). Exact binding is
+  verified and restored on drop as on Windows; a processor outside the thread's
+  allowed set is rejected before any mutation. `UnsupportedPlatform` now names
+  only targets with neither backend. Benches on Linux runners can pin.
 - [patch][HS-THEMIS-AFFINITY-CONSUMER] Route Windows NUMA-group selection and
   exact-processor mask construction through Themis's processor-affinity value
   types. Hermes retains active-host validation plus the thread-bound Win32
