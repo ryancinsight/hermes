@@ -1,5 +1,28 @@
 # Backlog — hermes-simd
 
+## HS-PROCESSOR-BINDING-LINUX-2026-09-01 — ProcessorBinding and ProcessorIndex::current have no Linux backend [minor] — todo
+
+- **Observed (apollo #252, Linux CI):** `hermes_simd::ProcessorBinding::bind`
+  returns `UnsupportedPlatform` on `x86_64-unknown-linux-gnu`; so does
+  `ProcessorIndex::current`. apollo's benches therefore run **unpinned on
+  every Linux runner** and pinned only on Windows hosts — the two-class
+  scheduler blend apollo just removed from its census
+  (`ATLAS-APOLLO-CENSUS-UNPINNED-BLEND-2026-09-01`) persists wherever CI
+  measures. themis, by contrast, reports topology on Linux, which is how the
+  gap surfaced: selection succeeded, binding refused.
+- **Outcome:** `sched_setaffinity(0, ...)` / `sched_getaffinity` for bind and
+  restore and `sched_getcpu` (or `getcpu`) for the current processor, behind
+  the existing API with the same exact-binding verification the Windows path
+  has. Processor numbering stays hermes's `ProcessorIndex` contract; the
+  group-aware Windows semantics do not apply on Linux (one flat CPU set).
+- **Acceptance oracle:** the four existing `ProcessorBinding` tests pass on
+  Linux; a new test binds to a processor from the affinity set, observes
+  `current()` equal to it, drops the binding, and observes the original set
+  restored via `sched_getaffinity`. apollo's `engine_census` Linux smoke then
+  prints a `bound to logical processor N` line instead of the unpinned notice.
+- **Non-goals:** NUMA-aware selection (themis owns topology); macOS, which has
+  no thread affinity API — it stays typed absence.
+
 ## HS-THEMIS-AFFINITY-CONSUMER-2026-09-01 [patch] — complete
 
 - PR #121 merged history-preserved as `92cbfcbc6f926e8e1fae689214dc4a604eb4275e` (source `bf48f97`; PM `9e1b9e4`), deleting duplicate Windows affinity decomposition/grouping while preserving binding contracts and all 544 workspace tests.
