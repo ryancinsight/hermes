@@ -1836,3 +1836,47 @@ fn rounding_matches_reference_all_backends() {
         check_rounding_f64::<hermes_simd::Neon>();
     }
 }
+
+/// A kernel that prefers the F16C frame must still see the same backend, the
+/// same lane count and the same values as one that does not.
+///
+/// The preference is instruction selection, not semantics: a host with F16C
+/// runs the body in the extended frame and one without runs it in the
+/// ordinary frame, and neither may change what the kernel computes. Two
+/// kernels differing only in `CONVERTS_BINARY16` therefore have to agree
+/// exactly, which is what this asserts — including on the hosts where the
+/// extended frame is never entered.
+#[test]
+fn the_binary16_frame_preference_changes_no_result() {
+    use hermes_simd::{vectorize_hardware_lanes, LaneKernel, Simd, SimdArch, SimdKernel};
+
+    struct Sum<const PREFERS: bool>(&'static [f32]);
+
+    impl<const PREFERS: bool> LaneKernel<f32> for Sum<PREFERS> {
+        type Output = (usize, f32);
+        const CONVERTS_BINARY16: bool = PREFERS;
+
+        fn call<A: SimdArch + SimdKernel<f32>>(self, simd: Simd<f32, A>) -> Self::Output {
+            let view = simd.view(self.0);
+            let lanes = <A as hermes_simd::SimdStorage<f32>>::LANE_COUNT;
+            let vector = hermes_simd::Vector::<f32, A>::from_view_chunk(&view, 0);
+            let mut lane_values = vec![0.0f32; lanes];
+            vector
+                .store_unaligned_to_slice(&mut lane_values)
+                .expect("the destination holds exactly one vector");
+            (lanes, lane_values.iter().sum())
+        }
+    }
+
+    static VALUES: [f32; 16] = [
+        1.5, -2.25, 3.0, 4.75, -5.5, 6.25, 7.0, -8.125, 9.0, 10.5, -11.25, 12.0, 13.75, -14.5,
+        15.25, 16.0,
+    ];
+
+    let plain = vectorize_hardware_lanes::<8, f32, _>(Sum::<false>(&VALUES));
+    let prefers = vectorize_hardware_lanes::<8, f32, _>(Sum::<true>(&VALUES));
+    assert_eq!(
+        plain, prefers,
+        "the frame preference changed the backend, lane count or values"
+    );
+}
