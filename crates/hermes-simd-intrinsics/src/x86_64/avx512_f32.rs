@@ -463,6 +463,19 @@ impl BackendKernel<f32> for Avx512 {
         )
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn interleave_halves(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
+        // Each half is two 128-bit blocks: `shuffle_f32x4` takes blocks 0-1 of
+        // both operands for the low result and blocks 2-3 for the high.
+        (
+            Avx512F32Vec(_mm512_shuffle_f32x4::<0b01_00_01_00>(a.0, b.0)),
+            Avx512F32Vec(_mm512_shuffle_f32x4::<0b11_10_11_10>(a.0, b.0)),
+        )
+    }
+
     // -----------------------------------------------------------------------
     // Scatter (native `vscatterdps`)
     // -----------------------------------------------------------------------

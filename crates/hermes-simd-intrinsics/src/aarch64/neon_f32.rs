@@ -208,6 +208,17 @@ impl BackendKernel<f32> for Neon {
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
+    unsafe fn interleave_halves(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
+        // A half is a 64-bit `float32x2_t`: combine the low halves, then the high.
+        (
+            NeonF32Vec(vcombine_f32(vget_low_f32(a.0), vget_low_f32(b.0))),
+            NeonF32Vec(vcombine_f32(vget_high_f32(a.0), vget_high_f32(b.0))),
+        )
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "neon")]
+    #[inline]
     unsafe fn dup_even(v: Self::Vector) -> Self::Vector {
         NeonF32Vec(vtrn1q_f32(v.0, v.0))
     }
