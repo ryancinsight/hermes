@@ -283,6 +283,10 @@ fn safe_avx512_vector_constructors_reject_unsupported_target() {
         Err(SimdError::UnsupportedTarget)
     );
     assert_eq!(
+        Vector::<f32, Avx512>::try_splat_pair(1.0, 2.0),
+        Err(SimdError::UnsupportedTarget)
+    );
+    assert_eq!(
         Vector::<f32, Avx512>::try_from_array(data),
         Err(SimdError::UnsupportedTarget)
     );
@@ -292,6 +296,19 @@ fn safe_avx512_vector_constructors_reject_unsupported_target() {
     );
 
     let panic = std::panic::catch_unwind(|| Vector::<f32, Avx512>::splat(1.0));
+    assert!(panic.is_err());
+
+    let panic = std::panic::catch_unwind(|| Vector::<f32, Avx512>::splat_pair(1.0, 2.0));
+    assert!(
+        panic.is_err(),
+        "splat_pair is a constructor: no existing register proves host support"
+    );
+
+    // `ComplexReg::splat` reaches the same constructor, so it inherits the
+    // check rather than trusting its caller.
+    let panic = std::panic::catch_unwind(|| {
+        hermes_simd::ComplexReg::<f32, Avx512>::splat(eunomia::Complex::new(1.0, 2.0))
+    });
     assert!(panic.is_err());
 }
 

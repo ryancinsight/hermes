@@ -208,6 +208,7 @@ impl BackendKernel<f32> for Neon {
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn interleave_halves(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
         // A half is a 64-bit `float32x2_t`: combine the low halves, then the high.
         (
@@ -219,6 +220,7 @@ impl BackendKernel<f32> for Neon {
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn splat_pair(lo: f32, hi: f32) -> Self::Vector {
         // The `(lo, hi)` f32 pair is one f64 lane; one `dup` fills both halves.
         let pair = f64::from_bits((u64::from(hi.to_bits()) << 32) | u64::from(lo.to_bits()));
@@ -228,6 +230,7 @@ impl BackendKernel<f32> for Neon {
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn blend_halves(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         // Each half keeps its position: one combine of the two halves.
         NeonF32Vec(vcombine_f32(vget_low_f32(a.0), vget_high_f32(b.0)))
