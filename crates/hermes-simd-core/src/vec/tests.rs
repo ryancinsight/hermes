@@ -93,7 +93,24 @@ fn test_aligned_vec_drop_exception_safety() {
         let mut v = AlignedVec::<PanicOnDrop, Unaligned>::new();
         v.push(PanicOnDrop);
     });
-    assert!(res.is_err());
+    let message = res
+        .err()
+        .map(|payload| {
+            payload
+                .downcast_ref::<String>()
+                .cloned()
+                .or_else(|| {
+                    payload
+                        .downcast_ref::<&'static str>()
+                        .map(|stri| (*stri).to_string())
+                })
+                .unwrap_or_default()
+        })
+        .unwrap_or_default();
+    assert_eq!(
+        message, "intentional panic on drop",
+        "push must surface the element's own drop panic, not abort first"
+    );
 }
 
 #[test]
@@ -107,8 +124,7 @@ fn test_aligned_vec_alignment_casting() {
     let addr = v.as_ptr() as usize;
     if addr % 32 == 0 {
         let v_aligned = v.try_into_alignment::<Aligned<32>>();
-        assert!(v_aligned.is_some());
-        let v_aligned = v_aligned.unwrap();
+        let v_aligned = v_aligned.expect("a 32-byte-aligned buffer must cast to Aligned<32>");
         assert_eq!(v_aligned[0], 1);
         assert_eq!(v_aligned[1], 2);
     } else {

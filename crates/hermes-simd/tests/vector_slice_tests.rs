@@ -296,12 +296,23 @@ fn safe_avx512_vector_constructors_reject_unsupported_target() {
     );
 
     let panic = std::panic::catch_unwind(|| Vector::<f32, Avx512>::splat(1.0));
-    assert!(panic.is_err());
+    let message = panic
+        .err()
+        .and_then(|payload| payload.downcast_ref::<String>().cloned())
+        .unwrap_or_default();
+    assert!(
+        message.contains("this host"),
+        "splat must reject an unsupported host through its own check, got: {message}"
+    );
 
     let panic = std::panic::catch_unwind(|| Vector::<f32, Avx512>::splat_pair(1.0, 2.0));
+    let message = panic
+        .err()
+        .and_then(|payload| payload.downcast_ref::<String>().cloned())
+        .unwrap_or_default();
     assert!(
-        panic.is_err(),
-        "splat_pair is a constructor: no existing register proves host support"
+        message.contains("this host"),
+        "splat_pair is a constructor: no existing register proves host support, got: {message}"
     );
 
     // `ComplexReg::splat` reaches the same constructor, so it inherits the
@@ -309,7 +320,14 @@ fn safe_avx512_vector_constructors_reject_unsupported_target() {
     let panic = std::panic::catch_unwind(|| {
         hermes_simd::ComplexReg::<f32, Avx512>::splat(eunomia::Complex::new(1.0, 2.0))
     });
-    assert!(panic.is_err());
+    let message = panic
+        .err()
+        .and_then(|payload| payload.downcast_ref::<String>().cloned())
+        .unwrap_or_default();
+    assert!(
+        message.contains("this host"),
+        "ComplexReg::splat must inherit the constructor check, got: {message}"
+    );
 }
 
 #[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), feature = "std"))]
