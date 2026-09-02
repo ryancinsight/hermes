@@ -24,6 +24,50 @@
 - **Scope correction (2026-09-02):** the F16 half was already served — `impl_lane_scalar!` covers `F16`, every backend implements `SimdKernel<F16>` (scalar, AVX2 via F16C, AVX-512, NEON), and the `SimdOps` blanket therefore provides the full elementwise/reduction/axpy/gemv/GEMM surface at F16; leto routes it in leto #146 (`LETO-F16-HERMES-ROUTING-2026-09-02`) with bitwise elementwise parity against its scalar path. What remains here is **Bf16 only**: a lane scalar plus `SimdKernel<Bf16>` on the scalar, AVX2 and AVX-512 backends (the x86 `SimdOps` blanket bounds on all three) with the same generic conformance suite and differential tests, computing each op through the exact `f32` widening and round-to-nearest-even narrowing that defines bf16 arithmetic, as the F16C-backed F16 kernels do.
 
 
+## HS-DEINTERLEAVE-PAIRS-AVX2-F32-2026-09-02 — AVX2 f32 `deinterleave_pairs` pays two cross-lane permutes [patch] [perf] — todo
+
+- **Finding (apollo ADR 0045, seventh slice, 2026-09-02):** porting apollo's
+  final Stockham stage (`groups == 1`) onto a `LaneKernel` costs +2.5%
+  (40 ns of 1.56 µs) at f32 n = 1024 on an efficiency core, both rounds
+  agreeing to 0.2%, while every other size is flat. The stage splits two
+  loaded registers into even and odd complex samples; hermes'
+  `Avx2::deinterleave_pairs` for f32 (`x86_64/avx2_f32.rs`) is two
+  `permute2f128_ps` plus two `shuffle_ps`, where the retired intrinsic body
+  used two in-lane `unpacklo/hi_pd` at SSE width per two digits — the same
+  shuffle count, but the cross-lane permutes carry port-5 latency.
+- **Outcome:** an even/odd complex split for AVX2 f32 whose per-register cost
+  matches the unpack form (candidates: `vpermps` with a constant index
+  vector, one per output, or `unpacklo/hi_pd` on the 128-bit halves followed
+  by one `permute2f128`), selected by measurement; the same review for the
+  f64 backend, whose `deinterleave_pairs` is one `permute2f128` pair.
+- **Acceptance oracle:** the reduce/deinterleave conformance tests unchanged
+  and green; apollo's pinned probe cell (efficiency core, f32 n = 1024) back
+  within the 0.5% repeatability of the pre-port binary once the consumer
+  lock advances; a hermes micro-benchmark of the split recorded before/after.
+- **Risk / change class:** [patch] [perf]; one backend method.
+
+## HS-HALF-INTERLEAVE-2026-09-02 — No lane movement at 128-bit-half granularity [minor] — todo
+
+- **Driver (apollo ADR 0045):** the remaining intrinsic Stockham
+  specialisations pack two digits per register at the f32 width — a
+  register holds `(x_i k0 j, x_i k1 j, x_i k0 j+1, x_i k1 j+1)`, two
+  two-sample runs from inputs 16 samples apart. Building it from two
+  loaded registers is an unpack at 128-bit-half granularity
+  (`(lo(a), lo(b))`, `(hi(a), hi(b))` — `vperm2f128`/`vinsertf128` on
+  x86-64, `vzip1q/vzip2q` on 64-bit lanes for NEON f32). `Vector` offers
+  `swap_adjacent`, `swap_pairs`, `deinterleave_pairs{,4}`, `interleave`,
+  `transpose_square`, and `blend` (mask-driven), none of which expresses it
+  without a mask register or a lane-granular detour.
+- **Outcome:** `Vector::interleave_halves(self, other) -> (Self, Self)` (name
+  per the existing family; `ComplexReg` twin) with the backend intrinsics
+  above, a scalar reference, and conformance tests across every backend and
+  width; documented as the operand pairing a two-digit-per-register kernel
+  needs. Not speculative: the four apollo families it unblocks are named in
+  apollo `ATLAS-APOLLO-ISA-FORK-2026-08-25`.
+- **Acceptance oracle:** conformance green on scalar/AVX2/AVX-512 (and NEON
+  where run); apollo's next slice consumes it with its own measurement.
+- **Risk / change class:** [minor] (additive API).
+
 ## HS-GEMM-PANEL-REUSE-2026-08-29 — Reuse bounded packed-B scratch [patch] [perf] — rejected 2026-08-29 on measurement
 
 - **Rejected.** Retaining the panel per thread removes one allocate/free pair
