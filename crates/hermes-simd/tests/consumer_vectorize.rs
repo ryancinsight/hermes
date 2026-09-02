@@ -456,4 +456,19 @@ fn generic_consumer_kernel_compiles_and_runs() {
     let mut a64 = [1.0f64, 2.0, 3.0];
     double_all(&mut a64);
     assert_eq!(a64.as_slice(), [2.0f64, 4.0, 6.0].as_slice());
+
+    let mut abf16 = [
+        eunomia::Bf16::from_f32(1.0),
+        eunomia::Bf16::from_f32(2.0),
+        eunomia::Bf16::from_f32(3.0),
+    ];
+    double_all(&mut abf16);
+    assert_eq!(
+        abf16.map(eunomia::Bf16::to_bits),
+        [
+            eunomia::Bf16::from_f32(2.0).to_bits(),
+            eunomia::Bf16::from_f32(4.0).to_bits(),
+            eunomia::Bf16::from_f32(6.0).to_bits(),
+        ]
+    );
 }
