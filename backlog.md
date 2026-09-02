@@ -21,6 +21,8 @@
   widen-compute-narrow), differential-tested against the scalar path;
   leto then drops `impl_simd_ops_unsupported!` for both.
 - **Non-goals:** tile GEMM (already exists for Bf16), AMX.
+- **Scope correction (2026-09-02):** the F16 half was already served — `impl_lane_scalar!` covers `F16`, every backend implements `SimdKernel<F16>` (scalar, AVX2 via F16C, AVX-512, NEON), and the `SimdOps` blanket therefore provides the full elementwise/reduction/axpy/gemv/GEMM surface at F16; leto routes it in leto #146 (`LETO-F16-HERMES-ROUTING-2026-09-02`) with bitwise elementwise parity against its scalar path. What remains here is **Bf16 only**: a lane scalar plus `SimdKernel<Bf16>` on the scalar, AVX2 and AVX-512 backends (the x86 `SimdOps` blanket bounds on all three) with the same generic conformance suite and differential tests, computing each op through the exact `f32` widening and round-to-nearest-even narrowing that defines bf16 arithmetic, as the F16C-backed F16 kernels do.
+
 
 ## HS-GEMM-PANEL-REUSE-2026-08-29 — Reuse bounded packed-B scratch [patch] [perf] — rejected 2026-08-29 on measurement
 
