@@ -6,6 +6,16 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Added
 
+- [minor][HS-SPLAT-PAIR] `Vector::splat_pair` (and the
+  `BackendKernel`/`SimdPermute` method beneath it): one lane pair broadcast
+  across the register, `[lo, hi, lo, hi, ...]`. `ComplexReg::splat` now uses
+  it, so a splatted twiddle costs one `vbroadcastsd`/`vbroadcastf64x2`/
+  `vinsertf128`/`dup` instead of interleaving two scalar broadcasts — the
+  interleave form spent two shuffles per twiddle, one of them cross-lane,
+  which a Stockham stage loop pays on every iteration. Value-identical;
+  covered by the permute property test at both precisions on every host
+  backend.
+
 - [minor][HS-HALF-INTERLEAVE] `Vector::interleave_halves` (and the
   `BackendKernel`/`SimdPermute` method beneath it): the two registers' low
   halves concatenated, and their high halves. One `vperm2f128`/`vshuff32x4`

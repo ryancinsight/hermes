@@ -1244,6 +1244,29 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
             Self::load_unaligned(hi.as_ptr().cast::<T>()),
         )
     }
+    /// Broadcasts one lane pair across the register: `[lo, hi, lo, hi, ...]`.
+    ///
+    /// On interleaved complex data this is a twiddle factor filling a whole
+    /// register — the shape a per-register complex multiply consumes. Every
+    /// supported ISA has a single pair-broadcast instruction for it, so the
+    /// override is one op where the portable form below costs an interleave.
+    ///
+    /// Requires an even `LANE_COUNT`.
+    ///
+    /// Default: `interleave` of the two scalar broadcasts.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn splat_pair(lo: T, hi: T) -> Self::Vector {
+        const { Self::LANE_BOUND_CHECK };
+        debug_assert!(
+            Self::LANE_COUNT.is_multiple_of(2),
+            "pair granularity needs whole pairs"
+        );
+        // SAFETY: forwarded contract — the caller proved the target feature.
+        unsafe { Self::interleave(Self::splat(lo), Self::splat(hi)).0 }
+    }
 
     /// Splits four registers' adjacent-lane pairs into the four stride-4
     /// subsequences: reading `a || b || c || d` as a flat pair sequence,

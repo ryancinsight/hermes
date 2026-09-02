@@ -25,7 +25,10 @@ use core::arch::x86_64::{
     any(target_arch = "x86", target_arch = "x86_64"),
     not(hermes_benchmark_generic_default)
 ))]
-use core::arch::x86_64::{_mm256_unpackhi_pd, _mm256_unpacklo_pd};
+use core::arch::x86_64::{
+    _mm256_castpd128_pd256, _mm256_insertf128_pd, _mm256_unpackhi_pd, _mm256_unpacklo_pd,
+    _mm_set_pd,
+};
 use hermes_simd_core::kernel::BackendKernel;
 
 /// Newtype over `__m256d` so `Send + Sync` can be implemented on the wrapper.
@@ -279,6 +282,20 @@ impl BackendKernel<f64> for Avx2 {
             Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(a.0, b.0)),
             Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(a.0, b.0)),
         )
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn splat_pair(lo: f64, hi: f64) -> Self::Vector {
+        // The `(lo, hi)` f64 pair is one 128-bit block; one `vinsertf128`
+        // duplicates it into the upper half.
+        let pair = _mm_set_pd(hi, lo);
+        Avx2F64Vec(_mm256_insertf128_pd::<1>(
+            _mm256_castpd128_pd256(pair),
+            pair,
+        ))
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.

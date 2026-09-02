@@ -61,6 +61,12 @@ pub trait SimdPermute<T: Scalar>: SimdStorage<T> + Sealed {
     /// The backend's target features must be available.
     unsafe fn interleave_halves(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector);
 
+    /// Broadcasts one lane pair across the register: `[lo, hi, lo, hi, ...]`.
+    ///
+    /// # Safety
+    /// The backend's target features must be available.
+    unsafe fn splat_pair(lo: T, hi: T) -> Self::Vector;
+
     /// Swaps each adjacent lane pair.
     ///
     /// # Safety
@@ -153,6 +159,10 @@ impl<T: Scalar, A: BackendKernel<T>> SimdPermute<T> for A {
 
     unsafe fn interleave_halves(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
         <A as BackendKernel<T>>::interleave_halves(a, b)
+    }
+
+    unsafe fn splat_pair(lo: T, hi: T) -> Self::Vector {
+        <A as BackendKernel<T>>::splat_pair(lo, hi)
     }
 
     unsafe fn swap_adjacent(v: Self::Vector) -> Self::Vector {

@@ -869,6 +869,20 @@ where
         (Self::new(lo), Self::new(hi))
     }
 
+    /// Broadcasts one lane pair across the register: `[lo, hi, lo, hi, ...]`.
+    ///
+    /// On interleaved complex data this is one sample filling the register —
+    /// the twiddle-factor shape a per-register complex multiply consumes. Each
+    /// ISA has a single pair-broadcast instruction, so this costs one op where
+    /// interleaving two scalar broadcasts costs a shuffle pair.
+    #[inline(always)]
+    #[must_use]
+    pub fn splat_pair(lo: T, hi: T) -> Self {
+        // SAFETY: `Simd<T, Arch>` construction proved host support for `Arch`,
+        // and this associated function is reachable only through it.
+        Self::new(unsafe { Arch::splat_pair(lo, hi) })
+    }
+
     /// Swaps each adjacent lane pair: `[a, b, c, d]` becomes `[b, a, d, c]`.
     ///
     /// On interleaved complex data this exchanges the real and imaginary parts
