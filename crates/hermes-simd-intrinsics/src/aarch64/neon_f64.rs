@@ -190,6 +190,7 @@ impl BackendKernel<f64> for Neon {
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 2-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn interleave_halves(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
         // A half is one lane: the zips pair the low lanes, then the high lanes.
         (
@@ -201,6 +202,7 @@ impl BackendKernel<f64> for Neon {
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 2-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn splat_pair(lo: f64, hi: f64) -> Self::Vector {
         // Two lanes hold exactly one pair.
         NeonF64Vec(vcombine_f64(vdup_n_f64(lo), vdup_n_f64(hi)))
@@ -209,6 +211,7 @@ impl BackendKernel<f64> for Neon {
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 2-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn blend_halves(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         // Each half keeps its position: one combine of the two halves.
         NeonF64Vec(vcombine_f64(vget_low_f64(a.0), vget_high_f64(b.0)))
