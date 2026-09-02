@@ -1,27 +1,41 @@
 # Backlog — hermes-simd
 
-## HS-REDUCED-PRECISION-ELEMENTWISE-2026-09-01 — Elementwise SIMD ops for F16/Bf16 [minor] [perf] — todo
+## HS-REDUCED-PRECISION-ELEMENTWISE-2026-09-01 — Elementwise SIMD ops for F16/Bf16 [minor] [perf] — done
 
-- **Finding (stack triage 2026-09-01):** leto's `SimdStrategy` routes f32/f64
-  through `hermes_simd::{elementwise_add, sub, mul, div, sum, dot, axpy, ...}`
-  and marks `F16`/`Bf16` `impl_simd_ops_unsupported!` — not because leto
-  chose scalar for them, but because this crate offers no elementwise
-  entry points at those types: `impl_lane_scalar!` covers `f32, f64, F16`
-  only, `Bf16` has FMA/AVX-512/AMX support markers and the tile GEMM but no
-  lane scalar, and neither reduced type has an `elementwise_*` impl.
+- **Integrator:** Codex atlas-session; **branch:** `perf/hermes-bf16-elementwise`;
+  **lease:** `crates/hermes-simd/src/vectorize.rs`,
+  `crates/hermes-simd-intrinsics/src/x86_64/`,
+  `crates/hermes-simd/tests/`; **last-update:** 2026-09-02.
+
+- **Finding (stack triage 2026-09-01, corrected 2026-09-02):** Leto's
+  `SimdStrategy` routes f32/f64 through
+  `hermes_simd::{elementwise_add, sub, mul, div, sum, dot, axpy, ...}`
+  and marks `Bf16` unsupported. Hermes already provides Bf16
+  `BackendKernel` implementations for the scalar, AVX2, AVX-512, and NEON
+  backends, and the public `SimdOps` surface is therefore present; the
+  existing Bf16 sum/dot conformance test confirms that route. The missing
+  consumer-facing capability is the generic `LaneScalar` entry, which still
+  covered only `f32`, `f64`, and `F16`.
 - **Why filed here:** a 3-week-old leto branch
   (`codex/leto-hermes-reduced-precision`) rewrote leto's strategy to route
   F16/Bf16 through hermes ahead of the provider; it could never compile
   against 0.7.0 and is deleted with this record in its place. The gap is
   the provider's (upstream ownership), and leto's routing is a one-macro
   change once it exists.
-- **Acceptance:** `elementwise_{add,sub,mul,div}`, `sum`, `dot`, `axpy`
-  accept `F16` and `Bf16` with the same generic conformance suite the f32/f64
-  instantiations run, native-precision per the scalar contract (no
-  widen-compute-narrow), differential-tested against the scalar path;
-  leto then drops `impl_simd_ops_unsupported!` for both.
+- **Acceptance:** `LaneScalar` accepts Bf16 and a generic consumer can call
+  `vectorize` without naming a backend; the existing `SimdOps` operations
+  remain covered by their Bf16 conformance tests and use Eunomia's exact
+  f32-widen, round-to-nearest-even narrowing contract. Leto can then remove
+  `impl_simd_ops_unsupported!(Bf16)` in its consumer increment.
 - **Non-goals:** tile GEMM (already exists for Bf16), AMX.
-- **Scope correction (2026-09-02):** the F16 half was already served — `impl_lane_scalar!` covers `F16`, every backend implements `SimdKernel<F16>` (scalar, AVX2 via F16C, AVX-512, NEON), and the `SimdOps` blanket therefore provides the full elementwise/reduction/axpy/gemv/GEMM surface at F16; leto routes it in leto #146 (`LETO-F16-HERMES-ROUTING-2026-09-02`) with bitwise elementwise parity against its scalar path. What remains here is **Bf16 only**: a lane scalar plus `SimdKernel<Bf16>` on the scalar, AVX2 and AVX-512 backends (the x86 `SimdOps` blanket bounds on all three) with the same generic conformance suite and differential tests, computing each op through the exact `f32` widening and round-to-nearest-even narrowing that defines bf16 arithmetic, as the F16C-backed F16 kernels do.
+- **Scope correction (2026-09-02):** the F16 half was already served — `impl_lane_scalar!` covers `F16`, every backend implements `SimdKernel<F16>` (scalar, AVX2 via F16C, AVX-512, NEON), and the `SimdOps` blanket therefore provides the full elementwise/reduction/axpy/gemv/GEMM surface at F16; leto routes it in leto #146 (`LETO-F16-HERMES-ROUTING-2026-09-02`) with bitwise elementwise parity against its scalar path. The remaining Bf16 gap was the `LaneScalar` registration; the scalar, AVX2, AVX-512, and NEON `SimdKernel<Bf16>` implementations were already present and are covered by the existing Bf16 conformance tests. The provider increment therefore adds only the generic lane entry, preserving Eunomia's exact f32 widening and round-to-nearest-even narrowing contract.
+- **Disposition (2026-09-02):** completed by adding the Bf16 `LaneScalar`
+  registration and a generic consumer regression test. `cargo nextest run
+  --offline -p hermes-simd --no-fail-fast` passed 460/460 tests; clippy,
+  formatting, diff checks, and the minor-release semver gate passed. The doc
+  test/doc build could not complete because the shared stack overlay resolves
+  peer-owned, currently uncompilable Mnemosyne edits; this is recorded as an
+  external verification limit, not changed in this increment.
 
 
 ## HS-DEINTERLEAVE-PAIRS-AVX2-F32-2026-09-02 — AVX2 f32 `deinterleave_pairs` pays two cross-lane permutes [patch] [perf] — rejected 2026-09-02 on measurement

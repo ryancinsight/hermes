@@ -163,10 +163,10 @@ where
 /// the backends actually support, each entering the ladder at a concrete type.
 /// A consumer writes `T: LaneScalar` and is done.
 ///
-/// Implemented for `f32`, `f64`, and `F16` — the exact set for which every
-/// backend implements `BackendKernel`. It is not extensible from outside: a new
-/// scalar becomes vectorizable by gaining backend implementations upstream, not
-/// by a downstream impl of this trait.
+/// Implemented for `f32`, `f64`, `F16`, and `Bf16` — the exact set for which
+/// every runtime-dispatched backend implements `BackendKernel`. It is not
+/// extensible from outside: a new scalar becomes vectorizable by gaining
+/// backend implementations upstream, not by a downstream impl of this trait.
 pub trait LaneScalar: Scalar {
     /// Enters the dispatch ladder at this concrete scalar type.
     ///
@@ -228,7 +228,7 @@ macro_rules! impl_lane_scalar {
     };
 }
 
-impl_lane_scalar!(f32, f64, eunomia::F16);
+impl_lane_scalar!(f32, f64, eunomia::F16, eunomia::Bf16);
 
 /// Runs `kernel` inside the `#[target_feature]` scope of the widest backend
 /// this host supports.
