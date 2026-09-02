@@ -209,18 +209,32 @@ mod windows {
 
         let previous = crate::numa::affinity::bind(&GroupAffinity::new(group, mask))?;
 
-        let bound_processors = mask.count_ones();
-        let coverage = if node_groups == 1 && bound_processors == node_processors {
+        let coverage = coverage(group, mask.count_ones(), node_processors, node_groups);
+        Some((previous, coverage))
+    }
+
+    /// What one group-mask bind expresses of a node with `node_processors`
+    /// processors across `node_groups` groups.
+    ///
+    /// Complete only when the node lives in one group and every processor of
+    /// it is in the applied mask; anything less is reported, never rounded up.
+    /// Pure, so the rule is testable without a multi-group host.
+    pub(super) fn coverage(
+        bound_group: u16,
+        bound_processors: u32,
+        node_processors: u32,
+        node_groups: u32,
+    ) -> NumaBindingCoverage {
+        if node_groups == 1 && bound_processors == node_processors {
             NumaBindingCoverage::Complete
         } else {
             NumaBindingCoverage::Partial {
-                bound_group: group,
+                bound_group,
                 bound_processors,
                 node_processors,
                 node_groups,
             }
-        };
-        Some((previous, coverage))
+        }
     }
 }
 
@@ -329,6 +343,72 @@ mod binding_tests {
         assert_eq!(
             thread_affinity().expect("restored affinity is queryable"),
             before
+        );
+    }
+
+    /// The guard's own `Drop` is what callers rely on, and no other test
+    /// reaches it: binding the current node short-circuits to `Unbound`, and
+    /// the live test above restores by hand. This drives `drop` with a
+    /// synthetic previous affinity so a guard that stops restoring is caught
+    /// on a single-node host.
+    #[test]
+    fn dropping_the_guard_restores_the_previous_affinity() {
+        let before = thread_affinity().expect("current affinity is queryable");
+        let active = active_mask(before.group).expect("the current group is active");
+        assert!(
+            active.count_ones() >= 2,
+            "the host must offer two processors in this group to observe a change"
+        );
+        // Confine to the lowest active processor, a strict subset of `before`.
+        let subset = active & active.wrapping_neg();
+        let previous =
+            crate::numa::affinity::bind(&windows::GroupAffinity::new(before.group, subset))
+                .expect("a subset of the active mask binds");
+        assert_eq!(previous, before, "bind reports the affinity it replaced");
+        assert_ne!(
+            thread_affinity().expect("bound affinity is queryable"),
+            before,
+            "the bind must have moved the thread, or this test proves nothing"
+        );
+
+        drop(NumaBinding {
+            previous: Some(previous),
+            coverage: NumaBindingCoverage::Complete,
+        });
+
+        assert_eq!(
+            thread_affinity().expect("restored affinity is queryable"),
+            before,
+            "dropping the guard must put the previous affinity back"
+        );
+    }
+
+    /// The coverage rule, pinned with inputs this host cannot produce: the
+    /// live test derives its expectation from the same formula, so on a
+    /// single-group, all-active host a rule that always answered `Complete`
+    /// would pass it.
+    #[test]
+    fn coverage_is_complete_only_for_a_whole_single_group_node() {
+        assert_eq!(windows::coverage(0, 4, 4, 1), NumaBindingCoverage::Complete);
+        assert_eq!(
+            windows::coverage(1, 3, 5, 2),
+            NumaBindingCoverage::Partial {
+                bound_group: 1,
+                bound_processors: 3,
+                node_processors: 5,
+                node_groups: 2,
+            },
+            "a node spanning two groups is never Complete"
+        );
+        assert_eq!(
+            windows::coverage(0, 3, 4, 1),
+            NumaBindingCoverage::Partial {
+                bound_group: 0,
+                bound_processors: 3,
+                node_processors: 4,
+                node_groups: 1,
+            },
+            "an inactive processor in a single-group node is a shortfall"
         );
     }
 

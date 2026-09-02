@@ -108,7 +108,7 @@
   outputs (4 assertion failures) then restored. fmt, clippy `-D warnings`,
   519/519 nextest, doctests, warning-clean AArch64 cross-compilation.
 
-## HS-NUMA-BINDING-THEMIS-QUERY-2026-09-01 [minor] — review 2026-09-01
+## HS-NUMA-BINDING-THEMIS-QUERY-2026-09-01 [minor] — done 2026-09-01
 
 - **Delivered.** `NumaBinding::bind` reads the node's processors from
   `themis::CpuTopology` and applies them with `SetThreadGroupAffinity`; the
@@ -120,6 +120,19 @@
   revision note; ADR 021 unchanged and its ownership split intact. Six Windows
   tests added where there were none, liveness-proved against two deliberate
   regressions.
+- **Independent review (2026-09-01, Claude; PR #120 merged 18:58):** three
+  deliberate regressions run against the eight tests on a 1-node, 24-processor,
+  single-group host. Reversing the tie rule fails
+  `group_selection_is_deterministic_under_ties` — pinned. Two survived:
+  (1) the guard's `Drop` restoring nothing — no test reached `drop`, since the
+  live test restores by hand and binding the current node short-circuits to
+  `Unbound`; (2) coverage always `Complete` — invisible on a single-group
+  all-active host, and the live test derives its expectation from the same
+  formula. Both closed: `dropping_the_guard_restores_the_previous_affinity`
+  drives `drop` with a synthetic previous affinity, and the coverage rule is a
+  pure `windows::coverage` pinned with inputs this host cannot produce. Both
+  regressions now fail their test; 546/546 workspace, fmt, Clippy, Rustdoc
+  clean.
 
 ### Earlier state
 
@@ -200,9 +213,9 @@
 - **Scope / non-goals.** Confine Hermes source to the canonical dispatch family, public export, value/error/allocation tests, and a pinned benchmark. Preserve native `T` arithmetic, exact output order, runtime ISA safety, existing operations, and `no_std`; reject Apollo adoption unless two unchanged full-STFT comparisons improve. Do not change FFT arithmetic, frame scheduling, windows, workloads, assertions, or timeouts.
 - **Acceptance.** Validate every length before mutation; accept empty input; cover full and ragged vector tails for f32/f64 across scalar, runtime, x86, and AArch64-capable code; prove zero allocation and no per-element dispatch; pass warning-denied host/AArch64, debug/release tests, Rustdoc/doctests, Miri or stated SIMD substitute, SemVer, format, diff, size, and standalone-lock gates. Consumer closure must prove equal values, remove both retained scratch roles, retain zero warm allocation, and improve two unchanged Apollo STFT measurements.
 - **Risk / dependency.** [minor] [perf]. Driven by Apollo STFT's current three-pass frame preparation; no external blocker. Integrator `/root`; lease `/root` on the new dispatch leaf, its export/tests/benchmark, and this item's PM/doc hunks. Last update 2026-09-01.
-## HS-REAL-COMPLEX-DOT-2026-09-01 — Dot real samples with interleaved complex weights [minor] [perf] — review
+## HS-REAL-COMPLEX-DOT-2026-09-01 — Dot real samples with interleaved complex weights [minor] [perf] — done
 
-- **Delivery state:** provider source head `59c89431` merged through PR #113 as `2e993503`; documentation correction `e5b9e7d` is open on PR #114. Integrator `/root`; lease `/root` on this item's PM/documentation hunks.
+- **Delivery state:** provider source head `59c89431` merged through PR #113 as `2e993503`; documentation correction `e5b9e7d` merged through PR #114 (2026-09-01 10:01). Integrator `/root`; lease: none.
 - **Outcome:** one allocation-free generic/runtime real-by-interleaved-complex dot lets Apollo Mellin remove its retained 16N-byte real-lane materialization while preserving target safety, exact shape validation, and ragged tails.
 - **Evidence:** two primitive pairs improve 31–53%; two Apollo public-plan pairs improve N = 128 by 1.96%/1.49% and N = 256 by 1.46%/0.83% with a neutral N = 64 control. Source hosted run `33492225619` passes every repository gate. The corrected exact-head review, PR #114 hosted gates, and merge remain open.
 
