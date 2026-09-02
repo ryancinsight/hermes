@@ -388,16 +388,54 @@ fn test_f16_basic_ops() {
 #[test]
 fn test_dispatch_view_selection() {
     let data = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
-    let view = dispatch_view::<f32, Unaligned>(&data);
-    assert!(view.is_some());
-
     let mut data_mut = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
-    let view_mut = dispatch_view_mut::<f32, Unaligned>(&mut data_mut);
-    assert!(view_mut.is_some());
-
     let data_f16 = vec![eunomia::F16::from_f32(1.0); 8];
+
+    // The dispatched view must expose the exact input storage it wrapped,
+    // whichever backend the host selected: read it back through the view.
+    let view = dispatch_view::<f32, Unaligned>(&data);
+    match &view {
+        Some(DispatchedView::Scalar(view)) => assert_eq!(view.as_slice(), &data),
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        Some(DispatchedView::Avx2(view)) => assert_eq!(view.as_slice(), &data),
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        Some(DispatchedView::Avx512(view)) => assert_eq!(view.as_slice(), &data),
+        #[cfg(target_arch = "aarch64")]
+        Some(DispatchedView::Neon(view)) => assert_eq!(view.as_slice(), &data),
+        Some(DispatchedView::Sve(view)) => assert_eq!(view.as_slice(), &data),
+        _ => panic!("dispatch_view must select a backend for any host"),
+    }
+
+    // The mutable dispatched view must preserve exclusive access to the same
+    // storage: write through it, then read the slice back and compare.
+    let mut expected = data;
+    expected[2] = 9.0;
+    let mut view_mut = dispatch_view_mut::<f32, Unaligned>(&mut data_mut);
+    match &mut view_mut {
+        Some(DispatchedView::Scalar(view)) => view.as_slice_mut()[2] = 9.0,
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        Some(DispatchedView::Avx2(view)) => view.as_slice_mut()[2] = 9.0,
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        Some(DispatchedView::Avx512(view)) => view.as_slice_mut()[2] = 9.0,
+        #[cfg(target_arch = "aarch64")]
+        Some(DispatchedView::Neon(view)) => view.as_slice_mut()[2] = 9.0,
+        Some(DispatchedView::Sve(view)) => view.as_slice_mut()[2] = 9.0,
+        _ => panic!("dispatch_view_mut must select a backend for any host"),
+    }
+    assert_eq!(data_mut, expected);
+
     let view_f16 = dispatch_view::<eunomia::F16, Unaligned>(&data_f16);
-    assert!(view_f16.is_some());
+    match &view_f16 {
+        Some(DispatchedView::Scalar(view)) => assert_eq!(view.as_slice(), &data_f16),
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        Some(DispatchedView::Avx2(view)) => assert_eq!(view.as_slice(), &data_f16),
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        Some(DispatchedView::Avx512(view)) => assert_eq!(view.as_slice(), &data_f16),
+        #[cfg(target_arch = "aarch64")]
+        Some(DispatchedView::Neon(view)) => assert_eq!(view.as_slice(), &data_f16),
+        Some(DispatchedView::Sve(view)) => assert_eq!(view.as_slice(), &data_f16),
+        _ => panic!("dispatch_view must select a backend for any host"),
+    }
 }
 
 #[test]

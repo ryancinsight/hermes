@@ -1777,13 +1777,22 @@ fn test_simd_view_slicing_and_alignment_transitions() {
     let unaligned_view = sub_view.into_unaligned();
     assert_eq!(unaligned_view.len(), 4);
 
-    // 3. Alignment promotion attempts
+    // 3. Alignment promotion attempts: a promoted view still reads the same
+    //    storage, so assert the element values it exposes, not just that the
+    //    promotion produced something.
     let opt_aligned = unaligned_view.try_into_aligned::<4>();
-    assert!(opt_aligned.is_some());
+    let aligned_view =
+        opt_aligned.expect("promotion of a 4-element unaligned view to Aligned<4> must succeed");
+    assert_eq!(aligned_view[0].0, 2.0);
+    assert_eq!(aligned_view[3].0, 5.0);
 
-    // 4. Slicing aligned
+    // 4. Slicing aligned: the sliced window covers exactly elements 0..4 of
+    //    the original view.
     let aligned_slice = view.slice_aligned::<4>(0..4);
-    assert!(aligned_slice.is_some());
+    let aligned_slice =
+        aligned_slice.expect("a 64-byte-aligned buffer sliced at 0..4 must succeed");
+    assert_eq!(aligned_slice[0].0, 1.0);
+    assert_eq!(aligned_slice[3].0, 4.0);
 }
 
 #[test]
@@ -1801,9 +1810,12 @@ fn test_simd_cow_slicing_and_alignment_transitions() {
     assert_eq!(sliced_cow.len(), 2);
     assert_eq!(sliced_cow[0].0, 20.0);
 
-    // Alignment promotion
+    // Alignment promotion: a promoted cow still reads the same elements.
     let aligned_cow = sliced_cow.try_into_aligned::<4>();
-    assert!(aligned_cow.is_some());
+    let aligned_cow =
+        aligned_cow.expect("promotion of a 2-element unaligned cow to Aligned<4> must succeed");
+    assert_eq!(aligned_cow[0].0, 20.0);
+    assert_eq!(aligned_cow[1].0, 30.0);
 
     // 2. Owned SimdCow
     let cow_owned = SimdCow::<F32, Scalar, Unaligned>::from_slice(&data);
@@ -1840,11 +1852,12 @@ fn test_simd_cow_mutable_views_and_slicing() {
     }
     assert_eq!(cow[1].0, 20.0);
 
-    // 3. slice_aligned_mut
+    // 3. slice_aligned_mut: write through the aligned window and read the
+    //    element back through the cow it borrows.
     {
         let opt_aligned_mut = cow.slice_aligned_mut::<4>(0..4);
-        assert!(opt_aligned_mut.is_some());
-        let mut aligned_mut = opt_aligned_mut.unwrap();
+        let mut aligned_mut = opt_aligned_mut
+            .expect("a 4-element owned cow sliced at 0..4 as Aligned<4> must succeed");
         aligned_mut[3] = F32(40.0);
     }
     assert_eq!(cow[3].0, 40.0);
@@ -2007,9 +2020,12 @@ fn test_insufficient_alignment_view_rejection() {
     struct Align64Buf([F32; 16]);
     let buf = Align64Buf([F32(0.0); 16]);
 
-    // 1. Scalar arch (REGISTER_WIDTH_BITS = 0) accepts any Aligned alignment
+    // 1. Scalar arch (REGISTER_WIDTH_BITS = 0) accepts any Aligned alignment;
+    //    the view exposes the buffer's storage, so read a value back.
     let view_scalar = SimdView::<'_, F32, Scalar, Aligned<16>>::new(&buf.0);
-    assert!(view_scalar.is_some());
+    let view_scalar = view_scalar.expect("the scalar arch accepts any Aligned alignment");
+    assert_eq!(view_scalar.len(), 16);
+    assert_eq!(view_scalar.as_slice()[0], F32(0.0));
 
     // A view is also refused when the host cannot execute the architecture, so
     // the alignment rule is only observable for a marker this host runs —
@@ -2025,9 +2041,12 @@ fn test_insufficient_alignment_view_rejection() {
             let view_avx2_bad = SimdView::<'_, F32, Avx2, Aligned<16>>::new(&buf.0);
             assert!(view_avx2_bad.is_none());
 
-            // Aligned<32> must be accepted.
+            // Aligned<32> must be accepted and expose the same storage.
             let view_avx2_good = SimdView::<'_, F32, Avx2, Aligned<32>>::new(&buf.0);
-            assert!(view_avx2_good.is_some());
+            let view_avx2_good =
+                view_avx2_good.expect("a 64-byte-aligned buffer satisfies Aligned<32>");
+            assert_eq!(view_avx2_good.len(), 16);
+            assert_eq!(view_avx2_good.as_slice()[0], F32(0.0));
 
             // try_into_aligned:<16> on Avx2 must be rejected.
             let view_avx2_unaligned = SimdView::<'_, F32, Avx2, Unaligned>::new(&buf.0).unwrap();
@@ -2044,9 +2063,12 @@ fn test_insufficient_alignment_view_rejection() {
             let view_avx512_bad = SimdView::<'_, F32, Avx512, Aligned<32>>::new(&buf.0);
             assert!(view_avx512_bad.is_none());
 
-            // Aligned<64> must be accepted.
+            // Aligned<64> must be accepted and expose the same storage.
             let view_avx512_good = SimdView::<'_, F32, Avx512, Aligned<64>>::new(&buf.0);
-            assert!(view_avx512_good.is_some());
+            let view_avx512_good =
+                view_avx512_good.expect("a 64-byte-aligned buffer satisfies Aligned<64>");
+            assert_eq!(view_avx512_good.len(), 16);
+            assert_eq!(view_avx512_good.as_slice()[0], F32(0.0));
         }
     }
 }
