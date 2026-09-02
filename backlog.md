@@ -24,13 +24,21 @@
 - **Scope correction (2026-09-02):** the F16 half was already served — `impl_lane_scalar!` covers `F16`, every backend implements `SimdKernel<F16>` (scalar, AVX2 via F16C, AVX-512, NEON), and the `SimdOps` blanket therefore provides the full elementwise/reduction/axpy/gemv/GEMM surface at F16; leto routes it in leto #146 (`LETO-F16-HERMES-ROUTING-2026-09-02`) with bitwise elementwise parity against its scalar path. What remains here is **Bf16 only**: a lane scalar plus `SimdKernel<Bf16>` on the scalar, AVX2 and AVX-512 backends (the x86 `SimdOps` blanket bounds on all three) with the same generic conformance suite and differential tests, computing each op through the exact `f32` widening and round-to-nearest-even narrowing that defines bf16 arithmetic, as the F16C-backed F16 kernels do.
 
 
-## HS-DEINTERLEAVE-PAIRS-AVX2-F32-2026-09-02 — AVX2 f32 `deinterleave_pairs` pays two cross-lane permutes [patch] [perf] — in-progress
+## HS-DEINTERLEAVE-PAIRS-AVX2-F32-2026-09-02 — AVX2 f32 `deinterleave_pairs` pays two cross-lane permutes [patch] [perf] — rejected 2026-09-02 on measurement
 
 - **Integrator:** Codex atlas-session; **branch:** `perf/hermes-deinterleave-pairs`;
-  **lease:** `crates/hermes-simd-intrinsics/src/x86_64/avx2_f32.rs`,
-  `crates/hermes-simd/tests/kernel_property_tests.rs`,
-  `crates/hermes-simd/benches/lane_throughput/permute.rs`.
+  **lease:** none.
 - **Last-update:** 2026-09-02.
+- **Disposition:** rejected 2026-09-02 on direct pinned measurement. The
+  origin implementation measured 644.21 ns (10 samples, interval
+  `[641.05, 647.05] ns`) for `cross_lane_deinterleave_f32/hermes/4096`.
+  The AVX2 f64-shaped `unpacklo/hi_pd` plus `permute4x64_pd` candidate
+  measured 1.1120 µs (interval `[1.0475, 1.1785] µs`), and the shared-index
+  `vpermps` candidate measured 887.13 ns (interval `[882.12, 893.84] ns`),
+  which is +72.6% and +37.7% against the direct origin baseline. Both
+  preserve the property-tested pair layout but lose on this host, so the
+  production intrinsic remains unchanged. Re-open only with a distinct
+  sequence whose same-binary pinned measurement beats the origin path.
 
 - **Finding (apollo ADR 0045, seventh slice, 2026-09-02):** porting apollo's
   final Stockham stage (`groups == 1`) onto a `LaneKernel` costs +2.5%
