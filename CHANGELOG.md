@@ -16,6 +16,15 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   covered by the permute property test at both precisions on every host
   backend.
 
+- [minor][HS-BLEND-HALVES] `Vector::blend_halves`: the low half of one
+  register concatenated with the high half of the other. The half-granular
+  *select*, where `interleave_halves` is the half-granular *gather* — each
+  half keeps its position, so every ISA serves it with one in-lane blend
+  (`vblendps`/`vblendpd`/`vpblendm*`/`vcombine`) instead of the cross-lane
+  permute the gather needs. Two broadcasts plus this blend build a
+  two-digit twiddle register with no cross-lane traffic. Covered by the
+  permute property test on every host backend.
+
 - [minor][HS-HALF-INTERLEAVE] `Vector::interleave_halves` (and the
   `BackendKernel`/`SimdPermute` method beneath it): the two registers' low
   halves concatenated, and their high halves. One `vperm2f128`/`vshuff32x4`

@@ -488,6 +488,15 @@ impl BackendKernel<f32> for Avx512 {
         Avx512F32Vec(_mm512_castpd_ps(_mm512_set1_pd(pair)))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn blend_halves(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        // Each half keeps its position: one in-lane blend, no permute.
+        Avx512F32Vec(_mm512_mask_blend_ps(0xFF00, a.0, b.0))
+    }
+
     // -----------------------------------------------------------------------
     // Scatter (native `vscatterdps`)
     // -----------------------------------------------------------------------

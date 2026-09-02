@@ -1268,6 +1268,40 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         unsafe { Self::interleave(Self::splat(lo), Self::splat(hi)).0 }
     }
 
+    /// Concatenates the low half of `a` with the high half of `b`:
+    /// `a[..n/2] ++ b[n/2..]`.
+    ///
+    /// The half-granular select. Where [`BackendKernel::interleave_halves`]
+    /// gathers both operands' low halves and needs a cross-lane permute on
+    /// x86, this keeps each half in place, so every ISA serves it with a
+    /// single in-lane blend.
+    ///
+    /// Requires an even `LANE_COUNT`.
+    ///
+    /// Default: scalar emulation.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn blend_halves(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        const { Self::LANE_BOUND_CHECK };
+        let lanes = Self::LANE_COUNT;
+        debug_assert!(
+            lanes.is_multiple_of(2),
+            "half granularity needs whole halves"
+        );
+        let half = lanes / 2;
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        Self::store_unaligned(buf.as_mut_ptr().cast::<T>(), a);
+        let mut tail = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        Self::store_unaligned(tail.as_mut_ptr().cast::<T>(), b);
+        for i in half..lanes {
+            // SAFETY: `store_unaligned` initialized lanes `0..lanes` of `tail`.
+            buf[i].write(unsafe { tail[i].assume_init() });
+        }
+        Self::load_unaligned(buf.as_ptr().cast::<T>())
+    }
+
     /// Splits four registers' adjacent-lane pairs into the four stride-4
     /// subsequences: reading `a || b || c || d` as a flat pair sequence,
     /// output `i` holds the pairs congruent to `i` modulo 4, in order.

@@ -26,8 +26,8 @@ use core::arch::x86_64::{
     not(hermes_benchmark_generic_default)
 ))]
 use core::arch::x86_64::{
-    _mm256_castpd128_pd256, _mm256_insertf128_pd, _mm256_unpackhi_pd, _mm256_unpacklo_pd,
-    _mm_set_pd,
+    _mm256_blend_pd, _mm256_castpd128_pd256, _mm256_insertf128_pd, _mm256_unpackhi_pd,
+    _mm256_unpacklo_pd, _mm_set_pd,
 };
 use hermes_simd_core::kernel::BackendKernel;
 
@@ -296,6 +296,15 @@ impl BackendKernel<f64> for Avx2 {
             _mm256_castpd128_pd256(pair),
             pair,
         ))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn blend_halves(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        // Each half keeps its position: one in-lane blend, no permute.
+        Avx2F64Vec(_mm256_blend_pd::<0b1100>(a.0, b.0))
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.

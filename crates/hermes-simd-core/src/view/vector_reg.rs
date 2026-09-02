@@ -883,6 +883,19 @@ where
         Self::new(unsafe { Arch::splat_pair(lo, hi) })
     }
 
+    /// Concatenates the low half of `self` with the high half of `other`:
+    /// `self[..n/2] ++ other[n/2..]`.
+    ///
+    /// The half-granular select. Both halves keep their position, so this is
+    /// one in-lane blend where [`Self::interleave_halves`] — which gathers
+    /// both operands' *low* halves — costs a cross-lane permute on x86.
+    #[inline(always)]
+    #[must_use]
+    pub fn blend_halves(self, other: Self) -> Self {
+        // SAFETY: constructing the operand vectors proved host support for `Arch`.
+        Self::new(unsafe { Arch::blend_halves(self.raw, other.raw) })
+    }
+
     /// Swaps each adjacent lane pair: `[a, b, c, d]` becomes `[b, a, d, c]`.
     ///
     /// On interleaved complex data this exchanges the real and imaginary parts
