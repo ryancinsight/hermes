@@ -29,17 +29,11 @@ jobs:
 
   adr-index:
     name: ADR index is current
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+    uses: ryancinsight/atlas/.github/workflows/adr-index-guard.yml@49cba25c1dca207c6adbe86670ebc25c1ee9e632
     permissions:
       contents: read
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v6.0.2
-        with:
-          path: hermes
-      - name: Check docs/adr/README.md against the ADR files
-        working-directory: hermes
-        run: python3 scripts/adr-index.py check
+    with:
+      strict: true
 
   gates:
     name: fmt + clippy + test + doc (x86_64)
