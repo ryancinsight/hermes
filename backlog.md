@@ -1,6 +1,8 @@
 # Backlog — hermes-simd
 
-## HS-PROCESSOR-BINDING-LINUX-2026-09-01 — ProcessorBinding and ProcessorIndex::current have no Linux backend [minor] — todo
+## HS-PROCESSOR-BINDING-LINUX-2026-09-01 — ProcessorBinding and ProcessorIndex::current have no Linux backend [minor] — in-progress 2026-09-01
+
+- **Claim:** integrator claude (this session); lane `worktrees/hermes-processor-binding-linux` on `feat/hermes-processor-binding-linux`; lease: `crates/hermes-simd-core/src/numa/processor.rs`, `docs/adr/021-*`, `CHANGELOG.md`, this entry. Linux behaviour is verified by the Ubuntu `gates` job; local verification is cross-compile plus unchanged Windows tests.
 
 - **Observed (apollo #252, Linux CI):** `hermes_simd::ProcessorBinding::bind`
   returns `UnsupportedPlatform` on `x86_64-unknown-linux-gnu`; so does
