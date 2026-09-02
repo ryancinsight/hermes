@@ -27,7 +27,9 @@
 
 - PR #121 merged history-preserved as `92cbfcbc6f926e8e1fae689214dc4a604eb4275e` (source `bf48f97`; PM `9e1b9e4`), deleting duplicate Windows affinity decomposition/grouping while preserving binding contracts and all 544 workspace tests.
 
-## HS-ADR-INDEX-GENERATOR-ABSENT-2026-09-01 [patch] — in-progress 2026-09-01
+## HS-ADR-INDEX-GENERATOR-ABSENT-2026-09-01 [patch] — done 2026-09-01 (merged 38af58f5)
+
+- **Delivered (PR #123):** apollo's generator vendored at the head of apollo#255 (three- or four-digit numbering, width-agnostic filename check); `adr-index` CI job beside the lockfile guard, green on the PR (`ADR index is current`, 22 records). README unchanged — `generate` reproduced it byte for byte. Liveness: a desynchronised index fails `check`. This copy is tracked debt under `ATLAS-ADR-INDEX-GUARD-2026-09-01`.
 
 - **Claim:** integrator claude (this session); lane `worktrees/hermes-adr-index` on `chore/hermes-adr-index-generator`; lease: `scripts/adr-index.py`, `docs/adr/README.md`, `.github/workflows/ci.yml`, this entry. Option (a) with apollo#254's generalized copy (`dad4f3d0`).
 
