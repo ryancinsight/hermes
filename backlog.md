@@ -37,6 +37,15 @@
   whereas leaving it unvalidated pending a stack decision keeps a live defect
   open. Record the (b) item at the same time so the duplication is tracked
   rather than forgotten.
+- **DoR facts (2026-09-01):** apollo's `scripts/adr-index.py` (131 lines,
+  argparse `generate|check`, difflib diff on check) hardcodes four-digit
+  numbering: `# ADR (\d{4}):` headings and a `[0-9][0-9][0-9][0-9]-*.md`
+  glob. hermes numbers its ADRs `NNN-` (`001-precision-ladder.md`), so a
+  verbatim copy indexes nothing. Option (a) therefore requires generalizing
+  the generator to three- or four-digit numbering *upstream first* (apollo
+  `[patch]`), then vendoring the generalized copy — which is option (b)'s
+  first step, not an alternative to it. hermes `ci.yml` has no Python step
+  today; the check fits as a job beside `lockfile` (`Lockfile integrity`).
 - **Acceptance oracle:** `python scripts/adr-index.py check` runs in hermes CI
   and **fails on a deliberately desynchronised index** (prove it bites before
   claiming it works), then passes against the real one.
