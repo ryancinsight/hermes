@@ -1,6 +1,8 @@
 # Backlog — hermes-simd
 
-## HS-PROCESSOR-BINDING-LINUX-2026-09-01 — ProcessorBinding and ProcessorIndex::current have no Linux backend [minor] — in-progress 2026-09-01
+## HS-PROCESSOR-BINDING-LINUX-2026-09-01 — ProcessorBinding and ProcessorIndex::current have no Linux backend [minor] — done 2026-09-01 (merged 6da6d139)
+
+- **Delivered (PR #124):** `linux` module — `sched_getaffinity`/`sched_setaffinity` on the calling thread, `sched_getcpu`; bind returns the previous `cpu_set_t` for restore-on-drop; out-of-set or past-`CPU_SETSIZE` processors rejected before mutation. Three Linux tests mirroring the Windows ones **executed on the Ubuntu `gates` and aarch64 jobs and passed**; miri-ignored (foreign scheduler calls). ADR 021 revision note; CHANGELOG `[minor]`. Consumer follow-through: apollo lock advance so its Linux smoke pins.
 
 - **Claim:** integrator claude (this session); lane `worktrees/hermes-processor-binding-linux` on `feat/hermes-processor-binding-linux`; lease: `crates/hermes-simd-core/src/numa/processor.rs`, `docs/adr/021-*`, `CHANGELOG.md`, this entry. Linux behaviour is verified by the Ubuntu `gates` job; local verification is cross-compile plus unchanged Windows tests.
 
