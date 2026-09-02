@@ -27,6 +27,28 @@
 - **Non-goals:** NUMA-aware selection (themis owns topology); macOS, which has
   no thread affinity API — it stays typed absence.
 
+## HS-REDUCED-PRECISION-ELEMENTWISE-2026-09-01 — Elementwise SIMD ops for F16/Bf16 [minor] [perf] — todo
+
+- **Finding (stack triage 2026-09-01):** leto's `SimdStrategy` routes f32/f64
+  through `hermes_simd::{elementwise_add, sub, mul, div, sum, dot, axpy, ...}`
+  and marks `F16`/`Bf16` `impl_simd_ops_unsupported!` — not because leto
+  chose scalar for them, but because this crate offers no elementwise
+  entry points at those types: `impl_lane_scalar!` covers `f32, f64, F16`
+  only, `Bf16` has FMA/AVX-512/AMX support markers and the tile GEMM but no
+  lane scalar, and neither reduced type has an `elementwise_*` impl.
+- **Why filed here:** a 3-week-old leto branch
+  (`codex/leto-hermes-reduced-precision`) rewrote leto's strategy to route
+  F16/Bf16 through hermes ahead of the provider; it could never compile
+  against 0.7.0 and is deleted with this record in its place. The gap is
+  the provider's (upstream ownership), and leto's routing is a one-macro
+  change once it exists.
+- **Acceptance:** `elementwise_{add,sub,mul,div}`, `sum`, `dot`, `axpy`
+  accept `F16` and `Bf16` with the same generic conformance suite the f32/f64
+  instantiations run, native-precision per the scalar contract (no
+  widen-compute-narrow), differential-tested against the scalar path;
+  leto then drops `impl_simd_ops_unsupported!` for both.
+- **Non-goals:** tile GEMM (already exists for Bf16), AMX.
+
 ## HS-THEMIS-AFFINITY-CONSUMER-2026-09-01 [patch] — complete
 
 - PR #121 merged history-preserved as `92cbfcbc6f926e8e1fae689214dc4a604eb4275e` (source `bf48f97`; PM `9e1b9e4`), deleting duplicate Windows affinity decomposition/grouping while preserving binding contracts and all 544 workspace tests.
