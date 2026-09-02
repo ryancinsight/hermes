@@ -1,41 +1,5 @@
 # Backlog — hermes-simd
 
-## HS-PROCESSOR-MODULE-SPLIT-2026-09-02 — Split numa/processor.rs into platform leaf modules [patch] — done 2026-09-02 (merged 5c3303b9)
-
-- **Delivered (PR #130):** `numa/processor/{windows,linux}.rs` (95/125 lines) hold the backends; parent 369 lines. Clippy clean on x86_64-windows, x86_64-linux, aarch64-linux; 41 tests / 17 doctests unchanged; Ubuntu and aarch64 jobs ran the Linux tests from the new file.
-
-- **Driver:** `numa/processor.rs` is 579 lines after the Linux binding backend (#124), one of hermes's seven new `oversized_files` on the atlas ratchet (`ATLAS-RATCHET-REGRESSIONS-2026-09-02`). Each platform backend is a bounded concern with its own leaf module.
-- **Outcome:** `numa/processor/windows.rs` and `numa/processor/linux.rs` hold the backends; the parent keeps `ProcessorIndex`, `ProcessorBinding`, the cfg'd `mod` declarations, and the tests. Behaviour and public surface unchanged; visibility unchanged (`super` resolves identically for a child file).
-- **Acceptance oracle:** parent under 500 lines; clippy clean on x86_64-windows, x86_64-linux, and aarch64-linux targets; nextest and doctests unchanged in count and green.
-- **Claim:** integrator claude (this session); lane `worktrees/hermes-processor-split` on `refactor/hermes-processor-platform-modules`; lease: `crates/hermes-simd-core/src/numa/processor.rs`, `numa/processor/`, this entry.
-
-## HS-PROCESSOR-BINDING-LINUX-2026-09-01 — ProcessorBinding and ProcessorIndex::current have no Linux backend [minor] — done 2026-09-01 (merged 6da6d139)
-
-- **Delivered (PR #124):** `linux` module — `sched_getaffinity`/`sched_setaffinity` on the calling thread, `sched_getcpu`; bind returns the previous `cpu_set_t` for restore-on-drop; out-of-set or past-`CPU_SETSIZE` processors rejected before mutation. Three Linux tests mirroring the Windows ones **executed on the Ubuntu `gates` and aarch64 jobs and passed**; miri-ignored (foreign scheduler calls). ADR 021 revision note; CHANGELOG `[minor]`. Consumer follow-through: apollo lock advance so its Linux smoke pins.
-
-- **Claim:** integrator claude (this session); lane `worktrees/hermes-processor-binding-linux` on `feat/hermes-processor-binding-linux`; lease: `crates/hermes-simd-core/src/numa/processor.rs`, `docs/adr/021-*`, `CHANGELOG.md`, this entry. Linux behaviour is verified by the Ubuntu `gates` job; local verification is cross-compile plus unchanged Windows tests.
-
-- **Observed (apollo #252, Linux CI):** `hermes_simd::ProcessorBinding::bind`
-  returns `UnsupportedPlatform` on `x86_64-unknown-linux-gnu`; so does
-  `ProcessorIndex::current`. apollo's benches therefore run **unpinned on
-  every Linux runner** and pinned only on Windows hosts — the two-class
-  scheduler blend apollo just removed from its census
-  (`ATLAS-APOLLO-CENSUS-UNPINNED-BLEND-2026-09-01`) persists wherever CI
-  measures. themis, by contrast, reports topology on Linux, which is how the
-  gap surfaced: selection succeeded, binding refused.
-- **Outcome:** `sched_setaffinity(0, ...)` / `sched_getaffinity` for bind and
-  restore and `sched_getcpu` (or `getcpu`) for the current processor, behind
-  the existing API with the same exact-binding verification the Windows path
-  has. Processor numbering stays hermes's `ProcessorIndex` contract; the
-  group-aware Windows semantics do not apply on Linux (one flat CPU set).
-- **Acceptance oracle:** the four existing `ProcessorBinding` tests pass on
-  Linux; a new test binds to a processor from the affinity set, observes
-  `current()` equal to it, drops the binding, and observes the original set
-  restored via `sched_getaffinity`. apollo's `engine_census` Linux smoke then
-  prints a `bound to logical processor N` line instead of the unpinned notice.
-- **Non-goals:** NUMA-aware selection (themis owns topology); macOS, which has
-  no thread affinity API — it stays typed absence.
-
 ## HS-REDUCED-PRECISION-ELEMENTWISE-2026-09-01 — Elementwise SIMD ops for F16/Bf16 [minor] [perf] — todo
 
 - **Finding (stack triage 2026-09-01):** leto's `SimdStrategy` routes f32/f64
@@ -57,195 +21,6 @@
   widen-compute-narrow), differential-tested against the scalar path;
   leto then drops `impl_simd_ops_unsupported!` for both.
 - **Non-goals:** tile GEMM (already exists for Bf16), AMX.
-
-## HS-THEMIS-AFFINITY-CONSUMER-2026-09-01 [patch] — complete
-
-- PR #121 merged history-preserved as `92cbfcbc6f926e8e1fae689214dc4a604eb4275e` (source `bf48f97`; PM `9e1b9e4`), deleting duplicate Windows affinity decomposition/grouping while preserving binding contracts and all 544 workspace tests.
-
-## HS-ADR-INDEX-GENERATOR-ABSENT-2026-09-01 [patch] — done 2026-09-02 (merged 38af58f5, 028a8822)
-
-- **Delivered:** PR #123 vendored apollo's generator (22 records indexed, README byte-identical, drift fails `check`); PR #131 replaced that copy with a call to atlas's reusable `adr-index-guard.yml` (`strict: true`) and deleted `scripts/adr-index.py` — one generator stack-wide (`ATLAS-ADR-INDEX-GUARD-2026-09-01`).
-
-## HS-PAIR-DEINTERLEAVE4-2026-09-01 — Fused four-way pair deinterleave [minor] — done 2026-09-01
-
-- **Delivered.** `deinterleave_pairs4` on `BackendKernel`/`SimdPermute` with a
-  safe `Vector` wrapper: splits four registers' adjacent-lane pairs into the
-  four stride-4 subsequences. Default composes `deinterleave_pairs` twice;
-  the AVX2 overrides fuse the network — f32: four lane-local 64-bit unpacks
-  plus four `vperm2f128` (half the composed shuffle count; the cross-half
-  permute is the expensive step on efficiency cores), f64: one half
-  concatenation per output (a quarter of the composed cost).
-- **Driver.** The consumer's four-block FFT split gather measured a P-core
-  win but an E-core regression on the composed two-level form
-  (apollo `ATLAS-APOLLO-WIDE-STRIDED-LOADS-2026-09-01`); the fused network
-  targets exactly that residue.
-- **Evidence.** Stride-4 reference checks added to both permute property
-  harnesses per detected backend; proven to bite by swapping two fused
-  outputs (4 assertion failures) then restored. fmt, clippy `-D warnings`,
-  519/519 nextest, doctests, warning-clean AArch64 cross-compilation.
-
-## HS-NUMA-BINDING-THEMIS-QUERY-2026-09-01 [minor] — done 2026-09-01
-
-- **Delivered.** `NumaBinding::bind` reads the node's processors from
-  `themis::CpuTopology` and applies them with `SetThreadGroupAffinity`; the
-  shared `GROUP_AFFINITY` layout and `kernel32` declarations move to
-  `numa::affinity` so both guards declare them once. A node spanning several
-  processor groups binds the largest share and reports the shortfall through
-  the new `NumaBindingCoverage`. Reclassified `[patch]` -> `[minor]`: the
-  coverage report is additive public surface. ADR 010 §2 revised with a dated
-  revision note; ADR 021 unchanged and its ownership split intact. Six Windows
-  tests added where there were none, liveness-proved against two deliberate
-  regressions.
-- **Independent review (2026-09-01, Claude; PR #120 merged 18:58):** three
-  deliberate regressions run against the eight tests on a 1-node, 24-processor,
-  single-group host. Reversing the tie rule fails
-  `group_selection_is_deterministic_under_ties` — pinned. Two survived:
-  (1) the guard's `Drop` restoring nothing — no test reached `drop`, since the
-  live test restores by hand and binding the current node short-circuits to
-  `Unbound`; (2) coverage always `Complete` — invisible on a single-group
-  all-active host, and the live test derives its expectation from the same
-  formula. Both closed: `dropping_the_guard_restores_the_previous_affinity`
-  drives `drop` with a synthetic previous affinity, and the coverage rule is a
-  pure `windows::coverage` pinned with inputs this host cannot produce. Both
-  regressions now fail their test; 546/546 workspace, fmt, Clippy, Rustdoc
-  clean.
-
-### Earlier state
-
-- **Finding (stack audit 2026-09-01):** `crates/hermes-simd-core/src/numa/
-  binding.rs` `NumaBinding::bind` asks the OS for the node's processor mask
-  itself, via the legacy `GetNumaNodeProcessorMask(node as u8, *mut u64)`,
-  then binds with single-group `SetThreadAffinityMask`. themis already
-  publishes the same table as `topology.numa_nodes()[i].processors`,
-  group-flattened as `group * 64 + number`.
-- **Why it matters:** two answers to one question that disagree on real
-  hardware. The legacy API is group-unaware (group 0, at most 64 processors)
-  and truncates `node` to `u8`; themis's Windows backend parses
-  `GetLogicalProcessorInformationEx`. On a >64-processor host they diverge.
-- **The recorded rationale is stale, not protective:** ADR 010 endorses the
-  `GetNumaNodeProcessorMask` choice, while ADR 021 in this same repo already
-  argues the single-group path is wrong. Update ADR 010 §2 in the same change
-  rather than leaving the two records contradicting each other.
-- **Layering is fine:** `hermes-simd-core` already carries an unconditional
-  `themis` dependency; this removes a query, not adds an edge.
-- **Note the coverage gap:** `NumaBinding` has no Windows test at all (only
-  `ProcessorBinding` does), so a regression here is currently invisible — the
-  change should bring its own test rather than trusting the suite.
-- **Explicitly NOT in scope:** the `ProcessorBinding` mechanism-vs-policy
-  split. The audit checked it and found it correct — themis is an immutable
-  observation crate, a thread-lifetime mutable guard is execution, and ADR 021
-  considered and rejected moving it. "Hermes does not choose a core class"
-  stays the right line.
-
-## HS-PAIR-DEINTERLEAVE-2026-09-01 — Deinterleave at adjacent-lane-pair granularity [minor] — done 2026-09-01
-
-- **Delivered.** `deinterleave_pairs` on `BackendKernel`/`SimdPermute` with a
-  safe `Vector` wrapper: reading `a || b` as adjacent-lane pairs (interleaved
-  complex samples), the results hold the even- and odd-indexed pairs — the
-  split of a stride-2 complex decimation. Portable default plus native
-  overrides on all six backends (AVX2 f32: 2x`vperm2f128` + 2x`vshufps`;
-  AVX2 f64: two half concatenations; AVX-512: `permutex2var` pair indices;
-  NEON f32: 64-bit `uzp` reinterprets; NEON f64: pass-through).
-- **Driver.** A downstream FFT split gathers stride-2/4 complex subsequences
-  through a hand-rolled four-lane blend network; this is its width-generic
-  form (apollo `ATLAS-APOLLO-WIDE-STRIDED-LOADS-2026-09-01`).
-- **Evidence.** Reference-based pair checks added to both permute property
-  harnesses, running per detected backend; proven to bite by mutating the
-  AVX2 f32 shuffle immediate (value mismatch) then restored. fmt, clippy
-  `-D warnings`, 519/519 nextest, doctests, and warning-clean AArch64
-  cross-compilation on the delivered revision. AVX-512 and NEON overrides
-  are compile evidence only on this host.
-
-## HS-REAL-WINDOW-INTERLEAVE-2026-09-01 — Fuse real windowing into complex layout [minor] [perf] — done 2026-09-01 (consumer closed)
-
-- **Consumer closure (2026-09-01).** Apollo STFT adopts
-  `real_mul_to_interleaved_complex_runtime` for every interior frame, writing
-  `[x * w, 0]` from the signal slice straight into the complex frame. Both
-  forward real scratch pools are deleted (16 KiB per worker at frame 1024).
-  Isolated per-frame A/B: 0.71x-0.77x of the three-pass shape, bit-exact;
-  STFT-level rows moved favorably in two adjacent pairs and never regressed.
-  Apollo record: `ATLAS-APOLLO-STFT-WINDOW-INTERLEAVE-2026-09-01`
-  (re-adjudicated under the memory criterion). The provider surface has a
-  consumer.
-
-- **Delivery state (2026-09-01).** Provider source `c42571d` merged through PR
-  #115 as `3c6feb4`, without squash. Collected by Claude session 03d80d33 under
-  the stale-claim rule: the branch carried three commits with no PR for ~8
-  hours, past the staleness bound. Takeover completed the work rather than
-  restarting it; the commits are unmodified and authorship is unchanged.
-- **Provider evidence.** fmt clean; `clippy --workspace --all-targets -D
-  warnings` clean; `nextest --workspace` 536/536; workspace doctests 0 (none at
-  the root, as in CI); `cargo doc --no-deps --workspace` clean under
-  `RUSTDOCFLAGS=-D warnings`; `--no-default-features` check clean;
-  `--examples --workspace` clean.
-- **Falsifiability.** The new tests were proven to bite rather than accepted on
-  a green run: swapping the `low`/`high` store order in the SIMD main loop
-  fails `real_mul_to_interleaved_complex_covers_full_and_ragged_vectors` and
-  `..._preserves_native_f32_arithmetic` with value-semantic assertions
-  (`left: -1.0, right: 3.0`), confirming the vector path is covered and not
-  only the scalar tail. The perturbation was reverted and the suite re-run
-  green.
-- **Remaining — consumer closure.** Apollo STFT must prove equal values, remove
-  both retained scratch roles, retain zero warm allocation, and improve two
-  unchanged full-STFT measurements. Not started: Apollo is at its two-tree cap
-  with both trees held by live leases. The provider operation is additive and
-  changes no existing caller, so it ships independently of that closure.
-  **Re-open trigger:** Apollo tree capacity.
-- **Lease:** none. **Last-update:** 2026-09-01.
-
-### Original item
-
-- **Outcome.** Add one allocation-free Hermes operation that multiplies equal-length real input/window slices and writes interleaved complex output as `[input[i] * window[i], 0]`, allowing Apollo STFT to delete its two per-worker scratch buffers and three-pass large-frame preparation.
-- **Scope / non-goals.** Confine Hermes source to the canonical dispatch family, public export, value/error/allocation tests, and a pinned benchmark. Preserve native `T` arithmetic, exact output order, runtime ISA safety, existing operations, and `no_std`; reject Apollo adoption unless two unchanged full-STFT comparisons improve. Do not change FFT arithmetic, frame scheduling, windows, workloads, assertions, or timeouts.
-- **Acceptance.** Validate every length before mutation; accept empty input; cover full and ragged vector tails for f32/f64 across scalar, runtime, x86, and AArch64-capable code; prove zero allocation and no per-element dispatch; pass warning-denied host/AArch64, debug/release tests, Rustdoc/doctests, Miri or stated SIMD substitute, SemVer, format, diff, size, and standalone-lock gates. Consumer closure must prove equal values, remove both retained scratch roles, retain zero warm allocation, and improve two unchanged Apollo STFT measurements.
-- **Risk / dependency.** [minor] [perf]. Driven by Apollo STFT's current three-pass frame preparation; no external blocker. Integrator `/root`; lease `/root` on the new dispatch leaf, its export/tests/benchmark, and this item's PM/doc hunks. Last update 2026-09-01.
-## HS-REAL-COMPLEX-DOT-2026-09-01 — Dot real samples with interleaved complex weights [minor] [perf] — done
-
-- **Delivery state:** provider source head `59c89431` merged through PR #113 as `2e993503`; documentation correction `e5b9e7d` merged through PR #114 (2026-09-01 10:01). Integrator `/root`; lease: none.
-- **Outcome:** one allocation-free generic/runtime real-by-interleaved-complex dot lets Apollo Mellin remove its retained 16N-byte real-lane materialization while preserving target safety, exact shape validation, and ragged tails.
-- **Evidence:** two primitive pairs improve 31–53%; two Apollo public-plan pairs improve N = 128 by 1.96%/1.49% and N = 256 by 1.46%/0.83% with a neutral N = 64 control. Source hosted run `33492225619` passes every repository gate. The corrected exact-head review, PR #114 hosted gates, and merge remain open.
-
-## HS-EXACT-PROCESSOR-BINDING-2026-08-31 — Exact thread placement for reproducible consumer measurements [minor] [arch] — done 2026-09-01
-
-- **Outcome:** add one public, typed, allocation-free RAII guard that binds the
-  calling thread to an exact logical processor and restores its prior affinity,
-  so hybrid-core consumers can exclude processor migration from measurements.
-- **Scope / non-goals:** `hermes-simd-core` affinity ownership and public facade,
-  Windows processor-group-safe implementation, explicit unsupported/failure
-  errors elsewhere, tests, ADR 021, Rustdoc, CHANGELOG, and Apollo adoption.
-  Do not change NUMA allocation policy, scheduler placement, or silently no-op.
-- **Acceptance:** validate the requested system processor before mutation;
-  bind with `SetThreadGroupAffinity`, preserve the complete previous group
-  affinity, keep the guard non-`Send`/non-`Sync`, restore on the originating
-  thread at scope exit, and structurally report invalid, unsupported, query,
-  bind, and explicit-restore failures. Invalid requests leave affinity
-  unchanged. Windows value tests cover bind/current/restore; other targets
-  compile and return the unsupported variant. The public addition passes
-  warning-denied host and AArch64 gates, doctests, Rustdoc, SemVer, exact lock,
-  independent review, and Apollo consumer verification.
-- **Dependency / driver:** Apollo item
-  `ATLAS-APOLLO-SWEEP-STOPS-AT-512-2026-08-31`; two release-profile runs make
-  1,024/2,048 stable but retain split 32,768 latency bands across both Apollo
-  and RustFFT without exact processor binding.
-- **Integrator / lease:** Codex `/root`; lease none. Source `6baf287` passes
-  warning-denied workspace Clippy, 527/527 workspace Nextest, 23 executable
-  doctests plus the non-`Send` compile-fail contract, warning-denied Rustdoc,
-  host no-default builds, AArch64 Windows warning-denied all-target compile,
-  additive SemVer 196/196 for both public crates, exact standalone lock with 11
-  first-party Git sources, formatting, diff, and unchanged Atlas conformance
-  counts. Independent exact-head review, hosted gates, provider merge, and
-  Apollo adoption remain. Last update 2026-08-31.
-
-- **Independent review (2026-09-01, Claude; 1-node / 24-processor host):**
-  two deliberate regressions against the three Windows tests, both caught.
-  A `Drop` that restores nothing fails
-  `exact_binding_reports_processor_and_restores_on_drop`; a bind that
-  applies a wider mask than the single requested processor fails that test
-  and `explicit_restore_is_observable_and_idempotent`. Unlike the node guard
-  reviewed under `HS-NUMA-BINDING-THEMIS-QUERY-2026-09-01`, this suite reaches
-  the guard's own `drop` and pins the exact applied mask, so the RAII contract
-  is tested rather than assumed. Merged through PR #120's series; Apollo
-  consumes it for pinned probes.
 
 ## HS-GEMM-PANEL-REUSE-2026-08-29 — Reuse bounded packed-B scratch [patch] [perf] — rejected 2026-08-29 on measurement
 
@@ -287,79 +62,6 @@
 - **Handover.** Claimed by Codex task 01a03eb2, whose tree sat seven hours
   untouched with the work uncommitted and its own timing criterion unrun. Taken
   over, completed to a verdict, lease released.
-
-## HS-SPMV-GATHER-PREFETCH-2026-08-29 — Measure out-of-cache CSR prefetch [patch] [perf] — done 2026-08-29
-
-- **Outcome:** rejected software prefetch because two paired median wins were not established; retained the corrected five-case sparse Criterion instrument and restored production source unchanged ([ADR 020](docs/adr/020-backend-owned-read-prefetch.md)).
-- **Evidence:** provider `335c3f8`, independent GREEN review, PR #104 merged as `232d167`, and hosted run `33273062108` passed every job, including the bounded benchmark suite. **Lease:** none.
-
-## HS-REDUCTION-UNROLL-2026-08-29 — Measure backend-specific reduction depth [patch] [perf] — done 2026-08-29
-
-- **Outcome:** rejected eight accumulators; production and the 48-row dense benchmark remain unchanged.
-- **Evidence:** two pinned-core, same-binary Criterion runs covered f32/f64 sum and dot at 256/1024/4096/16384 elements with exact dyadic value gates. Only f64 sum at 4096 repeated materially (15.1–15.2% versus four); f32 had no repeated material win and other f64 rows were flat, unstable, or already slower than production.
-- **Closure:** the measurement threshold failed before production editing or codegen qualification; no API, arithmetic, allocation, workload, timeout, or cache-policy change landed. Lease discharged in the closure commit.
-## HS-SIMD-PERF-2026-08-28 — AVX-512 f32 transpose network and bit-exact oracle [patch] — done 2026-08-31, residual: hosted AVX-512 runtime confirmation
-
-- **Outcome:** closed the last hole in the `transpose_square` override
-  surface. The AVX-512 f32 16x16 network — filed as the explicit not-done
-  follow-on of HS-AVX512-TRANSPOSE-2026-08-28 — replaces the stack-capture
-  default with four stages of 64 shuffles, and the generic default's override
-  roster no longer claims AVX-512 takes the default.
-- **Evidence — feature budget:** every instruction in the new network is
-  AVX512F in its zmm form (`vunpcklps`, `vunpckhps`, `vshufps`,
-  `vshuff32x4`), so the dispatcher's `avx512f`-only probe is sufficient and
-  no AVX512DQ/BW/VL operand can reach F-only silicon.
-- **Evidence — correctness:** the permutation algebra was checked symbolically
-  off-machine against a model of the four intrinsics; the same model
-  reproduces the in-repo AVX-512 f64 network exactly, which is what validates
-  the model. The per-backend index-coded law and involution law cover the
-  network under the SDE job.
-- **Evidence — gates:** `fmt --check` clean, warning-denied workspace
-  all-target Clippy clean, Nextest 523/523, 22 runnable doctests, and the
-  warning-denied `aarch64-unknown-linux-gnu` all-target cross-check clean.
-- **Added oracle:** `transpose_square_is_bit_exact_all_backends` asserts every
-  backend moves lane bit patterns unchanged, using signalling and quiet NaNs,
-  negative zero, and denormals. Confirmed live: a no-op `_mm256_add_ps` in the
-  AVX2 f32 network fails it at (0, 0) while the index-coded law still passes,
-  so it covers a defect class the suite could not previously detect.
-- **Bounds elision (found by codegen inspection, not by the audit):** both
-  AVX-512 networks indexed the tile as a slice under a `debug_assert`, so
-  release codegen kept a panic path per access — 24 `ud2` sites for f32 and 30
-  for f64. Re-borrowing as a fixed-size array, the idiom the AVX2 f32 and NEON
-  f32 networks already use, drops both to one and collapses the f64 body from
-  roughly 3400 lines of assembly to 64. Shuffle counts are unchanged.
-- **Measurement (pinned, single P-core, `ProcessorAffinity = 1`):** native
-  network versus the same backend's forced `hermes_benchmark_generic_default`
-  build — AVX2 f32 8x8 4.185-4.198 ns against 422.74-426.87 ns (101x); AVX2
-  f64 4x4 2.861-3.032 ns against 100.94-101.38 ns (34x). The native f32 figure
-  reproduces the 4.21-4.32 ns recorded under HS-TRANSPOSE-NETWORKS, which
-  validates the instrument. These are the unchanged AVX2 paths: they quantify
-  what the default costs, not the changed path, which cannot be measured here.
-- **Residual risk — no hardware measurement:** this host is an Arrow Lake Core
-  Ultra 9 285K reporting `avx512f: false`, so the changed path cannot execute
-  here and no timing evidence for it exists. Every host-executable transpose
-  path is byte-identical to `origin/main`, so a before/after comparison would
-  measure only noise. The explicit AVX-512 benchmark rows remain the re-open
-  instrument when suitable hardware is available.
-- **Precedent tension to adjudicate:** PR #94 deleted provisional AVX-512
-  f32/f64 networks specifically because no controlled real-silicon timing was
-  available, recording them as unverified optimizations. PR #98 then landed
-  the f64 network on symbolic verification alone without overturning that
-  decision, and this change follows PR #98 for f32. The two precedents
-  disagree; an integrator should settle which standard governs AVX-512
-  optimizations on AVX-512-less development hosts.
-- **Closed 2026-08-31, code delivery only.** Verified against the current
-  tree: `crates/hermes-simd-intrinsics/src/x86_64/avx512_f32.rs` carries the
-  four-stage 16x16 network (`_mm512_unpacklo_ps`/`unpackhi_ps`, two
-  `_mm512_shuffle_ps` stages, `_mm512_shuffle_f32x4` at row distance four then
-  eight) behind the fixed-size-array re-borrow, and PR #100 is merged at
-  `5c50d1d`. **The residual is not closed:** no AVX-512 silicon has executed
-  this path. The item is closed as delivered-and-unmeasured, and the standard
-  that governs whether that is acceptable is *not* settled here — the
-  precedent tension above is promoted to
-  HS-AVX512-EVIDENCE-STANDARD-2026-08-31 for an owner to rule on.
-- **Integrator:** claude-fable session 03d80d33 subagent.
-- **Last update:** 2026-08-31.
 
 ## HS-AVX512-EVIDENCE-STANDARD-2026-08-31 — Which evidence standard governs AVX-512 work on AVX-512-less hosts [arch] — review, awaiting owner ratification
 
@@ -428,244 +130,6 @@
   is not blocked on this.
 - **Dependencies.** None. **Lease:** none. **Last update:** 2026-09-01.
 
-## HS-AVX512-TRANSPOSE-2026-08-28 — AVX-512 square-tile transpose [patch] — done 2026-08-28
-
-- **Gap:** `transpose_square` had AVX2 f64/f32 and NEON overrides; both
-  AVX-512 backends fell to the stack-capture default, which round-trips a
-  whole tile through memory. Every other permute in the family already had
-  an AVX-512 override, so this was the one hole in the surface.
-- **Delivered:** the canonical three-stage 8x8 f64 network — `unpack` weaving
-  within each 128-bit block, then two rounds of `shuffle_f64x2` moving whole
-  blocks, 24 shuffles. **Verification is stated honestly:** the permutation
-  algebra was checked symbolically off-machine (a model of `unpacklo/hi_pd`
-  and `shuffle_f64x2` on index pairs confirms `out[i][j] == (j, i)` for all
-  64 elements), and the existing per-backend property law covers it under
-  the CI SDE job. **It is not verified on hardware here** — this host is an
-  Arrow Lake Core Ultra 9 285K, which reports `avx512f: false`, so no
-  AVX-512 measurement of any kind is possible on it.
-- **Not done:** the f32 16x16 network, which is roughly 64 shuffles rather
-  than 24 and stays on the default. Its property instantiation already
-  exists, so it would be covered when written.
-
-## HS-TRANSPOSE-NETWORKS-2026-08-27 — In-register transpose_square permute networks [patch] — done 2026-08-27
-
-- **Delivery:** provider `4af1b25`; PR #94 merged as `93ba7ce`; lease none.
-- **Outcome:** retained measured AVX2 f32 and NEON f32 register networks,
-  removed the regressing NEON f64 override, and deleted unmeasured AVX-512
-  candidates while preserving their benchmark instrument.
-- **Evidence:** exact hosted run `33139847261` is green across bounded
-  benchmarks, x86, native AArch64, SDE, Miri, no-std, dependency policy, and
-  lock integrity; local codegen and timings are recorded in [gap_audit](gap_audit.md#square-transpose-networks-hs-transpose-networks-2026-08-27).
-
-## HS-MASKED-TAIL-PARTIAL-LOAD-2026-08-27 — Partial masked load/store seam for dispatch tails [minor] — done 2026-08-31, residual: hosted AVX-512/NEON runtime confirmation
-
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** none after the provider commit.
-- **Outcome:** add active-prefix `masked_load_partial`/`masked_store_partial`
-  through the canonical backend, role-facet, and `Vector` surfaces. The generic
-  default dereferences active lanes only; AVX2 and AVX-512 f32/f64 use native
-  masked memory, while x86 F16 retains that generic default. Safe short-slice
-  access and applicable AXPY, scale, GEMM/GEMV, view, reduction, and
-  scatter-source tails no longer construct caller-side full-width staging
-  buffers. Existing full-width masked methods retain their contract.
-- **Acceptance oracle:** criterion evidence on short-tail workloads; masked
-  conformance suites instantiate the new seam across backends.
-- **Scope / non-goals:** preserve existing full-width masked operations and
-  arithmetic semantics; do not add per-backend public types, allocate, or
-  weaken the dispatch tail's exact-length behavior.
-- **Evidence:** generic prefix/mask/merge/canary conformance covers Scalar,
-  emulated SVE, x86 F16, and supported AVX2/AVX-512/NEON backends; Windows guard
-  pages verify active and zero-mask boundary access. Release Nextest passes
-  521/521; focused Miri passes 1/1; warning-denied all-target/all-feature Clippy
-  and the AArch64 Windows test-target check pass. Two short-tail AXPY
-  confirmation runs show repeatable gains for every f32 row and f64 length 3;
-  other f64 rows are noisy but show no repeated regression. AVX2 f32/f64
-  assembly removes 640/1088-byte frames and tail memset/memcpy, emitting
-  `vmaskmovps`/`vmaskmovpd` instead. The independent artifact review is green.
-- **Dependencies / risk:** additive public [minor] backend capability. AVX-512
-  and NEON are compile-verified locally; exact hosted runtime coverage remains
-  before closure. **Last update:** 2026-08-28.
-- **Closed 2026-08-31, code delivery only.** Verified against the current
-  tree: `masked_load_partial`/`masked_store_partial` are live on the canonical
-  backend (`hermes-simd-core/src/kernel/backend.rs`), the `load_store` role
-  facet, and the `Vector`/view surfaces, with native AVX2 and AVX-512 f32/f64
-  overrides in `hermes-simd-intrinsics/src/x86_64/`; the tail consumers named
-  in the outcome — `dispatch/axpy.rs`, `dispatch/scale.rs`, `tiling/gemm.rs`,
-  `tiling/gemv.rs`, `tiling/gemv_transpose.rs`, `view/{masked,ops,ops_mut,
-  reduce,scatter,vector_reg}.rs`, `sparse/spmv/dense_with_mask.rs` — all call
-  it. Provider PR #96 is merged at `eb4058a`. **The residual stands exactly as
-  written:** AVX-512 and NEON remain compile-verified and SDE/cross-checked
-  only; hosted AVX-512 and NEON *runtime* confirmation has not been obtained
-  on this host and is the sole outstanding work. Closed as delivered with that
-  residual rather than unconditionally done.
-
-## HS-SPMV-SHORT-ROW-MASKED-2026-08-27 — Masked single-vector body for short SpMV rows [patch] [arch] — done 2026-08-31
-
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** the same task owns `sparse/spmv.rs`, its focused value tests,
-  `sparse_bench.rs`, and this item's PM regions through the next commit.
-- **Outcome:** DenseWithMask rows shorter than half a register bypass empty
-  vector setup; wider tails use one exact-prefix masked vector body on the
-  existing partial-memory and PackedMask seams. The regressing CSR candidate
-  was removed. ADR 019 assigns each format implementation to one leaf module.
-- **Acceptance oracle:** differential equality with the scalar reference on
-  narrow-band fixtures (reduction-order-exact inputs); criterion evidence on
-  banded matrices.
-- **Scope / non-goals:** preserve sparse format validation, accumulation order
-  outside the candidate row/tail, and public APIs; do not specialize by scalar
-  type or retain a regressing candidate. Split the touched four-format SpMV
-  implementation into format-owned leaf modules under [ADR 019](docs/adr/019-format-owned-spmv-kernels.md);
-  do not change format routing as part of that structural move.
-- **Dependencies / risk:** depends on merged provider PR #96 (`eb4058a`). Risk
-  is [patch] behavior with [arch] private module ownership. Two pinned P-core
-  confirmation runs improve all f32 widths 3/4/5/6/7/15 by 12.8–44.3% while
-  the unchanged CSR control stays within −4.9% to +6.6%; 31/31 focused tests,
-  warning-denied Clippy, Miri, and AVX2/AVX-512 codegen are green. **Last
-  update:** 2026-08-28.
-- **Closed 2026-08-31.** Verified against the current tree: the format-owned
-  leaf modules ADR 019 mandates exist —
-  `crates/hermes-simd-core/src/sparse/spmv/{csr,sellp,blocked_coo,
-  dense_with_mask}.rs` under the `spmv.rs` manifest — `dense_with_mask.rs`
-  calls the `masked_load_partial` seam, and
-  `docs/adr/019-format-owned-spmv-kernels.md` is present and indexed.
-  Provider PR #96 (`eb4058a`) and PR #97 (`6382336`) are merged. The lease
-  recorded above is discharged; no residual.
-
-## HS-ARGEXTREMA-ONE-PASS-2026-08-27 — Measure single-pass arg-extrema [patch] — done 2026-08-27
-
-- **Outcome:** rejected the semantics-equivalent per-vector single-pass
-  candidate; production `argmin`/`argmax` remains unchanged. Lease: none.
-- **Evidence:** two unchanged f32/f64 runs at 256/1024/4096/16384 elements lost
-  every row (f32 2.07–4.00×; f64 1.23–1.58× slower). Exact AVX2 assembly shows
-  a serial horizontal-minimum shuffle chain on every vector before comparison.
-- **Risk / change class:** [patch], documentation-only closure; the current
-  vector reduction plus locating/NaN scan was faster of the two measured
-  designs.
-
-## HS-AVX2-INTERLEAVE-OVERRIDES-2026-08-27 — Native AVX2 interleave/deinterleave [patch] — done 2026-08-27
-
-- **Delivered:** AVX2 f64 and f32 `interleave`/`deinterleave` overrides
-  (unpack + cross-half permute networks, 4 shuffles per pair). Both ops
-  previously fell to the portable stack-bounce default on AVX2 — correct but
-  store-forward-stall-bound, which poisons planar<->interleaved boundary
-  networks in register-resident consumers (apollo's planar FFT rows, the
-  driving item). Verified by the existing per-arch flat-sequence conformance
-  oracles and round-trip property tests; `hermes_benchmark_generic_default`
-  cfg preserved for instrument comparisons. Integrator: Claude session
-  d791281c.
-
-## HS-DISPATCH-CACHE-THROUGHPUT-2026-08-27 — Measure cached dispatch boundary [patch] — done 2026-08-27 (PR #82, merge 99910ad)
-
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** none.
-- **Outcome:** determine whether Hermes' per-operation runtime feature ladder
-  has a stable measurable deficit against Fearless SIMD 0.7's cached `Level`,
-  using Archmage 0.9.28 and simd-abstraction 0.7.1 as independent cached-design
-  references. Implement only a provider-owned correction identified by timing
-  and exact code generation.
-- **Scope / non-goals:** add an input-sensitive f32/f64 dispatch-only group to
-  the existing bounded instrument. Compare `vectorize`, `Level::new` plus
-  dispatch, caller-reused `Level` plus dispatch, and a direct control without
-  changing existing workloads or retaining another dependency. Do not add a
-  process cache, atomic, or indirect function call before evidence identifies
-  the dispatch ladder as the binding cost.
-- **Acceptance oracle:** each provider returns the black-boxed input and the
-  same native lane count; two unchanged Criterion runs must show a repeatable
-  disjoint 95% confidence interval, and emitted code must identify the exact
-  extra load, branch, or call. A correction survives only if the same
-  instrument removes that mechanism without adding hot-path indirection and
-  all backend/value gates remain green.
-- **Risk / change class:** [patch], measurement-only unless the evidence
-  requires an internal dispatch correction. No public contract change is
-  authorized. **Dependencies:** Pulp parity PR #79 merged as `3c548015`; AVX2
-  interleave PR #80 merged as `2fa126a` and is outside this item's production
-  scope.
-- **Decision:** retain the dispatch-only regression instrument and make no
-  production cache change. Exact release assembly confirms Hermes performs
-  three standard-library cache loads/tests while Fearless dispatches from a
-  cached `Level`, but two unchanged runs do not show a Hermes disadvantage with
-  disjoint 95% confidence intervals for both precisions. The public-entry cost
-  is 0.97–2.17 ns for Hermes and 0.96–2.06 ns for `Level::new` in run one;
-  1.34–1.43 ns and 1.51–1.76 ns respectively in run two. The evidence therefore
-  rejects added atomics or indirect calls under the predeclared oracle.
-
-## HS-PULP-LANE-THROUGHPUT-2026-08-27 — Measure Pulp lane parity [patch] — done 2026-08-27 (PR #79, merge 3c548015)
-
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** none.
-- **Outcome:** compare Hermes' capability-bearing planar butterfly with Pulp
-  0.22.3's runtime-dispatched native-width path at identical input/output
-  addresses for f32 and f64. Preserve only a provider-owned correction whose
-  repeated timing and exact code generation identify a Hermes deficit.
-- **Scope / non-goals:** one temporary dev-only Pulp baseline in the existing
-  bounded instrument, generic f32/f64 value semantics, two unchanged timing
-  runs, exact AVX2 inspection, and dependency-policy review before retention.
-  Do not add Pulp to production, add a build-time-only `wide` row, admit
-  nightly `std::simd`, or alter benchmark inputs and timing.
-- **Acceptance oracle:** all providers use the same native width and addresses;
-  each output satisfies the existing derived butterfly bound before timing;
-  two bounded runs plus AVX2 inspection either identify one stable Hermes
-  mechanism and correction or record parity without production mutation.
-- **Risk / change class:** [patch], measurement-only unless evidence requires a
-  production correction. A Pulp dependency is retainable only if dependency
-  and benchmark-budget gates remain green. **Dependency:** capability-load
-  evidence merged in PR #77 at `c3d1b676`; this branch rebases onto that merge
-  before publication.
-- **Decision:** record parity but remove the Pulp row and dependency. No Pulp
-  advantage has a disjoint 95% confidence interval in both runs. Exact AVX2
-  hot loops match at six loads, four stores, six fused instructions, one
-  branch, and zero calls or bounds/panic branches; the differing counter
-  spellings are equivalent. Pulp 0.22.3 and Macerator 0.3.4 both require
-  `paste = "1"`, which resolves to unmaintained 1.0.15
-  (RUSTSEC-2024-0436) and fails `cargo deny`.
-
-## HS-CAPABILITY-LOAD-THROUGHPUT-2026-08-27 — Hoist support probes from strided lane loads [patch] — done 2026-08-27 (PR #77, merge c3d1b67)
-
-- **Outcome:** reject the capability-scoped checked-load candidate; it removed
-  support probes but retained five bounds/panic branches and missed the
-  `SimdView`/direct ceiling in the short-loop regime.
-- **Evidence:** two bounded measurements and exact AVX2 code generation keep
-  `SimdView`/`SimdChunk` as the authoritative probe-free, bounds-free route. No
-  production or benchmark change survives.
-- **Delivery:** PR #77 merged as `c3d1b67`; hosted run `33095471221` is green
-  across x86, AArch64, Miri, SDE, dependency policy, lock integrity, and
-  bounded benchmarks.
-
-## HS-FEARLESS-COMPLEX-REG-THROUGHPUT-2026-08-27 — Measure interleaved complex-register parity [patch] — done 2026-08-27 (PR #76, merge ba32b8c)
-
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`.
-  **Lease:** none.
-- **Outcome:** compare the new `ComplexReg` f32/f64 interleaved butterfly with
-  the raw Hermes recipe and `fearless_simd` 0.7's best public
-  deinterleave/planar/reinterleave route at identical input/output addresses.
-  Preserve only a production correction supported by repeated timing and exact
-  codegen evidence.
-- **Acceptance:** exact scalar lane-order and fused-rounding oracles pass;
-  Hermes and Fearless use equal native widths and identical scalar workloads;
-  `ComplexReg` adds no instructions over the raw Hermes recipe; bounded
-  Criterion runs report medians and 95% confidence intervals; every stable
-  Hermes deficit is explained and corrected, or rejected with assembly/model
-  evidence; exact workspace gates pass before merge.
-- **Scope / non-goals:** the existing lane-throughput instrument and synchronized
-  evidence only, plus a measured Hermes kernel correction if required. Do not
-  add a second benchmark binary, adopt Fearless, change Apollo transform logic,
-  or add Fearless-only capabilities without a current consumer contract.
-- **Risk / class:** [patch], benchmark-first; production code remains unchanged
-  unless the measurement falsifies the zero-cost/parity hypotheses.
-  **Dependencies:** merged `ComplexReg` PRs 73–74 and Fearless 0.7.0.
-
-## HS-FEARLESS-PERMUTE-THROUGHPUT-2026-08-26 — Measure shared cross-lane parity [patch] — complete 2026-08-26
-
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`. **Lease:** none. Implementation `4ef5145`.
-- **Outcome:** one generic same-address f32/f64 instrument covers shared interleave/deinterleave; unstable host ordering plus equivalent AVX2/model evidence rejects a production correction.
-- **Evidence:** exact Clippy, 475/475 Nextest, 19 runnable doctests, Rustdoc, no-default-features, examples, 45-case smoke, two bounded timings, assembly, and `llvm-mca` are green; full intervals are in `gap_audit.md#fearless-simd-2026-08-25`.
-
-## HS-FEARLESS-F32-THROUGHPUT-2026-08-26 — Verify native single-precision lane parity [patch] — complete 2026-08-26
-
-- **Integrator:** Codex task `01a03eb2-6f0a-7301-9290-55b918675e48`. **Lease:** none. Implementation `937c120`.
-- **Outcome:** one same-address generic f32/f64 instrument retains the f64 identity; exact locked f32 intervals overlap at 256, 1,024, and 4,096 scalars, so no production correction is justified.
-- **Evidence:** workspace Clippy, 475/475 nextest, 19 runnable doctests, examples, Rustdoc, no-default-features, 21-case bench smoke, bounded timing, and AVX2 assembly are green; full measurements and limits are in `gap_audit.md#lane-throughput-2026-08-25`.
-
 ## ATLAS-HERMES-CODEGEN-SSOT-2026-08-21 — Resolve SIMD codegen source of truth [arch] [minor] — in-progress (hosted verification pending)
 
 - **Owner / scope:** Atlas integration, clean `origin/main` lane; the former
@@ -692,15 +156,6 @@
   workspace example builds pass. The Atlas development overlay rewrites the
   provider lock during unlocked local commands; its derived lock changes were
   discarded. Hosted locked CI remains the delivery gate.
-
-## HS-BOARD-COMPACTION-TOOLING-2026-09-01 — Stack compactor cannot compact this board [patch] — todo
-
-- **Defect.** `scripts/atlas-board-compact.py` hardcodes `ROOT` to the meta-repo,
-  splits items on `##` headings only, and drops indented `- [x]` bullets
-  (`HS-436`). Run here it would collapse the whole legacy HS-4xx era — every
-  measured-rejection record with it — into one archive line.
-- **Scope.** Take a root argument, recognise the checkbox-bullet form, then
-  re-run against this board and diff to nothing. Meta-repo change. **Lease:** none.
 
 ## Legacy HS-4xx record — open items and measured limits
 
@@ -1109,7 +564,7 @@ marked delivered.
 
 ## Archive — closed items
 
-Closed items, one line each. Full prose is in this file's git history; the commit SHAs and PR numbers below are the entry points.
+Closed items, one line each. Full prose is in git history; commit SHAs below are the entry points.
 
 - **HS-434 — workspace lint floor**
 - **HS-433 — AMX downgrade notice writes to stderr** — `f4d444b5`
@@ -1202,3 +657,30 @@ Closed items, one line each. Full prose is in this file's git history; the commi
 - [patch] Vectorized in-place prefix scan, single authoritative impl (8b4a796). — `8b4a796`
 - [patch] Complex-kernel property tests with analytical tolerances (8b4a796). — `8b4a796`
 - [patch] Workspace fmt normalization; rustdoc warning cleanup (fc34e6a, 3aa963e). — `fc34e6a`, `3aa963e`
+
+- **HS-PROCESSOR-MODULE-SPLIT-2026-09-02** Split numa/processor.rs into platform leaf modules [patch] (2026-09-02) — `5c3303b9`
+- **HS-PROCESSOR-BINDING-LINUX-2026-09-01** ProcessorBinding and ProcessorIndex::current have no Linux backend [minor] (2026-09-01) — `6da6d139`
+- **HS-THEMIS-AFFINITY-CONSUMER-2026-09-01** [patch] (2026-09-01) — `92cbfcbc6f926e8e1fae689214dc4a604eb4275e`, `bf48f97`, `9e1b9e4`
+- **HS-ADR-INDEX-GENERATOR-ABSENT-2026-09-01** [patch] (2026-09-02) — `38af58f5`, `028a8822`
+- **HS-PAIR-DEINTERLEAVE4-2026-09-01** Fused four-way pair deinterleave [minor] (2026-09-01)
+- **HS-NUMA-BINDING-THEMIS-QUERY-2026-09-01** [minor] (2026-09-01)
+- **HS-PAIR-DEINTERLEAVE-2026-09-01** Deinterleave at adjacent-lane-pair granularity [minor] (2026-09-01)
+- **HS-REAL-WINDOW-INTERLEAVE-2026-09-01** Fuse real windowing into complex layout [minor] [perf] (2026-09-01) — `c42571d`, `3c6feb4`, `03d80d33`
+- **HS-REAL-COMPLEX-DOT-2026-09-01** Dot real samples with interleaved complex weights [minor] [perf] (2026-09-01) — `59c89431`, `2e993503`, `e5b9e7d`
+- **HS-EXACT-PROCESSOR-BINDING-2026-08-31** Exact thread placement for reproducible consumer measurements [minor] [arch] (2026-09-01) — `6baf287`
+- **HS-SPMV-GATHER-PREFETCH-2026-08-29** Measure out-of-cache CSR prefetch [patch] [perf] (2026-08-29) — `335c3f8`, `232d167`
+- **HS-REDUCTION-UNROLL-2026-08-29** Measure backend-specific reduction depth [patch] [perf] (2026-08-29)
+- **HS-SIMD-PERF-2026-08-28** AVX-512 f32 transpose network and bit-exact oracle [patch] (2026-08-31) — `5c50d1d`, `03d80d33`
+- **HS-AVX512-TRANSPOSE-2026-08-28** AVX-512 square-tile transpose [patch] (2026-08-28)
+- **HS-TRANSPOSE-NETWORKS-2026-08-27** In-register transpose_square permute networks [patch] (2026-08-27) — `4af1b25`, `93ba7ce`
+- **HS-MASKED-TAIL-PARTIAL-LOAD-2026-08-27** Partial masked load/store seam for dispatch tails [minor] (2026-08-31) — `01a03eb2`, `55b918675e48`, `eb4058a`
+- **HS-SPMV-SHORT-ROW-MASKED-2026-08-27** Masked single-vector body for short SpMV rows [patch] [arch] (2026-08-31) — `01a03eb2`, `55b918675e48`, `eb4058a`
+- **HS-ARGEXTREMA-ONE-PASS-2026-08-27** Measure single-pass arg-extrema [patch] (2026-08-27)
+- **HS-AVX2-INTERLEAVE-OVERRIDES-2026-08-27** Native AVX2 interleave/deinterleave [patch] (2026-08-27) — `d791281c`
+- **HS-DISPATCH-CACHE-THROUGHPUT-2026-08-27** Measure cached dispatch boundary [patch] (2026-08-27) — `99910ad`, `01a03eb2`, `55b918675e48`, `3c548015`
+- **HS-PULP-LANE-THROUGHPUT-2026-08-27** Measure Pulp lane parity [patch] (2026-08-27) — `3c548015`, `01a03eb2`, `55b918675e48`, `c3d1b676`
+- **HS-CAPABILITY-LOAD-THROUGHPUT-2026-08-27** Hoist support probes from strided lane loads [patch] (2026-08-27) — `c3d1b67`
+- **HS-FEARLESS-COMPLEX-REG-THROUGHPUT-2026-08-27** Measure interleaved complex-register parity [patch] (2026-08-27) — `ba32b8c`, `01a03eb2`, `55b918675e48`
+- **HS-FEARLESS-PERMUTE-THROUGHPUT-2026-08-26** Measure shared cross-lane parity [patch] (2026-08-26) — `01a03eb2`, `55b918675e48`, `4ef5145`
+- **HS-FEARLESS-F32-THROUGHPUT-2026-08-26** Verify native single-precision lane parity [patch] (2026-08-26) — `01a03eb2`, `55b918675e48`, `937c120`
+- **HS-BOARD-COMPACTION-TOOLING-2026-09-01** Stack compactor cannot compact this board [patch] (2026-09-02) — `9a5e00d68`
