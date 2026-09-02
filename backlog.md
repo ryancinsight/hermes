@@ -1,5 +1,12 @@
 # Backlog — hermes-simd
 
+## HS-PROCESSOR-MODULE-SPLIT-2026-09-02 — Split numa/processor.rs into platform leaf modules [patch] — in-progress 2026-09-02
+
+- **Driver:** `numa/processor.rs` is 579 lines after the Linux binding backend (#124), one of hermes's seven new `oversized_files` on the atlas ratchet (`ATLAS-RATCHET-REGRESSIONS-2026-09-02`). Each platform backend is a bounded concern with its own leaf module.
+- **Outcome:** `numa/processor/windows.rs` and `numa/processor/linux.rs` hold the backends; the parent keeps `ProcessorIndex`, `ProcessorBinding`, the cfg'd `mod` declarations, and the tests. Behaviour and public surface unchanged; visibility unchanged (`super` resolves identically for a child file).
+- **Acceptance oracle:** parent under 500 lines; clippy clean on x86_64-windows, x86_64-linux, and aarch64-linux targets; nextest and doctests unchanged in count and green.
+- **Claim:** integrator claude (this session); lane `worktrees/hermes-processor-split` on `refactor/hermes-processor-platform-modules`; lease: `crates/hermes-simd-core/src/numa/processor.rs`, `numa/processor/`, this entry.
+
 ## HS-PROCESSOR-BINDING-LINUX-2026-09-01 — ProcessorBinding and ProcessorIndex::current have no Linux backend [minor] — done 2026-09-01 (merged 6da6d139)
 
 - **Delivered (PR #124):** `linux` module — `sched_getaffinity`/`sched_setaffinity` on the calling thread, `sched_getcpu`; bind returns the previous `cpu_set_t` for restore-on-drop; out-of-set or past-`CPU_SETSIZE` processors rejected before mutation. Three Linux tests mirroring the Windows ones **executed on the Ubuntu `gates` and aarch64 jobs and passed**; miri-ignored (foreign scheduler calls). ADR 021 revision note; CHANGELOG `[minor]`. Consumer follow-through: apollo lock advance so its Linux smoke pins.
