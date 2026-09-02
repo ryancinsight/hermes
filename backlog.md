@@ -1,6 +1,8 @@
 # Backlog — hermes-simd
 
-## HS-PROCESSOR-MODULE-SPLIT-2026-09-02 — Split numa/processor.rs into platform leaf modules [patch] — in-progress 2026-09-02
+## HS-PROCESSOR-MODULE-SPLIT-2026-09-02 — Split numa/processor.rs into platform leaf modules [patch] — done 2026-09-02 (merged 5c3303b9)
+
+- **Delivered (PR #130):** `numa/processor/{windows,linux}.rs` (95/125 lines) hold the backends; parent 369 lines. Clippy clean on x86_64-windows, x86_64-linux, aarch64-linux; 41 tests / 17 doctests unchanged; Ubuntu and aarch64 jobs ran the Linux tests from the new file.
 
 - **Driver:** `numa/processor.rs` is 579 lines after the Linux binding backend (#124), one of hermes's seven new `oversized_files` on the atlas ratchet (`ATLAS-RATCHET-REGRESSIONS-2026-09-02`). Each platform backend is a bounded concern with its own leaf module.
 - **Outcome:** `numa/processor/windows.rs` and `numa/processor/linux.rs` hold the backends; the parent keeps `ProcessorIndex`, `ProcessorBinding`, the cfg'd `mod` declarations, and the tests. Behaviour and public surface unchanged; visibility unchanged (`super` resolves identically for a child file).
