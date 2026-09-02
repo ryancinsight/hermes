@@ -119,27 +119,6 @@ pub trait LaneKernel<T: Scalar> {
     /// What the kernel produces.
     type Output;
 
-    /// Whether the body converts between `binary16` storage and its compute
-    /// lanes, and would rather run where that conversion is native.
-    ///
-    /// A kernel that computes in `f32` over half-precision storage — the
-    /// shape of every mixed-precision consumer on a host without
-    /// AVX512-FP16 — needs its conversion and its arithmetic in one
-    /// `#[target_feature]` scope, or the converted lanes round-trip through
-    /// memory between them. The storage scalar cannot express that: `T` here
-    /// is the *compute* type, and `REQUIRES_F16C` asks whether the backend's
-    /// own vector type needs F16C, which for `f32` it does not.
-    ///
-    /// Setting this asks [`vectorize_hardware_lanes`] to prefer a frame with
-    /// the conversion feature enabled where the host has it (F16C on x86-64;
-    /// `AArch64` converts in baseline NEON and is unaffected). It changes
-    /// instruction selection only: the lane count, the backend, and every
-    /// value are identical either way, and a host without the feature runs
-    /// the same body in the ordinary frame. Leaving it `false` — the default
-    /// — costs nothing: the preference is a compile-time constant, so a
-    /// kernel that does not convert never instantiates the extended frame.
-    const CONVERTS_BINARY16: bool = false;
-
     /// Runs the kernel against one backend.
     ///
     /// Called exactly once, from inside that backend's `#[target_feature]`
@@ -407,20 +386,13 @@ where
         return Ok(unsafe { call_avx512(kernel) });
     }
     if <Avx2 as SimdStorage<T>>::LANE_COUNT == LANES && Avx2::is_runtime_supported() {
-        // Two independent reasons to enter the extended frame, and they fail
-        // differently. The backend's own vector type may *require* F16C, in
-        // which case a host without it cannot run this backend at all and the
-        // arm falls through to the next one. A kernel may merely *prefer* it
-        // for the conversions in its body (`CONVERTS_BINARY16`), in which case
-        // a host without it runs the same body in the ordinary frame with the
-        // conversion unaccelerated — same lanes, same values, same backend.
-        let storage_requires = <Avx2 as SimdStorage<T>>::REQUIRES_F16C;
-        if (storage_requires || K::CONVERTS_BINARY16) && avx2_f16c_available() {
-            // SAFETY: the architecture probe proves AVX2 and FMA; the
-            // scalar-specific probe additionally proves F16C.
-            return Ok(unsafe { call_avx2_f16c(kernel) });
-        }
-        if !storage_requires {
+        if <Avx2 as SimdStorage<T>>::REQUIRES_F16C {
+            if avx2_f16c_available() {
+                // SAFETY: the architecture probe proves AVX2 and FMA; the
+                // scalar-specific probe additionally proves F16C.
+                return Ok(unsafe { call_avx2_f16c(kernel) });
+            }
+        } else {
             // SAFETY: the architecture probe proves ordinary AVX2 and FMA
             // support; this scalar does not require the extended F16C frame.
             return Ok(unsafe { call_avx2(kernel) });
