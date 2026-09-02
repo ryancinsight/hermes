@@ -28,8 +28,8 @@ use core::arch::x86_64::{
 };
 #[cfg(not(hermes_benchmark_generic_default))]
 use core::arch::x86_64::{
-    _mm512_permutex2var_pd, _mm512_permutexvar_pd, _mm512_setr_epi64, _mm512_unpackhi_pd,
-    _mm512_unpacklo_pd,
+    _mm512_broadcast_f64x2, _mm512_permutex2var_pd, _mm512_permutexvar_pd, _mm512_setr_epi64,
+    _mm512_unpackhi_pd, _mm512_unpacklo_pd, _mm_set_pd,
 };
 use hermes_simd_core::kernel::BackendKernel;
 
@@ -447,6 +447,25 @@ impl BackendKernel<f64> for Avx512 {
             Avx512F64Vec(_mm512_shuffle_f64x2::<0b01_00_01_00>(a.0, b.0)),
             Avx512F64Vec(_mm512_shuffle_f64x2::<0b11_10_11_10>(a.0, b.0)),
         )
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn splat_pair(lo: f64, hi: f64) -> Self::Vector {
+        // The `(lo, hi)` f64 pair is one 128-bit block; `vbroadcastf64x2`
+        // fills all four blocks in a single op.
+        Avx512F64Vec(_mm512_broadcast_f64x2(_mm_set_pd(hi, lo)))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn blend_halves(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        // Each half keeps its position: one in-lane blend, no permute.
+        Avx512F64Vec(_mm512_mask_blend_pd(0xF0, a.0, b.0))
     }
 
     // -----------------------------------------------------------------------

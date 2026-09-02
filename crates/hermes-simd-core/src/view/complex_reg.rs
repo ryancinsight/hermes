@@ -96,10 +96,10 @@ where
     #[inline(always)]
     #[must_use]
     pub fn splat(sample: Complex<T>) -> Self {
-        // Interleaving [re, re, ...] with [im, im, ...] yields
-        // [re, im, re, im, ...] in the low output; the high output repeats it.
-        let (lo, _) = Vector::splat(sample.re).interleave(Vector::splat(sample.im));
-        Self(lo)
+        // One pair broadcast: `[re, im]` repeated over the register. The
+        // interleave of two scalar broadcasts computes the same value but
+        // pays a shuffle pair per twiddle, which a stage loop repeats.
+        Self(Vector::splat_pair(sample.re, sample.im))
     }
 
     /// Complex multiply by the conjugate, sample-wise: `self * conj(w)`.

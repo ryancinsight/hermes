@@ -613,6 +613,60 @@ fn check_permutes_f64<A: SimdKernel<f64>>() {
 
 /// The half concatenation must match the flat reference: the low halves of
 /// `a` then `b`, and the high halves of `a` then `b`.
+fn check_blend_halves<A: SimdKernel<f32>>() {
+    let lanes = A::LANE_COUNT;
+    let half = lanes / 2;
+    let a_vals: Vec<f32> = (0..lanes).map(|i| (i + 1) as f32).collect();
+    let b_vals: Vec<f32> = (0..lanes).map(|i| -((i + 1) as f32) * 10.0).collect();
+    let mut out = vec![0.0f32; lanes];
+
+    // SAFETY: caller gates on the required target features for `A`.
+    unsafe {
+        let a = A::load_unaligned(a_vals.as_ptr());
+        let b = A::load_unaligned(b_vals.as_ptr());
+        A::store_unaligned(out.as_mut_ptr(), A::blend_halves(a, b));
+    }
+
+    let expected: Vec<f32> = a_vals[..half]
+        .iter()
+        .chain(&b_vals[half..])
+        .copied()
+        .collect();
+    assert_eq!(out, expected, "blend_halves mismatch ({lanes} lanes)");
+}
+
+fn check_splat_pair<A: SimdKernel<f32>>() {
+    let lanes = A::LANE_COUNT;
+    let (lo, hi) = (1.5_f32, -2.25_f32);
+    let mut out = vec![0.0f32; lanes];
+
+    // SAFETY: caller gates on the required target features for `A`.
+    unsafe {
+        A::store_unaligned(out.as_mut_ptr(), A::splat_pair(lo, hi));
+    }
+
+    let expected: Vec<f32> = (0..lanes)
+        .map(|i: usize| if i.is_multiple_of(2) { lo } else { hi })
+        .collect();
+    assert_eq!(out, expected, "splat_pair mismatch ({lanes} lanes)");
+}
+
+fn check_splat_pair_f64<A: SimdKernel<f64>>() {
+    let lanes = A::LANE_COUNT;
+    let (lo, hi) = (0.125_f64, -7.5_f64);
+    let mut out = vec![0.0f64; lanes];
+
+    // SAFETY: caller gates on the required target features for `A`.
+    unsafe {
+        A::store_unaligned(out.as_mut_ptr(), A::splat_pair(lo, hi));
+    }
+
+    let expected: Vec<f64> = (0..lanes)
+        .map(|i: usize| if i.is_multiple_of(2) { lo } else { hi })
+        .collect();
+    assert_eq!(out, expected, "splat_pair f64 mismatch ({lanes} lanes)");
+}
+
 fn check_interleave_halves<A: SimdKernel<f32>>() {
     let lanes = A::LANE_COUNT;
     let half = lanes / 2;
@@ -654,12 +708,18 @@ fn check_interleave_halves<A: SimdKernel<f32>>() {
 fn permutes_match_reference_all_backends() {
     check_permutes::<Scalar>();
     check_interleave_halves::<Scalar>();
+    check_splat_pair::<Scalar>();
+    check_blend_halves::<Scalar>();
+    check_splat_pair_f64::<Scalar>();
     check_transpose_square::<f32, Scalar>();
     check_transpose_square::<f64, Scalar>();
     check_transpose_interleaved_square::<f32, Scalar>();
     check_transpose_interleaved_square::<f64, Scalar>();
     check_permutes::<SveArch>();
     check_interleave_halves::<SveArch>();
+    check_splat_pair::<SveArch>();
+    check_blend_halves::<SveArch>();
+    check_splat_pair_f64::<SveArch>();
     check_permutes_f64::<Scalar>();
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -667,6 +727,9 @@ fn permutes_match_reference_all_backends() {
         if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
             check_permutes::<hermes_simd::Avx2>();
             check_interleave_halves::<hermes_simd::Avx2>();
+            check_splat_pair::<hermes_simd::Avx2>();
+            check_blend_halves::<hermes_simd::Avx2>();
+            check_splat_pair_f64::<hermes_simd::Avx2>();
             check_transpose_square::<f32, hermes_simd::Avx2>();
             check_transpose_square::<f64, hermes_simd::Avx2>();
             check_transpose_interleaved_square::<f32, hermes_simd::Avx2>();
@@ -676,6 +739,9 @@ fn permutes_match_reference_all_backends() {
         if std::is_x86_feature_detected!("avx512f") {
             check_permutes::<hermes_simd::Avx512>();
             check_interleave_halves::<hermes_simd::Avx512>();
+            check_splat_pair::<hermes_simd::Avx512>();
+            check_blend_halves::<hermes_simd::Avx512>();
+            check_splat_pair_f64::<hermes_simd::Avx512>();
             check_transpose_square::<f32, hermes_simd::Avx512>();
             check_transpose_square::<f64, hermes_simd::Avx512>();
             check_transpose_interleaved_square::<f32, hermes_simd::Avx512>();
@@ -687,6 +753,9 @@ fn permutes_match_reference_all_backends() {
     {
         check_permutes::<hermes_simd::Neon>();
         check_interleave_halves::<hermes_simd::Neon>();
+        check_splat_pair::<hermes_simd::Neon>();
+        check_blend_halves::<hermes_simd::Neon>();
+        check_splat_pair_f64::<hermes_simd::Neon>();
         check_transpose_square::<f32, hermes_simd::Neon>();
         check_transpose_square::<f64, hermes_simd::Neon>();
         check_transpose_interleaved_square::<f32, hermes_simd::Neon>();

@@ -28,8 +28,9 @@ use core::arch::x86_64::{
 };
 #[cfg(not(hermes_benchmark_generic_default))]
 use core::arch::x86_64::{
-    _mm512_permutex2var_ps, _mm512_permutexvar_ps, _mm512_setr_epi32, _mm512_shuffle_f32x4,
-    _mm512_shuffle_ps, _mm512_unpackhi_ps, _mm512_unpacklo_ps,
+    _mm512_castpd_ps, _mm512_permutex2var_ps, _mm512_permutexvar_ps, _mm512_set1_pd,
+    _mm512_setr_epi32, _mm512_shuffle_f32x4, _mm512_shuffle_ps, _mm512_unpackhi_ps,
+    _mm512_unpacklo_ps,
 };
 use hermes_simd_core::kernel::BackendKernel;
 
@@ -474,6 +475,26 @@ impl BackendKernel<f32> for Avx512 {
             Avx512F32Vec(_mm512_shuffle_f32x4::<0b01_00_01_00>(a.0, b.0)),
             Avx512F32Vec(_mm512_shuffle_f32x4::<0b11_10_11_10>(a.0, b.0)),
         )
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn splat_pair(lo: f32, hi: f32) -> Self::Vector {
+        // The `(lo, hi)` f32 pair is one f64 lane; `vbroadcastsd` fills all
+        // sixteen lanes in a single op.
+        let pair = f64::from_bits((u64::from(hi.to_bits()) << 32) | u64::from(lo.to_bits()));
+        Avx512F32Vec(_mm512_castpd_ps(_mm512_set1_pd(pair)))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn blend_halves(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        // Each half keeps its position: one in-lane blend, no permute.
+        Avx512F32Vec(_mm512_mask_blend_ps(0xFF00, a.0, b.0))
     }
 
     // -----------------------------------------------------------------------
