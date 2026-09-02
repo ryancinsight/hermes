@@ -748,7 +748,9 @@
   provider lock during unlocked local commands; its derived lock changes were
   discarded. Hosted locked CI remains the delivery gate.
 
-## HS-BOARD-COMPACTION-TOOLING-2026-09-01 — Stack compactor cannot compact this board [patch] — todo
+## HS-BOARD-COMPACTION-TOOLING-2026-09-01 — Stack compactor cannot compact this board [patch] — in-progress
+
+- **Owner**: Claude (claimed 2026-09-02; delivery in the meta-repo `scripts/atlas-board-compact.py`, this board as the fixture).
 
 - **Defect.** `scripts/atlas-board-compact.py` hardcodes `ROOT` to the meta-repo,
   splits items on `##` headings only, and drops indented `- [x]` bullets
