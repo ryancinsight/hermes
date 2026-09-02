@@ -1,6 +1,11 @@
 # Backlog — hermes-simd
 
-## HS-REDUCED-PRECISION-ELEMENTWISE-2026-09-01 — Elementwise SIMD ops for F16/Bf16 [minor] [perf] — todo
+## HS-REDUCED-PRECISION-ELEMENTWISE-2026-09-01 — Elementwise SIMD ops for F16/Bf16 [minor] [perf] — in progress
+
+- **Integrator:** Codex atlas-session; **branch:** `perf/hermes-bf16-elementwise`;
+  **lease:** `crates/hermes-simd/src/vectorize.rs`,
+  `crates/hermes-simd-intrinsics/src/x86_64/`,
+  `crates/hermes-simd/tests/`; **last-update:** 2026-09-02.
 
 - **Finding (stack triage 2026-09-01):** leto's `SimdStrategy` routes f32/f64
   through `hermes_simd::{elementwise_add, sub, mul, div, sum, dot, axpy, ...}`
