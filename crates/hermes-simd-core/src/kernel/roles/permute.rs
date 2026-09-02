@@ -55,6 +55,12 @@ pub trait SimdPermute<T: Scalar>: SimdStorage<T> + Sealed {
         d: Self::Vector,
     ) -> (Self::Vector, Self::Vector, Self::Vector, Self::Vector);
 
+    /// Concatenates the two registers' low halves, and their high halves.
+    ///
+    /// # Safety
+    /// The backend's target features must be available.
+    unsafe fn interleave_halves(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector);
+
     /// Swaps each adjacent lane pair.
     ///
     /// # Safety
@@ -143,6 +149,10 @@ impl<T: Scalar, A: BackendKernel<T>> SimdPermute<T> for A {
         d: Self::Vector,
     ) -> (Self::Vector, Self::Vector, Self::Vector, Self::Vector) {
         <A as BackendKernel<T>>::deinterleave_pairs4(a, b, c, d)
+    }
+
+    unsafe fn interleave_halves(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
+        <A as BackendKernel<T>>::interleave_halves(a, b)
     }
 
     unsafe fn swap_adjacent(v: Self::Vector) -> Self::Vector {

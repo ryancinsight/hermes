@@ -4,6 +4,17 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ## [Unreleased]
 
+### Added
+
+- [minor][HS-HALF-INTERLEAVE] `Vector::interleave_halves` (and the
+  `BackendKernel`/`SimdPermute` method beneath it): the two registers' low
+  halves concatenated, and their high halves. One `vperm2f128`/`vshuff32x4`
+  per result on AVX2/AVX-512, a `vcombine`/`vzip` on NEON, scalar emulation
+  by default. The operand pairing a kernel that packs two digits of a stride
+  structure into one register needs; apollo's remaining Stockham
+  specialisations consume it. Covered by the permute property test on every
+  host backend.
+
 ### Changed
 
 - [minor][HS-PROCESSOR-BINDING-LINUX] `ProcessorBinding::bind`, `restore`, and

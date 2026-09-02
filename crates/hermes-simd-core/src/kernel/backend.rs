@@ -1203,6 +1203,48 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         )
     }
 
+    /// Concatenates the two registers' low halves, and their high halves:
+    /// `(a[..n/2] ++ b[..n/2], a[n/2..] ++ b[n/2..])` for `n = LANE_COUNT`.
+    ///
+    /// The half-granular unpack: one `vperm2f128`/`vshuff32x4` per result
+    /// on x86-64, a `vcombine` of the halves on NEON. A kernel that packs two
+    /// digits of a stride-`n/2` structure into one register needs exactly
+    /// this operand pairing. Requires an even `LANE_COUNT`.
+    ///
+    /// Default: scalar emulation.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn interleave_halves(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
+        const { Self::LANE_BOUND_CHECK };
+        let lanes = Self::LANE_COUNT;
+        debug_assert!(
+            lanes.is_multiple_of(2),
+            "half granularity needs whole halves"
+        );
+        let half = lanes / 2;
+        let mut buf_a = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let mut buf_b = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        Self::store_unaligned(buf_a.as_mut_ptr().cast::<T>(), a);
+        Self::store_unaligned(buf_b.as_mut_ptr().cast::<T>(), b);
+
+        let mut lo = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let mut hi = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        for i in 0..half {
+            // SAFETY: `store_unaligned` above initialized lanes `0..lanes` of
+            // both buffers, and `i < half` keeps every index below `lanes`.
+            lo[i].write(unsafe { buf_a[i].assume_init() });
+            lo[half + i].write(unsafe { buf_b[i].assume_init() });
+            hi[i].write(unsafe { buf_a[half + i].assume_init() });
+            hi[half + i].write(unsafe { buf_b[half + i].assume_init() });
+        }
+        (
+            Self::load_unaligned(lo.as_ptr().cast::<T>()),
+            Self::load_unaligned(hi.as_ptr().cast::<T>()),
+        )
+    }
+
     /// Splits four registers' adjacent-lane pairs into the four stride-4
     /// subsequences: reading `a || b || c || d` as a flat pair sequence,
     /// output `i` holds the pairs congruent to `i` modulo 4, in order.

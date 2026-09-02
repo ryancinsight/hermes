@@ -855,6 +855,20 @@ where
         (Self::new(r0), Self::new(r1), Self::new(r2), Self::new(r3))
     }
 
+    /// Concatenates the low halves of `self` and `other`, and their high
+    /// halves: `(self[..n/2] ++ other[..n/2], self[n/2..] ++ other[n/2..])`.
+    ///
+    /// On interleaved complex data this pairs the first `n/4` samples of each
+    /// register, then the last `n/4`: the operand pairing a kernel that packs
+    /// two digits of a stride-`n/4` structure into one register needs.
+    #[inline(always)]
+    #[must_use]
+    pub fn interleave_halves(self, other: Self) -> (Self, Self) {
+        // SAFETY: constructing the operand vectors proved host support for `Arch`.
+        let (lo, hi) = unsafe { Arch::interleave_halves(self.raw, other.raw) };
+        (Self::new(lo), Self::new(hi))
+    }
+
     /// Swaps each adjacent lane pair: `[a, b, c, d]` becomes `[b, a, d, c]`.
     ///
     /// On interleaved complex data this exchanges the real and imaginary parts
