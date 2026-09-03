@@ -1,5 +1,46 @@
 # Backlog — hermes-simd
 
+## HS-STRIDED-BLOCK-GATHER-2026-09-03 — No lane-permutation primitive, so consumers hand-write one per arity [minor] [perf] — todo <a id="hs-strided-block-gather"></a>
+
+- **Consumer driver.** Apollo's base-128 split reorders its input by a strided
+  gather — subsequence `b` of stride `blocks`, starting at the bit-reversed
+  offset `rev(b)` — and hermes offers nothing for it. So apollo writes the
+  pair-deinterleave blend network itself, inside its own crate, hand-written
+  for `BLOCKS = 2` and `BLOCKS = 4` and asserting on anything else, with a
+  scalar strided loop behind it as the fallback.
+- **What that costs, measured on the consumer side.** Disabling apollo's
+  four-block network at n = 512 costs f64 +7.5% and f32 +15.4%, so the network
+  earns its place. But being arity-bound is what stopped apollo extending its
+  split to eight blocks for n = 1024, its largest power-of-two gap against
+  RustFFT: the eight-block path has to take the scalar gather, and the whole
+  construction then measures no better than the flat Stockham route it would
+  replace (apollo `backlog.md#atlas-apollo-eight-block-split`). Every new block
+  count needs another hand-written network.
+- **Why it belongs here.** The operation is pure register permutation: an
+  N-way deinterleave of consecutive chunks into `N` strided subsequences. It
+  has a natural implementation per backend (AVX2 blends, AVX-512 permutes,
+  NEON zips) and no natural implementation in a consumer, which can only reach
+  backends through the facet traits in the `SimdKernel` umbrella. Hermes
+  already carries the arithmetic half of this vocabulary —
+  `interleaved_complex_mul_assign`, `interleaved_complex_dot` — and none of the
+  movement half. Mixed-radix transforms are not the only consumer: any
+  strided-to-contiguous reshape at register width wants it.
+- **Shape.** A facet trait method taking a block count as a const parameter,
+  `deinterleave_blocks::<const BLOCKS: usize>`, with per-backend impls for the
+  counts each backend can do in registers and a documented decline otherwise,
+  so a consumer can ask for eight and be told no rather than assert. The
+  existing `LaneKernel` dispatch already carries the width selection; this adds
+  the permutation the kernel body needs once it is inside the frame.
+- **The measurement that must come first.** A generic primitive that costs
+  more than apollo's hand-written arity-2 and arity-4 networks would be a
+  regression wearing an architecture argument. Acceptance is that it matches
+  them at those two counts on the same probe apollo already has
+  (`split_boundary`), before apollo deletes its copies.
+- **Acceptance.** One strided block deinterleave owned here, generic in block
+  count, no slower than apollo's hand-written networks at `BLOCKS = 2` and `4`;
+  apollo's `GatherBlocks` and its scalar fallback deleted; apollo's eight-block
+  split re-measured with it in place.
+
 ## HS-F16C-FRAME-FOR-COMPUTE-SCALARS-2026-09-02 — A consumer computing in f32 over binary16 storage cannot reach the F16C frame [minor] [perf] — closed 2026-09-02: built, consumer measured no gain, reverted
 
 - **Outcome.** The capability was designed, implemented, merged and then
