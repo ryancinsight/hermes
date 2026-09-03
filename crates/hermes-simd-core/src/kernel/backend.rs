@@ -1332,6 +1332,51 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         }
     }
 
+    /// Splits eight registers' adjacent-lane pairs into the eight stride-8
+    /// subsequences.
+    ///
+    /// The strided gather a mixed-radix transform performs between passes —
+    /// subsequence `k` of stride `N` starting at pair `k` — is this operation
+    /// at register width. Exposing it for eight lets a consumer reach a
+    /// radix-8 decimation without hand-writing a third blend network per
+    /// backend; a Stockham pass moving data between stages wants the same
+    /// permutation for the same reason.
+    ///
+    /// Default: two four-way networks and one pairwise level, the same shape
+    /// by which `deinterleave_pairs4` defaults to two pairwise levels. The
+    /// composition is independent of how many pairs a register holds, so it is
+    /// correct on every backend; where a backend can do better with its own
+    /// shuffles it overrides.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "eight registers is the operation's arity, not a parameter list"
+    )]
+    #[inline(always)]
+    unsafe fn deinterleave_pairs8(
+        a: Self::Vector,
+        b: Self::Vector,
+        c: Self::Vector,
+        d: Self::Vector,
+        e: Self::Vector,
+        f: Self::Vector,
+        g: Self::Vector,
+        h: Self::Vector,
+    ) -> [Self::Vector; 8] {
+        // SAFETY: the caller's feature obligation covers every nested call.
+        unsafe {
+            let (x0, x1, x2, x3) = Self::deinterleave_pairs4(a, b, c, d);
+            let (y0, y1, y2, y3) = Self::deinterleave_pairs4(e, f, g, h);
+            let (r0, r4) = Self::deinterleave_pairs(x0, y0);
+            let (r1, r5) = Self::deinterleave_pairs(x1, y1);
+            let (r2, r6) = Self::deinterleave_pairs(x2, y2);
+            let (r3, r7) = Self::deinterleave_pairs(x3, y3);
+            [r0, r1, r2, r3, r4, r5, r6, r7]
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Adjacent-Pair Shuffles & Alternating FMA (interleaved complex support)
     // -------------------------------------------------------------------------
