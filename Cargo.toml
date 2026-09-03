@@ -134,7 +134,7 @@ too_many_arguments = "allow"           # 9 (9 prod)
 manual_is_multiple_of = "allow"        # 24 (24 prod)
 
 [workspace.dependencies]
-mnemosyne = { package = "mnemosyne-memory", git = "https://github.com/ryancinsight/Mnemosyne.git", rev = "cdf3363db2ff31337c531b24d0025d945ac59a23", version = "0.7.0", default-features = false }
+mnemosyne = { package = "mnemosyne-memory", git = "https://github.com/ryancinsight/Mnemosyne.git", rev = "03fe32f4ea669538402bf8fae8d9809610a101a8", version = "0.7.0", default-features = false }
 themis = { package = "themis-topology", git = "https://github.com/ryancinsight/themis", version = "0.10.1", default-features = false }
 eunomia = { version = "0.8.0", git = "https://github.com/ryancinsight/eunomia", default-features = false }
 tracing = { version = "0.1", default-features = false }
