@@ -13,7 +13,6 @@ keywords = ["simd", "vectorization", "no-std", "zero-cost", "kernel"]
 
 [dependencies]
 eunomia = { workspace = true, features = ["rkyv"] }
-bytemuck = { version = "1.14", features = ["derive"] }
 rkyv = { version = "0.8" }
 mnemosyne = { workspace = true, optional = true }
 themis = { workspace = true }

@@ -481,7 +481,6 @@ dependencies = [
 name = "hermes-simd-core"
 version = "0.7.0"
 dependencies = [
- "bytemuck",
  "eunomia",
  "hermes-simd-intrinsics",
  "mnemosyne-memory",
