@@ -855,6 +855,37 @@ where
         (Self::new(r0), Self::new(r1), Self::new(r2), Self::new(r3))
     }
 
+    /// Splits eight vectors' adjacent-lane pairs into the eight stride-8
+    /// subsequences: reading the concatenation as a flat pair sequence,
+    /// output `i` holds the pairs congruent to `i` modulo 8.
+    ///
+    /// On interleaved complex data this is the radix-8 complex decimation of
+    /// eight registers in one operation — the movement a mixed-radix
+    /// transform performs between passes, and the shuffle a radix-8 Stockham
+    /// stage would otherwise route through memory.
+    #[inline(always)]
+    #[must_use]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "eight registers is the operation's arity, not a parameter list"
+    )]
+    pub fn deinterleave_pairs8(
+        self,
+        b: Self,
+        c: Self,
+        d: Self,
+        e: Self,
+        f: Self,
+        g: Self,
+        h: Self,
+    ) -> [Self; 8] {
+        // SAFETY: constructing the operand vectors proved host support for `Arch`.
+        let raw = unsafe {
+            Arch::deinterleave_pairs8(self.raw, b.raw, c.raw, d.raw, e.raw, f.raw, g.raw, h.raw)
+        };
+        raw.map(Self::new)
+    }
+
     /// Concatenates the low halves of `self` and `other`, and their high
     /// halves: `(self[..n/2] ++ other[..n/2], self[n/2..] ++ other[n/2..])`.
     ///
