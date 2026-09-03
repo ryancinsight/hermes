@@ -1,5 +1,50 @@
 # Backlog — hermes-simd
 
+## HS-INTERLEAVE-PAIRS-2026-09-03 — `deinterleave_pairs` has no inverse, blocking apollo's N=16 codelet [minor] [perf] — todo
+
+- **Integrator:** unclaimed; **branch:** none; **lease:** none.
+- **Last-update:** 2026-09-03.
+- **Outcome:** `SimdPermute::interleave_pairs`, the missing inverse of
+  `deinterleave_pairs`, so a two-register permutation at adjacent-lane-pair
+  granularity can run in registers instead of through memory.
+- **Contract.** Mirror of the `deinterleave_pairs` default in
+  `kernel/backend.rs`. Treat `a` concatenated with `b` as a stream of
+  `LANE_COUNT` adjacent-lane pairs. `deinterleave_pairs` sends even-indexed
+  pairs to the first result and odd-indexed pairs to the second;
+  `interleave_pairs(even, odd)` restores the original `(a, b)`. Flat form,
+  for `p in 0..lanes / 2`, over the concatenated output:
+  `out[4p] = even[2p]`, `out[4p + 1] = even[2p + 1]`,
+  `out[4p + 2] = odd[2p]`, `out[4p + 3] = odd[2p + 1]`.
+  Requires an even `LANE_COUNT`, as its inverse does.
+- **Consumer.** Apollo's `components/codelet` is compiled for tests only.
+  Its N = 16 codelet passes a direct-DFT oracle in both directions but loses
+  to the incumbent sized kernel by 1.8x on an efficiency core, because the
+  bit-reversal permutation runs through a stack buffer whose scalar stores
+  stall the following vector loads. With `ComplexReg` a complex sample *is* a
+  lane pair, so this is the "two-register sample-granularity shuffle" that
+  module's docs name as the promotion gate. Apollo cites this item ID; until
+  now it existed only in that comment, never on this board.
+- **Surface.** Ten sites, mirroring `deinterleave_pairs`: the `SimdPermute`
+  declaration and its blanket forward (`kernel/roles/permute.rs`), the
+  scalar-emulation default (`kernel/backend.rs`), the safe wrapper
+  (`view/vector_reg.rs`), and six intrinsic backends (avx2/avx512/neon x
+  f32/f64).
+- **Prior measurement — read before implementing.** HS-DEINTERLEAVE-PAIRS-AVX2-F32
+  was rejected on measurement: AVX2 f32 pair movement costs two
+  `permute2f128_ps` plus two `shuffle_ps`, and both replacement candidates
+  lost (+37.7% for shared-index `vpermps`, +72.6% for the `unpacklo/hi_pd`
+  plus `permute4x64_pd` form). The inverse will pay the same port-5 cross-lane
+  latency on this host, so a correct `interleave_pairs` does **not** imply the
+  apollo promotion succeeds. It makes the comparison possible, which it is
+  not today; the promotion stays gated on apollo's pinned probe.
+- **Acceptance oracle:** round-trip property over both backends and both
+  scalars — `interleave_pairs(deinterleave_pairs(a, b)) == (a, b)` for
+  arbitrary inputs — plus per-backend agreement with the scalar emulation,
+  added to `kernel_property_tests.rs` beside the existing pair coverage.
+  Not conditioned on the apollo promotion landing.
+- **Risk / change class:** [minor] [perf]; additive trait method with a
+  default, so no existing backend breaks.
+
 ## HS-STRIDED-BLOCK-GATHER-2026-09-03 — No lane-permutation primitive, so consumers hand-write one per arity [minor] [perf] — todo <a id="hs-strided-block-gather"></a>
 
 - **Consumer driver.** Apollo's base-128 split reorders its input by a strided
