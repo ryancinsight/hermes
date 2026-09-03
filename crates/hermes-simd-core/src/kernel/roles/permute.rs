@@ -55,6 +55,30 @@ pub trait SimdPermute<T: Scalar>: SimdStorage<T> + Sealed {
         d: Self::Vector,
     ) -> (Self::Vector, Self::Vector, Self::Vector, Self::Vector);
 
+    /// Splits eight registers' adjacent-lane pairs into the eight stride-8
+    /// subsequences.
+    ///
+    /// The register-width form of the strided gather a mixed-radix transform
+    /// performs between passes. See
+    /// [`BackendKernel::deinterleave_pairs8`](crate::kernel::BackendKernel::deinterleave_pairs8).
+    ///
+    /// # Safety
+    /// The backend's target features must be available.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "eight registers is the operation's arity, not a parameter list"
+    )]
+    unsafe fn deinterleave_pairs8(
+        a: Self::Vector,
+        b: Self::Vector,
+        c: Self::Vector,
+        d: Self::Vector,
+        e: Self::Vector,
+        f: Self::Vector,
+        g: Self::Vector,
+        h: Self::Vector,
+    ) -> [Self::Vector; 8];
+
     /// Concatenates the two registers' low halves, and their high halves.
     ///
     /// # Safety
@@ -161,6 +185,19 @@ impl<T: Scalar, A: BackendKernel<T>> SimdPermute<T> for A {
         d: Self::Vector,
     ) -> (Self::Vector, Self::Vector, Self::Vector, Self::Vector) {
         <A as BackendKernel<T>>::deinterleave_pairs4(a, b, c, d)
+    }
+
+    unsafe fn deinterleave_pairs8(
+        a: Self::Vector,
+        b: Self::Vector,
+        c: Self::Vector,
+        d: Self::Vector,
+        e: Self::Vector,
+        f: Self::Vector,
+        g: Self::Vector,
+        h: Self::Vector,
+    ) -> [Self::Vector; 8] {
+        <A as BackendKernel<T>>::deinterleave_pairs8(a, b, c, d, e, f, g, h)
     }
 
     unsafe fn interleave_halves(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {

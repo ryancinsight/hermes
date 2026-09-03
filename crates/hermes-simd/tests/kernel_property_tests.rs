@@ -194,6 +194,52 @@ where
 /// The reference is written on plain slices, independent of any lane
 /// arithmetic in the kernel defaults, so a backend override and the default it
 /// replaces are both checked against the same external specification.
+/// The eight-way pair split against the same external specification the
+/// four-way uses: subsequence `k` is every eighth pair starting at `k`.
+///
+/// Eight distinct registers rather than a repeated pair, so an implementation
+/// that transposed two of the outputs could not pass by symmetry.
+fn check_deinterleave_pairs8<A: SimdKernel<f32>>() {
+    let lanes = A::LANE_COUNT;
+    let inputs: Vec<Vec<f32>> = (0..8)
+        .map(|r| {
+            (0..lanes)
+                .map(|i| (r * lanes + i + 1) as f32)
+                .collect::<Vec<f32>>()
+        })
+        .collect();
+    let mut outputs = vec![vec![0.0f32; lanes]; 8];
+
+    // SAFETY: caller gates on the required target features for `A`.
+    unsafe {
+        let loaded: Vec<A::Vector> = inputs
+            .iter()
+            .map(|v| A::load_unaligned(v.as_ptr()))
+            .collect();
+        let split = A::deinterleave_pairs8(
+            loaded[0], loaded[1], loaded[2], loaded[3], loaded[4], loaded[5], loaded[6], loaded[7],
+        );
+        for (slot, vector) in outputs.iter_mut().zip(split) {
+            A::store_unaligned(slot.as_mut_ptr(), vector);
+        }
+    }
+
+    let concat: Vec<f32> = inputs.iter().flatten().copied().collect();
+    let pairs: Vec<&[f32]> = concat.chunks_exact(2).collect();
+    for subsequence in 0..8usize {
+        let expected: Vec<f32> = pairs
+            .iter()
+            .skip(subsequence)
+            .step_by(8)
+            .flat_map(|p| p.iter().copied())
+            .collect();
+        assert_eq!(
+            outputs[subsequence], expected,
+            "deinterleave_pairs8 output {subsequence} mismatch ({lanes} lanes)"
+        );
+    }
+}
+
 fn check_permutes<A: SimdKernel<f32>>() {
     let lanes = A::LANE_COUNT;
     let a_vals: Vec<f32> = (0..lanes).map(|i| (i + 1) as f32).collect();
@@ -707,6 +753,7 @@ fn check_interleave_halves<A: SimdKernel<f32>>() {
 #[test]
 fn permutes_match_reference_all_backends() {
     check_permutes::<Scalar>();
+    check_deinterleave_pairs8::<Scalar>();
     check_interleave_halves::<Scalar>();
     check_splat_pair::<Scalar>();
     check_blend_halves::<Scalar>();
@@ -716,6 +763,7 @@ fn permutes_match_reference_all_backends() {
     check_transpose_interleaved_square::<f32, Scalar>();
     check_transpose_interleaved_square::<f64, Scalar>();
     check_permutes::<SveArch>();
+    check_deinterleave_pairs8::<SveArch>();
     check_interleave_halves::<SveArch>();
     check_splat_pair::<SveArch>();
     check_blend_halves::<SveArch>();
@@ -726,6 +774,7 @@ fn permutes_match_reference_all_backends() {
     {
         if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
             check_permutes::<hermes_simd::Avx2>();
+            check_deinterleave_pairs8::<hermes_simd::Avx2>();
             check_interleave_halves::<hermes_simd::Avx2>();
             check_splat_pair::<hermes_simd::Avx2>();
             check_blend_halves::<hermes_simd::Avx2>();
@@ -738,6 +787,7 @@ fn permutes_match_reference_all_backends() {
         }
         if std::is_x86_feature_detected!("avx512f") {
             check_permutes::<hermes_simd::Avx512>();
+            check_deinterleave_pairs8::<hermes_simd::Avx512>();
             check_interleave_halves::<hermes_simd::Avx512>();
             check_splat_pair::<hermes_simd::Avx512>();
             check_blend_halves::<hermes_simd::Avx512>();
@@ -752,6 +802,7 @@ fn permutes_match_reference_all_backends() {
     #[cfg(target_arch = "aarch64")]
     {
         check_permutes::<hermes_simd::Neon>();
+        check_deinterleave_pairs8::<hermes_simd::Neon>();
         check_interleave_halves::<hermes_simd::Neon>();
         check_splat_pair::<hermes_simd::Neon>();
         check_blend_halves::<hermes_simd::Neon>();

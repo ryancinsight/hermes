@@ -427,6 +427,31 @@ impl BackendKernel<f32> for Avx2 {
         )
     }
 
+    /// Four pairs per register, so the eight stride-8 subsequences are two
+    /// independent stride-4 problems: the even-indexed registers carry
+    /// subsequences 0 to 3 and the odd-indexed ones carry 4 to 7. Two fused
+    /// four-way networks, against the default's two plus a pairwise level.
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above).
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn deinterleave_pairs8(
+        a: Self::Vector,
+        b: Self::Vector,
+        c: Self::Vector,
+        d: Self::Vector,
+        e: Self::Vector,
+        f: Self::Vector,
+        g: Self::Vector,
+        h: Self::Vector,
+    ) -> [Self::Vector; 8] {
+        // SAFETY: the target feature above covers both nested calls.
+        unsafe {
+            let (s0, s1, s2, s3) = <Self as BackendKernel<f32>>::deinterleave_pairs4(a, c, e, g);
+            let (s4, s5, s6, s7) = <Self as BackendKernel<f32>>::deinterleave_pairs4(b, d, f, h);
+            [s0, s1, s2, s3, s4, s5, s6, s7]
+        }
+    }
+
     /// Alternating FMA requires `avx2` + `fma` target features.
     // SAFETY: caller must ensure the target CPU supports `avx2,fma` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx2,fma")]

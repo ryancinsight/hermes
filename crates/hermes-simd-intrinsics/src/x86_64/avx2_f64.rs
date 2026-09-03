@@ -327,6 +327,34 @@ impl BackendKernel<f64> for Avx2 {
         )
     }
 
+    /// A pair is a 128-bit half, so a stride-8 subsequence over eight
+    /// registers is one half concatenation of the register four apart: eight
+    /// `vperm2f128` against the default's sixteen.
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above).
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn deinterleave_pairs8(
+        a: Self::Vector,
+        b: Self::Vector,
+        c: Self::Vector,
+        d: Self::Vector,
+        e: Self::Vector,
+        f: Self::Vector,
+        g: Self::Vector,
+        h: Self::Vector,
+    ) -> [Self::Vector; 8] {
+        [
+            Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(a.0, e.0)),
+            Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(a.0, e.0)),
+            Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(b.0, f.0)),
+            Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(b.0, f.0)),
+            Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(c.0, g.0)),
+            Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(c.0, g.0)),
+            Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(d.0, h.0)),
+            Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(d.0, h.0)),
+        ]
+    }
+
     /// Alternating FMA requires `avx2` + `fma` target features.
     // SAFETY: caller must ensure the target CPU supports `avx2,fma` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx2,fma")]
