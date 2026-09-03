@@ -45,7 +45,7 @@
 - **Risk / change class:** [minor] [perf]; additive trait method with a
   default, so no existing backend breaks.
 
-## HS-STRIDED-BLOCK-GATHER-2026-09-03 — No lane-permutation primitive, so consumers hand-write one per arity [minor] [perf] — todo <a id="hs-strided-block-gather"></a>
+## HS-STRIDED-BLOCK-GATHER-2026-09-03 — No eight-way lane permutation, so consumers hand-write one per arity [minor] [perf] — done 2026-09-03 <a id="hs-strided-block-gather"></a>
 
 - **Consumer driver.** Apollo's base-128 split reorders its input by a strided
   gather — subsequence `b` of stride `blocks`, starting at the bit-reversed
@@ -85,6 +85,39 @@
   count, no slower than apollo's hand-written networks at `BLOCKS = 2` and `4`;
   apollo's `GatherBlocks` and its scalar fallback deleted; apollo's eight-block
   split re-measured with it in place.
+- **Correction to this item's own framing.** It said hermes had no
+  lane-permutation primitive. That is wrong: `deinterleave_pairs` and
+  `deinterleave_pairs4` were already here, in `BackendKernel` with AVX2
+  overrides, and apollo calls them. What apollo hand-writes is the *loop* over
+  chunks and the arity dispatch, and what was actually missing is the **eight**
+  way split. The gap was narrower than filed and is stated as measured.
+- **Delivered:** `deinterleave_pairs8` on `BackendKernel`, forwarded through
+  the `SimdPermute` facet. The default composes two four-way networks and one
+  pairwise level — the shape `deinterleave_pairs4` already uses one level down
+  — and holds for any number of pairs per register, so every backend gets a
+  correct implementation rather than only the one it was derived on.
+- **Both AVX2 overrides are compositions, not new shuffle sequences.** `f64`
+  carries one pair per 128-bit half, so a stride-8 subsequence is one
+  `vperm2f128` against the register four apart: eight instructions against the
+  default's sixteen. `f32` carries four pairs, so the eight subsequences are
+  two independent stride-4 problems over the even- and odd-indexed registers:
+  two fused four-way networks against the default's two plus a pairwise level.
+- **Verified against an external specification**, not against the default the
+  overrides replace — subsequence `k` is every eighth pair starting at `k` —
+  across Scalar, AVX2, AVX-512, NEON and SVE, with eight distinct registers so
+  a transposed output pair cannot pass by symmetry. 548/548 workspace, clippy
+  and fmt clean.
+- **What this does and does not buy the consumer.** It removes the reason
+  apollo could not write `GatherBlocks<8>`. It does not on its own make
+  apollo's eight-block split win: that split measured 32% behind the flat
+  Stockham route at `f32`, and removing the scalar gather is worth about 15%
+  there (apollo `backlog.md#atlas-apollo-eight-block-split`). The re-measure is
+  apollo's to run and the honest expectation is that it narrows the gap without
+  closing it.
+- **The wider consumer is the Stockham pass.** Its inter-stage data movement is
+  the same strided permutation, so a radix-8 stage can now express its shuffle
+  through the backend rather than through memory. That is untested here and is
+  apollo's next question rather than a claim.
 
 ## HS-F16C-FRAME-FOR-COMPUTE-SCALARS-2026-09-02 — A consumer computing in f32 over binary16 storage cannot reach the F16C frame [minor] [perf] — closed 2026-09-02: built, consumer measured no gain, reverted
 
