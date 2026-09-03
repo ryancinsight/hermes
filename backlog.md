@@ -1,5 +1,12 @@
 # Backlog — hermes-simd
 
+## HERMES-EUNOMIA-IDENTITY-2026-09-03 — Unify Eunomia source identity for co-evolution [patch] — in-progress <a id="hermes-eunomia-identity-2026-09-03"></a>
+
+- **Integrator:** Codex; **branch:** `build/mnemosyne-phase12`; **lease:** `Cargo.toml`, `Cargo.lock`.
+- **Outcome:** Pin Hermes' first-party Eunomia workspace edge to the derive-capable provider revision used by the current Atlas co-evolution, so `hermes-simd` and its consumers expose one nominal Eunomia type identity.
+- **Acceptance:** the standalone lockfile resolves one Eunomia source revision, workspace check/clippy/nextest/docs gates pass, and no conversion or compatibility layer is added.
+- **Dependencies:** Eunomia PR #87 (`fdbf122`); **Last-update:** 2026-09-03.
+
 ## HS-INTERLEAVE-PAIRS-2026-09-03 — `deinterleave_pairs` has no inverse, blocking apollo's N=16 codelet [minor] [perf] — todo
 
 - **Integrator:** unclaimed; **branch:** none; **lease:** none.
