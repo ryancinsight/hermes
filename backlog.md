@@ -1,5 +1,29 @@
 # Backlog — hermes-simd
 
+## HERMES-MNEMOSYNE-IDENTITY-2026-09-03 — Align the workspace memory provider with the Eunomia co-evolution [patch] [arch] — in-progress <a id="hermes-mnemosyne-identity-2026-09-03"></a>
+
+- **Integrator:** Codex on `build/mnemosyne-phase12`; **lease:** none.
+- **Outcome:** Advance Hermes' workspace Mnemosyne edge to PR #123 so all
+  provider consumers use one first-party memory source identity.
+- **Acceptance:** Standalone lock resolves only Mnemosyne `26726d2` and
+  Eunomia `fdbf122`; workspace check, Clippy, nextest, doctests, rustdoc, and
+  diff checks pass; no conversion or compatibility layer is added.
+- **ADR:** [`023`](docs/adr/023-first-party-memory-source-identity.md).
+- **Evidence, 2026-09-04.** Mnemosyne is now `26726d2` in the standalone
+  lockfile; the locked workspace check, warning-denied Clippy, 548/548
+  Nextest, 26 executable doctests, and warning-denied rustdoc pass. Windows
+  Miri cannot execute the six NUMA cases that call Windows affinity APIs;
+  hosted Linux Miri remains the applicable platform gate.
+- **Dependency:** Mnemosyne source revision `26726d2`; the original Eunomia
+  identity driver is Mnemosyne PR #123 (`7f17375`); **Last-update:** 2026-09-04.
+
+## HERMES-EUNOMIA-IDENTITY-2026-09-03 — Unify Eunomia source identity for co-evolution [patch] — done <a id="hermes-eunomia-identity-2026-09-03"></a>
+
+- **Integrator:** Codex; **branch:** `build/mnemosyne-phase12`; **lease:** none.
+- **Outcome:** Pin Hermes' first-party Eunomia workspace edge to the derive-capable provider revision used by the current Atlas co-evolution, so `hermes-simd` and its consumers expose one nominal Eunomia type identity.
+- **Acceptance:** the standalone lockfile resolves one Eunomia source revision; workspace check, Clippy (`-D warnings`), nextest (548/548), doctests (26 executable checks), and rustdoc (`-D warnings`) pass; no conversion or compatibility layer is added. Commit and PR carry the final evidence.
+- **Dependencies:** Eunomia PR #87 (`fdbf122`); **Last-update:** 2026-09-03.
+
 ## HS-INTERLEAVE-PAIRS-2026-09-03 — `deinterleave_pairs` has no inverse, blocking apollo's N=16 codelet [minor] [perf] — todo
 
 - **Integrator:** unclaimed; **branch:** none; **lease:** none.
