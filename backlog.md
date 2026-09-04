@@ -2,17 +2,20 @@
 
 ## HERMES-MNEMOSYNE-IDENTITY-2026-09-03 — Align the workspace memory provider with the Eunomia co-evolution [patch] [arch] — in-progress <a id="hermes-mnemosyne-identity-2026-09-03"></a>
 
-- **Integrator:** Codex on `build/mnemosyne-phase12`; **lease:** `Cargo.toml`, `backlog.md`.
+- **Integrator:** Codex on `build/mnemosyne-phase12`; **lease:** none.
 - **Outcome:** Advance Hermes' workspace Mnemosyne edge to PR #123 so all
   provider consumers use one first-party memory source identity.
-- **Acceptance:** Standalone lock resolves only Mnemosyne `da5c6be` and
+- **Acceptance:** Standalone lock resolves only Mnemosyne `26726d2` and
   Eunomia `fdbf122`; workspace check, Clippy, nextest, doctests, rustdoc, and
   diff checks pass; no conversion or compatibility layer is added.
 - **ADR:** [`023`](docs/adr/023-first-party-memory-source-identity.md).
-- **Evidence, 2026-09-03.** Mnemosyne is now `da5c6be` in the standalone
-  lockfile; workspace check, warning-denied Clippy, 548/548 Nextest, 26
-  executable doctests, warning-denied rustdoc, and diff checks pass.
-- **Dependency:** Mnemosyne PR #123 (`da5c6be`); **Last-update:** 2026-09-03.
+- **Evidence, 2026-09-04.** Mnemosyne is now `26726d2` in the standalone
+  lockfile; the locked workspace check, warning-denied Clippy, 548/548
+  Nextest, 26 executable doctests, and warning-denied rustdoc pass. Windows
+  Miri cannot execute the six NUMA cases that call Windows affinity APIs;
+  hosted Linux Miri remains the applicable platform gate.
+- **Dependency:** Mnemosyne source revision `26726d2`; the original Eunomia
+  identity driver is Mnemosyne PR #123 (`7f17375`); **Last-update:** 2026-09-04.
 
 ## HERMES-EUNOMIA-IDENTITY-2026-09-03 — Unify Eunomia source identity for co-evolution [patch] — done <a id="hermes-eunomia-identity-2026-09-03"></a>
 
