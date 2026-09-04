@@ -464,6 +464,21 @@ impl BackendKernel<f32> for Avx512 {
         )
     }
 
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn interleave_pairs(
+        even: Self::Vector,
+        odd: Self::Vector,
+    ) -> (Self::Vector, Self::Vector) {
+        // Alternate pairs from `even` and `odd`, indices 16..31 selecting `odd`.
+        let first_idx = _mm512_setr_epi32(0, 1, 16, 17, 2, 3, 18, 19, 4, 5, 20, 21, 6, 7, 22, 23);
+        let second_idx =
+            _mm512_setr_epi32(8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31);
+        (
+            Avx512F32Vec(_mm512_permutex2var_ps(even.0, first_idx, odd.0)),
+            Avx512F32Vec(_mm512_permutex2var_ps(even.0, second_idx, odd.0)),
+        )
+    }
+
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx512f")]
     #[inline]

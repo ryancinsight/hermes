@@ -28,10 +28,18 @@
 - **Acceptance:** the standalone lockfile resolves one Eunomia source revision; workspace check, Clippy (`-D warnings`), nextest (548/548), doctests (26 executable checks), and rustdoc (`-D warnings`) pass; no conversion or compatibility layer is added. Commit and PR carry the final evidence.
 - **Dependencies:** Eunomia PR #87 (`fdbf122`); **Last-update:** 2026-09-03.
 
-## HS-INTERLEAVE-PAIRS-2026-09-03 — `deinterleave_pairs` has no inverse, blocking apollo's N=16 codelet [minor] [perf] — todo
+<a id="hs-interleave-pairs"></a>
 
-- **Integrator:** unclaimed; **branch:** none; **lease:** none.
-- **Last-update:** 2026-09-03.
+## HS-INTERLEAVE-PAIRS-2026-09-03 — `deinterleave_pairs` has no inverse, blocking apollo's N=16 codelet [minor] [perf] — done 2026-09-04
+
+- **Delivered.** `SimdPermute::interleave_pairs` across all ten sites, with the
+  round-trip and flat-placement oracles in `kernel_property_tests.rs`. The
+  local gate covers the scalar default and both AVX2 backends; AVX-512 index
+  vectors were verified by independent simulation and run under the CI SDE
+  job; NEON is unverified on this host.
+- **Consumer.** Apollo's N = 16 codelet promotion is now measurable and stays
+  gated on its pinned probe, per the prior AVX2 f32 pair-movement rejection.
+- **Last-update:** 2026-09-04.
 - **Outcome:** `SimdPermute::interleave_pairs`, the missing inverse of
   `deinterleave_pairs`, so a two-register permutation at adjacent-lane-pair
   granularity can run in registers instead of through memory.

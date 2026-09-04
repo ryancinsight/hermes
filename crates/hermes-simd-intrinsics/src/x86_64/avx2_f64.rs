@@ -272,6 +272,20 @@ impl BackendKernel<f64> for Avx2 {
         )
     }
 
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn interleave_pairs(
+        even: Self::Vector,
+        odd: Self::Vector,
+    ) -> (Self::Vector, Self::Vector) {
+        // With a 64-bit pair occupying a 128-bit half, the split is its own
+        // inverse: the first result takes both low halves, the second both
+        // high halves.
+        (
+            Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(even.0, odd.0)),
+            Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(even.0, odd.0)),
+        )
+    }
+
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx2")]
     #[inline]

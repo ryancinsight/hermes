@@ -1203,6 +1203,64 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         )
     }
 
+    /// Reassembles the even-pair and odd-pair registers produced by
+    /// [`BackendKernel::deinterleave_pairs`] into the original operand pair,
+    /// so a pair-granular permutation can round-trip in registers rather than
+    /// through a stack buffer.
+    ///
+    /// Reading the result `a || b` as a flat lane sequence, for every pair
+    /// index `p` below `LANE_COUNT / 2`: `out[4p] = even[2p]`,
+    /// `out[4p + 1] = even[2p + 1]`, `out[4p + 2] = odd[2p]`, and
+    /// `out[4p + 3] = odd[2p + 1]`. Requires an even `LANE_COUNT`.
+    ///
+    /// Default: scalar emulation.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn interleave_pairs(
+        even: Self::Vector,
+        odd: Self::Vector,
+    ) -> (Self::Vector, Self::Vector) {
+        const { Self::LANE_BOUND_CHECK };
+        let lanes = Self::LANE_COUNT;
+        debug_assert!(
+            lanes.is_multiple_of(2),
+            "pair granularity needs whole pairs"
+        );
+        let mut buf_even = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let mut buf_odd = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        Self::store_unaligned(buf_even.as_mut_ptr().cast::<T>(), even);
+        Self::store_unaligned(buf_odd.as_mut_ptr().cast::<T>(), odd);
+
+        let mut first = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let mut second = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        for p in 0..lanes / 2 {
+            // SAFETY: `store_unaligned` above initialized lanes `0..lanes` of
+            // both buffers, and every index below stays within that range.
+            let (e0, e1, o0, o1) = unsafe {
+                (
+                    buf_even[2 * p].assume_init(),
+                    buf_even[2 * p + 1].assume_init(),
+                    buf_odd[2 * p].assume_init(),
+                    buf_odd[2 * p + 1].assume_init(),
+                )
+            };
+            for (offset, value) in [e0, e1, o0, o1].into_iter().enumerate() {
+                let flat = 4 * p + offset;
+                if flat < lanes {
+                    first[flat].write(value);
+                } else {
+                    second[flat - lanes].write(value);
+                }
+            }
+        }
+        (
+            Self::load_unaligned(first.as_ptr().cast::<T>()),
+            Self::load_unaligned(second.as_ptr().cast::<T>()),
+        )
+    }
+
     /// Concatenates the two registers' low halves, and their high halves:
     /// `(a[..n/2] ++ b[..n/2], a[n/2..] ++ b[n/2..])` for `n = LANE_COUNT`.
     ///
