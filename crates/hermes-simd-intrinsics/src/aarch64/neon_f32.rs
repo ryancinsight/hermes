@@ -205,6 +205,21 @@ impl BackendKernel<f32> for Neon {
         )
     }
 
+    #[inline]
+    unsafe fn interleave_pairs(
+        even: Self::Vector,
+        odd: Self::Vector,
+    ) -> (Self::Vector, Self::Vector) {
+        // A lane pair is 64 bits, so the f64 zips rebuild each operand from
+        // its even and odd pair with the pair's lanes kept adjacent.
+        let even64 = vreinterpretq_f64_f32(even.0);
+        let odd64 = vreinterpretq_f64_f32(odd.0);
+        (
+            NeonF32Vec(vreinterpretq_f32_f64(vzip1q_f64(even64, odd64))),
+            NeonF32Vec(vreinterpretq_f32_f64(vzip2q_f64(even64, odd64))),
+        )
+    }
+
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]

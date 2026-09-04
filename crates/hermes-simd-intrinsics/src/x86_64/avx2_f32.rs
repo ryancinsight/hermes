@@ -363,6 +363,21 @@ impl BackendKernel<f32> for Avx2 {
         )
     }
 
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn interleave_pairs(
+        even: Self::Vector,
+        odd: Self::Vector,
+    ) -> (Self::Vector, Self::Vector) {
+        // Undo the forward shuffles first, rebuilding four consecutive source
+        // pairs per 128-bit block, then restore the original half order.
+        let lo = _mm256_shuffle_ps::<0b01_00_01_00>(even.0, odd.0);
+        let hi = _mm256_shuffle_ps::<0b11_10_11_10>(even.0, odd.0);
+        (
+            Avx2F32Vec(_mm256_permute2f128_ps::<0x20>(lo, hi)),
+            Avx2F32Vec(_mm256_permute2f128_ps::<0x31>(lo, hi)),
+        )
+    }
+
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx2")]
     #[inline]

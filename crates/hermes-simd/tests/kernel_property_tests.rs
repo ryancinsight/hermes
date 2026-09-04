@@ -187,6 +187,71 @@ where
     assert_eq!(restored, values, "gather∘scatter is not the identity");
 }
 
+/// `interleave_pairs` reassembles what `deinterleave_pairs` split, checked two
+/// ways that fail independently: against the flat placement specification, and
+/// as the round-trip identity the pair split's inverse must satisfy.
+///
+/// A backend override that transposed its two results would satisfy the
+/// round-trip on symmetric inputs, so the operands carry distinct value ranges
+/// and the specification check pins each output register separately.
+fn check_interleave_pairs<T, A>()
+where
+    T: hermes_simd_core::Scalar + PartialEq + core::fmt::Debug + From<u16>,
+    A: SimdKernel<T>,
+{
+    let lanes = A::LANE_COUNT;
+    let value = |flat: usize| T::from(u16::try_from(flat + 1).expect("fixture fits in u16"));
+    let first: Vec<T> = (0..lanes).map(value).collect();
+    let second: Vec<T> = (0..lanes).map(|i| value(lanes + i)).collect();
+
+    let mut even = vec![T::default(); lanes];
+    let mut odd = vec![T::default(); lanes];
+    let mut restored_first = vec![T::default(); lanes];
+    let mut restored_second = vec![T::default(); lanes];
+
+    // SAFETY: caller gates on the required target features for `A`.
+    unsafe {
+        let a = A::load_unaligned(first.as_ptr());
+        let b = A::load_unaligned(second.as_ptr());
+        let (split_even, split_odd) = A::deinterleave_pairs(a, b);
+        A::store_unaligned(even.as_mut_ptr(), split_even);
+        A::store_unaligned(odd.as_mut_ptr(), split_odd);
+
+        let (joined_first, joined_second) = A::interleave_pairs(split_even, split_odd);
+        A::store_unaligned(restored_first.as_mut_ptr(), joined_first);
+        A::store_unaligned(restored_second.as_mut_ptr(), joined_second);
+    }
+
+    // Specification: reading the results as one flat sequence, each pair index
+    // takes its even-register pair then its odd-register pair.
+    let mut expected: Vec<T> = Vec::with_capacity(2 * lanes);
+    for p in 0..lanes / 2 {
+        expected.push(even[2 * p]);
+        expected.push(even[2 * p + 1]);
+        expected.push(odd[2 * p]);
+        expected.push(odd[2 * p + 1]);
+    }
+    let (expected_first, expected_second) = expected.split_at(lanes);
+    assert_eq!(
+        restored_first, expected_first,
+        "interleave_pairs first output mismatch ({lanes} lanes)"
+    );
+    assert_eq!(
+        restored_second, expected_second,
+        "interleave_pairs second output mismatch ({lanes} lanes)"
+    );
+
+    // Round-trip: the split's inverse must restore the original operands.
+    assert_eq!(
+        restored_first, first,
+        "interleave_pairs is not the inverse of deinterleave_pairs ({lanes} lanes)"
+    );
+    assert_eq!(
+        restored_second, second,
+        "interleave_pairs is not the inverse of deinterleave_pairs ({lanes} lanes)"
+    );
+}
+
 /// Cross-lane permutes must match the flat reference reordering, and satisfy
 /// their algebraic identities: `reverse` is an involution and `deinterleave` is
 /// the exact inverse of `interleave`.
@@ -754,6 +819,8 @@ fn check_interleave_halves<A: SimdKernel<f32>>() {
 fn permutes_match_reference_all_backends() {
     check_permutes::<Scalar>();
     check_deinterleave_pairs8::<Scalar>();
+    check_interleave_pairs::<f32, Scalar>();
+    check_interleave_pairs::<f64, Scalar>();
     check_interleave_halves::<Scalar>();
     check_splat_pair::<Scalar>();
     check_blend_halves::<Scalar>();
@@ -764,6 +831,8 @@ fn permutes_match_reference_all_backends() {
     check_transpose_interleaved_square::<f64, Scalar>();
     check_permutes::<SveArch>();
     check_deinterleave_pairs8::<SveArch>();
+    check_interleave_pairs::<f32, SveArch>();
+    check_interleave_pairs::<f64, SveArch>();
     check_interleave_halves::<SveArch>();
     check_splat_pair::<SveArch>();
     check_blend_halves::<SveArch>();
@@ -775,6 +844,8 @@ fn permutes_match_reference_all_backends() {
         if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
             check_permutes::<hermes_simd::Avx2>();
             check_deinterleave_pairs8::<hermes_simd::Avx2>();
+            check_interleave_pairs::<f32, hermes_simd::Avx2>();
+            check_interleave_pairs::<f64, hermes_simd::Avx2>();
             check_interleave_halves::<hermes_simd::Avx2>();
             check_splat_pair::<hermes_simd::Avx2>();
             check_blend_halves::<hermes_simd::Avx2>();
@@ -788,6 +859,8 @@ fn permutes_match_reference_all_backends() {
         if std::is_x86_feature_detected!("avx512f") {
             check_permutes::<hermes_simd::Avx512>();
             check_deinterleave_pairs8::<hermes_simd::Avx512>();
+            check_interleave_pairs::<f32, hermes_simd::Avx512>();
+            check_interleave_pairs::<f64, hermes_simd::Avx512>();
             check_interleave_halves::<hermes_simd::Avx512>();
             check_splat_pair::<hermes_simd::Avx512>();
             check_blend_halves::<hermes_simd::Avx512>();
@@ -803,6 +876,8 @@ fn permutes_match_reference_all_backends() {
     {
         check_permutes::<hermes_simd::Neon>();
         check_deinterleave_pairs8::<hermes_simd::Neon>();
+        check_interleave_pairs::<f32, hermes_simd::Neon>();
+        check_interleave_pairs::<f64, hermes_simd::Neon>();
         check_interleave_halves::<hermes_simd::Neon>();
         check_splat_pair::<hermes_simd::Neon>();
         check_blend_halves::<hermes_simd::Neon>();

@@ -841,6 +841,20 @@ where
         (Self::new(even), Self::new(odd))
     }
 
+    /// Reassembles the even-pair and odd-pair vectors produced by
+    /// [`Vector::deinterleave_pairs`] into the original operand pair.
+    ///
+    /// On interleaved complex data this is the radix-2 complex interleave: the
+    /// inverse of a stride-2 decimation, run in registers rather than through
+    /// a stack buffer.
+    #[inline(always)]
+    #[must_use]
+    pub fn interleave_pairs(self, other: Self) -> (Self, Self) {
+        // SAFETY: constructing the operand vectors proved host support for `Arch`.
+        let (first, second) = unsafe { Arch::interleave_pairs(self.raw, other.raw) };
+        (Self::new(first), Self::new(second))
+    }
+
     /// Splits four vectors' adjacent-lane pairs into the four stride-4
     /// subsequences: reading the concatenation as a flat pair sequence,
     /// output `i` holds the pairs congruent to `i` modulo 4.
