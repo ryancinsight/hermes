@@ -8,6 +8,10 @@
 - **Acceptance:** Standalone lock resolves only Mnemosyne `da5c6be` and
   Eunomia `fdbf122`; workspace check, Clippy, nextest, doctests, rustdoc, and
   diff checks pass; no conversion or compatibility layer is added.
+- **ADR:** [`023`](docs/adr/023-first-party-memory-source-identity.md).
+- **Evidence, 2026-09-03.** Mnemosyne is now `da5c6be` in the standalone
+  lockfile; workspace check, warning-denied Clippy, 548/548 Nextest, 26
+  executable doctests, warning-denied rustdoc, and diff checks pass.
 - **Dependency:** Mnemosyne PR #123 (`da5c6be`); **Last-update:** 2026-09-03.
 
 ## HERMES-EUNOMIA-IDENTITY-2026-09-03 — Unify Eunomia source identity for co-evolution [patch] — done <a id="hermes-eunomia-identity-2026-09-03"></a>
