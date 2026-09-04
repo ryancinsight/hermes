@@ -36,10 +36,12 @@ conversion, path override, compatibility layer, or duplicate API is added.
 ## Contract and verification
 
 The change preserves Hermes' public SIMD and memory behavior; it changes only
-the resolved first-party provider revision. The standalone lockfile resolves
-Mnemosyne `da5c6be` and Eunomia `fdbf122`. Workspace check and warning-denied
-Clippy pass, Nextest passes 548/548, 26 executable doctests pass, warning-denied
-rustdoc passes, and `git diff --check` passes.
+the resolved first-party provider revision. At the initial decision revision,
+the standalone lockfile resolved Mnemosyne `da5c6be` and Eunomia `fdbf122`.
+After the 2026-09-04 follow-up below, it resolves Mnemosyne `26726d2` and
+Eunomia main at `02397fa`. Workspace check and warning-denied Clippy pass,
+Nextest passes 548/548, 26 executable doctests pass, warning-denied rustdoc
+passes, and `git diff --check` passes.
 
 ## Consequences
 
@@ -47,3 +49,10 @@ Hermes consumers that already use the current Atlas provider revisions now
 share one Mnemosyne source identity. The exact revision remains visible until
 PR #123 merges; the merge is the removal trigger, not a reason to retain the
 pin indefinitely.
+
+## Revision note
+
+2026-09-04: Eunomia PR #87 merged. The workspace Eunomia edge now follows the
+merged default branch, eliminating the obsolete review source identity while
+the independent Mnemosyne PR #123 pin remains in force. This lets unpinned Gaia
+and Leto consumers share Hermes' Eunomia scalar and derive traits directly.

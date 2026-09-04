@@ -139,9 +139,9 @@ manual_is_multiple_of = "allow"        # 24 (24 prod)
 # Cargo.lock.
 mnemosyne = { package = "mnemosyne-memory", git = "https://github.com/ryancinsight/Mnemosyne.git", rev = "26726d20cb45c88233a83165cf2ec663efee9050", version = "0.7.0", default-features = false }
 themis = { package = "themis-topology", git = "https://github.com/ryancinsight/themis", version = "0.10.1", default-features = false }
-# Temporary co-evolution pin for Eunomia PR #87; remove `rev` after the
-# provider derive delivery merges to main and regenerate Cargo.lock.
-eunomia = { version = "0.8.0", git = "https://github.com/ryancinsight/eunomia", rev = "fdbf12275d35aa1545060a4277644c497ddcda37", default-features = false }
+# Eunomia PR #87 is merged; default-branch resolution preserves the provider's
+# source identity without the temporary review revision.
+eunomia = { version = "0.8.0", git = "https://github.com/ryancinsight/eunomia", default-features = false }
 tracing = { version = "0.1", default-features = false }
 
 # Integer overflow must trap during development and tests (numerical-discipline
