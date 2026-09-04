@@ -1,24 +1,16 @@
 # Backlog — hermes-simd
 
-## HERMES-EUNOMIA-MERGED-2026-09-04 — Follow merged Eunomia source [patch] [arch] — in-progress <a id="hermes-eunomia-merged-2026-09-04"></a>
+## HERMES-EUNOMIA-MERGED-2026-09-04 — Follow merged Eunomia source [patch] [arch] — done <a id="hermes-eunomia-merged-2026-09-04"></a>
 
-- **Integrator:** Codex on `build/hermes-eunomia-source-identity`; **lease:**
-  `Cargo.toml`, `Cargo.lock`, `backlog.md`.
-- **Outcome:** remove the temporary Eunomia PR #87 revision pin now that its
-  derive delivery is on main, preserving one trait identity for unpinned Gaia,
-  Leto, RITK, and Leoneuro consumers.
-- **Acceptance:** standalone lock resolves Eunomia from merged main; workspace
-  check, warning-denied Clippy, nextest, doctests, rustdoc, and diff checks pass;
-  Leto compiles with Hermes from this source without duplicate-Eunomia errors.
-- **Dependency:** Eunomia PR #87 merged at `27237595`; **Last-update:** 2026-09-04.
+- **Outcome:** removed the obsolete Eunomia review pin; workspace check, Clippy, 548/548 Nextest tests, 26 executable doctests, rustdoc, diff checks, and the Leto `leto-ops` consumer compile pass. Delivery: pending PR.
 
 ## HERMES-MNEMOSYNE-IDENTITY-2026-09-03 — Align the workspace memory provider with the Eunomia co-evolution [patch] [arch] — in-progress <a id="hermes-mnemosyne-identity-2026-09-03"></a>
 
 - **Integrator:** Codex on `build/mnemosyne-phase12`; **lease:** none.
 - **Outcome:** Advance Hermes' workspace Mnemosyne edge to PR #123 so all
   provider consumers use one first-party memory source identity.
-- **Acceptance:** Standalone lock resolves only Mnemosyne `26726d2` and
-  Eunomia `fdbf122`; workspace check, Clippy, nextest, doctests, rustdoc, and
+- **Acceptance:** Standalone lock resolves only Mnemosyne `26726d2` and merged
+  Eunomia main `02397fa`; workspace check, Clippy, nextest, doctests, rustdoc, and
   diff checks pass; no conversion or compatibility layer is added.
 - **ADR:** [`023`](docs/adr/023-first-party-memory-source-identity.md).
 - **Evidence, 2026-09-04.** Mnemosyne is now `26726d2` in the standalone
