@@ -1,5 +1,17 @@
 # Backlog — hermes-simd
 
+## HERMES-EUNOMIA-MERGED-2026-09-04 — Follow merged Eunomia source [patch] [arch] — in-progress <a id="hermes-eunomia-merged-2026-09-04"></a>
+
+- **Integrator:** Codex on `build/hermes-eunomia-source-identity`; **lease:**
+  `Cargo.toml`, `Cargo.lock`, `backlog.md`.
+- **Outcome:** remove the temporary Eunomia PR #87 revision pin now that its
+  derive delivery is on main, preserving one trait identity for unpinned Gaia,
+  Leto, RITK, and Leoneuro consumers.
+- **Acceptance:** standalone lock resolves Eunomia from merged main; workspace
+  check, warning-denied Clippy, nextest, doctests, rustdoc, and diff checks pass;
+  Leto compiles with Hermes from this source without duplicate-Eunomia errors.
+- **Dependency:** Eunomia PR #87 merged at `27237595`; **Last-update:** 2026-09-04.
+
 ## HERMES-MNEMOSYNE-IDENTITY-2026-09-03 — Align the workspace memory provider with the Eunomia co-evolution [patch] [arch] — in-progress <a id="hermes-mnemosyne-identity-2026-09-03"></a>
 
 - **Integrator:** Codex on `build/mnemosyne-phase12`; **lease:** none.
