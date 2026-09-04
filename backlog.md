@@ -28,10 +28,15 @@
 - **Acceptance:** the standalone lockfile resolves one Eunomia source revision; workspace check, Clippy (`-D warnings`), nextest (548/548), doctests (26 executable checks), and rustdoc (`-D warnings`) pass; no conversion or compatibility layer is added. Commit and PR carry the final evidence.
 - **Dependencies:** Eunomia PR #87 (`fdbf122`); **Last-update:** 2026-09-03.
 
-## HS-INTERLEAVE-PAIRS-2026-09-03 — `deinterleave_pairs` has no inverse, blocking apollo's N=16 codelet [minor] [perf] — todo
+<a id="hs-interleave-pairs"></a>
 
-- **Integrator:** unclaimed; **branch:** none; **lease:** none.
-- **Last-update:** 2026-09-03.
+## HS-INTERLEAVE-PAIRS-2026-09-03 — `deinterleave_pairs` has no inverse, blocking apollo's N=16 codelet [minor] [perf] — in-progress
+
+- **Integrator:** claude-opus-5; **branch:** `feat/hermes-interleave-pairs`;
+  **lease:** `kernel/roles/permute.rs`, `kernel/backend.rs`,
+  `view/vector_reg.rs`, `x86_64/`, `aarch64/`, `tests/kernel_property_tests.rs`
+  2026-09-04T16:10Z.
+- **Last-update:** 2026-09-04.
 - **Outcome:** `SimdPermute::interleave_pairs`, the missing inverse of
   `deinterleave_pairs`, so a two-register permutation at adjacent-lane-pair
   granularity can run in registers instead of through memory.
