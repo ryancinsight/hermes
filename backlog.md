@@ -1,5 +1,15 @@
 # Backlog — hermes-simd
 
+## HERMES-MNEMOSYNE-IDENTITY-2026-09-03 — Align the workspace memory provider with the Eunomia co-evolution [patch] [arch] — in-progress <a id="hermes-mnemosyne-identity-2026-09-03"></a>
+
+- **Integrator:** Codex on `build/mnemosyne-phase12`; **lease:** `Cargo.toml`, `backlog.md`.
+- **Outcome:** Advance Hermes' workspace Mnemosyne edge to PR #123 so all
+  provider consumers use one first-party memory source identity.
+- **Acceptance:** Standalone lock resolves only Mnemosyne `da5c6be` and
+  Eunomia `fdbf122`; workspace check, Clippy, nextest, doctests, rustdoc, and
+  diff checks pass; no conversion or compatibility layer is added.
+- **Dependency:** Mnemosyne PR #123 (`da5c6be`); **Last-update:** 2026-09-03.
+
 ## HERMES-EUNOMIA-IDENTITY-2026-09-03 — Unify Eunomia source identity for co-evolution [patch] — done <a id="hermes-eunomia-identity-2026-09-03"></a>
 
 - **Integrator:** Codex; **branch:** `build/mnemosyne-phase12`; **lease:** none.
