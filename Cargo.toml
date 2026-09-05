@@ -137,7 +137,7 @@ manual_is_multiple_of = "allow"        # 24 (24 prod)
 # Temporary co-evolution pin for Mnemosyne PR #123; remove `rev` after the
 # memory provider source-identity correction merges to main and regenerate
 # Cargo.lock.
-mnemosyne = { package = "mnemosyne-memory", git = "https://github.com/ryancinsight/Mnemosyne.git", rev = "39d116d579826d16e2c2d1070e548a78964cdd06", version = "0.7.0", default-features = false }
+mnemosyne = { package = "mnemosyne-memory", git = "https://github.com/ryancinsight/Mnemosyne.git", rev = "92e840b4990c12d675046863460be7d822ea2929", version = "0.7.0", default-features = false }
 themis = { package = "themis-topology", git = "https://github.com/ryancinsight/themis", version = "0.10.1", default-features = false }
 # Temporary co-evolution pin for Eunomia PR #87; remove `rev` after the
 # provider derive delivery merges to main and regenerate Cargo.lock.
