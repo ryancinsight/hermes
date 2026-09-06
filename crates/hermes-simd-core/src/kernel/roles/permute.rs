@@ -241,8 +241,13 @@ impl<T: Scalar, A: BackendKernel<T>> SimdPermute<T> for A {
         <A as BackendKernel<T>>::transpose_square(tile);
     }
 
+    // The generic backend must see the caller's proven target features;
+    // an outlined facet otherwise stages rows through load/store helpers.
+    #[inline(always)]
     unsafe fn transpose_interleaved_square(tile: &mut [Self::Vector]) {
-        <A as BackendKernel<T>>::transpose_interleaved_square(tile);
+        // SAFETY: the facet caller establishes host support and the exact
+        // complex-square extent; forwarding preserves the vector type and slice.
+        unsafe { <A as BackendKernel<T>>::transpose_interleaved_square(tile) };
     }
 
     unsafe fn dup_even(v: Self::Vector) -> Self::Vector {

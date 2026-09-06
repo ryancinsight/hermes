@@ -30,6 +30,62 @@ the crate boundary without adding another consumer-selectable backend.
 
 ## Consequences
 
+The [complex-permutation forwarding increment](../../backlog.md#hermes-complex-permutation-inlining)
+applies the same boundary rule to `SimdPermute::transpose_interleaved_square`.
+Apollo's retained `07bd618` Leto candidate emits the unannotated generic facet
+as a separate AVX-512 function with a 1,272-byte frame and 20 load/store calls.
+The initial AVX2 specialization folds the same backend default into register
+operations. A monomorphized method alone therefore does not establish zero
+runtime overhead across the facet.
+
+The bounded correction marks only this forwarding method `inline(always)`.
+The selected target-feature kernel continues to own capability proof, and
+`BackendKernel` remains the single algorithm source. No native shuffle network,
+new ISA selection or global compiler flag is introduced. This annotation does
+not authorize target instructions at an unproven public boundary: backend
+target-feature functions retain their compiler-enforced call restrictions.
+
+The entry baseline at `e6e08211` passes 16 existing permutation and host-
+capability tests. Acceptance additionally requires unchanged workspace gates,
+downstream bitwise/allocation oracles and matching assembly showing the
+forwarding call and its row-buffer staging eliminated. The complete Apollo
+engine census and executable size decide adoption; no timing result is
+established by this source change.
+
+The local provider gates pass 548 workspace native tests, 16 focused release
+tests without profile overrides, 26 doctests (10 existing ignored), all-target
+Clippy, examples, warning-denied rustdoc and no-default-feature compilation.
+The release pass also corrects the CI step label's stale claim that the test
+harness conflicts with the release panic setting. Host reporting identifies
+Scalar, AVX2 and emulated SVE execution; it does not establish AVX-512 or NEON
+runtime coverage on this workstation. Source hashes and command outputs are
+retained in Atlas `output/hermes-complex-permutation` under the existing
+14-day/10-GiB policy.
+
+Apollo assembly `CD76ED04...FCA8B57BA`, built with Leto `00fd88e` and Hermes
+`07c5e5f`, removes the outlined permutation helper. Complete AVX2 and AVX-512
+tiles remain in registers: the AVX-512 off-diagonal pair uses eight ZMM loads,
+eight stores and register permutations, without payload spills or load/store
+helper calls. The remaining vector stack traffic is register preservation and
+the scalar tail. This establishes successful specialization of the existing
+generic algorithm, not a need for another native backend implementation. The
+complete candidate grows by 11,776 executable bytes. Retained artifacts live
+in `output/apollo-square-transpose/feature-frame` under the same policy.
+
+The subsequent Leto extent revision reduces that growth to 7,168 bytes, but
+the unchanged replicated Apollo census rejects the combined candidate: it
+finds no supported gain and a 0.95–1.51% median slowdown for the performance-
+core 1,024-point full real transform. This comparison does not isolate the
+Hermes annotation's contribution. Subsequent Leto cache blocking supports one
+efficiency-core real-transform gain without a supported regression, but still
+grows the executable by 9,728 bytes. The restored Leto `00665a4` consumer
+checkpoint passes 1,442 native tests, 552 release tests and seven bounded
+smokes; all 20 retained-memory windows match the accepted baseline. It still
+grows the executable by 10,752 bytes. [Apollo draft PR 338](https://github.com/ryancinsight/apollo/pull/338)
+records the pending acceptance; its ADR 0040 owns the complete experiment
+sequence. Provider adoption remains unaccepted; code generation alone is
+insufficient for merge.
+
 - **Loop inlining:** the helper's complete target-feature set permits backend
   operations to inline into the kernel. Exact assembly remains the acceptance
   oracle because a generic abstraction alone does not prove this codegen.

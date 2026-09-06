@@ -96,7 +96,7 @@ jobs:
         run: cargo nextest run -p hermes-simd -E 'test(host_backend_coverage)' --no-capture
         env:
           HERMES_EXPECTED_TARGETS: scalar,avx2,sve
-      - name: Tests (nextest, dev profile; release uses panic=abort which conflicts with the test harness)
+      - name: Tests (nextest, dev profile)
         run: cargo nextest run --workspace
       - name: Doctests
         run: cargo test --doc --workspace

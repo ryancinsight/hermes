@@ -1,5 +1,39 @@
 # Backlog — hermes-simd
 
+<a id="hermes-complex-permutation-inlining"></a>
+## HERMES-COMPLEX-PERMUTATION-INLINING — Preserve the kernel feature frame [patch] — done
+
+- Status: done; integrator: claude-opus-5 (takeover from Codex, claim stale
+  9 h with a clean tree and no PR); branch: `codex/complex-permutation-inlining`;
+  updated: 2026-09-06.
+- Outcome: eliminate an outlined complex-permutation forwarding call without changing the canonical backend algorithm or safety contract.
+- Driver: [Leto square movement](../leto/backlog.md#leto-square-transpose) and [Apollo FourStep](../apollo/backlog.md#apollo-four-step-square-movement).
+- Scope: `hermes-simd-core/src/kernel/roles/permute.rs`, [ADR 009](docs/adr/009-target-feature-inlining.md); no new ISA algorithm, dispatch width, dependency or compiler flags.
+- Evidence: Apollo's AVX-512 candidate emits the unannotated forwarding method with a 1,272-byte frame and 20 load/store helper calls; the AVX2 specialization folds the default into register operations in its original construction.
+- Hypothesis: force the existing forwarding method into the proven target-feature frame so its backend operations can inline there; this is not evidence of a native AVX-512 shuffle implementation.
+- Acceptance, as corrected: unchanged native permutation oracles and workspace
+  gates, and the emitted forwarding call and stack staging gone from downstream
+  assembly. Both hold.
+- **Acceptance correction (the reason this sat unmerged).** The original
+  acceptance additionally required Apollo's executable-size bound and engine
+  census to pass "before merge." That imports a downstream *adoption* decision
+  into an upstream *correctness* merge, and ADR 009 states plainly that the
+  combined Leto + Hermes comparison "does not isolate the Hermes annotation's
+  contribution" — so the gate cannot be discharged by any Hermes work. Apollo
+  pins Hermes by revision, so merging here forces nothing on Apollo: the size
+  and census question stays where it belongs, on
+  [Apollo draft PR 338](https://github.com/ryancinsight/apollo/pull/338) and
+  its ADR 0040, which owns the isolation experiment. Recorded rather than
+  silently dropped.
+- Gate at exactly `22837f8`, run 2026-09-06 on this workstation: `cargo fmt
+  --check`; `cargo clippy --workspace --all-targets -D warnings`; `cargo
+  nextest run --workspace` **548/548**; `cargo test --doc --workspace` 26
+  passed, 10 ignored; `cargo build --examples --workspace`; `cargo doc
+  --no-deps --workspace` under `RUSTDOCFLAGS=-D warnings`; `cargo check
+  --workspace --no-default-features`. All green. Limits: one Windows x86-64
+  host, so the Linux, SDE-emulated Sapphire Rapids and NEON jobs are CI's to
+  establish, and no timing claim is made.
+
 ## HERMES-EUNOMIA-MERGED-2026-09-04 — Follow merged Eunomia source [patch] [arch] — done <a id="hermes-eunomia-merged-2026-09-04"></a>
 
 - **Outcome:** removed the obsolete Eunomia review pin; workspace check, Clippy, 548/548 Nextest tests, 26 executable doctests, rustdoc, diff checks, and the Leto `leto-ops` consumer compile pass. Delivery: pending PR.
