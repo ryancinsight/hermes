@@ -1,5 +1,17 @@
 # Backlog — hermes-simd
 
+<a id="hermes-complex-permutation-inlining"></a>
+## HERMES-COMPLEX-PERMUTATION-INLINING — Preserve the kernel feature frame [patch]
+
+- Status: in-progress; integrator: Codex; branch: `codex/complex-permutation-inlining`; updated: 2026-09-06.
+- Outcome: eliminate an outlined complex-permutation forwarding call without changing the canonical backend algorithm or safety contract.
+- Driver: [Leto square movement](../leto/backlog.md#leto-square-transpose) and [Apollo FourStep](../apollo/backlog.md#apollo-four-step-square-movement).
+- Scope: `hermes-simd-core/src/kernel/roles/permute.rs`, [ADR 009](docs/adr/009-target-feature-inlining.md); no new ISA algorithm, dispatch width, dependency or compiler flags.
+- Evidence: Apollo's AVX-512 candidate emits the unannotated forwarding method with a 1,272-byte frame and 20 load/store helper calls; the AVX2 specialization folds the default into register operations in its original construction.
+- Hypothesis: force the existing forwarding method into the proven target-feature frame so its backend operations can inline there; this is not evidence of a native AVX-512 shuffle implementation.
+- Acceptance: unchanged native permutation oracles and workspace gates; emitted forwarding call/stack staging disappear in downstream assembly; allocation and executable-size bounds and the unchanged engine census pass before merge.
+- Dependency: source baseline is fetched `e6e08211`; prior pin-only branch remains preserved. Verify this increment before Leto/Apollo source advancement.
+
 ## HERMES-EUNOMIA-MERGED-2026-09-04 — Follow merged Eunomia source [patch] [arch] — done <a id="hermes-eunomia-merged-2026-09-04"></a>
 
 - **Outcome:** removed the obsolete Eunomia review pin; workspace check, Clippy, 548/548 Nextest tests, 26 executable doctests, rustdoc, diff checks, and the Leto `leto-ops` consumer compile pass. Delivery: pending PR.
