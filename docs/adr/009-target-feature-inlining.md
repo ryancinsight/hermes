@@ -60,7 +60,31 @@ harness conflicts with the release panic setting. Host reporting identifies
 Scalar, AVX2 and emulated SVE execution; it does not establish AVX-512 or NEON
 runtime coverage on this workstation. Source hashes and command outputs are
 retained in Atlas `output/hermes-complex-permutation` under the existing
-14-day/10-GiB policy. Downstream codegen and timing remain outstanding.
+14-day/10-GiB policy.
+
+Apollo assembly `CD76ED04...FCA8B57BA`, built with Leto `00fd88e` and Hermes
+`07c5e5f`, removes the outlined permutation helper. Complete AVX2 and AVX-512
+tiles remain in registers: the AVX-512 off-diagonal pair uses eight ZMM loads,
+eight stores and register permutations, without payload spills or load/store
+helper calls. The remaining vector stack traffic is register preservation and
+the scalar tail. This establishes successful specialization of the existing
+generic algorithm, not a need for another native backend implementation. The
+complete candidate grows by 11,776 executable bytes. Retained artifacts live
+in `output/apollo-square-transpose/feature-frame` under the same policy.
+
+The subsequent Leto extent revision reduces that growth to 7,168 bytes, but
+the unchanged replicated Apollo census rejects the combined candidate: it
+finds no supported gain and a 0.95–1.51% median slowdown for the performance-
+core 1,024-point full real transform. This comparison does not isolate the
+Hermes annotation's contribution. Subsequent Leto cache blocking supports one
+efficiency-core real-transform gain without a supported regression, but still
+grows the executable by 9,728 bytes. The restored Leto `00665a4` consumer
+checkpoint passes 1,442 native tests, 552 release tests and seven bounded
+smokes; all 20 retained-memory windows match the accepted baseline. It still
+grows the executable by 10,752 bytes. [Apollo draft PR 338](https://github.com/ryancinsight/apollo/pull/338)
+records the pending acceptance; its ADR 0040 owns the complete experiment
+sequence. Provider adoption remains unaccepted; code generation alone is
+insufficient for merge.
 
 - **Loop inlining:** the helper's complete target-feature set permits backend
   operations to inline into the kernel. Exact assembly remains the acceptance
