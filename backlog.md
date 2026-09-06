@@ -11,6 +11,7 @@
 - Hypothesis: force the existing forwarding method into the proven target-feature frame so its backend operations can inline there; this is not evidence of a native AVX-512 shuffle implementation.
 - Acceptance: unchanged native permutation oracles and workspace gates; emitted forwarding call/stack staging disappear in downstream assembly; allocation and executable-size bounds and the unchanged engine census pass before merge.
 - Dependency: source baseline is fetched `e6e08211`; prior pin-only branch remains preserved. Verify this increment before Leto/Apollo source advancement.
+- Gates: 548 native tests, 16 release tests, 26 doctests (10 existing ignored), Clippy, minimal features, examples, docs and the committed benchmark compile pass. Downstream assembly and size acceptance remain in progress.
 
 ## HERMES-EUNOMIA-MERGED-2026-09-04 — Follow merged Eunomia source [patch] [arch] — done <a id="hermes-eunomia-merged-2026-09-04"></a>
 

@@ -30,6 +30,38 @@ the crate boundary without adding another consumer-selectable backend.
 
 ## Consequences
 
+The [complex-permutation forwarding increment](../../backlog.md#hermes-complex-permutation-inlining)
+applies the same boundary rule to `SimdPermute::transpose_interleaved_square`.
+Apollo's retained `07bd618` Leto candidate emits the unannotated generic facet
+as a separate AVX-512 function with a 1,272-byte frame and 20 load/store calls.
+The initial AVX2 specialization folds the same backend default into register
+operations. A monomorphized method alone therefore does not establish zero
+runtime overhead across the facet.
+
+The bounded correction marks only this forwarding method `inline(always)`.
+The selected target-feature kernel continues to own capability proof, and
+`BackendKernel` remains the single algorithm source. No native shuffle network,
+new ISA selection or global compiler flag is introduced. This annotation does
+not authorize target instructions at an unproven public boundary: backend
+target-feature functions retain their compiler-enforced call restrictions.
+
+The entry baseline at `e6e08211` passes 16 existing permutation and host-
+capability tests. Acceptance additionally requires unchanged workspace gates,
+downstream bitwise/allocation oracles and matching assembly showing the
+forwarding call and its row-buffer staging eliminated. The complete Apollo
+engine census and executable size decide adoption; no timing result is
+established by this source change.
+
+The local provider gates pass 548 workspace native tests, 16 focused release
+tests without profile overrides, 26 doctests (10 existing ignored), all-target
+Clippy, examples, warning-denied rustdoc and no-default-feature compilation.
+The release pass also corrects the CI step label's stale claim that the test
+harness conflicts with the release panic setting. Host reporting identifies
+Scalar, AVX2 and emulated SVE execution; it does not establish AVX-512 or NEON
+runtime coverage on this workstation. Source hashes and command outputs are
+retained in Atlas `output/hermes-complex-permutation` under the existing
+14-day/10-GiB policy. Downstream codegen and timing remain outstanding.
+
 - **Loop inlining:** the helper's complete target-feature set permits backend
   operations to inline into the kernel. Exact assembly remains the acceptance
   oracle because a generic abstraction alone does not prove this codegen.
