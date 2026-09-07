@@ -53,7 +53,27 @@
   Miri cannot execute the six NUMA cases that call Windows affinity APIs;
   hosted Linux Miri remains the applicable platform gate.
 - **Dependency:** Mnemosyne source revision `26726d2`; the original Eunomia
-  identity driver is Mnemosyne PR #123 (`7f17375`); **Last-update:** 2026-09-04.
+  identity driver is Mnemosyne PR #123 (`7f17375`); **Last-update:** 2026-09-06.
+- **Acceptance corrected, 2026-09-06 — the oracle could not see the failure
+  it was written for.** "Standalone lock resolves only Mnemosyne `26726d2`"
+  is satisfied by construction: any member's standalone lock resolves one
+  identity. Measured from the integrator instead, Apollo's `apollo-fft`
+  graph carries **three** Mnemosyne stacks over normal edges — `26726d2`
+  through hermes-simd-core, `7f17375` through moirai-core, and the unpinned
+  branch head through Apollo's own crates. Cargo refuses
+  `-p mnemosyne-arena` as ambiguous and names all three. `26726d2` and
+  `7f17375` are two points on one chain: Hermes advanced, Moirai did not,
+  and pinning by `rev` is what preserved the split.
+- **Change:** the `rev =` is removed, so the requirement states git+version
+  and the lock holds the commit — Apollo's own model, and the reason its
+  eighteen crates share one identity. The standalone lock re-resolves to a
+  single Mnemosyne source (`3ebc4da1`) with one `mnemosyne-arena` entry.
+  Nothing about the pin was a live quarantine; it was an advance point that
+  was never cleaned up.
+- **Acceptance now:** one Mnemosyne source in Hermes' standalone lock **and**
+  no Hermes-attributable duplicate in the integrator's graph, tracked at
+  [`atlas#atlas-mnemosyne-source-triplication`](../../backlog.md#atlas-mnemosyne-source-triplication).
+  Collapsing all three additionally needs Moirai's pin and Apollo's two.
 
 ## HERMES-EUNOMIA-IDENTITY-2026-09-03 — Unify Eunomia source identity for co-evolution [patch] — done <a id="hermes-eunomia-identity-2026-09-03"></a>
 
