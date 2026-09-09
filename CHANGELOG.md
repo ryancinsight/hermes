@@ -6,6 +6,14 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Added
 
+- [minor][HERMES-SUBLANE-INTERLEAVE] `Vector::interleave_sublanes` and
+  `Vector::deinterleave_sublanes` with `SimdPermute::SUBLANE_LANES` (and
+  the `BackendKernel` methods and constant beneath them): the two-register
+  interleave specified per 128-bit sub-lane, so on AVX2 and AVX-512 it is
+  one `unpack` (or `shuffle_ps`) per result where the flat `interleave`
+  adds a cross-lane permute; the flat operation itself where the register
+  is one sub-lane (NEON, scalar). A kernel keeping planar data in sub-lane
+  order gets its interleaved boundary from these alone.
 - [minor][HS-SPLAT-PAIR] `Vector::splat_pair` (and the
   `BackendKernel`/`SimdPermute` method beneath it): one lane pair broadcast
   across the register, `[lo, hi, lo, hi, ...]`. `ComplexReg::splat` now uses

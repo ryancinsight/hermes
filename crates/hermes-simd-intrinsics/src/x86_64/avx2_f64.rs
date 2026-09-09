@@ -73,6 +73,7 @@ impl BackendKernel<f64> for Avx2 {
     type Mask = Avx2F64Mask;
     type IndexVector = Avx2F64Idx;
     const LANE_COUNT: usize = 4;
+    const SUBLANE_LANES: usize = 2;
     const UNROLL_FACTOR: usize = 4;
 
     // -----------------------------------------------------------------------
@@ -255,6 +256,37 @@ impl BackendKernel<f64> for Avx2 {
         (
             Avx2F64Vec(_mm256_permute4x64_pd::<0b11_01_10_00>(t0)),
             Avx2F64Vec(_mm256_permute4x64_pd::<0b11_01_10_00>(t1)),
+        )
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn interleave_sublanes(
+        a: Self::Vector,
+        b: Self::Vector,
+    ) -> (Self::Vector, Self::Vector) {
+        // Two lanes per sub-lane: the unpacks are the whole operation.
+        (
+            Avx2F64Vec(_mm256_unpacklo_pd(a.0, b.0)),
+            Avx2F64Vec(_mm256_unpackhi_pd(a.0, b.0)),
+        )
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn deinterleave_sublanes(
+        a: Self::Vector,
+        b: Self::Vector,
+    ) -> (Self::Vector, Self::Vector) {
+        // With two lanes per sub-lane the split of evens and odds is the
+        // same unpack pair as the interleave.
+        (
+            Avx2F64Vec(_mm256_unpacklo_pd(a.0, b.0)),
+            Avx2F64Vec(_mm256_unpackhi_pd(a.0, b.0)),
         )
     }
 

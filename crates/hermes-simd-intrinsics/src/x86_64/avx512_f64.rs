@@ -52,6 +52,7 @@ impl BackendKernel<f64> for Avx512 {
     /// 8 × i32 index vector for gather (`__m256i`).
     type IndexVector = __m256i;
     const LANE_COUNT: usize = 8;
+    const SUBLANE_LANES: usize = 2;
     const UNROLL_FACTOR: usize = 4;
 
     // -----------------------------------------------------------------------
@@ -419,6 +420,37 @@ impl BackendKernel<f64> for Avx512 {
         (
             Avx512F64Vec(_mm512_permutex2var_pd(a.0, even_idx, b.0)),
             Avx512F64Vec(_mm512_permutex2var_pd(a.0, odd_idx, b.0)),
+        )
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn interleave_sublanes(
+        a: Self::Vector,
+        b: Self::Vector,
+    ) -> (Self::Vector, Self::Vector) {
+        // Two lanes per 128-bit sub-lane: the unpacks are the whole operation.
+        (
+            Avx512F64Vec(_mm512_unpacklo_pd(a.0, b.0)),
+            Avx512F64Vec(_mm512_unpackhi_pd(a.0, b.0)),
+        )
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn deinterleave_sublanes(
+        a: Self::Vector,
+        b: Self::Vector,
+    ) -> (Self::Vector, Self::Vector) {
+        // With two lanes per sub-lane the split of evens and odds is the
+        // same unpack pair as the interleave.
+        (
+            Avx512F64Vec(_mm512_unpacklo_pd(a.0, b.0)),
+            Avx512F64Vec(_mm512_unpackhi_pd(a.0, b.0)),
         )
     }
 
