@@ -77,6 +77,7 @@ impl BackendKernel<f32> for Avx2 {
     type Mask = Avx2F32Mask;
     type IndexVector = Avx2IdxI32;
     const LANE_COUNT: usize = 8;
+    const SUBLANE_LANES: usize = 4;
     const UNROLL_FACTOR: usize = 4;
 
     // -----------------------------------------------------------------------
@@ -344,6 +345,38 @@ impl BackendKernel<f32> for Avx2 {
         (
             Avx2F32Vec(_mm256_shuffle_ps::<0b10_00_10_00>(t0, t1)),
             Avx2F32Vec(_mm256_shuffle_ps::<0b11_01_11_01>(t0, t1)),
+        )
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn interleave_sublanes(
+        a: Self::Vector,
+        b: Self::Vector,
+    ) -> (Self::Vector, Self::Vector) {
+        // Four lanes per sub-lane: `unpacklo` weaves each half's first two
+        // lanes and `unpackhi` its last two.
+        (
+            Avx2F32Vec(_mm256_unpacklo_ps(a.0, b.0)),
+            Avx2F32Vec(_mm256_unpackhi_ps(a.0, b.0)),
+        )
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn deinterleave_sublanes(
+        a: Self::Vector,
+        b: Self::Vector,
+    ) -> (Self::Vector, Self::Vector) {
+        // Within each half `shuffle_ps` picks lanes 0 and 2 of `a` then of
+        // `b` for the evens, 1 and 3 for the odds.
+        (
+            Avx2F32Vec(_mm256_shuffle_ps::<0b10_00_10_00>(a.0, b.0)),
+            Avx2F32Vec(_mm256_shuffle_ps::<0b11_01_11_01>(a.0, b.0)),
         )
     }
 

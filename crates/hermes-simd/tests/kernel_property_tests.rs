@@ -815,9 +815,101 @@ fn check_interleave_halves<A: SimdKernel<f32>>() {
     );
 }
 
+/// `interleave_sublanes` weaves within sub-lanes of `SUBLANE_LANES` lanes and
+/// `deinterleave_sublanes` is its inverse: both against the lane model, on
+/// every backend and both scalar types.
+fn check_sublane_interleave<T, A>()
+where
+    T: ScalarElement + From<u8> + PartialEq + core::fmt::Debug,
+    A: SimdKernel<T>,
+{
+    let lanes = A::LANE_COUNT;
+    let width = A::SUBLANE_LANES;
+    assert!(
+        lanes % width == 0 && (width == lanes || width % 2 == 0),
+        "sub-lane width {width} must divide {lanes} lanes and be even below it"
+    );
+    let value = |i: usize| T::from(u8::try_from(i).expect("lane index fits u8"));
+    let a_vals: Vec<T> = (0..lanes).map(|i| value(i + 1)).collect();
+    let b_vals: Vec<T> = (0..lanes).map(|i| value(i + 101)).collect();
+
+    let (mut lo, mut hi, mut even, mut odd) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    for i in 0..lanes {
+        if width == lanes {
+            let flat = |p: usize| {
+                if p % 2 == 0 {
+                    a_vals[p / 2]
+                } else {
+                    b_vals[p / 2]
+                }
+            };
+            lo.push(flat(i));
+            hi.push(flat(i + lanes));
+            even.push(if 2 * i < lanes {
+                a_vals[2 * i]
+            } else {
+                b_vals[2 * i - lanes]
+            });
+            odd.push(if 2 * i + 1 < lanes {
+                a_vals[2 * i + 1]
+            } else {
+                b_vals[2 * i + 1 - lanes]
+            });
+        } else {
+            let half = width / 2;
+            let (sub, pos) = (i / width, i % width);
+            let woven = if pos % 2 == 0 { &a_vals } else { &b_vals };
+            lo.push(woven[sub * width + pos / 2]);
+            hi.push(woven[sub * width + pos / 2 + half]);
+            let split = if pos < half { &a_vals } else { &b_vals };
+            even.push(split[sub * width + 2 * (pos % half)]);
+            odd.push(split[sub * width + 2 * (pos % half) + 1]);
+        }
+    }
+
+    let mut got = vec![vec![value(0); lanes]; 6];
+    // SAFETY: caller gates on the required target features for `A`.
+    unsafe {
+        let a = A::load_unaligned(a_vals.as_ptr());
+        let b = A::load_unaligned(b_vals.as_ptr());
+        let (w_lo, w_hi) = A::interleave_sublanes(a, b);
+        let (s_even, s_odd) = A::deinterleave_sublanes(a, b);
+        let (r_a, r_b) = A::deinterleave_sublanes(w_lo, w_hi);
+        for (slot, vector) in got.iter_mut().zip([w_lo, w_hi, s_even, s_odd, r_a, r_b]) {
+            A::store_unaligned(slot.as_mut_ptr(), vector);
+        }
+    }
+    assert_eq!(
+        got[0], lo,
+        "interleave_sublanes low mismatch ({lanes} lanes, {width} per sub-lane)"
+    );
+    assert_eq!(
+        got[1], hi,
+        "interleave_sublanes high mismatch ({lanes} lanes, {width} per sub-lane)"
+    );
+    assert_eq!(
+        got[2], even,
+        "deinterleave_sublanes even mismatch ({lanes} lanes, {width} per sub-lane)"
+    );
+    assert_eq!(
+        got[3], odd,
+        "deinterleave_sublanes odd mismatch ({lanes} lanes, {width} per sub-lane)"
+    );
+    assert_eq!(
+        got[4], a_vals,
+        "deinterleave_sublanes does not invert interleave_sublanes ({lanes} lanes)"
+    );
+    assert_eq!(
+        got[5], b_vals,
+        "deinterleave_sublanes does not invert interleave_sublanes ({lanes} lanes)"
+    );
+}
+
 #[test]
 fn permutes_match_reference_all_backends() {
     check_permutes::<Scalar>();
+    check_sublane_interleave::<f32, Scalar>();
+    check_sublane_interleave::<f64, Scalar>();
     check_deinterleave_pairs8::<Scalar>();
     check_interleave_pairs::<f32, Scalar>();
     check_interleave_pairs::<f64, Scalar>();
@@ -830,6 +922,8 @@ fn permutes_match_reference_all_backends() {
     check_transpose_interleaved_square::<f32, Scalar>();
     check_transpose_interleaved_square::<f64, Scalar>();
     check_permutes::<SveArch>();
+    check_sublane_interleave::<f32, SveArch>();
+    check_sublane_interleave::<f64, SveArch>();
     check_deinterleave_pairs8::<SveArch>();
     check_interleave_pairs::<f32, SveArch>();
     check_interleave_pairs::<f64, SveArch>();
@@ -843,6 +937,8 @@ fn permutes_match_reference_all_backends() {
     {
         if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
             check_permutes::<hermes_simd::Avx2>();
+            check_sublane_interleave::<f32, hermes_simd::Avx2>();
+            check_sublane_interleave::<f64, hermes_simd::Avx2>();
             check_deinterleave_pairs8::<hermes_simd::Avx2>();
             check_interleave_pairs::<f32, hermes_simd::Avx2>();
             check_interleave_pairs::<f64, hermes_simd::Avx2>();
@@ -858,6 +954,8 @@ fn permutes_match_reference_all_backends() {
         }
         if std::is_x86_feature_detected!("avx512f") {
             check_permutes::<hermes_simd::Avx512>();
+            check_sublane_interleave::<f32, hermes_simd::Avx512>();
+            check_sublane_interleave::<f64, hermes_simd::Avx512>();
             check_deinterleave_pairs8::<hermes_simd::Avx512>();
             check_interleave_pairs::<f32, hermes_simd::Avx512>();
             check_interleave_pairs::<f64, hermes_simd::Avx512>();
@@ -875,6 +973,8 @@ fn permutes_match_reference_all_backends() {
     #[cfg(target_arch = "aarch64")]
     {
         check_permutes::<hermes_simd::Neon>();
+        check_sublane_interleave::<f32, hermes_simd::Neon>();
+        check_sublane_interleave::<f64, hermes_simd::Neon>();
         check_deinterleave_pairs8::<hermes_simd::Neon>();
         check_interleave_pairs::<f32, hermes_simd::Neon>();
         check_interleave_pairs::<f64, hermes_simd::Neon>();

@@ -826,6 +826,32 @@ where
         (Self::new(even), Self::new(odd))
     }
 
+    /// Interleaves `self` and `other` within each sub-lane of
+    /// [`SUBLANE_LANES`](crate::kernel::SimdPermute::SUBLANE_LANES) lanes.
+    ///
+    /// The one-instruction form of [`Vector::interleave`] on x86, where the
+    /// `unpack` instructions weave within 128-bit sub-lanes; identical to
+    /// it where the register is one sub-lane. A kernel that stores its
+    /// planar data in sub-lane order gets the interleaved layout from this
+    /// alone.
+    #[inline(always)]
+    #[must_use]
+    pub fn interleave_sublanes(self, other: Self) -> (Self, Self) {
+        // SAFETY: constructing the operand vectors proved host support for `Arch`.
+        let (lo, hi) = unsafe { Arch::interleave_sublanes(self.raw, other.raw) };
+        (Self::new(lo), Self::new(hi))
+    }
+
+    /// Deinterleaves two vectors within each sub-lane, the inverse of
+    /// [`Vector::interleave_sublanes`].
+    #[inline(always)]
+    #[must_use]
+    pub fn deinterleave_sublanes(self, other: Self) -> (Self, Self) {
+        // SAFETY: constructing the operand vectors proved host support for `Arch`.
+        let (even, odd) = unsafe { Arch::deinterleave_sublanes(self.raw, other.raw) };
+        (Self::new(even), Self::new(odd))
+    }
+
     /// Deinterleaves two vectors at adjacent-lane-pair granularity: reading
     /// `self || other` as a flat sequence of lane pairs, the results hold the
     /// even-indexed and odd-indexed pairs.

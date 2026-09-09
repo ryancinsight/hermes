@@ -1,5 +1,11 @@
 # Checklist — active sprint
 
+## HERMES-SUBLANE-INTERLEAVE [minor] [perf] — claude/fable
+
+- [x] Specify the sub-lane pair against the flat pair, add the constant and the
+      defaults, native AVX2 and AVX-512 overrides, lane-model tests on every backend.
+- [ ] PR merged without squash; Apollo consumes the ops in its planar seams.
+
 ## HS-REAL-WINDOW-INTERLEAVE-2026-09-01 [minor] [perf]
 
 - [x] Pin validation-before-mutation, empty, full-vector, ragged-tail, scalar,

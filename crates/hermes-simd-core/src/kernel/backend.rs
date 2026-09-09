@@ -106,6 +106,19 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
     /// Number of primitive elements of type `T` in one `Vector`.
     const LANE_COUNT: usize;
 
+    /// Lanes per shuffle sub-lane: the widest run of lanes the backend's
+    /// one-instruction two-register interleave weaves without crossing a
+    /// 128-bit boundary. [`LANE_COUNT`](Self::LANE_COUNT) where the register
+    /// is one such run (scalar, NEON, and this default); 2 for `f64` and 4
+    /// for `f32` on AVX2 and AVX-512, whose `unpack` instructions weave
+    /// within 128-bit sub-lanes.
+    ///
+    /// [`interleave_sublanes`](Self::interleave_sublanes) and its inverse are
+    /// specified per sub-lane of this width, so a kernel that keeps its data
+    /// in sub-lane order pays one unpack per result register where the flat
+    /// [`interleave`](Self::interleave) pays a cross-lane permute as well.
+    const SUBLANE_LANES: usize = Self::LANE_COUNT;
+
     /// Compile-time guard that [`LANE_COUNT`](Self::LANE_COUNT) fits the fixed
     /// `MAX_SIMD_LANES` scalar-fallback stack buffers. Referencing this const in
     /// the buffer-using default methods forces the assertion to be evaluated for
@@ -1044,11 +1057,15 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
     // General lane reordering, as opposed to the adjacent-pair shuffles below —
     // those are shaped for interleaved complex and express nothing else.
     //
-    // All three are defined on the *flat* lane sequence, never per 128-bit
-    // sub-lane. That distinction matters on x86: `_mm256_unpacklo_ps` and
-    // friends operate within 128-bit halves, so they do not implement
-    // `interleave` as specified here and cannot be dropped in as overrides
-    // without additional cross-half permutes.
+    // `reverse`, `interleave` and `deinterleave` are defined on the *flat*
+    // lane sequence, never per 128-bit sub-lane. That distinction matters on
+    // x86: `_mm256_unpacklo_ps` and friends operate within 128-bit halves,
+    // so they do not implement `interleave` as specified here and cannot be
+    // dropped in as overrides without additional cross-half permutes. The
+    // sub-lane pair, `interleave_sublanes` and `deinterleave_sublanes`, is
+    // specified per `SUBLANE_LANES` lanes so that those instructions are its
+    // native form; a kernel chooses the pair by laying its data out in
+    // sub-lane order.
     //
     // `deinterleave` is the exact inverse of `interleave`, and `reverse` is its
     // own inverse; both identities are exercised as round-trip properties.
@@ -1147,6 +1164,116 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
             };
             even[i].write(pick(2 * i));
             odd[i].write(pick(2 * i + 1));
+        }
+        (
+            Self::load_unaligned(even.as_ptr().cast::<T>()),
+            Self::load_unaligned(odd.as_ptr().cast::<T>()),
+        )
+    }
+
+    /// Interleaves `a` and `b` within each sub-lane of
+    /// [`SUBLANE_LANES`](Self::SUBLANE_LANES) lanes.
+    ///
+    /// Sub-lane `s` of `.0` holds `[a[s][0], b[s][0], a[s][1], b[s][1], ...]`
+    /// over the first half of the sub-lane's lanes, and sub-lane `s` of `.1`
+    /// the same over the second half. With one sub-lane per register this is
+    /// [`interleave`](Self::interleave); on x86 it is `unpacklo`/`unpackhi`,
+    /// one instruction per result. The two agree on the flat result up to a
+    /// fixed permutation of each operand's lanes, which is what a kernel
+    /// storing its data in sub-lane order exploits.
+    ///
+    /// Default: the flat interleave when the register is one sub-lane,
+    /// otherwise scalar emulation.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn interleave_sublanes(
+        a: Self::Vector,
+        b: Self::Vector,
+    ) -> (Self::Vector, Self::Vector) {
+        const { Self::LANE_BOUND_CHECK };
+        let lanes = Self::LANE_COUNT;
+        let width = Self::SUBLANE_LANES;
+        if width == lanes {
+            return Self::interleave(a, b);
+        }
+        let mut buf_a = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let mut buf_b = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        Self::store_unaligned(buf_a.as_mut_ptr().cast::<T>(), a);
+        Self::store_unaligned(buf_b.as_mut_ptr().cast::<T>(), b);
+
+        let mut lo = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let mut hi = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let half = width / 2;
+        for i in 0..lanes {
+            // Position `pos` of a sub-lane takes lane `pos / 2` of the half,
+            // from `a` on even positions and from `b` on odd.
+            let (sub, pos) = (i / width, i % width);
+            let lane = sub * width + pos / 2;
+            let pick = |offset: usize| {
+                if pos % 2 == 0 {
+                    buf_a[lane + offset].assume_init()
+                } else {
+                    buf_b[lane + offset].assume_init()
+                }
+            };
+            lo[i].write(pick(0));
+            hi[i].write(pick(half));
+        }
+        (
+            Self::load_unaligned(lo.as_ptr().cast::<T>()),
+            Self::load_unaligned(hi.as_ptr().cast::<T>()),
+        )
+    }
+
+    /// Splits `a` and `b` within each sub-lane, the exact inverse of
+    /// [`interleave_sublanes`](Self::interleave_sublanes).
+    ///
+    /// Sub-lane `s` of `.0` holds the even lanes of `a[s]` then the even
+    /// lanes of `b[s]`; `.1` the odd lanes likewise. With one sub-lane per
+    /// register this is [`deinterleave`](Self::deinterleave); on x86 it is
+    /// `unpacklo`/`unpackhi` for `f64` and a `shuffle` pair for `f32`.
+    ///
+    /// Default: the flat deinterleave when the register is one sub-lane,
+    /// otherwise scalar emulation.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn deinterleave_sublanes(
+        a: Self::Vector,
+        b: Self::Vector,
+    ) -> (Self::Vector, Self::Vector) {
+        const { Self::LANE_BOUND_CHECK };
+        let lanes = Self::LANE_COUNT;
+        let width = Self::SUBLANE_LANES;
+        if width == lanes {
+            return Self::deinterleave(a, b);
+        }
+        let mut buf_a = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let mut buf_b = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        Self::store_unaligned(buf_a.as_mut_ptr().cast::<T>(), a);
+        Self::store_unaligned(buf_b.as_mut_ptr().cast::<T>(), b);
+
+        let mut even = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let mut odd = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
+        let half = width / 2;
+        for i in 0..lanes {
+            // The first half of a sub-lane reads `a`, the second `b`, at
+            // lane `2 * (pos % half)` of the sub-lane for `.0` and the lane
+            // after it for `.1`.
+            let (sub, pos) = (i / width, i % width);
+            let lane = sub * width + 2 * (pos % half);
+            let pick = |offset: usize| {
+                if pos < half {
+                    buf_a[lane + offset].assume_init()
+                } else {
+                    buf_b[lane + offset].assume_init()
+                }
+            };
+            even[i].write(pick(0));
+            odd[i].write(pick(1));
         }
         (
             Self::load_unaligned(even.as_ptr().cast::<T>()),

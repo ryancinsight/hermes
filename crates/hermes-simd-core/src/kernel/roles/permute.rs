@@ -36,6 +36,28 @@ pub trait SimdPermute<T: Scalar>: SimdStorage<T> + Sealed {
     /// The backend's target features must be available.
     unsafe fn deinterleave(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector);
 
+    /// Lanes per shuffle sub-lane; see [`BackendKernel::SUBLANE_LANES`].
+    const SUBLANE_LANES: usize;
+
+    /// Interleaves two registers within each sub-lane of
+    /// [`SUBLANE_LANES`](Self::SUBLANE_LANES) lanes; see
+    /// [`BackendKernel::interleave_sublanes`].
+    ///
+    /// # Safety
+    /// The backend's target features must be available.
+    unsafe fn interleave_sublanes(a: Self::Vector, b: Self::Vector)
+        -> (Self::Vector, Self::Vector);
+
+    /// Deinterleaves two registers within each sub-lane, the inverse of
+    /// [`interleave_sublanes`](Self::interleave_sublanes).
+    ///
+    /// # Safety
+    /// The backend's target features must be available.
+    unsafe fn deinterleave_sublanes(
+        a: Self::Vector,
+        b: Self::Vector,
+    ) -> (Self::Vector, Self::Vector);
+
     /// Deinterleaves two registers at adjacent-lane-pair granularity into
     /// even-pair and odd-pair result registers.
     ///
@@ -182,6 +204,22 @@ impl<T: Scalar, A: BackendKernel<T>> SimdPermute<T> for A {
 
     unsafe fn deinterleave(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
         <A as BackendKernel<T>>::deinterleave(a, b)
+    }
+
+    const SUBLANE_LANES: usize = <A as BackendKernel<T>>::SUBLANE_LANES;
+
+    unsafe fn interleave_sublanes(
+        a: Self::Vector,
+        b: Self::Vector,
+    ) -> (Self::Vector, Self::Vector) {
+        <A as BackendKernel<T>>::interleave_sublanes(a, b)
+    }
+
+    unsafe fn deinterleave_sublanes(
+        a: Self::Vector,
+        b: Self::Vector,
+    ) -> (Self::Vector, Self::Vector) {
+        <A as BackendKernel<T>>::deinterleave_sublanes(a, b)
     }
 
     unsafe fn deinterleave_pairs(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {

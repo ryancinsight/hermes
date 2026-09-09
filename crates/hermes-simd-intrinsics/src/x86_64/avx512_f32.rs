@@ -53,6 +53,7 @@ impl BackendKernel<f32> for Avx512 {
     /// 16 × i32 index vector for gather (`__m512i`).
     type IndexVector = __m512i;
     const LANE_COUNT: usize = 16;
+    const SUBLANE_LANES: usize = 4;
     const UNROLL_FACTOR: usize = 4;
 
     // -----------------------------------------------------------------------
@@ -447,6 +448,38 @@ impl BackendKernel<f32> for Avx512 {
         (
             Avx512F32Vec(_mm512_permutex2var_ps(a.0, even_idx, b.0)),
             Avx512F32Vec(_mm512_permutex2var_ps(a.0, odd_idx, b.0)),
+        )
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn interleave_sublanes(
+        a: Self::Vector,
+        b: Self::Vector,
+    ) -> (Self::Vector, Self::Vector) {
+        // Four lanes per 128-bit sub-lane: `unpacklo` weaves each sub-lane's
+        // first two lanes and `unpackhi` its last two.
+        (
+            Avx512F32Vec(_mm512_unpacklo_ps(a.0, b.0)),
+            Avx512F32Vec(_mm512_unpackhi_ps(a.0, b.0)),
+        )
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn deinterleave_sublanes(
+        a: Self::Vector,
+        b: Self::Vector,
+    ) -> (Self::Vector, Self::Vector) {
+        // Within each sub-lane `shuffle_ps` picks lanes 0 and 2 of `a` then
+        // of `b` for the evens, 1 and 3 for the odds.
+        (
+            Avx512F32Vec(_mm512_shuffle_ps::<0b10_00_10_00>(a.0, b.0)),
+            Avx512F32Vec(_mm512_shuffle_ps::<0b11_01_11_01>(a.0, b.0)),
         )
     }
 
