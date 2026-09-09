@@ -1,19 +1,18 @@
 # Backlog — hermes-simd
 
 <a id="hermes-sublane-interleave"></a>
-## HERMES-SUBLANE-INTERLEAVE — Interleave within shuffle sub-lanes [minor] [perf] — review
+## HERMES-SUBLANE-INTERLEAVE — Interleave within shuffle sub-lanes [minor] [perf] — done 2026-09-09
 
-- Status: review; integrator: claude/fable; branch: `feat/hermes-sublane-interleave`;
-  updated: 2026-09-09.
-- Outcome: `SimdPermute::SUBLANE_LANES` with `interleave_sublanes`/`deinterleave_sublanes`
-  (`Vector` wrappers, `BackendKernel` defaults): the two-register interleave specified per
-  128-bit sub-lane, one `unpack` (`shuffle_ps`) per result on AVX2 and AVX-512, the flat
-  operation where the register is one sub-lane (NEON, scalar).
-- Driver: [Apollo seam lane order](../apollo/backlog.md#apollo-planar-seam-lane-order): the
-  planar sink and source seams spend two `vpermpd` per row per quad on port 5 turning the
-  flat interleave back into the unpack the instruction already is.
-- Acceptance: lane-model and round-trip checks on every backend in both scalar types
-  (`kernel_property_tests`); full workspace gate green; CHANGELOG Unreleased entry.
+- Landed `e85b019` ([PR #161](https://github.com/ryancinsight/hermes/pull/161)):
+  `SimdPermute::SUBLANE_LANES` with `interleave_sublanes`/`deinterleave_sublanes`,
+  one `unpack` per result on AVX2 and AVX-512, flat where the register is one
+  sub-lane. Acceptance verified against the tree before closing: ops present,
+  lane-model and round-trip coverage in `kernel_property_tests.rs:818`, and the
+  CHANGELOG Unreleased entry.
+- Consumer note: [Apollo's seam-lane-order item](../apollo/backlog.md#apollo-planar-seam-lane-order)
+  still names these `interleave_in_lane`/`deinterleave_in_lane`. The shipped
+  names are `interleave_sublanes`/`deinterleave_sublanes`; whoever lands
+  Apollo's side corrects that reference rather than adding an alias.
 
 <a id="hermes-complex-permutation-inlining"></a>
 ## HERMES-COMPLEX-PERMUTATION-INLINING — Preserve the kernel feature frame [patch] — done
