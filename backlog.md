@@ -1,12 +1,9 @@
 # Backlog — hermes-simd
 
 <a id="hermes-pair-concatenate"></a>
-## HERMES-PAIR-CONCATENATE — Concatenate two registers and shift by whole complex samples [minor] [perf] — review
-- **Integrator:** claude/fable; **last-update:** 2026-09-10; branch `feat/hermes-pair-concatenate` on lane `D:/atlas/worktrees/hermes-pair-concatenate`; lease: claude/fable `crates/hermes-simd-core/src/{kernel/backend.rs,kernel/roles/permute.rs,view/vector_reg.rs}`, `crates/hermes-simd-intrinsics/src/**`, `crates/hermes-simd/tests/kernel_property_tests.rs`, `crates/hermes-simd/benches/permute.rs` 2026-09-10T21:30Z.
-- **Driver:** Apollo composite passes with three arms per group and four complexes per register: the exact scatter of arms into consecutive groups is a window of one complex over the concatenation of two registers (`alignr` at pair granularity), so without it the first stage pads a transpose tile and stores a third more ([`apollo-composite-odd-leading-stages`](../apollo/backlog.md#apollo-composite-odd-leading-stages), 1.16 to 1.32 at `f32` against the AVX2 kernels).
-- **Scope:** `Vector::concat_shift_pairs::<K>(self, next) -> Self`, the register holding samples `K..per` of `self` then `0..K` of `next`; `vpalignr`/`vperm2f128` plus in-lane shuffles on AVX2, `valignq`/`valignd` on AVX-512, `ext` on NEON, the lane-model default otherwise; property test at every width on every backend.
-- **Acceptance:** the op with its lane-model test and the permute bench row; Apollo consumes it in the three-arm scatter and measures the leading-3 orders level.
-- **Dependencies:** none. **Verification:** `kernel_property_tests`, `permute` bench.
+## HERMES-PAIR-CONCATENATE — Concatenate two registers and shift by whole complex samples [minor] [perf] — done 2026-09-10
+
+- Landed as [PR #](https://github.com/ryancinsight/hermes/pull/): `Vector::concat_shift_pairs::<K>`, one `vperm2f128` (plus one `vpalignr` for an odd `f32` sample count) on AVX2, one `valignd`/`valignq` on AVX-512, one `ext` on NEON; lane-model coverage at every admissible `K`. Apollo consumes it in [`apollo-composite-odd-leading-stages`](../apollo/backlog.md#apollo-composite-odd-leading-stages).
 
 <a id="hermes-complex-transpose-by-decimation"></a>
 ## HERMES-COMPLEX-TRANSPOSE-BY-DECIMATION — The interleaved square transpose defaults to the pair decimations [patch] [perf] — done 2026-09-10
