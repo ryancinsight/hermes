@@ -1487,6 +1487,42 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         Self::load_unaligned(buf.as_ptr().cast::<T>())
     }
 
+    /// The register window `K` lane pairs into the concatenation `a ++ b`:
+    /// lanes `2K..LANE_COUNT` of `a` followed by lanes `0..2K` of `b`.
+    ///
+    /// On interleaved complex data this is the byte-align at sample
+    /// granularity: one register's window over two consecutive ones, shifted
+    /// by `K` samples — what an arm scatter needs to place `R` arms into
+    /// consecutive groups when `R` does not divide the register's samples.
+    ///
+    /// `0 < K < LANE_COUNT / 2`, checked per instantiation.
+    ///
+    /// Default: scalar emulation.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn concat_shift_pairs<const K: usize>(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        const { Self::LANE_BOUND_CHECK };
+        const {
+            assert!(
+                K > 0 && 2 * K < Self::LANE_COUNT,
+                "the sample shift stays inside one register"
+            );
+        };
+        let lanes = Self::LANE_COUNT;
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 2 * MAX_SIMD_LANES];
+        let base = buf.as_mut_ptr().cast::<T>();
+        // SAFETY: `buf` holds `2 * MAX_SIMD_LANES >= 2 * lanes` lanes; `a` fills
+        // `0..lanes` and `b` fills `lanes..2 * lanes`, so the window
+        // `2K..2K + lanes` reads initialized lanes.
+        unsafe {
+            Self::store_unaligned(base, a);
+            Self::store_unaligned(base.add(lanes), b);
+            Self::load_unaligned(base.add(2 * K))
+        }
+    }
+
     /// Splits four registers' adjacent-lane pairs into the four stride-4
     /// subsequences: reading `a || b || c || d` as a flat pair sequence,
     /// output `i` holds the pairs congruent to `i` modulo 4, in order.

@@ -6,6 +6,17 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Added
 
+- [minor][HERMES-PAIR-CONCATENATE] `Vector::concat_shift_pairs::<K>` (and
+  the `BackendKernel`/`SimdPermute` method beneath it): the register window
+  `K` lane pairs into `self ++ next`, the byte-align at complex-sample
+  granularity. One `vperm2f128` on AVX2 (plus one in-lane `vpalignr` for an
+  odd sample count at `f32`), one `valignd`/`valignq` on AVX-512, one `ext`
+  on NEON, scalar emulation by default; `0 < K < LANE_COUNT / 2` is a
+  compile-time check per instantiation. The operand an arm scatter needs
+  to place three arms into consecutive groups of a four-sample register
+  without a padded transpose. Bit-exact lane-model coverage at every
+  admissible `K` on every host backend.
+
 - [minor][HERMES-SUBLANE-INTERLEAVE] `Vector::interleave_sublanes` and
   `Vector::deinterleave_sublanes` with `SimdPermute::SUBLANE_LANES` (and
   the `BackendKernel` methods and constant beneath them): the two-register

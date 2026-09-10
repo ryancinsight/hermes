@@ -146,6 +146,42 @@ fn interleave_f32(c: &mut Criterion) {
     group.finish();
 }
 
+fn concat_shift_pairs_f32(c: &mut Criterion) {
+    let mut group = c.benchmark_group("concat_shift_pairs_f32");
+    configure(&mut group);
+    let lanes = <PreferredArch as SimdStorage<f32>>::LANE_COUNT;
+
+    for &n in SIZES {
+        let a: Vec<f32> = (0..n + lanes).map(|i| i as f32).collect();
+        let mut dst = vec![0.0f32; n];
+        group.throughput(Throughput::Elements(n as u64));
+        group.bench_with_input(BenchmarkId::from_parameter(n), &n, |bencher, _| {
+            bencher.iter(|| {
+                // SAFETY: as in `reverse_f32`; `a` holds one register past `n`,
+                // so every chunk has a successor to concatenate with.
+                unsafe {
+                    for chunk in 0..n / lanes {
+                        let va = <PreferredArch as SimdLoadStore<f32>>::load_unaligned(
+                            a.as_ptr().add(chunk * lanes),
+                        );
+                        let vb = <PreferredArch as SimdLoadStore<f32>>::load_unaligned(
+                            a.as_ptr().add((chunk + 1) * lanes),
+                        );
+                        let shifted =
+                            <PreferredArch as SimdPermute<f32>>::concat_shift_pairs::<1>(va, vb);
+                        <PreferredArch as SimdLoadStore<f32>>::store_unaligned(
+                            dst.as_mut_ptr().add(chunk * lanes),
+                            shifted,
+                        );
+                    }
+                }
+                black_box(dst[0])
+            });
+        });
+    }
+    group.finish();
+}
+
 fn deinterleave_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("deinterleave_f32");
     configure(&mut group);
@@ -342,6 +378,7 @@ criterion_group!(
     reverse_f64,
     interleave_f32,
     deinterleave_f32,
+    concat_shift_pairs_f32,
     transpose_square,
     transpose_interleaved_square
 );

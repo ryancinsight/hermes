@@ -254,6 +254,14 @@ impl BackendKernel<f32> for Neon {
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
+    unsafe fn concat_shift_pairs<const K: usize>(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        // Two samples per register, so the only shift is one `ext` by two lanes.
+        NeonF32Vec(vextq_f32::<2>(a.0, b.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "neon")]
+    #[inline]
     unsafe fn dup_even(v: Self::Vector) -> Self::Vector {
         NeonF32Vec(vtrn1q_f32(v.0, v.0))
     }

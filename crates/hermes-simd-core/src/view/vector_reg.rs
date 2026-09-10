@@ -984,6 +984,22 @@ where
         Self::new(unsafe { Arch::blend_halves(self.raw, other.raw) })
     }
 
+    /// The register window `K` lane pairs into `self ++ next`: lanes `2K..`
+    /// of `self` followed by lanes `..2K` of `next`.
+    ///
+    /// On interleaved complex data this is the byte-align at sample
+    /// granularity: the window of one register over two consecutive ones,
+    /// shifted by `K` samples. One `vperm2f128` (plus one in-lane
+    /// `vpalignr` for an odd sample count) on AVX2, one `valignd`/`valignq`
+    /// on AVX-512, one `ext` on NEON. `0 < K < LANE_COUNT / 2`, checked per
+    /// instantiation.
+    #[inline(always)]
+    #[must_use]
+    pub fn concat_shift_pairs<const K: usize>(self, next: Self) -> Self {
+        // SAFETY: constructing the operand vectors proved host support for `Arch`.
+        Self::new(unsafe { Arch::concat_shift_pairs::<K>(self.raw, next.raw) })
+    }
+
     /// Swaps each adjacent lane pair: `[a, b, c, d]` becomes `[b, a, d, c]`.
     ///
     /// On interleaved complex data this exchanges the real and imaginary parts
