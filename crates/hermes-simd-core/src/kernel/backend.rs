@@ -1677,9 +1677,13 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
     /// occupies adjacent `[re, im]` lanes, and sample `(r, c)` moves to
     /// `(c, r)` without separating that pair.
     ///
-    /// Default: scalar emulation via symmetric complex-pair swaps staged
-    /// through two row buffers. Hardware backends may override this with a
-    /// pair-preserving shuffle network.
+    /// Default: the square read as one flat pair sequence is the
+    /// stride-`LANE_COUNT / 2` pair decimation, so output `i` is the
+    /// [`Self::deinterleave_pairs`], [`Self::deinterleave_pairs4`] or
+    /// [`Self::deinterleave_pairs8`] result `i` — column `i` of the tile —
+    /// and the transpose costs what the backend's decimation costs, in
+    /// registers. A backend overrides this only where a dedicated network
+    /// measures better than its decimation.
     ///
     /// # Safety
     /// Processor must support the required target feature. `tile` must hold
@@ -1687,24 +1691,40 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
     #[inline(always)]
     unsafe fn transpose_interleaved_square(tile: &mut [Self::Vector]) {
         const { Self::LANE_BOUND_CHECK };
-        let samples = Self::LANE_COUNT / 2;
         debug_assert_eq!(
             tile.len(),
-            samples,
+            Self::LANE_COUNT / 2,
             "tile must hold LANE_COUNT / 2 complex rows"
         );
-
-        let mut row_r = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        let mut row_c = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        for r in 0..samples {
-            Self::store_unaligned(row_r.as_mut_ptr().cast::<T>(), tile[r]);
-            for c in (r + 1)..samples {
-                Self::store_unaligned(row_c.as_mut_ptr().cast::<T>(), tile[c]);
-                core::mem::swap(&mut row_r[2 * c], &mut row_c[2 * r]);
-                core::mem::swap(&mut row_r[2 * c + 1], &mut row_c[2 * r + 1]);
-                tile[c] = Self::load_unaligned(row_c.as_ptr().cast::<T>());
+        // SAFETY: the caller's contract; every arm forwards the same target
+        // feature requirement to a decimation of this backend.
+        unsafe {
+            match tile {
+                // One sample per register (or none): a 1x1 tile is its own transpose.
+                [] | [_] => {}
+                [a, b] => {
+                    let (even, odd) = Self::deinterleave_pairs(*a, *b);
+                    *a = even;
+                    *b = odd;
+                }
+                [a, b, c, d] => {
+                    let (r0, r1, r2, r3) = Self::deinterleave_pairs4(*a, *b, *c, *d);
+                    *a = r0;
+                    *b = r1;
+                    *c = r2;
+                    *d = r3;
+                }
+                [a, b, c, d, e, f, g, h] => {
+                    let columns = Self::deinterleave_pairs8(*a, *b, *c, *d, *e, *f, *g, *h);
+                    [a, b, c, d, e, f, g, h]
+                        .into_iter()
+                        .zip(columns)
+                        .for_each(|(row, column)| *row = column);
+                }
+                _ => unreachable!(
+                    "invariant: LANE_COUNT is a power of two at most MAX_SIMD_LANES, so a complex square has 0, 1, 2, 4 or 8 rows; wider widths add their decimation here"
+                ),
             }
-            tile[r] = Self::load_unaligned(row_r.as_ptr().cast::<T>());
         }
     }
 

@@ -44,6 +44,18 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch][HERMES-COMPLEX-TRANSPOSE-BY-DECIMATION] The default
+  `BackendKernel::transpose_interleaved_square` is the backend's pair
+  decimation (`deinterleave_pairs`, `deinterleave_pairs4` or
+  `deinterleave_pairs8` by row count) instead of pair swaps staged through
+  two row buffers: a square tile read as one flat pair sequence is its
+  stride-`rows` decimation, so decimation output `i` is column `i`. Every
+  backend without a dedicated network (AVX2 `f64`, AVX-512, NEON) now
+  transposes in registers; AVX2 `f64` measures 9.3 ns to 7.1 ns on the
+  `permute` bench. Value-identical; the property test covers both
+  precisions on every host backend, natively and with the overrides
+  disabled.
+
 - [minor][HS-PROCESSOR-BINDING-LINUX] `ProcessorBinding::bind`, `restore`, and
   `ProcessorIndex::current` gain a Linux backend (`sched_setaffinity`,
   `sched_getaffinity`, `sched_getcpu` on the calling thread). Exact binding is
