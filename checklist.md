@@ -1,10 +1,5 @@
 # Checklist — active sprint
 
-## HERMES-LOAD-TRANSPOSED-SQUARE [minor] [perf] — claude/fable
-
-- [ ] Trait method and default, AVX2 f32/f64 half-row loads, `Vector` wrapper, tile laws on every backend, CHANGELOG.
-- [ ] PR merged without squash; Apollo's planar transposes consume it and its probe records the pass.
-
 ## HERMES-SUBLANE-INTERLEAVE [minor] [perf] — claude/fable
 
 - [x] Specify the sub-lane pair against the flat pair, add the constant and the
