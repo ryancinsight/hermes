@@ -27,7 +27,7 @@ use core::arch::x86_64::{
 ))]
 use core::arch::x86_64::{
     _mm256_blend_pd, _mm256_castpd128_pd256, _mm256_insertf128_pd, _mm256_unpackhi_pd,
-    _mm256_unpacklo_pd, _mm_loadu_pd, _mm_set_pd,
+    _mm256_unpacklo_pd, _mm_set_pd,
 };
 use hermes_simd_core::kernel::BackendKernel;
 
@@ -200,44 +200,6 @@ impl BackendKernel<f64> for Avx2 {
         tile[1] = Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(t1, t3));
         tile[2] = Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(t0, t2));
         tile[3] = Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(t1, t3));
-    }
-
-    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); `rows` holds four pointers each valid for four reads and `tile` four vectors, per the trait contract.
-    #[target_feature(enable = "avx2")]
-    #[inline]
-    #[cfg(not(hermes_benchmark_generic_default))]
-    unsafe fn load_transposed_square(rows: &[*const f64], tile: &mut [Self::Vector]) {
-        let rows: &[*const f64; 4] = rows
-            .try_into()
-            .expect("invariant: rows holds exactly LANE_COUNT pointers");
-        let tile: &mut [Self::Vector; 4] = tile
-            .try_into()
-            .expect("invariant: tile holds exactly LANE_COUNT rows");
-
-        // Register `i` of each pair takes lanes `at..at + 2` of row `i` in
-        // its low half and of row `i + 2` in its high half: the cross-half
-        // permute of `transpose_square` folded into the loads. One unpack
-        // pair per half then yields whole columns.
-        let x0 = _mm256_insertf128_pd::<1>(
-            _mm256_castpd128_pd256(_mm_loadu_pd(rows[0])),
-            _mm_loadu_pd(rows[2]),
-        );
-        let x1 = _mm256_insertf128_pd::<1>(
-            _mm256_castpd128_pd256(_mm_loadu_pd(rows[1])),
-            _mm_loadu_pd(rows[3]),
-        );
-        let y0 = _mm256_insertf128_pd::<1>(
-            _mm256_castpd128_pd256(_mm_loadu_pd(rows[0].add(2))),
-            _mm_loadu_pd(rows[2].add(2)),
-        );
-        let y1 = _mm256_insertf128_pd::<1>(
-            _mm256_castpd128_pd256(_mm_loadu_pd(rows[1].add(2))),
-            _mm_loadu_pd(rows[3].add(2)),
-        );
-        tile[0] = Avx2F64Vec(_mm256_unpacklo_pd(x0, x1));
-        tile[1] = Avx2F64Vec(_mm256_unpackhi_pd(x0, x1));
-        tile[2] = Avx2F64Vec(_mm256_unpacklo_pd(y0, y1));
-        tile[3] = Avx2F64Vec(_mm256_unpackhi_pd(y0, y1));
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.

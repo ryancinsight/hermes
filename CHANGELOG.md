@@ -6,13 +6,6 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Added
 
-- [minor][HERMES-LOAD-TRANSPOSED-SQUARE] `Vector::load_transposed_square`
-  (and `SimdPermute`/`BackendKernel::load_transposed_square` beneath it):
-  a square tile loaded transposed from `LANE_COUNT` row pointers. The
-  default loads then transposes; AVX2 `f32` and `f64` load each register
-  as two 128-bit halves from rows `i` and `i + LANE_COUNT / 2`, folding
-  the cross-half stage into the loads, so the in-half network finishes
-  with 16 shuffles in place of 24 (`f32`) and 4 in place of 8 (`f64`).
 - [minor][HERMES-SUBLANE-INTERLEAVE] `Vector::interleave_sublanes` and
   `Vector::deinterleave_sublanes` with `SimdPermute::SUBLANE_LANES` (and
   the `BackendKernel` methods and constant beneath them): the two-register
