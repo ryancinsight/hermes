@@ -1,13 +1,5 @@
 # Checklist — active sprint
 
-## HERMES-COMPLEX-TRANSPOSE-BY-DECIMATION [patch] [perf] — claude/fable
-
-- [x] Default `transpose_interleaved_square` to the pair decimations by row
-      count; property tests green natively and with the overrides disabled;
-      permute bench pair recorded on the item.
-- [ ] PR merged without squash; Apollo advances its `hermes-simd` lock and
-      re-measures the composite passes.
-
 ## HERMES-SUBLANE-INTERLEAVE [minor] [perf] — claude/fable
 
 - [x] Specify the sub-lane pair against the flat pair, add the constant and the

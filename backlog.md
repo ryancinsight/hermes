@@ -1,26 +1,16 @@
 # Backlog — hermes-simd
 
-<a id="hermes-complex-transpose-by-decimation"></a>
-## HERMES-COMPLEX-TRANSPOSE-BY-DECIMATION — The interleaved square transpose defaults to the pair decimations [patch] [perf] — review
+<a id="hermes-pair-concatenate"></a>
+## HERMES-PAIR-CONCATENATE — Concatenate two registers and shift by whole complex samples [minor] [perf] — todo
+- **Driver:** Apollo composite passes with three arms per group and four complexes per register: the exact scatter of arms into consecutive groups is a window of one complex over the concatenation of two registers (`alignr` at pair granularity), so without it the first stage pads a transpose tile and stores a third more ([`apollo-composite-odd-leading-stages`](../apollo/backlog.md#apollo-composite-odd-leading-stages), 1.16 to 1.32 at `f32` against the AVX2 kernels).
+- **Scope:** `Vector::concat_shift_pairs::<K>(self, next) -> Self`, the register holding samples `K..per` of `self` then `0..K` of `next`; `vpalignr`/`vperm2f128` plus in-lane shuffles on AVX2, `valignq`/`valignd` on AVX-512, `ext` on NEON, the lane-model default otherwise; property test at every width on every backend.
+- **Acceptance:** the op with its lane-model test and the permute bench row; Apollo consumes it in the three-arm scatter and measures the leading-3 orders level.
+- **Dependencies:** none. **Verification:** `kernel_property_tests`, `permute` bench.
 
-- Outcome: `BackendKernel::transpose_interleaved_square`'s default is
-  `deinterleave_pairs`/`deinterleave_pairs4`/`deinterleave_pairs8` by row
-  count (a square read as one flat pair sequence is its stride-`rows`
-  decimation, so decimation output `i` is column `i`), replacing the
-  through-memory pair swaps every backend but AVX2 `f32` ran; AVX2 `f32`
-  keeps its dedicated network.
-- Driver: Apollo's generic composite passes measured their `f64` first
-  stage 35% slower than the AVX2 intrinsics it replaced
-  ([`apollo-composite-passes-generic`](../apollo/backlog.md#apollo-composite-passes-generic));
-  its arm scatter rides `ComplexReg::transpose_square`, which on AVX2 `f64`
-  was four stores, four loads and two swaps per pair.
-- Acceptance: `kernel_property_tests` green natively and under
-  `--cfg hermes_benchmark_generic_default` (the composed default at two and
-  four rows on this host); `permute` bench `transpose_interleaved_square/avx2/f64`
-  not above main. Measured 2026-09-10, pinned performance core,
-  base/after/after/base: `f64` 9.31/9.34 ns to 7.05/7.15 ns, `f32`
-  (its override, unchanged) 4.56/4.58 to 4.65/4.71 ns.
-- Integrator: claude/fable. Lease: `crates/hermes-simd-core/src/kernel/backend.rs`.
+<a id="hermes-complex-transpose-by-decimation"></a>
+## HERMES-COMPLEX-TRANSPOSE-BY-DECIMATION — The interleaved square transpose defaults to the pair decimations [patch] [perf] — done 2026-09-10
+
+- Landed as [PR #165](https://github.com/ryancinsight/hermes/pull/165) (`4d432e0`): the default `transpose_interleaved_square` forwards to `deinterleave_pairs`/`deinterleave_pairs4`/`deinterleave_pairs8` by row count; AVX2 `f64` 9.3 ns to 7.1 ns on the permute bench. Apollo consumes it at that commit ([`apollo-composite-passes-generic`](../apollo/backlog.md#apollo-composite-passes-generic)).
 
 <a id="hermes-load-transposed-square"></a>
 ## HERMES-LOAD-TRANSPOSED-SQUARE — Load a square tile transposed, the cross-half stage folded into the loads [minor] [perf] — done 2026-09-10 (rejected)
