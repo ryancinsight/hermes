@@ -150,15 +150,6 @@ pub trait SimdPermute<T: Scalar>: SimdStorage<T> + Sealed {
     /// exactly `LANE_COUNT` vectors.
     unsafe fn transpose_square(tile: &mut [Self::Vector]);
 
-    /// Loads a square tile transposed: row `r` of `tile` receives lane `r`
-    /// of every source row, `rows[i]` pointing at row `i`.
-    ///
-    /// # Safety
-    /// The backend's target features must be available; `rows` must hold
-    /// exactly `LANE_COUNT` pointers, each valid for `LANE_COUNT` reads, and
-    /// `tile` exactly `LANE_COUNT` vectors.
-    unsafe fn load_transposed_square(rows: &[*const T], tile: &mut [Self::Vector]);
-
     /// Transposes a square tile of interleaved complex registers in place.
     ///
     /// Each vector is one row of `LANE_COUNT / 2` complex samples. Sample
@@ -286,10 +277,6 @@ impl<T: Scalar, A: BackendKernel<T>> SimdPermute<T> for A {
 
     unsafe fn transpose_square(tile: &mut [Self::Vector]) {
         <A as BackendKernel<T>>::transpose_square(tile);
-    }
-
-    unsafe fn load_transposed_square(rows: &[*const T], tile: &mut [Self::Vector]) {
-        <A as BackendKernel<T>>::load_transposed_square(rows, tile);
     }
 
     // The generic backend must see the caller's proven target features;
