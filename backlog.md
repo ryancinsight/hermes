@@ -1,13 +1,10 @@
 # Backlog — hermes-simd
 
 <a id="hermes-load-transposed-square"></a>
-## HERMES-LOAD-TRANSPOSED-SQUARE — Load a square tile transposed, the cross-half stage folded into the loads [minor] [perf] — in-progress
+## HERMES-LOAD-TRANSPOSED-SQUARE — Load a square tile transposed, the cross-half stage folded into the loads [minor] [perf] — done 2026-09-10 (rejected)
 
-- **Integrator:** claude/fable; **last-update:** 2026-09-10; branch `perf/hermes-load-transposed-square` on lane `D:/atlas/worktrees/hermes-transposed-load`; lease: claude/fable `hermes-simd-core/src/kernel/{backend.rs,roles/permute.rs}`, `hermes-simd-core/src/view/vector_reg.rs`, `hermes-simd-intrinsics/src/x86_64/avx2_{f32,f64}.rs`, `hermes-simd/tests/kernel_property_tests.rs` 2026-09-10T02:40Z.
-- **Driver:** Apollo's planar transposes ([`apollo-planar-transpose-staged-sweep`](../apollo/backlog.md#apollo-planar-transpose-staged-sweep), rejected, measured the transpose pass at 17% of 32768 `f32` and 16% of 2048 `f32`, 22 cycles per eight-by-eight tile: the port-5 floor of `transpose_square`'s 24 shuffles (8 unpack, 8 shuffle, 8 cross-half permute).
-- **Scope:** `SimdPermute::load_transposed_square(rows, tile)`: `LANE_COUNT` row pointers, the tile loaded transposed; default loads then `transpose_square`; AVX2 `f32` and `f64` load each register as two 128-bit halves from rows `i` and `i + LANE_COUNT / 2` (`vinsertf128` from memory, no port-5 uop), so the in-half network finishes the transpose: 16 shuffles at `f32`, 4 at `f64`. `Vector::load_transposed_square` beside `transpose_square`. Non-goals: AVX-512 and NEON overrides (the default serves; a measured shortfall files its own item), an in-place variant.
-- **Acceptance:** the index-coded and bit-exact tile laws hold for the new op on every backend the host dispatches (`kernel_property_tests`), and its result equals `load_unaligned` rows then `transpose_square` bit for bit; Apollo's section probe reads the transpose pass below the current by 20% or more at 32768 and 2048 in both precisions (its own item records it).
-- **Dependencies:** none. **Verification:** the CI gate; Apollo's `pinned_sections`.
+- Landed as [PR #163](https://github.com/ryancinsight/hermes/pull/163) and removed again in the follow-up PR: in Apollo's planar transposes the pass measured level on the rectangles (32768 `f32` 23.1k against 23.0k cycles) and 40 to 70% slower on the squares, and the assembly showed why: LLVM keeps every 128-bit half as its own load plus a register `vinsertf128`, never the memory-operand form, so the shuffle-port count stays at 24 while the loads double. Without a consumer the op is capability nobody uses; the finding stays here: the cross-half stage rides the loads only if the insert takes its memory operand, which the intrinsic pattern does not yield.
+- Evidence: `atlas/output/apollo-planar-rectangular/folded_*` and Apollo's item ([`apollo-planar-transpose-folded-loads`](../apollo/backlog.md#apollo-planar-transpose-folded-loads)).
 
 <a id="hermes-sublane-interleave"></a>
 ## HERMES-SUBLANE-INTERLEAVE — Interleave within shuffle sub-lanes [minor] [perf] — done 2026-09-09
