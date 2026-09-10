@@ -3,7 +3,7 @@
 <a id="hermes-pair-concatenate-at"></a>
 ## HERMES-PAIR-CONCATENATE-AT — The pair concatenate with a runtime shift [minor] [perf] — done 2026-09-11
 
-- `Vector::concat_shift_pairs_at(next, k)`: the constant form's per-instantiation check (`2K < LANE_COUNT`) rejects every kernel generic over the width, since the kernel is instantiated for the narrow backends too, and a rotation by a ragged row's remainder has no constant; each backend selects its constant shuffle by `k`, scalar emulation by default, the lane model at every admissible `k`. Apollo consumes it in the short-row stage of [`apollo-composite-ragged-rows`](../apollo/backlog.md#apollo-composite-ragged-rows).
+- `Vector::concat_shift_pairs_at(next, k)`: the constant form's per-instantiation check (`2K < LANE_COUNT`) rejects every kernel generic over the width, since the kernel is instantiated for the narrow backends too, and a rotation by a ragged row's remainder has no constant; each backend selects its constant shuffle by `k`, scalar emulation by default, the lane model at every admissible `k`. Written for the short-row stage of [`apollo-composite-ragged-rows`](../apollo/backlog.md#apollo-composite-ragged-rows), which measured slower than the run-over tail and was not landed; the op stays as backend surface with no stack consumer yet.
 
 <a id="hermes-pair-concatenate"></a>
 ## HERMES-PAIR-CONCATENATE — Concatenate two registers and shift by whole complex samples [minor] [perf] — done 2026-09-10
