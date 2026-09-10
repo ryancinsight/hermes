@@ -12,10 +12,10 @@
 use crate::Avx512;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::{
-    __m256i, __m512d, __mmask8, _mm512_add_pd, _mm512_and_si512, _mm512_andnot_si512,
-    _mm512_castpd_si512, _mm512_castsi512_pd, _mm512_cmp_pd_mask, _mm512_cmplt_epi64_mask,
-    _mm512_div_pd, _mm512_fmadd_pd, _mm512_fmaddsub_pd, _mm512_fmsub_pd, _mm512_fmsubadd_pd,
-    _mm512_i32gather_pd, _mm512_i32scatter_pd, _mm512_load_pd, _mm512_loadu_pd,
+    __m256i, __m512d, __mmask8, _mm512_add_pd, _mm512_alignr_epi64, _mm512_and_si512,
+    _mm512_andnot_si512, _mm512_castpd_si512, _mm512_castsi512_pd, _mm512_cmp_pd_mask,
+    _mm512_cmplt_epi64_mask, _mm512_div_pd, _mm512_fmadd_pd, _mm512_fmaddsub_pd, _mm512_fmsub_pd,
+    _mm512_fmsubadd_pd, _mm512_i32gather_pd, _mm512_i32scatter_pd, _mm512_load_pd, _mm512_loadu_pd,
     _mm512_mask3_fmadd_pd, _mm512_mask_add_pd, _mm512_mask_blend_pd, _mm512_mask_expand_pd,
     _mm512_mask_i32gather_pd, _mm512_mask_i32scatter_pd, _mm512_mask_loadu_pd, _mm512_mask_mov_pd,
     _mm512_mask_mul_pd, _mm512_mask_storeu_pd, _mm512_maskz_compress_pd, _mm512_max_pd,
@@ -512,6 +512,20 @@ impl BackendKernel<f64> for Avx512 {
     unsafe fn blend_halves(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         // Each half keeps its position: one in-lane blend, no permute.
         Avx512F64Vec(_mm512_mask_blend_pd(0xF0, a.0, b.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn concat_shift_pairs<const K: usize>(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        // One whole-register qword align, `b` high and `a` low.
+        let (hi, lo) = (_mm512_castpd_si512(b.0), _mm512_castpd_si512(a.0));
+        Avx512F64Vec(_mm512_castsi512_pd(match K {
+            1 => _mm512_alignr_epi64::<2>(hi, lo),
+            2 => _mm512_alignr_epi64::<4>(hi, lo),
+            _ => _mm512_alignr_epi64::<6>(hi, lo),
+        }))
     }
 
     // -----------------------------------------------------------------------

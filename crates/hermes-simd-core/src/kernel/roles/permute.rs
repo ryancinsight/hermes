@@ -129,6 +129,12 @@ pub trait SimdPermute<T: Scalar>: SimdStorage<T> + Sealed {
     /// The backend's target features must be available.
     unsafe fn blend_halves(a: Self::Vector, b: Self::Vector) -> Self::Vector;
 
+    /// The register window `K` lane pairs into `a ++ b`.
+    ///
+    /// # Safety
+    /// The backend's target features must be available.
+    unsafe fn concat_shift_pairs<const K: usize>(a: Self::Vector, b: Self::Vector) -> Self::Vector;
+
     /// Swaps each adjacent lane pair.
     ///
     /// # Safety
@@ -265,6 +271,10 @@ impl<T: Scalar, A: BackendKernel<T>> SimdPermute<T> for A {
 
     unsafe fn blend_halves(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         <A as BackendKernel<T>>::blend_halves(a, b)
+    }
+
+    unsafe fn concat_shift_pairs<const K: usize>(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        <A as BackendKernel<T>>::concat_shift_pairs::<K>(a, b)
     }
 
     unsafe fn swap_adjacent(v: Self::Vector) -> Self::Vector {

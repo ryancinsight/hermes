@@ -724,6 +724,40 @@ fn check_permutes_f64<A: SimdKernel<f64>>() {
 
 /// The half concatenation must match the flat reference: the low halves of
 /// `a` then `b`, and the high halves of `a` then `b`.
+/// `concat_shift_pairs::<K>` is the register window `K` lane pairs into
+/// `a ++ b`: lanes `2K..` of `a`, then lanes `..2K` of `b`, bit-exact.
+fn check_concat_shift_pairs<T, A, const K: usize>()
+where
+    T: hermes_simd_core::Scalar + PartialEq + core::fmt::Debug + From<u16>,
+    A: SimdKernel<T>,
+{
+    let lanes = A::LANE_COUNT;
+    let a_vals: Vec<T> = (0..lanes)
+        .map(|i| T::from(u16::try_from(i + 1).expect("lane index fits in u16")))
+        .collect();
+    let b_vals: Vec<T> = (0..lanes)
+        .map(|i| T::from(u16::try_from(100 + i).expect("lane index fits in u16")))
+        .collect();
+    let mut out = vec![T::from(0); lanes];
+
+    // SAFETY: caller gates on the required target features for `A`.
+    unsafe {
+        let a = A::load_unaligned(a_vals.as_ptr());
+        let b = A::load_unaligned(b_vals.as_ptr());
+        A::store_unaligned(out.as_mut_ptr(), A::concat_shift_pairs::<K>(a, b));
+    }
+
+    let expected: Vec<T> = a_vals[2 * K..]
+        .iter()
+        .chain(&b_vals[..2 * K])
+        .copied()
+        .collect();
+    assert_eq!(
+        out, expected,
+        "concat_shift_pairs::<{K}> mismatch ({lanes} lanes)"
+    );
+}
+
 fn check_blend_halves<A: SimdKernel<f32>>() {
     let lanes = A::LANE_COUNT;
     let half = lanes / 2;
@@ -945,6 +979,10 @@ fn permutes_match_reference_all_backends() {
             check_interleave_halves::<hermes_simd::Avx2>();
             check_splat_pair::<hermes_simd::Avx2>();
             check_blend_halves::<hermes_simd::Avx2>();
+            check_concat_shift_pairs::<f32, hermes_simd::Avx2, 1>();
+            check_concat_shift_pairs::<f32, hermes_simd::Avx2, 2>();
+            check_concat_shift_pairs::<f32, hermes_simd::Avx2, 3>();
+            check_concat_shift_pairs::<f64, hermes_simd::Avx2, 1>();
             check_splat_pair_f64::<hermes_simd::Avx2>();
             check_transpose_square::<f32, hermes_simd::Avx2>();
             check_transpose_square::<f64, hermes_simd::Avx2>();
@@ -962,6 +1000,16 @@ fn permutes_match_reference_all_backends() {
             check_interleave_halves::<hermes_simd::Avx512>();
             check_splat_pair::<hermes_simd::Avx512>();
             check_blend_halves::<hermes_simd::Avx512>();
+            check_concat_shift_pairs::<f32, hermes_simd::Avx512, 1>();
+            check_concat_shift_pairs::<f32, hermes_simd::Avx512, 2>();
+            check_concat_shift_pairs::<f32, hermes_simd::Avx512, 3>();
+            check_concat_shift_pairs::<f32, hermes_simd::Avx512, 4>();
+            check_concat_shift_pairs::<f32, hermes_simd::Avx512, 5>();
+            check_concat_shift_pairs::<f32, hermes_simd::Avx512, 6>();
+            check_concat_shift_pairs::<f32, hermes_simd::Avx512, 7>();
+            check_concat_shift_pairs::<f64, hermes_simd::Avx512, 1>();
+            check_concat_shift_pairs::<f64, hermes_simd::Avx512, 2>();
+            check_concat_shift_pairs::<f64, hermes_simd::Avx512, 3>();
             check_splat_pair_f64::<hermes_simd::Avx512>();
             check_transpose_square::<f32, hermes_simd::Avx512>();
             check_transpose_square::<f64, hermes_simd::Avx512>();
@@ -981,6 +1029,7 @@ fn permutes_match_reference_all_backends() {
         check_interleave_halves::<hermes_simd::Neon>();
         check_splat_pair::<hermes_simd::Neon>();
         check_blend_halves::<hermes_simd::Neon>();
+        check_concat_shift_pairs::<f32, hermes_simd::Neon, 1>();
         check_splat_pair_f64::<hermes_simd::Neon>();
         check_transpose_square::<f32, hermes_simd::Neon>();
         check_transpose_square::<f64, hermes_simd::Neon>();

@@ -12,18 +12,19 @@
 use crate::Avx512;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::{
-    __m512, __m512i, __mmask16, _mm512_add_ps, _mm512_and_si512, _mm512_andnot_si512,
-    _mm512_castps_si512, _mm512_castsi512_ps, _mm512_cmp_ps_mask, _mm512_cmplt_epi32_mask,
-    _mm512_div_ps, _mm512_fmadd_ps, _mm512_fmaddsub_ps, _mm512_fmsub_ps, _mm512_fmsubadd_ps,
-    _mm512_fnmadd_ps, _mm512_i32gather_ps, _mm512_i32scatter_ps, _mm512_load_ps, _mm512_loadu_ps,
-    _mm512_mask3_fmadd_ps, _mm512_mask_add_ps, _mm512_mask_blend_ps, _mm512_mask_expand_ps,
-    _mm512_mask_i32gather_ps, _mm512_mask_i32scatter_ps, _mm512_mask_loadu_ps, _mm512_mask_mov_ps,
-    _mm512_mask_mul_ps, _mm512_mask_storeu_ps, _mm512_maskz_compress_ps, _mm512_max_ps,
-    _mm512_min_ps, _mm512_movehdup_ps, _mm512_moveldup_ps, _mm512_mul_ps, _mm512_or_si512,
-    _mm512_permute_ps, _mm512_reduce_add_ps, _mm512_roundscale_ps, _mm512_rsqrt14_ps,
-    _mm512_set1_ps, _mm512_setzero_ps, _mm512_setzero_si512, _mm512_sqrt_ps, _mm512_store_ps,
-    _mm512_storeu_ps, _mm512_stream_ps, _mm512_sub_ps, _mm512_xor_si512, _CMP_EQ_OQ, _CMP_GE_OQ,
-    _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ, _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT,
+    __m512, __m512i, __mmask16, _mm512_add_ps, _mm512_alignr_epi32, _mm512_and_si512,
+    _mm512_andnot_si512, _mm512_castps_si512, _mm512_castsi512_ps, _mm512_cmp_ps_mask,
+    _mm512_cmplt_epi32_mask, _mm512_div_ps, _mm512_fmadd_ps, _mm512_fmaddsub_ps, _mm512_fmsub_ps,
+    _mm512_fmsubadd_ps, _mm512_fnmadd_ps, _mm512_i32gather_ps, _mm512_i32scatter_ps,
+    _mm512_load_ps, _mm512_loadu_ps, _mm512_mask3_fmadd_ps, _mm512_mask_add_ps,
+    _mm512_mask_blend_ps, _mm512_mask_expand_ps, _mm512_mask_i32gather_ps,
+    _mm512_mask_i32scatter_ps, _mm512_mask_loadu_ps, _mm512_mask_mov_ps, _mm512_mask_mul_ps,
+    _mm512_mask_storeu_ps, _mm512_maskz_compress_ps, _mm512_max_ps, _mm512_min_ps,
+    _mm512_movehdup_ps, _mm512_moveldup_ps, _mm512_mul_ps, _mm512_or_si512, _mm512_permute_ps,
+    _mm512_reduce_add_ps, _mm512_roundscale_ps, _mm512_rsqrt14_ps, _mm512_set1_ps,
+    _mm512_setzero_ps, _mm512_setzero_si512, _mm512_sqrt_ps, _mm512_store_ps, _mm512_storeu_ps,
+    _mm512_stream_ps, _mm512_sub_ps, _mm512_xor_si512, _CMP_EQ_OQ, _CMP_GE_OQ, _CMP_GT_OQ,
+    _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ, _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT,
     _MM_FROUND_TO_NEG_INF, _MM_FROUND_TO_POS_INF, _MM_FROUND_TO_ZERO,
 };
 #[cfg(not(hermes_benchmark_generic_default))]
@@ -543,6 +544,24 @@ impl BackendKernel<f32> for Avx512 {
     unsafe fn blend_halves(a: Self::Vector, b: Self::Vector) -> Self::Vector {
         // Each half keeps its position: one in-lane blend, no permute.
         Avx512F32Vec(_mm512_mask_blend_ps(0xFF00, a.0, b.0))
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 16-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn concat_shift_pairs<const K: usize>(a: Self::Vector, b: Self::Vector) -> Self::Vector {
+        // One whole-register dword align, `b` high and `a` low.
+        let (hi, lo) = (_mm512_castps_si512(b.0), _mm512_castps_si512(a.0));
+        Avx512F32Vec(_mm512_castsi512_ps(match K {
+            1 => _mm512_alignr_epi32::<2>(hi, lo),
+            2 => _mm512_alignr_epi32::<4>(hi, lo),
+            3 => _mm512_alignr_epi32::<6>(hi, lo),
+            4 => _mm512_alignr_epi32::<8>(hi, lo),
+            5 => _mm512_alignr_epi32::<10>(hi, lo),
+            6 => _mm512_alignr_epi32::<12>(hi, lo),
+            _ => _mm512_alignr_epi32::<14>(hi, lo),
+        }))
     }
 
     // -----------------------------------------------------------------------
