@@ -641,6 +641,82 @@ fn transpose_square_is_bit_exact_all_backends() {
     }
 }
 
+/// `load_transposed_square` must equal `load_unaligned` of every row then
+/// `transpose_square`, bit for bit, on the adversarial classes: the AVX2
+/// overrides fold the cross-half stage into half-register loads, and a
+/// misrouted half or a leaked lane shows here.
+fn check_load_transposed_square<T, A>(cell: impl Fn(usize, usize) -> T, bits: impl Fn(T) -> u64)
+where
+    T: hermes_simd_core::Scalar,
+    A: SimdKernel<T>,
+{
+    let lanes = A::LANE_COUNT;
+    let rows: Vec<Vec<T>> = (0..lanes)
+        .map(|r| (0..lanes).map(|c| cell(r, c)).collect())
+        .collect();
+    let mut out = rows.clone();
+
+    // SAFETY: caller gates on the required target features for `A`; every row
+    // holds exactly `LANE_COUNT` elements, and `pointers` and `tile` exactly
+    // `LANE_COUNT` entries.
+    unsafe {
+        let pointers: Vec<*const T> = rows.iter().map(Vec::as_ptr).collect();
+        let mut tile: Vec<A::Vector> = rows
+            .iter()
+            .map(|row| A::load_unaligned(row.as_ptr()))
+            .collect();
+        A::load_transposed_square(&pointers, &mut tile);
+        for (row, dst) in tile.iter().zip(out.iter_mut()) {
+            A::store_unaligned(dst.as_mut_ptr(), *row);
+        }
+    }
+
+    for r in 0..lanes {
+        for c in 0..lanes {
+            assert_eq!(
+                bits(out[r][c]),
+                bits(rows[c][r]),
+                "transposed load misrouted or perturbed ({r}, {c}) with {lanes} lanes"
+            );
+        }
+    }
+}
+
+#[test]
+fn load_transposed_square_matches_the_transpose_all_backends() {
+    check_load_transposed_square::<f32, Scalar>(transpose_bits_f32, |v| u64::from(v.to_bits()));
+    check_load_transposed_square::<f64, Scalar>(transpose_bits_f64, f64::to_bits);
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+            check_load_transposed_square::<f32, hermes_simd::Avx2>(transpose_bits_f32, |v| {
+                u64::from(v.to_bits())
+            });
+            check_load_transposed_square::<f64, hermes_simd::Avx2>(
+                transpose_bits_f64,
+                f64::to_bits,
+            );
+        }
+        if std::is_x86_feature_detected!("avx512f") {
+            check_load_transposed_square::<f32, hermes_simd::Avx512>(transpose_bits_f32, |v| {
+                u64::from(v.to_bits())
+            });
+            check_load_transposed_square::<f64, hermes_simd::Avx512>(
+                transpose_bits_f64,
+                f64::to_bits,
+            );
+        }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        check_load_transposed_square::<f32, hermes_simd::Neon>(transpose_bits_f32, |v| {
+            u64::from(v.to_bits())
+        });
+        check_load_transposed_square::<f64, hermes_simd::Neon>(transpose_bits_f64, f64::to_bits);
+    }
+}
+
 /// The f64 permute path is a separate monomorphization with its own lane count
 /// and, on AVX2, a different instruction (`vpermpd` by immediate rather than
 /// `vpermps` by index vector), so it needs its own coverage.
