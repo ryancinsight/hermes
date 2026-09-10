@@ -466,6 +466,25 @@ impl BackendKernel<f32> for Avx2 {
         })
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime selection in the hermes-simd dispatcher); the operands are register values.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn concat_shift_pairs_at(a: Self::Vector, b: Self::Vector, k: usize) -> Self::Vector {
+        debug_assert!(
+            k > 0 && 2 * k < 8,
+            "the sample shift stays inside one register"
+        );
+        // SAFETY: the caller's feature obligation covers the constant shuffles.
+        unsafe {
+            match k {
+                1 => <Self as BackendKernel<f32>>::concat_shift_pairs::<1>(a, b),
+                2 => <Self as BackendKernel<f32>>::concat_shift_pairs::<2>(a, b),
+                _ => <Self as BackendKernel<f32>>::concat_shift_pairs::<3>(a, b),
+            }
+        }
+    }
+
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx2")]
     #[inline]

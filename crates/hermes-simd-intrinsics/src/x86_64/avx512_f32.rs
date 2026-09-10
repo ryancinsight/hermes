@@ -564,6 +564,29 @@ impl BackendKernel<f32> for Avx512 {
         }))
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime selection in the hermes-simd dispatcher); the operands are register values.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn concat_shift_pairs_at(a: Self::Vector, b: Self::Vector, k: usize) -> Self::Vector {
+        debug_assert!(
+            k > 0 && 2 * k < 16,
+            "the sample shift stays inside one register"
+        );
+        // SAFETY: the caller's feature obligation covers the constant shuffles.
+        unsafe {
+            match k {
+                1 => <Self as BackendKernel<f32>>::concat_shift_pairs::<1>(a, b),
+                2 => <Self as BackendKernel<f32>>::concat_shift_pairs::<2>(a, b),
+                3 => <Self as BackendKernel<f32>>::concat_shift_pairs::<3>(a, b),
+                4 => <Self as BackendKernel<f32>>::concat_shift_pairs::<4>(a, b),
+                5 => <Self as BackendKernel<f32>>::concat_shift_pairs::<5>(a, b),
+                6 => <Self as BackendKernel<f32>>::concat_shift_pairs::<6>(a, b),
+                _ => <Self as BackendKernel<f32>>::concat_shift_pairs::<7>(a, b),
+            }
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Scatter (native `vscatterdps`)
     // -----------------------------------------------------------------------

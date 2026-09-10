@@ -1523,6 +1523,41 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         }
     }
 
+    /// [`concat_shift_pairs`](Self::concat_shift_pairs) with the shift `k`
+    /// a runtime count: the register window `k` lane pairs into `a ++ b`.
+    ///
+    /// A kernel generic over the width cannot name a shift as a constant
+    /// admissible on every backend it is instantiated for (the constant
+    /// check rejects the narrow ones at compile time), and a shift that
+    /// varies with the data (a rotation by a ragged row's remainder) has no
+    /// constant at all; this entry takes the count at run time, each backend
+    /// selecting its constant shuffle by `k`. `0 < k < LANE_COUNT / 2`,
+    /// checked in debug builds.
+    ///
+    /// Default: scalar emulation.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn concat_shift_pairs_at(a: Self::Vector, b: Self::Vector, k: usize) -> Self::Vector {
+        const { Self::LANE_BOUND_CHECK };
+        debug_assert!(
+            k > 0 && 2 * k < Self::LANE_COUNT,
+            "the sample shift stays inside one register"
+        );
+        let lanes = Self::LANE_COUNT;
+        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); 2 * MAX_SIMD_LANES];
+        let base = buf.as_mut_ptr().cast::<T>();
+        // SAFETY: `buf` holds `2 * MAX_SIMD_LANES >= 2 * lanes` lanes; `a` fills
+        // `0..lanes` and `b` fills `lanes..2 * lanes`, so the window
+        // `2k..2k + lanes` reads initialized lanes for `2k < lanes`.
+        unsafe {
+            Self::store_unaligned(base, a);
+            Self::store_unaligned(base.add(lanes), b);
+            Self::load_unaligned(base.add(2 * k))
+        }
+    }
+
     /// Splits four registers' adjacent-lane pairs into the four stride-4
     /// subsequences: reading `a || b || c || d` as a flat pair sequence,
     /// output `i` holds the pairs congruent to `i` modulo 4, in order.

@@ -6,6 +6,15 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Added
 
+- [minor][HERMES-PAIR-CONCATENATE-AT] `Vector::concat_shift_pairs_at(next, k)`
+  (and the `BackendKernel`/`SimdPermute` method beneath it): the pair
+  concatenate with the shift a runtime count, for kernels generic over
+  the width (the constant form's per-instantiation check rejects the
+  narrow backends) and for shifts that vary with the data. Each backend
+  selects its constant shuffle by `k`; scalar emulation by default;
+  `0 < k < LANE_COUNT / 2` is a debug assertion. Lane-model coverage at
+  every admissible `k` on every host backend.
+
 - [minor][HERMES-PAIR-CONCATENATE] `Vector::concat_shift_pairs::<K>` (and
   the `BackendKernel`/`SimdPermute` method beneath it): the register window
   `K` lane pairs into `self ++ next`, the byte-align at complex-sample
