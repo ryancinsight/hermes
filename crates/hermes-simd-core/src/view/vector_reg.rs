@@ -1000,6 +1000,22 @@ where
         Self::new(unsafe { Arch::concat_shift_pairs::<K>(self.raw, next.raw) })
     }
 
+    /// [`concat_shift_pairs`](Self::concat_shift_pairs) with the shift a
+    /// runtime count: the register window `k` lane pairs into `self ++ next`.
+    ///
+    /// For kernels generic over the width, whose admissible constants differ
+    /// per backend, and for shifts that vary with the data; each backend
+    /// selects its constant shuffle by `k`.
+    ///
+    /// # Panics
+    /// Panics in debug builds unless `0 < k < LANE_COUNT / 2`.
+    #[inline(always)]
+    #[must_use]
+    pub fn concat_shift_pairs_at(self, next: Self, k: usize) -> Self {
+        // SAFETY: constructing the operand vectors proved host support for `Arch`.
+        Self::new(unsafe { Arch::concat_shift_pairs_at(self.raw, next.raw, k) })
+    }
+
     /// Swaps each adjacent lane pair: `[a, b, c, d]` becomes `[b, a, d, c]`.
     ///
     /// On interleaved complex data this exchanges the real and imaginary parts
