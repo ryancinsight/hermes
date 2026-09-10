@@ -1671,6 +1671,41 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         }
     }
 
+    /// Loads a square tile transposed: row `r` of `tile` receives lane `r`
+    /// of every source row, so `tile` holds the transpose of the rows the
+    /// pointers address. `rows[i]` points at row `i`.
+    ///
+    /// Default: [`load_unaligned`](Self::load_unaligned) of every row, then
+    /// [`transpose_square`](Self::transpose_square). AVX2 `f32` and `f64`
+    /// load each register as two 128-bit halves, from rows `i` and
+    /// `i + LANE_COUNT / 2`, which is the transpose's cross-half stage
+    /// folded into the loads (`vinsertf128` from memory carries no
+    /// shuffle-port uop), and finish with the in-half network: 16 shuffles
+    /// in place of 24 at `f32`, 4 in place of 8 at `f64`.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature. `rows` must hold
+    /// exactly `LANE_COUNT` pointers, each valid for `LANE_COUNT` reads of
+    /// `T`; `tile` must hold exactly `LANE_COUNT` vectors.
+    #[inline(always)]
+    unsafe fn load_transposed_square(rows: &[*const T], tile: &mut [Self::Vector]) {
+        const { Self::LANE_BOUND_CHECK };
+        debug_assert_eq!(
+            rows.len(),
+            Self::LANE_COUNT,
+            "rows must hold LANE_COUNT pointers"
+        );
+        debug_assert_eq!(
+            tile.len(),
+            Self::LANE_COUNT,
+            "tile must hold LANE_COUNT rows"
+        );
+        for (dst, &row) in tile.iter_mut().zip(rows) {
+            *dst = Self::load_unaligned(row);
+        }
+        Self::transpose_square(tile);
+    }
+
     /// Transposes a square tile of interleaved complex registers in place.
     ///
     /// Each vector is one row of `LANE_COUNT / 2` complex samples. A sample

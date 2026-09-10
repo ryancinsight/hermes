@@ -1037,6 +1037,41 @@ where
         }
     }
 
+    /// Loads a square tile transposed: row `r` of `tile` receives lane `r`
+    /// of every source row, `rows[i]` pointing at row `i`. The blocked
+    /// transpose's load-and-transpose step in one, with the cross-half
+    /// stage folded into the loads where the backend can (AVX2).
+    ///
+    /// # Panics
+    /// Panics if `rows` or `tile` does not hold exactly `LANE_COUNT` entries.
+    ///
+    /// # Safety
+    /// Each pointer in `rows` must be valid for `LANE_COUNT` reads of `T`.
+    #[inline(always)]
+    pub unsafe fn load_transposed_square(rows: &[*const T], tile: &mut [Self]) {
+        assert_eq!(
+            rows.len(),
+            Arch::LANE_COUNT,
+            "rows must hold LANE_COUNT pointers"
+        );
+        assert_eq!(
+            tile.len(),
+            Arch::LANE_COUNT,
+            "tile must hold LANE_COUNT rows"
+        );
+        // SAFETY: `Vector` is `#[repr(transparent)]` over `Arch::Vector`, so
+        // the slice cast preserves layout; constructing the vectors proved
+        // host support for `Arch`; the pointers are valid per the caller's
+        // contract.
+        unsafe {
+            let raw = core::slice::from_raw_parts_mut(
+                tile.as_mut_ptr().cast::<Arch::Vector>(),
+                tile.len(),
+            );
+            Arch::load_transposed_square(rows, raw);
+        }
+    }
+
     /// Duplicates each even-indexed lane over its odd neighbour:
     /// `[a, b, c, d]` becomes `[a, a, c, c]`.
     ///

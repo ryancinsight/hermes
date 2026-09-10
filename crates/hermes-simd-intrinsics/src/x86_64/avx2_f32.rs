@@ -29,9 +29,10 @@ use core::arch::x86_64::{
     not(hermes_benchmark_generic_default)
 ))]
 use core::arch::x86_64::{
-    _mm256_blend_ps, _mm256_castpd_ps, _mm256_castps_pd, _mm256_permute2f128_pd,
-    _mm256_permute2f128_ps, _mm256_set1_pd, _mm256_shuffle_ps, _mm256_unpackhi_pd,
-    _mm256_unpackhi_ps, _mm256_unpacklo_pd, _mm256_unpacklo_ps,
+    _mm256_blend_ps, _mm256_castpd_ps, _mm256_castps128_ps256, _mm256_castps_pd,
+    _mm256_insertf128_ps, _mm256_permute2f128_pd, _mm256_permute2f128_ps, _mm256_set1_pd,
+    _mm256_shuffle_ps, _mm256_unpackhi_pd, _mm256_unpackhi_ps, _mm256_unpacklo_pd,
+    _mm256_unpacklo_ps, _mm_loadu_ps,
 };
 use hermes_simd_core::kernel::BackendKernel;
 
@@ -253,6 +254,75 @@ impl BackendKernel<f32> for Avx2 {
         tile[5] = Avx2F32Vec(_mm256_permute2f128_ps::<0x31>(s1, s5));
         tile[6] = Avx2F32Vec(_mm256_permute2f128_ps::<0x31>(s2, s6));
         tile[7] = Avx2F32Vec(_mm256_permute2f128_ps::<0x31>(s3, s7));
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); `rows` holds eight pointers each valid for eight reads and `tile` eight vectors, per the trait contract.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn load_transposed_square(rows: &[*const f32], tile: &mut [Self::Vector]) {
+        let rows: &[*const f32; 8] = rows
+            .try_into()
+            .expect("invariant: rows holds exactly LANE_COUNT pointers");
+        let tile: &mut [Self::Vector; 8] = tile
+            .try_into()
+            .expect("invariant: tile holds exactly LANE_COUNT rows");
+
+        // Register `i` of each quartet takes lanes `at..at + 4` of row `i`
+        // in its low half and of row `i + 4` in its high half: the cross-half
+        // permute of `transpose_square` folded into the loads, `vinsertf128`
+        // from memory carrying no shuffle-port uop. The in-half network then
+        // yields whole columns, `at` selecting columns `0..4` or `4..8`.
+        let x0 = _mm256_insertf128_ps::<1>(
+            _mm256_castps128_ps256(_mm_loadu_ps(rows[0])),
+            _mm_loadu_ps(rows[4]),
+        );
+        let x1 = _mm256_insertf128_ps::<1>(
+            _mm256_castps128_ps256(_mm_loadu_ps(rows[1])),
+            _mm_loadu_ps(rows[5]),
+        );
+        let x2 = _mm256_insertf128_ps::<1>(
+            _mm256_castps128_ps256(_mm_loadu_ps(rows[2])),
+            _mm_loadu_ps(rows[6]),
+        );
+        let x3 = _mm256_insertf128_ps::<1>(
+            _mm256_castps128_ps256(_mm_loadu_ps(rows[3])),
+            _mm_loadu_ps(rows[7]),
+        );
+        let y0 = _mm256_insertf128_ps::<1>(
+            _mm256_castps128_ps256(_mm_loadu_ps(rows[0].add(4))),
+            _mm_loadu_ps(rows[4].add(4)),
+        );
+        let y1 = _mm256_insertf128_ps::<1>(
+            _mm256_castps128_ps256(_mm_loadu_ps(rows[1].add(4))),
+            _mm_loadu_ps(rows[5].add(4)),
+        );
+        let y2 = _mm256_insertf128_ps::<1>(
+            _mm256_castps128_ps256(_mm_loadu_ps(rows[2].add(4))),
+            _mm_loadu_ps(rows[6].add(4)),
+        );
+        let y3 = _mm256_insertf128_ps::<1>(
+            _mm256_castps128_ps256(_mm_loadu_ps(rows[3].add(4))),
+            _mm_loadu_ps(rows[7].add(4)),
+        );
+
+        let t0 = _mm256_unpacklo_ps(x0, x1);
+        let t1 = _mm256_unpackhi_ps(x0, x1);
+        let t2 = _mm256_unpacklo_ps(x2, x3);
+        let t3 = _mm256_unpackhi_ps(x2, x3);
+        let u0 = _mm256_unpacklo_ps(y0, y1);
+        let u1 = _mm256_unpackhi_ps(y0, y1);
+        let u2 = _mm256_unpacklo_ps(y2, y3);
+        let u3 = _mm256_unpackhi_ps(y2, y3);
+
+        tile[0] = Avx2F32Vec(_mm256_shuffle_ps::<0x44>(t0, t2));
+        tile[1] = Avx2F32Vec(_mm256_shuffle_ps::<0xEE>(t0, t2));
+        tile[2] = Avx2F32Vec(_mm256_shuffle_ps::<0x44>(t1, t3));
+        tile[3] = Avx2F32Vec(_mm256_shuffle_ps::<0xEE>(t1, t3));
+        tile[4] = Avx2F32Vec(_mm256_shuffle_ps::<0x44>(u0, u2));
+        tile[5] = Avx2F32Vec(_mm256_shuffle_ps::<0xEE>(u0, u2));
+        tile[6] = Avx2F32Vec(_mm256_shuffle_ps::<0x44>(u1, u3));
+        tile[7] = Avx2F32Vec(_mm256_shuffle_ps::<0xEE>(u1, u3));
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx2` and `tile`
