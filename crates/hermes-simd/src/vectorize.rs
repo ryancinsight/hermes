@@ -199,6 +199,28 @@ pub trait LaneScalar: Scalar {
         let _ = kernel;
         None
     }
+
+    /// The lane count of the frame backend [`vectorize_in_frame`] runs on:
+    /// AVX2's on `x86_64`, NEON's on `aarch64`, the portable backend's
+    /// elsewhere. The default is the portable count, for downstream
+    /// implementations; Hermes' sealed scalar set overrides it.
+    const FRAME_LANES: usize = 1;
+
+    /// Runs `kernel` on the frame backend without a probe.
+    ///
+    /// Call [`vectorize_in_frame`] instead. The default runs the probing
+    /// ladder, so a downstream implementation stays sound; Hermes' sealed
+    /// scalar set overrides it with the direct backend entry.
+    ///
+    /// # Safety
+    ///
+    /// The caller has established the frame backend's target features on
+    /// this host: `avx2` and `fma` on `x86_64` (plus `f16c` where the
+    /// scalar requires it), `neon` on `aarch64`.
+    #[doc(hidden)]
+    unsafe fn run_lane_kernel_in_frame<K: LaneKernel<Self>>(kernel: K) -> K::Output {
+        Self::run_lane_kernel(kernel)
+    }
 }
 
 macro_rules! impl_lane_scalar {
@@ -223,10 +245,28 @@ macro_rules! impl_lane_scalar {
                 ) -> Option<K::Output> {
                     dispatch_hardware_lane_count::<$t, K, LANES>(kernel).ok()
                 }
+
+                const FRAME_LANES: usize = <FrameArch as SimdStorage<$t>>::LANE_COUNT;
+
+                #[inline(always)]
+                unsafe fn run_lane_kernel_in_frame<K: LaneKernel<Self>>(kernel: K) -> K::Output {
+                    // SAFETY: the caller established the frame backend's
+                    // target features, which is `assume_supported`'s contract.
+                    kernel.call::<FrameArch>(unsafe { Simd::<$t, FrameArch>::assume_supported() })
+                }
             }
         )+
     };
 }
+
+/// The backend a caller-held frame runs: the 256-bit ISA on `x86_64`, NEON on
+/// `aarch64`, the portable backend elsewhere.
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+type FrameArch = Avx2;
+#[cfg(target_arch = "aarch64")]
+type FrameArch = Neon;
+#[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
+type FrameArch = ScalarArch;
 
 impl_lane_scalar!(f32, f64, eunomia::F16, eunomia::Bf16);
 
@@ -323,6 +363,53 @@ pub fn vectorize_hardware_lanes<const LANES: usize, T: LaneScalar, K: LaneKernel
     kernel: K,
 ) -> Option<K::Output> {
     T::run_hardware_lane_kernel_for::<LANES, K>(kernel)
+}
+
+/// Runs `kernel` on the frame backend inside a `#[target_feature]` scope the
+/// caller has already entered.
+///
+/// The probing entries above select a backend per call — two feature reads
+/// and a call into the backend's scope. A caller that itself carries the
+/// scope (a transform's outer function marked `#[target_feature(enable =
+/// "avx2,fma")]`, selected once when its plan was built) pays that on every
+/// kernel it runs, and the kernel body cannot inline across the boundary. This
+/// entry runs the kernel on the frame backend directly, so it inlines into the
+/// caller's frame with no probe in front of it. [`LaneScalar::FRAME_LANES`]
+/// names the lane count the kernel will see.
+///
+/// # Safety
+///
+/// The caller has established the frame backend's target features on this
+/// host: `avx2` and `fma` on `x86_64` (plus `f16c` where the scalar requires
+/// it, see `SimdStorage::REQUIRES_F16C`), `neon` on `aarch64`. `Avx2::
+/// is_runtime_supported()` is the probe that discharges the `x86_64` half.
+///
+/// # Examples
+///
+/// ```
+/// use hermes_simd::{vectorize_in_frame, LaneKernel, LaneScalar, Simd, SimdArch, SimdKernel, SimdStorage};
+///
+/// struct LaneCount;
+///
+/// impl LaneKernel<f32> for LaneCount {
+///     type Output = usize;
+///
+///     fn call<A: SimdArch + SimdKernel<f32>>(self, _: Simd<f32, A>) -> usize {
+///         <A as SimdStorage<f32>>::LANE_COUNT
+///     }
+/// }
+///
+/// # #[cfg(target_arch = "x86_64")]
+/// if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+///     // SAFETY: the probe just established the frame.
+///     let lanes = unsafe { vectorize_in_frame::<f32, _>(LaneCount) };
+///     assert_eq!(lanes, <f32 as LaneScalar>::FRAME_LANES);
+/// }
+/// ```
+#[inline(always)]
+pub unsafe fn vectorize_in_frame<T: LaneScalar, K: LaneKernel<T>>(kernel: K) -> K::Output {
+    // SAFETY: the caller carries the frame contract through.
+    unsafe { T::run_lane_kernel_in_frame(kernel) }
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
