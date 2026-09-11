@@ -1,12 +1,8 @@
 # Backlog — hermes-simd
 
 <a id="hermes-rotation-sign-mask"></a>
-## HERMES-ROTATION-SIGN-MASK — Rotate complex registers by a sign flip, not a fused multiply-add against zero [patch] [perf] — in-progress
-- **Integrator:** claude/fable; **last-update:** 2026-09-11; branch `perf/hermes-rotation-sign-mask`; regions `crates/hermes-simd-core/src/view/complex_reg.rs`, `crates/hermes-simd/tests/complex_reg.rs`.
-- **Evidence (apollo asm census, `atlas/output/apollo-base128/base256_2026-09-11.md`):** `ComplexReg::mul_i` / `mul_neg_i` spend the flip as `fmaddsub(0, 0, swapped)`, which LLVM expands to an add and a subtract against zero and a blend — four instructions per rotation where RustFFT spends two (sign mask, swap) — twice per 16-point transform and in every radix-4 stage of apollo's register kernels; apollo `f32` 16 reads 1.27 of RustFFT on the efficiency core with the call chain already removed.
-- **Scope:** the flip as `bitxor` against a `splat_pair(SIGN_MASK, ZERO)` mask built without a host probe; the `tests/complex_reg.rs` reference already negates by sign (`-ai`), so a zero lane now agrees with it bitwise (`-0.0`). Non-goals: the complex multiply form (apollo's constant twiddles defeat `fmaddsub` formation there; an apollo item).
-- **Acceptance:** `tests/complex_reg.rs` bitwise and two-ulp tiers pass on the AVX2 and scalar backends; the rotation is two vector instructions in apollo's `f32` 16 framed executor on re-census. Downstream: [`apollo-f32-16-32-kernel-gap`](../apollo/backlog.md#apollo-f32-16-32-kernel-gap).
-
+## HERMES-ROTATION-SIGN-MASK — Rotate complex registers by a sign flip, not a fused multiply-add against zero [patch] [perf] — done 2026-09-11
+- Landed as [PR #172](https://github.com/ryancinsight/hermes/pull/172): `ComplexReg::mul_i` / `mul_neg_i` are the swap and one `bitxor` against a `splat_pair(SIGN_MASK, ZERO)` mask built without a host probe, two instructions where the alternating FMA against zero expanded to four; a zero lane comes out `-0.0` as `tests/complex_reg.rs` asserts. Downstream: [`apollo-f32-16-32-kernel-gap`](../apollo/backlog.md#apollo-f32-16-32-kernel-gap).
 <a id="hermes-interleave-pairs3"></a>
 ## HERMES-INTERLEAVE-PAIRS3 — Interleave three registers' pairs into the flat three-arm sequence [minor] [perf] — done 2026-09-11
 
