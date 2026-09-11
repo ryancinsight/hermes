@@ -1,5 +1,11 @@
 # Backlog — hermes-simd
 
+<a id="hermes-mul-with-swapped"></a>
+## HERMES-MUL-WITH-SWAPPED — Multiply a complex register by a twiddle held as its direct and swapped rows [minor] [perf] — in-progress
+- **Integrator:** claude/fable; **last-update:** 2026-09-11; branch `feat/hermes-mul-with-swapped`; regions `crates/hermes-simd-core/src/view/complex_reg.rs`, `crates/hermes-simd/tests/complex_reg.rs`.
+- **Evidence:** apollo's DFT-16 / DFT-32 register kernels multiply by stored twiddle rows through `ComplexReg::mul`, which swaps the twiddle's lanes per use (one `vshufps` per row per transform, three at 16 and six at 32) where RustFFT keeps the swapped row beside the direct one (`atlas/output/apollo-base128/base256_2026-09-11.md`).
+- **Scope:** `ComplexReg::mul_with_swapped(w, w_swapped)`: two duplicates, one product, one alternating FMA, bitwise the value of `self * w`; an eighth block in the `tests/complex_reg.rs` kernel and reference. **Acceptance:** the bitwise and two-ulp tiers pass on the AVX2 and scalar backends. Downstream: [`apollo-f32-16-32-kernel-gap`](../apollo/backlog.md#apollo-f32-16-32-kernel-gap).
+
 <a id="hermes-rotation-sign-mask"></a>
 ## HERMES-ROTATION-SIGN-MASK — Rotate complex registers by a sign flip, not a fused multiply-add against zero [patch] [perf] — done 2026-09-11
 - Landed as [PR #172](https://github.com/ryancinsight/hermes/pull/172): `ComplexReg::mul_i` / `mul_neg_i` are the swap and one `bitxor` against a `splat_pair(SIGN_MASK, ZERO)` mask built without a host probe, two instructions where the alternating FMA against zero expanded to four; a zero lane comes out `-0.0` as `tests/complex_reg.rs` asserts. Downstream: [`apollo-f32-16-32-kernel-gap`](../apollo/backlog.md#apollo-f32-16-32-kernel-gap).

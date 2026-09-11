@@ -102,6 +102,21 @@ where
         Self(Vector::splat_pair(sample.re, sample.im))
     }
 
+    /// Complex multiply by a twiddle held as its direct and swapped rows.
+    ///
+    /// `w_swapped` is `w` with each sample's real and imaginary lanes
+    /// exchanged ([`Vector::swap_adjacent`]), which a kernel whose twiddles
+    /// are stored can keep beside the direct row: the multiply is then two
+    /// duplicates, one product and one alternating FMA, with no shuffle of
+    /// the twiddle per use. The same value as `self * w`, bitwise.
+    #[inline(always)]
+    #[must_use]
+    pub fn mul_with_swapped(self, w: Self, w_swapped: Self) -> Self {
+        let re_a = self.0.dup_even();
+        let im_a = self.0.dup_odd();
+        Self(re_a.fmaddsub(w.0, im_a * w_swapped.0))
+    }
+
     /// Complex multiply by the conjugate, sample-wise: `self * conj(w)`.
     #[inline(always)]
     #[must_use]
