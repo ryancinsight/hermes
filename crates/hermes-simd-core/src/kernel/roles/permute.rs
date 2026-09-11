@@ -75,6 +75,17 @@ pub trait SimdPermute<T: Scalar>: SimdStorage<T> + Sealed {
         odd: Self::Vector,
     ) -> (Self::Vector, Self::Vector);
 
+    /// Interleaves three registers' adjacent-lane pairs into the flat
+    /// sequence `a0 b0 c0 a1 b1 c1 ...`, three registers long.
+    ///
+    /// # Safety
+    /// The backend's target features must be available.
+    unsafe fn interleave_pairs3(
+        a: Self::Vector,
+        b: Self::Vector,
+        c: Self::Vector,
+    ) -> (Self::Vector, Self::Vector, Self::Vector);
+
     /// Splits four registers' adjacent-lane pairs into the four stride-4
     /// subsequences.
     ///
@@ -243,6 +254,14 @@ impl<T: Scalar, A: BackendKernel<T>> SimdPermute<T> for A {
         odd: Self::Vector,
     ) -> (Self::Vector, Self::Vector) {
         <A as BackendKernel<T>>::interleave_pairs(even, odd)
+    }
+
+    unsafe fn interleave_pairs3(
+        a: Self::Vector,
+        b: Self::Vector,
+        c: Self::Vector,
+    ) -> (Self::Vector, Self::Vector, Self::Vector) {
+        <A as BackendKernel<T>>::interleave_pairs3(a, b, c)
     }
 
     unsafe fn deinterleave_pairs4(

@@ -194,6 +194,42 @@ where
 /// A backend override that transposed its two results would satisfy the
 /// round-trip on symmetric inputs, so the operands carry distinct value ranges
 /// and the specification check pins each output register separately.
+/// `interleave_pairs3` is the flat sequence `a0 b0 c0 a1 b1 c1 ...`: pair
+/// `3p + k` of the three outputs is pair `p` of operand `k`.
+fn check_interleave_pairs3<T, A>()
+where
+    T: hermes_simd_core::Scalar + PartialEq + core::fmt::Debug + From<u16>,
+    A: SimdKernel<T>,
+{
+    let lanes = A::LANE_COUNT;
+    let operand = |k: usize| -> Vec<T> {
+        (0..lanes)
+            .map(|i| T::from(u16::try_from(100 * k + i + 1).expect("fixture fits in u16")))
+            .collect()
+    };
+    let (a_vals, b_vals, c_vals) = (operand(0), operand(1), operand(2));
+    let mut out = vec![T::default(); 3 * lanes];
+
+    // SAFETY: caller gates on the required target features for `A`.
+    unsafe {
+        let a = A::load_unaligned(a_vals.as_ptr());
+        let b = A::load_unaligned(b_vals.as_ptr());
+        let c = A::load_unaligned(c_vals.as_ptr());
+        let (x, y, z) = A::interleave_pairs3(a, b, c);
+        A::store_unaligned(out.as_mut_ptr(), x);
+        A::store_unaligned(out.as_mut_ptr().add(lanes), y);
+        A::store_unaligned(out.as_mut_ptr().add(2 * lanes), z);
+    }
+
+    let mut expected: Vec<T> = Vec::with_capacity(3 * lanes);
+    for p in 0..lanes / 2 {
+        for vals in [&a_vals, &b_vals, &c_vals] {
+            expected.extend_from_slice(&vals[2 * p..2 * p + 2]);
+        }
+    }
+    assert_eq!(out, expected, "interleave_pairs3 mismatch ({lanes} lanes)");
+}
+
 fn check_interleave_pairs<T, A>()
 where
     T: hermes_simd_core::Scalar + PartialEq + core::fmt::Debug + From<u16>,
@@ -973,69 +1009,51 @@ where
     );
 }
 
+/// The pair-granular permutes every backend implements, in both precisions.
+fn check_pair_family<A: SimdKernel<f32> + SimdKernel<f64>>() {
+    check_permutes::<A>();
+    check_sublane_interleave::<f32, A>();
+    check_sublane_interleave::<f64, A>();
+    check_deinterleave_pairs8::<A>();
+    check_interleave_pairs::<f32, A>();
+    check_interleave_pairs::<f64, A>();
+    check_interleave_pairs3::<f32, A>();
+    check_interleave_pairs3::<f64, A>();
+    check_interleave_halves::<A>();
+    check_splat_pair::<A>();
+    check_blend_halves::<A>();
+    check_splat_pair_f64::<A>();
+}
+
+/// The square transposes and the `f64` permutes, on the backends that carry them.
+fn check_transposes<A: SimdKernel<f32> + SimdKernel<f64>>() {
+    check_transpose_square::<f32, A>();
+    check_transpose_square::<f64, A>();
+    check_transpose_interleaved_square::<f32, A>();
+    check_transpose_interleaved_square::<f64, A>();
+    check_permutes_f64::<A>();
+}
+
 #[test]
 fn permutes_match_reference_all_backends() {
-    check_permutes::<Scalar>();
-    check_sublane_interleave::<f32, Scalar>();
-    check_sublane_interleave::<f64, Scalar>();
-    check_deinterleave_pairs8::<Scalar>();
-    check_interleave_pairs::<f32, Scalar>();
-    check_interleave_pairs::<f64, Scalar>();
-    check_interleave_halves::<Scalar>();
-    check_splat_pair::<Scalar>();
-    check_blend_halves::<Scalar>();
-    check_splat_pair_f64::<Scalar>();
-    check_transpose_square::<f32, Scalar>();
-    check_transpose_square::<f64, Scalar>();
-    check_transpose_interleaved_square::<f32, Scalar>();
-    check_transpose_interleaved_square::<f64, Scalar>();
-    check_permutes::<SveArch>();
-    check_sublane_interleave::<f32, SveArch>();
-    check_sublane_interleave::<f64, SveArch>();
-    check_deinterleave_pairs8::<SveArch>();
-    check_interleave_pairs::<f32, SveArch>();
-    check_interleave_pairs::<f64, SveArch>();
-    check_interleave_halves::<SveArch>();
-    check_splat_pair::<SveArch>();
-    check_blend_halves::<SveArch>();
-    check_splat_pair_f64::<SveArch>();
-    check_permutes_f64::<Scalar>();
+    check_pair_family::<Scalar>();
+    check_transposes::<Scalar>();
+    check_pair_family::<SveArch>();
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
         if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
-            check_permutes::<hermes_simd::Avx2>();
-            check_sublane_interleave::<f32, hermes_simd::Avx2>();
-            check_sublane_interleave::<f64, hermes_simd::Avx2>();
-            check_deinterleave_pairs8::<hermes_simd::Avx2>();
-            check_interleave_pairs::<f32, hermes_simd::Avx2>();
-            check_interleave_pairs::<f64, hermes_simd::Avx2>();
-            check_interleave_halves::<hermes_simd::Avx2>();
-            check_splat_pair::<hermes_simd::Avx2>();
-            check_blend_halves::<hermes_simd::Avx2>();
+            check_pair_family::<hermes_simd::Avx2>();
             check_concat_shift_pairs::<f32, hermes_simd::Avx2, 1>();
             check_concat_shift_pairs::<f32, hermes_simd::Avx2, 2>();
             check_concat_shift_pairs::<f32, hermes_simd::Avx2, 3>();
             check_concat_shift_pairs::<f64, hermes_simd::Avx2, 1>();
             check_concat_shift_pairs_at::<f32, hermes_simd::Avx2>();
             check_concat_shift_pairs_at::<f64, hermes_simd::Avx2>();
-            check_splat_pair_f64::<hermes_simd::Avx2>();
-            check_transpose_square::<f32, hermes_simd::Avx2>();
-            check_transpose_square::<f64, hermes_simd::Avx2>();
-            check_transpose_interleaved_square::<f32, hermes_simd::Avx2>();
-            check_transpose_interleaved_square::<f64, hermes_simd::Avx2>();
-            check_permutes_f64::<hermes_simd::Avx2>();
+            check_transposes::<hermes_simd::Avx2>();
         }
         if std::is_x86_feature_detected!("avx512f") {
-            check_permutes::<hermes_simd::Avx512>();
-            check_sublane_interleave::<f32, hermes_simd::Avx512>();
-            check_sublane_interleave::<f64, hermes_simd::Avx512>();
-            check_deinterleave_pairs8::<hermes_simd::Avx512>();
-            check_interleave_pairs::<f32, hermes_simd::Avx512>();
-            check_interleave_pairs::<f64, hermes_simd::Avx512>();
-            check_interleave_halves::<hermes_simd::Avx512>();
-            check_splat_pair::<hermes_simd::Avx512>();
-            check_blend_halves::<hermes_simd::Avx512>();
+            check_pair_family::<hermes_simd::Avx512>();
             check_concat_shift_pairs::<f32, hermes_simd::Avx512, 1>();
             check_concat_shift_pairs::<f32, hermes_simd::Avx512, 2>();
             check_concat_shift_pairs::<f32, hermes_simd::Avx512, 3>();
@@ -1044,37 +1062,19 @@ fn permutes_match_reference_all_backends() {
             check_concat_shift_pairs::<f32, hermes_simd::Avx512, 6>();
             check_concat_shift_pairs::<f32, hermes_simd::Avx512, 7>();
             check_concat_shift_pairs::<f64, hermes_simd::Avx512, 1>();
-            check_concat_shift_pairs_at::<f32, hermes_simd::Avx512>();
-            check_concat_shift_pairs_at::<f64, hermes_simd::Avx512>();
             check_concat_shift_pairs::<f64, hermes_simd::Avx512, 2>();
             check_concat_shift_pairs::<f64, hermes_simd::Avx512, 3>();
-            check_splat_pair_f64::<hermes_simd::Avx512>();
-            check_transpose_square::<f32, hermes_simd::Avx512>();
-            check_transpose_square::<f64, hermes_simd::Avx512>();
-            check_transpose_interleaved_square::<f32, hermes_simd::Avx512>();
-            check_transpose_interleaved_square::<f64, hermes_simd::Avx512>();
-            check_permutes_f64::<hermes_simd::Avx512>();
+            check_concat_shift_pairs_at::<f32, hermes_simd::Avx512>();
+            check_concat_shift_pairs_at::<f64, hermes_simd::Avx512>();
+            check_transposes::<hermes_simd::Avx512>();
         }
     }
     #[cfg(target_arch = "aarch64")]
     {
-        check_permutes::<hermes_simd::Neon>();
-        check_sublane_interleave::<f32, hermes_simd::Neon>();
-        check_sublane_interleave::<f64, hermes_simd::Neon>();
-        check_deinterleave_pairs8::<hermes_simd::Neon>();
-        check_interleave_pairs::<f32, hermes_simd::Neon>();
-        check_interleave_pairs::<f64, hermes_simd::Neon>();
-        check_interleave_halves::<hermes_simd::Neon>();
-        check_splat_pair::<hermes_simd::Neon>();
-        check_blend_halves::<hermes_simd::Neon>();
+        check_pair_family::<hermes_simd::Neon>();
         check_concat_shift_pairs::<f32, hermes_simd::Neon, 1>();
         check_concat_shift_pairs_at::<f32, hermes_simd::Neon>();
-        check_splat_pair_f64::<hermes_simd::Neon>();
-        check_transpose_square::<f32, hermes_simd::Neon>();
-        check_transpose_square::<f64, hermes_simd::Neon>();
-        check_transpose_interleaved_square::<f32, hermes_simd::Neon>();
-        check_transpose_interleaved_square::<f64, hermes_simd::Neon>();
-        check_permutes_f64::<hermes_simd::Neon>();
+        check_transposes::<hermes_simd::Neon>();
     }
 }
 

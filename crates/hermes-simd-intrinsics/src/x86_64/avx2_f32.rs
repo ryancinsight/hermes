@@ -30,8 +30,8 @@ use core::arch::x86_64::{
 ))]
 use core::arch::x86_64::{
     _mm256_blend_ps, _mm256_castpd_ps, _mm256_castps_pd, _mm256_permute2f128_pd,
-    _mm256_permute2f128_ps, _mm256_set1_pd, _mm256_shuffle_ps, _mm256_unpackhi_pd,
-    _mm256_unpackhi_ps, _mm256_unpacklo_pd, _mm256_unpacklo_ps,
+    _mm256_permute2f128_ps, _mm256_set1_pd, _mm256_shuffle_pd, _mm256_shuffle_ps,
+    _mm256_unpackhi_pd, _mm256_unpackhi_ps, _mm256_unpacklo_pd, _mm256_unpacklo_ps,
 };
 use hermes_simd_core::kernel::BackendKernel;
 
@@ -408,6 +408,34 @@ impl BackendKernel<f32> for Avx2 {
         (
             Avx2F32Vec(_mm256_permute2f128_ps::<0x20>(lo, hi)),
             Avx2F32Vec(_mm256_permute2f128_ps::<0x31>(lo, hi)),
+        )
+    }
+
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime selection in the hermes-simd dispatcher); the operands are register values.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn interleave_pairs3(
+        a: Self::Vector,
+        b: Self::Vector,
+        c: Self::Vector,
+    ) -> (Self::Vector, Self::Vector, Self::Vector) {
+        // Lane-local 64-bit unpacks pair the first two arms' even pairs and
+        // the last two's odd pairs, one pair shuffle takes the third arm's
+        // even pairs beside the first's odd, and three half permutes
+        // assemble the outputs: six shuffles, no padding.
+        let (a, b, c) = (
+            _mm256_castps_pd(a.0),
+            _mm256_castps_pd(b.0),
+            _mm256_castps_pd(c.0),
+        );
+        let ab = _mm256_unpacklo_pd(a, b);
+        let bc = _mm256_unpackhi_pd(b, c);
+        let ca = _mm256_shuffle_pd::<0b1010>(c, a);
+        (
+            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x20>(ab, ca))),
+            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x30>(bc, ab))),
+            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x31>(ca, bc))),
         )
     }
 

@@ -220,6 +220,23 @@ impl BackendKernel<f32> for Neon {
         )
     }
 
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus runtime selection in the hermes-simd dispatcher); the operands are register values.
+    #[target_feature(enable = "neon")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn interleave_pairs3(
+        a: Self::Vector,
+        b: Self::Vector,
+        c: Self::Vector,
+    ) -> (Self::Vector, Self::Vector, Self::Vector) {
+        // A pair is a 64-bit half, so each output is one half combine.
+        (
+            NeonF32Vec(vcombine_f32(vget_low_f32(a.0), vget_low_f32(b.0))),
+            NeonF32Vec(vcombine_f32(vget_low_f32(c.0), vget_high_f32(a.0))),
+            NeonF32Vec(vcombine_f32(vget_high_f32(b.0), vget_high_f32(c.0))),
+        )
+    }
+
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "neon")]
     #[inline]
