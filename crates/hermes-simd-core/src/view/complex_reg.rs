@@ -115,40 +115,56 @@ where
     /// Rotates every sample by `+i`: `(re, im)` becomes `(-im, re)`.
     ///
     /// The quarter-turn twiddle of every power-of-two transform, done as one
-    /// shuffle and one alternating FMA against zero rather than a multiply by
-    /// a stored constant.
+    /// shuffle and one sign flip: the swapped register xored with the sign
+    /// mask on its even lanes. Negation is the sign bit, so a zero lane comes
+    /// out `-0.0`, as scalar negation gives it.
+    ///
+    /// An earlier form spent an alternating fused multiply-add against zero
+    /// for the flip; LLVM expands that into an add and a subtract against
+    /// zero and a blend (it cannot fold `0 - c` to `-c` with signed zeros),
+    /// four instructions for what is two, on every rotation of every radix-4
+    /// stage.
     #[inline(always)]
     #[must_use]
     pub fn mul_i(self) -> Self {
-        // fmaddsub(0, 0, c) = [-c, +c, ...]: even lanes negate, odd pass.
-        let swapped = self.0.swap_adjacent();
-        Self(Self::zero_proved().fmaddsub(Self::zero_proved(), swapped))
-    }
-
-    /// A zero register built without re-probing the host.
-    ///
-    /// [`Vector::zero`] is a public constructor, so it asks whether the host
-    /// supports `Arch` before handing one out. Inside a method taking `self`
-    /// that question is already answered: a `ComplexReg` can only be built
-    /// from a [`Vector`], and a `Vector` can only be built with proof. Asking
-    /// again is not merely redundant — the probe is a call, so the register
-    /// allocator spills every live vector around it, and a rotation used in
-    /// an inner butterfly loop drags the whole working set through the stack
-    /// each time (`apollo gap_audit.md#base-kernel-probes`).
-    #[inline(always)]
-    fn zero_proved() -> Vector<T, Arch> {
-        // SAFETY: possessing a `ComplexReg<T, Arch>` proves the host executes
-        // `Arch` for `T`, since one cannot be constructed without a `Vector`,
-        // which cannot be constructed without that proof.
-        Vector::new(unsafe { Arch::zero() })
+        Self(Self::flip_lanes(
+            self.0.swap_adjacent(),
+            T::SIGN_MASK,
+            T::ZERO,
+        ))
     }
 
     /// Rotates every sample by `-i`: `(re, im)` becomes `(im, -re)`.
+    ///
+    /// The mirror of [`Self::mul_i`]: the swap, then the sign flip on the odd
+    /// lanes.
     #[inline(always)]
     #[must_use]
     pub fn mul_neg_i(self) -> Self {
-        let swapped = self.0.swap_adjacent();
-        Self(Self::zero_proved().fmsubadd(Self::zero_proved(), swapped))
+        Self(Self::flip_lanes(
+            self.0.swap_adjacent(),
+            T::ZERO,
+            T::SIGN_MASK,
+        ))
+    }
+
+    /// Xors every even lane with `even` and every odd lane with `odd`, the
+    /// mask register built without re-probing the host.
+    ///
+    /// [`Vector::splat_pair`] is a public constructor, so it asks whether the
+    /// host supports `Arch` before handing one out. Inside a method taking
+    /// `self` that question is already answered: a `ComplexReg` can only be
+    /// built from a [`Vector`], and a `Vector` can only be built with proof.
+    /// Asking again is not merely redundant — the probe is a call, so the
+    /// register allocator spills every live vector around it, and a rotation
+    /// used in an inner butterfly loop drags the whole working set through
+    /// the stack each time (`apollo gap_audit.md#base-kernel-probes`).
+    #[inline(always)]
+    fn flip_lanes(value: Vector<T, Arch>, even: T, odd: T) -> Vector<T, Arch> {
+        // SAFETY: the caller holds a `ComplexReg<T, Arch>`, which proves the
+        // host executes `Arch` for `T`, since one cannot be constructed
+        // without a `Vector`, which cannot be constructed without that proof.
+        Vector::new(unsafe { Arch::bitxor(value.raw, Arch::splat_pair(even, odd)) })
     }
 
     /// Exchanges neighbouring complex samples: `[c0, c1, c2, c3]` becomes
