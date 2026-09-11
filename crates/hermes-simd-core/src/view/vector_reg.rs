@@ -881,6 +881,22 @@ where
         (Self::new(first), Self::new(second))
     }
 
+    /// Interleaves three registers' adjacent-lane pairs into the flat
+    /// sequence `self0 b0 c0 self1 b1 c1 ...`, three registers long: the
+    /// inverse of a stride-3 pair decimation, and the store shape of a
+    /// three-arm scatter whose registers hold one group per pair.
+    ///
+    /// Six shuffles on AVX2 at `f32` (two lane-local unpacks, one pair
+    /// shuffle, three half permutes), three half permutes at `f64`, three
+    /// half combines on NEON, scalar emulation by default.
+    #[inline(always)]
+    #[must_use]
+    pub fn interleave_pairs3(self, b: Self, c: Self) -> (Self, Self, Self) {
+        // SAFETY: constructing the operand vectors proved host support for `Arch`.
+        let (x, y, z) = unsafe { Arch::interleave_pairs3(self.raw, b.raw, c.raw) };
+        (Self::new(x), Self::new(y), Self::new(z))
+    }
+
     /// Splits four vectors' adjacent-lane pairs into the four stride-4
     /// subsequences: reading the concatenation as a flat pair sequence,
     /// output `i` holds the pairs congruent to `i` modulo 4.

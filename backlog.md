@@ -1,5 +1,10 @@
 # Backlog — hermes-simd
 
+<a id="hermes-interleave-pairs3"></a>
+## HERMES-INTERLEAVE-PAIRS3 — Interleave three registers' pairs into the flat three-arm sequence [minor] [perf] — done 2026-09-11
+
+- `Vector::interleave_pairs3(b, c)`: the inverse of a stride-3 pair decimation, the store shape of a radix-3 arm scatter (three whole stores, no padded tile). AVX2 `f32` six shuffles, `f64` three half permutes, NEON three half combines, scalar emulation by default; the lane model in both precisions on every host backend. Consumer: apollo's radix-3 first stage ([`apollo-composite-three-arm-interleave`](../apollo/backlog.md#apollo-composite-three-arm-interleave)), whose padded tile reads 1.32 per stage against the AVX2 kernel at four complexes per register.
+
 <a id="hermes-pair-concatenate-at"></a>
 ## HERMES-PAIR-CONCATENATE-AT — The pair concatenate with a runtime shift [minor] [perf] — done 2026-09-11
 

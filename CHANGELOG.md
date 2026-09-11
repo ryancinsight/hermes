@@ -6,6 +6,14 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Added
 
+- [minor][HERMES-INTERLEAVE-PAIRS3] `Vector::interleave_pairs3(b, c)` (and
+  the `BackendKernel`/`SimdPermute` method beneath it): three registers'
+  adjacent-lane pairs interleaved into the flat sequence `a0 b0 c0 a1 b1
+  c1 ...`, the inverse of a stride-3 pair decimation and the store shape
+  of a three-arm scatter. Six shuffles on AVX2 at `f32`, three half
+  permutes at `f64`, three half combines on NEON, scalar emulation by
+  default; lane-model coverage on every host backend in both precisions.
+
 - [minor][HERMES-PAIR-CONCATENATE-AT] `Vector::concat_shift_pairs_at(next, k)`
   (and the `BackendKernel`/`SimdPermute` method beneath it): the pair
   concatenate with the shift a runtime count, for kernels generic over
