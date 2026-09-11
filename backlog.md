@@ -1,5 +1,11 @@
 # Backlog — hermes-simd
 
+<a id="hermes-vectorize-in-frame"></a>
+## HERMES-VECTORIZE-IN-FRAME — Run a lane kernel inside a frame the caller has entered [minor] [perf] — in-progress
+- **Integrator:** claude/fable; **last-update:** 2026-09-11; branch `feat/hermes-interleave-pairs5` (second commit); regions `crates/hermes-simd/src/{vectorize.rs,lib.rs}`.
+- **Evidence:** apollo's plan selects framed executors once at construction (apollo PR #432); its hermes-based kernels still enter through `vectorize_hardware_lanes`, two feature reads and a `call_avx2` per kernel inside an already-established frame (the asm census in `atlas/output/apollo-base128/base256_2026-09-11.md`: the `f32` 32 executor carried both), and a generic caller cannot name `Avx2` itself without the whole backend bound list.
+- **Scope:** `vectorize_in_frame::<T, K>(kernel)` (unsafe: the caller holds the frame) and `LaneScalar::FRAME_LANES`, the sealed scalars entering the frame backend (`Avx2` on x86, `Neon` on aarch64, the portable backend elsewhere) through `assume_supported`; a doctest that runs it under the probe. **Acceptance:** the doctest and the existing suite pass; apollo's framed kernels reach the backend with no probe in the census. Downstream: [`apollo-codelets-over-lanes`](../apollo/backlog.md#apollo-codelets-over-lanes).
+
 <a id="hermes-interleave-pairs5"></a>
 ## HERMES-INTERLEAVE-PAIRS5 — Interleave five registers' pairs into the flat five-arm sequence [minor] [perf] — in-progress
 - **Integrator:** claude/fable; **last-update:** 2026-09-11; branch `feat/hermes-interleave-pairs5`; regions `crates/hermes-simd-core/src/{kernel/backend.rs,kernel/roles/permute.rs,view/vector_reg.rs}`, `crates/hermes-simd-intrinsics/src/x86_64/avx2_f{32,64}.rs`, `crates/hermes-simd/tests/kernel_property_tests.rs`.
