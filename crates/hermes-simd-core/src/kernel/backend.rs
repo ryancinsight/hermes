@@ -1440,6 +1440,66 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         }
     }
 
+    /// Interleaves five registers' adjacent-lane pairs into the flat
+    /// sequence `a0 b0 c0 d0 e0 a1 b1 c1 d1 e1 ...`, five registers long.
+    ///
+    /// Reading `a || b || c || d || e` as a flat pair sequence, pair
+    /// `5p + k` is pair `p` of operand `k`: the inverse of a stride-5 pair
+    /// decimation, and the store shape of a five-row column pass whose
+    /// registers hold one row's consecutive columns — the transpose that
+    /// writes `n = 5 m` in natural order after five `m`-point transforms.
+    /// Requires an even `LANE_COUNT`.
+    ///
+    /// Default: scalar emulation.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn interleave_pairs5(
+        a: Self::Vector,
+        b: Self::Vector,
+        c: Self::Vector,
+        d: Self::Vector,
+        e: Self::Vector,
+    ) -> [Self::Vector; 5] {
+        const { Self::LANE_BOUND_CHECK };
+        let lanes = Self::LANE_COUNT;
+        debug_assert!(
+            lanes.is_multiple_of(2),
+            "pair granularity needs whole pairs"
+        );
+        let mut src = [core::mem::MaybeUninit::<T>::uninit(); 5 * MAX_SIMD_LANES];
+        let mut out = [core::mem::MaybeUninit::<T>::uninit(); 5 * MAX_SIMD_LANES];
+        let base = src.as_mut_ptr().cast::<T>();
+        // SAFETY: `src` holds `5 * MAX_SIMD_LANES >= 5 * lanes` lanes, the
+        // five stores fill `0..5 * lanes`, every read below stays inside
+        // that range, and every write lands inside `0..5 * lanes` of `out`,
+        // which the five loads then read in full.
+        unsafe {
+            Self::store_unaligned(base, a);
+            Self::store_unaligned(base.add(lanes), b);
+            Self::store_unaligned(base.add(2 * lanes), c);
+            Self::store_unaligned(base.add(3 * lanes), d);
+            Self::store_unaligned(base.add(4 * lanes), e);
+            for p in 0..lanes / 2 {
+                for k in 0..5 {
+                    let from = k * lanes + 2 * p;
+                    let to = 2 * (5 * p + k);
+                    out[to].write(src[from].assume_init());
+                    out[to + 1].write(src[from + 1].assume_init());
+                }
+            }
+            let packed = out.as_ptr().cast::<T>();
+            [
+                Self::load_unaligned(packed),
+                Self::load_unaligned(packed.add(lanes)),
+                Self::load_unaligned(packed.add(2 * lanes)),
+                Self::load_unaligned(packed.add(3 * lanes)),
+                Self::load_unaligned(packed.add(4 * lanes)),
+            ]
+        }
+    }
+
     /// Concatenates the two registers' low halves, and their high halves:
     /// `(a[..n/2] ++ b[..n/2], a[n/2..] ++ b[n/2..])` for `n = LANE_COUNT`.
     ///

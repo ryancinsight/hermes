@@ -230,6 +230,41 @@ where
     assert_eq!(out, expected, "interleave_pairs3 mismatch ({lanes} lanes)");
 }
 
+/// `interleave_pairs5` is the flat sequence `a0 b0 c0 d0 e0 a1 ...`: pair
+/// `5p + k` of the five outputs is pair `p` of operand `k`. Distinct value
+/// ranges per operand and a per-register comparison, as for three.
+fn check_interleave_pairs5<T, A>()
+where
+    T: hermes_simd_core::Scalar + PartialEq + core::fmt::Debug + From<u16>,
+    A: SimdKernel<T>,
+{
+    let lanes = A::LANE_COUNT;
+    let operand = |k: usize| -> Vec<T> {
+        (0..lanes)
+            .map(|i| T::from(u16::try_from(100 * k + i + 1).expect("fixture fits in u16")))
+            .collect()
+    };
+    let operands: [Vec<T>; 5] = core::array::from_fn(operand);
+    let mut out = vec![T::default(); 5 * lanes];
+
+    // SAFETY: caller gates on the required target features for `A`.
+    unsafe {
+        let [a, b, c, d, e] = core::array::from_fn(|k| A::load_unaligned(operands[k].as_ptr()));
+        let packed = A::interleave_pairs5(a, b, c, d, e);
+        for (k, register) in packed.into_iter().enumerate() {
+            A::store_unaligned(out.as_mut_ptr().add(k * lanes), register);
+        }
+    }
+
+    let mut expected: Vec<T> = Vec::with_capacity(5 * lanes);
+    for p in 0..lanes / 2 {
+        for vals in &operands {
+            expected.extend_from_slice(&vals[2 * p..2 * p + 2]);
+        }
+    }
+    assert_eq!(out, expected, "interleave_pairs5 mismatch ({lanes} lanes)");
+}
+
 fn check_interleave_pairs<T, A>()
 where
     T: hermes_simd_core::Scalar + PartialEq + core::fmt::Debug + From<u16>,
@@ -1019,6 +1054,8 @@ fn check_pair_family<A: SimdKernel<f32> + SimdKernel<f64>>() {
     check_interleave_pairs::<f64, A>();
     check_interleave_pairs3::<f32, A>();
     check_interleave_pairs3::<f64, A>();
+    check_interleave_pairs5::<f32, A>();
+    check_interleave_pairs5::<f64, A>();
     check_interleave_halves::<A>();
     check_splat_pair::<A>();
     check_blend_halves::<A>();

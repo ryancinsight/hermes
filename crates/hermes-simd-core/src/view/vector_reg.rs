@@ -897,6 +897,30 @@ where
         (Self::new(x), Self::new(y), Self::new(z))
     }
 
+    /// Interleaves five registers' adjacent-lane pairs into the flat
+    /// sequence `self0 b0 c0 d0 e0 self1 b1 c1 d1 e1 ...`, five registers
+    /// long: the inverse of a stride-5 pair decimation, and the transpose
+    /// that writes `n = 5 m` in natural order after five `m`-point
+    /// transforms held one row a register.
+    ///
+    /// Ten shuffles on AVX2 at `f32` (four lane-local unpacks, two blends,
+    /// four half permutes), five half permutes at `f64`, scalar emulation by
+    /// default.
+    #[inline(always)]
+    #[must_use]
+    pub fn interleave_pairs5(self, b: Self, c: Self, d: Self, e: Self) -> [Self; 5] {
+        // SAFETY: constructing the operand vectors proved host support for `Arch`.
+        let [r0, r1, r2, r3, r4] =
+            unsafe { Arch::interleave_pairs5(self.raw, b.raw, c.raw, d.raw, e.raw) };
+        [
+            Self::new(r0),
+            Self::new(r1),
+            Self::new(r2),
+            Self::new(r3),
+            Self::new(r4),
+        ]
+    }
+
     /// Splits four vectors' adjacent-lane pairs into the four stride-4
     /// subsequences: reading the concatenation as a flat pair sequence,
     /// output `i` holds the pairs congruent to `i` modulo 4.

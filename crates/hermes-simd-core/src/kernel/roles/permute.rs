@@ -86,6 +86,19 @@ pub trait SimdPermute<T: Scalar>: SimdStorage<T> + Sealed {
         c: Self::Vector,
     ) -> (Self::Vector, Self::Vector, Self::Vector);
 
+    /// Interleaves five registers' adjacent-lane pairs into the flat
+    /// sequence `a0 b0 c0 d0 e0 a1 b1 c1 d1 e1 ...`, five registers long.
+    ///
+    /// # Safety
+    /// The backend's target features must be available.
+    unsafe fn interleave_pairs5(
+        a: Self::Vector,
+        b: Self::Vector,
+        c: Self::Vector,
+        d: Self::Vector,
+        e: Self::Vector,
+    ) -> [Self::Vector; 5];
+
     /// Splits four registers' adjacent-lane pairs into the four stride-4
     /// subsequences.
     ///
@@ -262,6 +275,16 @@ impl<T: Scalar, A: BackendKernel<T>> SimdPermute<T> for A {
         c: Self::Vector,
     ) -> (Self::Vector, Self::Vector, Self::Vector) {
         <A as BackendKernel<T>>::interleave_pairs3(a, b, c)
+    }
+
+    unsafe fn interleave_pairs5(
+        a: Self::Vector,
+        b: Self::Vector,
+        c: Self::Vector,
+        d: Self::Vector,
+        e: Self::Vector,
+    ) -> [Self::Vector; 5] {
+        <A as BackendKernel<T>>::interleave_pairs5(a, b, c, d, e)
     }
 
     unsafe fn deinterleave_pairs4(
