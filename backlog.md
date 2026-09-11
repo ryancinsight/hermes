@@ -1,17 +1,11 @@
 # Backlog — hermes-simd
 
 <a id="hermes-vectorize-in-frame"></a>
-## HERMES-VECTORIZE-IN-FRAME — Run a lane kernel inside a frame the caller has entered [minor] [perf] — in-progress
-- **Integrator:** claude/fable; **last-update:** 2026-09-11; branch `feat/hermes-interleave-pairs5` (second commit); regions `crates/hermes-simd/src/{vectorize.rs,lib.rs}`.
-- **Evidence:** apollo's plan selects framed executors once at construction (apollo PR #432); its hermes-based kernels still enter through `vectorize_hardware_lanes`, two feature reads and a `call_avx2` per kernel inside an already-established frame (the asm census in `atlas/output/apollo-base128/base256_2026-09-11.md`: the `f32` 32 executor carried both), and a generic caller cannot name `Avx2` itself without the whole backend bound list.
-- **Scope:** `vectorize_in_frame::<T, K>(kernel)` (unsafe: the caller holds the frame) and `LaneScalar::FRAME_LANES`, the sealed scalars entering the frame backend (`Avx2` on x86, `Neon` on aarch64, the portable backend elsewhere) through `assume_supported`; a doctest that runs it under the probe. **Acceptance:** the doctest and the existing suite pass; apollo's framed kernels reach the backend with no probe in the census. Downstream: [`apollo-codelets-over-lanes`](../apollo/backlog.md#apollo-codelets-over-lanes).
-
+## HERMES-VECTORIZE-IN-FRAME — Run a lane kernel inside a frame the caller has entered [minor] [perf] — done 2026-09-11
+- Landed as [PR #174](https://github.com/ryancinsight/hermes/pull/174): `vectorize_in_frame::<T, K>(kernel)` (unsafe, the frame being the contract) runs the kernel on the frame backend through `assume_supported`, `LaneScalar::FRAME_LANES` names its lane count; the sealed scalars enter the backend directly, a downstream implementation keeps the probing ladder; a doctest runs it under the probe. Downstream: [`apollo-codelets-over-lanes`](../apollo/backlog.md#apollo-codelets-over-lanes).
 <a id="hermes-interleave-pairs5"></a>
-## HERMES-INTERLEAVE-PAIRS5 — Interleave five registers' pairs into the flat five-arm sequence [minor] [perf] — in-progress
-- **Integrator:** claude/fable; **last-update:** 2026-09-11; branch `feat/hermes-interleave-pairs5`; regions `crates/hermes-simd-core/src/{kernel/backend.rs,kernel/roles/permute.rs,view/vector_reg.rs}`, `crates/hermes-simd-intrinsics/src/x86_64/avx2_f{32,64}.rs`, `crates/hermes-simd/tests/kernel_property_tests.rs`.
-- **Evidence:** apollo's 180 route (ADR 0062, `apollo/backlog.md#apollo-codelets-over-lanes`) runs five 36-point transforms one row a register and needs the transpose that writes `n = 5 m` in natural order: the inverse of a stride-5 pair decimation, RustFFT's `transpose5_packed`, ten shuffles for twenty pairs at `f32`.
-- **Scope:** `Vector::interleave_pairs5(b, c, d, e) -> [Self; 5]` on the pattern of `interleave_pairs3`: scalar default, AVX2 `f32` (four unpacks, two blends, four half permutes) and `f64` (five half permutes) overrides, the property test per backend. **Acceptance:** `kernel_property_tests` pass on the scalar and AVX2 backends. Downstream: [`apollo-codelets-over-lanes`](../apollo/backlog.md#apollo-codelets-over-lanes).
-
+## HERMES-INTERLEAVE-PAIRS5 — Interleave five registers' pairs into the flat five-arm sequence [minor] [perf] — done 2026-09-11
+- Landed as [PR #174](https://github.com/ryancinsight/hermes/pull/174): `Vector::interleave_pairs5(b, c, d, e) -> [Self; 5]`, ten shuffles on AVX2 at `f32` and five half permutes at `f64`, scalar default; the property test pins each output register per backend. Downstream: [`apollo-codelets-over-lanes`](../apollo/backlog.md#apollo-codelets-over-lanes).
 <a id="hermes-mul-with-swapped"></a>
 ## HERMES-MUL-WITH-SWAPPED — Multiply a complex register by a twiddle held as its direct and swapped rows [minor] [perf] — done 2026-09-11
 - Landed as [PR #173](https://github.com/ryancinsight/hermes/pull/173): `ComplexReg::mul_with_swapped(w, w_swapped)`, two duplicates, one product and one alternating FMA with no shuffle of the twiddle per use, bitwise `self * w`; the complex-register test kernel carries it as an eighth block. Downstream: [`apollo-f32-16-32-kernel-gap`](../apollo/backlog.md#apollo-f32-16-32-kernel-gap).
