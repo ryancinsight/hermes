@@ -439,6 +439,44 @@ impl BackendKernel<f32> for Avx2 {
         )
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime selection in the hermes-simd dispatcher); the operands are register values.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn interleave_pairs5(
+        a: Self::Vector,
+        b: Self::Vector,
+        c: Self::Vector,
+        d: Self::Vector,
+        e: Self::Vector,
+    ) -> [Self::Vector; 5] {
+        // Four lane-local unpacks pair neighbouring arms' even and odd
+        // pairs, one blend pairs the last arm's even pairs beside the
+        // first's odd, and four half permutes and one blend assemble the
+        // outputs: ten shuffles for twenty pairs.
+        let (a, b, c, d, e) = (
+            _mm256_castps_pd(a.0),
+            _mm256_castps_pd(b.0),
+            _mm256_castps_pd(c.0),
+            _mm256_castps_pd(d.0),
+            _mm256_castps_pd(e.0),
+        );
+        let ab = _mm256_unpacklo_pd(a, b);
+        let bc = _mm256_unpackhi_pd(b, c);
+        let cd = _mm256_unpacklo_pd(c, d);
+        let de = _mm256_unpackhi_pd(d, e);
+        let ea = core::arch::x86_64::_mm256_blend_pd::<0b0101>(a, e);
+        [
+            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x20>(ab, cd))),
+            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x20>(ea, bc))),
+            Avx2F32Vec(_mm256_castpd_ps(core::arch::x86_64::_mm256_blend_pd::<
+                0b0011,
+            >(ab, de))),
+            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x31>(cd, ea))),
+            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x31>(bc, de))),
+        ]
+    }
+
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx2")]
     #[inline]

@@ -1,5 +1,11 @@
 # Backlog — hermes-simd
 
+<a id="hermes-interleave-pairs5"></a>
+## HERMES-INTERLEAVE-PAIRS5 — Interleave five registers' pairs into the flat five-arm sequence [minor] [perf] — in-progress
+- **Integrator:** claude/fable; **last-update:** 2026-09-11; branch `feat/hermes-interleave-pairs5`; regions `crates/hermes-simd-core/src/{kernel/backend.rs,kernel/roles/permute.rs,view/vector_reg.rs}`, `crates/hermes-simd-intrinsics/src/x86_64/avx2_f{32,64}.rs`, `crates/hermes-simd/tests/kernel_property_tests.rs`.
+- **Evidence:** apollo's 180 route (ADR 0062, `apollo/backlog.md#apollo-codelets-over-lanes`) runs five 36-point transforms one row a register and needs the transpose that writes `n = 5 m` in natural order: the inverse of a stride-5 pair decimation, RustFFT's `transpose5_packed`, ten shuffles for twenty pairs at `f32`.
+- **Scope:** `Vector::interleave_pairs5(b, c, d, e) -> [Self; 5]` on the pattern of `interleave_pairs3`: scalar default, AVX2 `f32` (four unpacks, two blends, four half permutes) and `f64` (five half permutes) overrides, the property test per backend. **Acceptance:** `kernel_property_tests` pass on the scalar and AVX2 backends. Downstream: [`apollo-codelets-over-lanes`](../apollo/backlog.md#apollo-codelets-over-lanes).
+
 <a id="hermes-mul-with-swapped"></a>
 ## HERMES-MUL-WITH-SWAPPED — Multiply a complex register by a twiddle held as its direct and swapped rows [minor] [perf] — done 2026-09-11
 - Landed as [PR #173](https://github.com/ryancinsight/hermes/pull/173): `ComplexReg::mul_with_swapped(w, w_swapped)`, two duplicates, one product and one alternating FMA with no shuffle of the twiddle per use, bitwise `self * w`; the complex-register test kernel carries it as an eighth block. Downstream: [`apollo-f32-16-32-kernel-gap`](../apollo/backlog.md#apollo-f32-16-32-kernel-gap).

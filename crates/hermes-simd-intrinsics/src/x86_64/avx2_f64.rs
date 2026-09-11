@@ -335,6 +335,27 @@ impl BackendKernel<f64> for Avx2 {
         )
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime selection in the hermes-simd dispatcher); the operands are register values.
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    #[cfg(not(hermes_benchmark_generic_default))]
+    unsafe fn interleave_pairs5(
+        a: Self::Vector,
+        b: Self::Vector,
+        c: Self::Vector,
+        d: Self::Vector,
+        e: Self::Vector,
+    ) -> [Self::Vector; 5] {
+        // A pair is a 128-bit half, so each output is one half concatenation.
+        [
+            Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(a.0, b.0)),
+            Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(c.0, d.0)),
+            Avx2F64Vec(_mm256_permute2f128_pd::<0x30>(e.0, a.0)),
+            Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(b.0, c.0)),
+            Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(d.0, e.0)),
+        ]
+    }
+
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
     #[target_feature(enable = "avx2")]
     #[inline]
