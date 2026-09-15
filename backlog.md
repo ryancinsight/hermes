@@ -1,13 +1,8 @@
 # Backlog — hermes-simd
 
 <a id="hermes-interleave-pairs-in-frame"></a>
-## HERMES-INTERLEAVE-PAIRS-IN-FRAME — `interleave_pairs` compiles outside its backend frame on every x86 backend [patch] [perf] — in-progress
-- **Integrator:** claude/fable; **last-update:** 2026-09-15; branch `fix/hermes-interleave-pairs-in-frame` in the main tree; regions `hermes-simd-intrinsics/src/x86_64/{avx2_f32,avx2_f64,avx512_f32,avx512_f64}.rs`.
-- **Evidence:** the AVX2 and AVX-512 `interleave_pairs` impls carry neither the `#[target_feature]` gate nor `#[inline]` their sibling pair operations carry (`deinterleave_pairs`, `interleave_pairs3`, `interleave_pairs5`, `deinterleave_pairs4`), so a lane kernel calling them from its dispatched frame emits an out-of-line call with `vzeroupper` and stack-passed operands: apollo's eight-block interleave at four lanes (`InterleaveBlocks<8>`, `f64`) censuses at 86 instructions a chunk with 40 spill moves and four such calls (`apollo/output/apollo-base128/base256_2026-09-11.md`, the column-pass census of 2026-09-15), and the pinned phase meter charges the `f64` chain interleaves 273k cycles at 131072 against the `f32` form's 64k for twice the data.
-- **Scope:** the four impls gated and inlined like their siblings; the consumer census (apollo, calls in the frame: zero) is the codegen check, since the doctests run the value contract only. Non-goals: NEON (already gated and inlined), the scalar default.
-- **Acceptance:** no `callq` inside a dispatched `InterleaveBlocks` frame in apollo after the lock advance; the intrinsics tests green.
-- **Dependencies:** none. Downstream: [`apollo-hermes-interleave-in-frame`](../apollo/backlog.md#apollo-hermes-interleave-in-frame).
-
+## HERMES-INTERLEAVE-PAIRS-IN-FRAME — `interleave_pairs` compiled outside its backend frame on every x86 backend [patch] [perf] — done 2026-09-15
+- Landed as [PR #175](https://github.com/ryancinsight/hermes/pull/175): the AVX2 and AVX-512 `interleave_pairs` impls gated and inlined like their sibling pair operations; they had emitted an out-of-line call with `vzeroupper` and stack-passed operands from a dispatched lane kernel (apollo's four-lane eight-block interleave censused at four such calls and 40 spill moves a chunk). The codegen check is the consumer census after the lock advance. Downstream: [`apollo-hermes-interleave-in-frame`](../apollo/backlog.md#apollo-hermes-interleave-in-frame).
 <a id="hermes-vectorize-in-frame"></a>
 ## HERMES-VECTORIZE-IN-FRAME — Run a lane kernel inside a frame the caller has entered [minor] [perf] — done 2026-09-11
 - Landed as [PR #174](https://github.com/ryancinsight/hermes/pull/174): `vectorize_in_frame::<T, K>(kernel)` (unsafe, the frame being the contract) runs the kernel on the frame backend through `assume_supported`, `LaneScalar::FRAME_LANES` names its lane count; the sealed scalars enter the backend directly, a downstream implementation keeps the probing ladder; a doctest runs it under the probe. Downstream: [`apollo-codelets-over-lanes`](../apollo/backlog.md#apollo-codelets-over-lanes).
