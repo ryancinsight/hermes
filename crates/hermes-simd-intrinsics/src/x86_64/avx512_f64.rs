@@ -468,6 +468,9 @@ impl BackendKernel<f64> for Avx512 {
         )
     }
 
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
     #[cfg(not(hermes_benchmark_generic_default))]
     unsafe fn interleave_pairs(
         even: Self::Vector,
