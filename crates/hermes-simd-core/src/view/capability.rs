@@ -66,6 +66,17 @@ where
         Vector::new(unsafe { Arch::splat(value) })
     }
 
+    /// Broadcast the lane pair `(lo, hi)` across the register without
+    /// another host probe: the token form of [`Vector::splat_pair`], for a
+    /// kernel that builds a signed or pair constant inside its loop, where
+    /// the constructor's own probe is a load and a branch per use.
+    #[inline(always)]
+    #[must_use]
+    pub fn splat_pair(&self, lo: T, hi: T) -> Vector<T, Arch> {
+        // SAFETY: possession of `self` proves host support for `Arch`.
+        Vector::new(unsafe { Arch::splat_pair(lo, hi) })
+    }
+
     /// Construct a mask from portable lane bits without another host probe.
     #[inline(always)]
     #[must_use]

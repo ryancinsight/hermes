@@ -247,22 +247,32 @@ fn capability_constructs_constants_and_masks() {
                 .to_bitmask()
                 .0;
 
-            let mut constants = vec![0.0; lanes];
+            let mut constants = vec![0.0; 2 * lanes];
+            let (splat, pair) = constants.split_at_mut(lanes);
             (simd.splat(2.0) + simd.zero())
-                .store_unaligned_to_slice(&mut constants)
+                .store_unaligned_to_slice(splat)
+                .expect("output has exactly one complete lane group");
+            simd.splat_pair(-0.0, 3.5)
+                .store_unaligned_to_slice(pair)
                 .expect("output has exactly one complete lane group");
             (constants, actual_bits)
         }
     }
 
     let (constants, bits) = hermes_simd::vectorize(Constructors);
-    assert!(constants
+    let (splat, pair) = constants.split_at(constants.len() / 2);
+    assert!(splat
         .iter()
         .all(|&value| value.to_bits() == 2.0_f64.to_bits()));
-    let valid_bits = if constants.len() == 64 {
+    // Even lanes the low value, signed zero kept; odd lanes the high one.
+    for (lane, &value) in pair.iter().enumerate() {
+        let expected = if lane % 2 == 0 { -0.0_f64 } else { 3.5 };
+        assert_eq!(value.to_bits(), expected.to_bits(), "pair lane {lane}");
+    }
+    let valid_bits = if splat.len() == 64 {
         u64::MAX
     } else {
-        (1_u64 << constants.len()) - 1
+        (1_u64 << splat.len()) - 1
     };
     assert_eq!(bits, 0xA5A5_A5A5_A5A5_A5A5 & valid_bits);
 }
