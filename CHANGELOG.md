@@ -6,6 +6,9 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Added
 
+- `Simd::splat_pair`: the token form of `Vector::splat_pair`, broadcasting
+  a lane pair without the constructor's host probe.
+
 - [minor][HERMES-INTERLEAVE-PAIRS3] `Vector::interleave_pairs3(b, c)` (and
   the `BackendKernel`/`SimdPermute` method beneath it): three registers'
   adjacent-lane pairs interleaved into the flat sequence `a0 b0 c0 a1 b1

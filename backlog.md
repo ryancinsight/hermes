@@ -1,5 +1,11 @@
 # Backlog — hermes-simd
 
+<a id="hermes-token-splat-pair"></a>
+## HERMES-TOKEN-SPLAT-PAIR — Broadcast a lane pair from the capability token [minor] [perf] — review
+- **Integrator:** claude-opus-5; branch `feat/hermes-token-splat-pair`.
+- **Driver:** apollo's radix-3 kernel folds the quarter turn's signs into `(s, -s)` constants; built per chunk in the four-lane radix-3 sink, `Vector::splat_pair`'s host probe cost `f64` 384 10% on the performance core ([`apollo-radix3-sign-folded`](../apollo/backlog.md#apollo-radix3-sign-folded)).
+- **Acceptance:** `Simd::splat_pair` beside `Simd::splat`; the capability constructor test checks its lanes bit for bit, signed zero included.
+
 <a id="hermes-interleave-pairs-in-frame"></a>
 ## HERMES-INTERLEAVE-PAIRS-IN-FRAME — `interleave_pairs` compiled outside its backend frame on every x86 backend [patch] [perf] — done 2026-09-15
 - Landed as [PR #175](https://github.com/ryancinsight/hermes/pull/175): the AVX2 and AVX-512 `interleave_pairs` impls gated and inlined like their sibling pair operations; they had emitted an out-of-line call with `vzeroupper` and stack-passed operands from a dispatched lane kernel (apollo's four-lane eight-block interleave censused at four such calls and 40 spill moves a chunk). The codegen check is the consumer census after the lock advance. Downstream: [`apollo-hermes-interleave-in-frame`](../apollo/backlog.md#apollo-hermes-interleave-in-frame).
