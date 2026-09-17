@@ -1,10 +1,8 @@
 # Backlog — hermes-simd
 
 <a id="hermes-token-splat-pair"></a>
-## HERMES-TOKEN-SPLAT-PAIR — Broadcast a lane pair from the capability token [minor] [perf] — review
-- **Integrator:** claude-opus-5; branch `feat/hermes-token-splat-pair`.
-- **Driver:** apollo's radix-3 kernel folds the quarter turn's signs into `(s, -s)` constants; built per chunk in the four-lane radix-3 sink, `Vector::splat_pair`'s host probe cost `f64` 384 10% on the performance core ([`apollo-radix3-sign-folded`](../apollo/backlog.md#apollo-radix3-sign-folded)).
-- **Acceptance:** `Simd::splat_pair` beside `Simd::splat`; the capability constructor test checks its lanes bit for bit, signed zero included.
+## HERMES-TOKEN-SPLAT-PAIR — Broadcast a lane pair from the capability token [minor] [perf] — done 2026-09-17
+- Landed as [PR #176](https://github.com/ryancinsight/hermes/pull/176): `Simd::splat_pair` beside `Simd::splat`, checked bit for bit by the capability constructor test. Downstream: [`apollo-radix3-sign-folded`](../apollo/backlog.md#apollo-radix3-sign-folded), where the constructor's per-chunk probe had cost `f64` 384 10%.
 
 <a id="hermes-interleave-pairs-in-frame"></a>
 ## HERMES-INTERLEAVE-PAIRS-IN-FRAME — `interleave_pairs` compiled outside its backend frame on every x86 backend [patch] [perf] — done 2026-09-15
