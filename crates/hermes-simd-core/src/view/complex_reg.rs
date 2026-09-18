@@ -163,6 +163,17 @@ where
         ))
     }
 
+    /// The conjugate of every sample: `(re, im)` becomes `(re, -im)`.
+    ///
+    /// One sign flip on the odd lanes, exact on every backend: a kernel that
+    /// keeps one direction's twiddle table can form the other direction's
+    /// products from it through sign flips alone, which round nothing.
+    #[inline(always)]
+    #[must_use]
+    pub fn conj(self) -> Self {
+        Self(Self::flip_lanes(self.0, T::ZERO, T::SIGN_MASK))
+    }
+
     /// Xors every even lane with `even` and every odd lane with `odd`, the
     /// mask register built without re-probing the host.
     ///
