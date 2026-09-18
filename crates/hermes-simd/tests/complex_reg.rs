@@ -21,7 +21,7 @@
 //!   evaluation-shape difference, not an allowance for a twice-rounding
 //!   fallback.
 //!
-//! `mul_i`, `mul_neg_i`, `swap_samples`, `splat`, and `butterfly` are pure
+//! `mul_i`, `mul_neg_i`, `conj`, `swap_samples`, `splat`, and `butterfly` are pure
 //! sign flips and permutations, exact on every backend, so they use only the
 //! exact tier.
 
@@ -41,7 +41,7 @@ struct ComplexOps<'a> {
 /// One output block per operation, interleaved, in declaration order:
 /// `mul`, `mul_conj`, `mul_i`, `mul_neg_i`, `swap_samples`, `add`, `sub`,
 /// `mul_with_swapped` (the twiddle handed over as its direct and swapped
-/// rows).
+/// rows), `conj`.
 struct ComplexResults {
     lanes: usize,
     out: Vec<f64>,
@@ -73,6 +73,7 @@ impl LaneKernel<f64> for ComplexOps<'_> {
                 w,
                 ComplexReg::from_interleaved(w.into_interleaved().swap_adjacent()),
             ),
+            a.conj(),
         ];
         let mut out = vec![0.0f64; lanes * results.len()];
         for (block, r) in results.into_iter().enumerate() {
@@ -88,7 +89,7 @@ impl LaneKernel<f64> for ComplexOps<'_> {
 /// backends compute, so the rounded tier compares against the tightest
 /// legitimate answer.
 fn reference(a: &[f64], w: &[f64], lanes: usize) -> Vec<Vec<f64>> {
-    let mut blocks = vec![vec![0.0f64; lanes]; 8];
+    let mut blocks = vec![vec![0.0f64; lanes]; 9];
     for s in 0..lanes / 2 {
         let (ar, ai) = (a[2 * s], a[2 * s + 1]);
         let (wr, wi) = (w[2 * s], w[2 * s + 1]);
@@ -112,6 +113,9 @@ fn reference(a: &[f64], w: &[f64], lanes: usize) -> Vec<Vec<f64>> {
         // supplying the cross terms.
         blocks[7][2 * s] = ar.mul_add(wr, -(ai * wi));
         blocks[7][2 * s + 1] = ar.mul_add(wi, ai * wr);
+        // conj: a sign flip of the imaginary lane.
+        blocks[8][2 * s] = ar;
+        blocks[8][2 * s + 1] = -ai;
     }
     // swap_samples: neighbouring samples exchange; a lone trailing pair stays.
     let samples = lanes / 2;
@@ -136,7 +140,7 @@ fn ulps_apart(x: f64, y: f64) -> u64 {
     x.to_bits().abs_diff(y.to_bits())
 }
 
-const OP_NAMES: [&str; 8] = [
+const OP_NAMES: [&str; 9] = [
     "mul",
     "mul_conj",
     "mul_i",
@@ -145,10 +149,11 @@ const OP_NAMES: [&str; 8] = [
     "add",
     "sub",
     "mul_with_swapped",
+    "conj",
 ];
 
 /// Which blocks are permutations and sign flips — exact on every backend.
-const EXACT_ALWAYS: [bool; 8] = [false, false, true, true, true, false, false, false];
+const EXACT_ALWAYS: [bool; 9] = [false, false, true, true, true, false, false, false, true];
 
 #[test]
 fn exact_inputs_agree_bitwise_on_every_operation() {

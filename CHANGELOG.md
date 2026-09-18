@@ -6,6 +6,11 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Added
 
+- [minor] `ComplexReg::conj`: the conjugate of every sample, one sign flip
+  on the odd lanes, exact on every backend. Apollo serves its inverse
+  twiddles from the forward tables through it rather than storing
+  conjugated copies.
+
 - `Simd::splat_pair`: the token form of `Vector::splat_pair`, broadcasting
   a lane pair without the constructor's host probe.
 
