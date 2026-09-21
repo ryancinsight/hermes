@@ -12,10 +12,10 @@
 use crate::Avx512;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::{
-    __m256i, __m512d, __mmask8, _mm512_add_pd, _mm512_alignr_epi64, _mm512_and_si512,
-    _mm512_andnot_si512, _mm512_castpd_si512, _mm512_castsi512_pd, _mm512_cmp_pd_mask,
-    _mm512_cmplt_epi64_mask, _mm512_div_pd, _mm512_fmadd_pd, _mm512_fmaddsub_pd, _mm512_fmsub_pd,
-    _mm512_fmsubadd_pd, _mm512_i32gather_pd, _mm512_i32scatter_pd, _mm512_load_pd, _mm512_loadu_pd,
+    __m256i, __m512d, __mmask8, _mm512_add_pd, _mm512_and_si512, _mm512_andnot_si512,
+    _mm512_castpd_si512, _mm512_castsi512_pd, _mm512_cmp_pd_mask, _mm512_cmplt_epi64_mask,
+    _mm512_div_pd, _mm512_fmadd_pd, _mm512_fmaddsub_pd, _mm512_fmsub_pd, _mm512_fmsubadd_pd,
+    _mm512_i32gather_pd, _mm512_i32scatter_pd, _mm512_load_pd, _mm512_loadu_pd,
     _mm512_mask3_fmadd_pd, _mm512_mask_add_pd, _mm512_mask_blend_pd, _mm512_mask_expand_pd,
     _mm512_mask_i32gather_pd, _mm512_mask_i32scatter_pd, _mm512_mask_loadu_pd, _mm512_mask_mov_pd,
     _mm512_mask_mul_pd, _mm512_mask_storeu_pd, _mm512_maskz_compress_pd, _mm512_max_pd,
@@ -28,8 +28,8 @@ use core::arch::x86_64::{
 };
 #[cfg(not(hermes_benchmark_generic_default))]
 use core::arch::x86_64::{
-    _mm512_broadcast_f64x2, _mm512_permutex2var_pd, _mm512_permutexvar_pd, _mm512_setr_epi64,
-    _mm512_unpackhi_pd, _mm512_unpacklo_pd, _mm_set_pd,
+    _mm512_alignr_epi64, _mm512_broadcast_f64x2, _mm512_permutex2var_pd, _mm512_permutexvar_pd,
+    _mm512_setr_epi64, _mm512_unpackhi_pd, _mm512_unpacklo_pd, _mm_set_pd,
 };
 use hermes_simd_core::kernel::BackendKernel;
 
