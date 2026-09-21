@@ -12,25 +12,24 @@
 use crate::Avx512;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::{
-    __m512, __m512i, __mmask16, _mm512_add_ps, _mm512_alignr_epi32, _mm512_and_si512,
-    _mm512_andnot_si512, _mm512_castps_si512, _mm512_castsi512_ps, _mm512_cmp_ps_mask,
-    _mm512_cmplt_epi32_mask, _mm512_div_ps, _mm512_fmadd_ps, _mm512_fmaddsub_ps, _mm512_fmsub_ps,
-    _mm512_fmsubadd_ps, _mm512_fnmadd_ps, _mm512_i32gather_ps, _mm512_i32scatter_ps,
-    _mm512_load_ps, _mm512_loadu_ps, _mm512_mask3_fmadd_ps, _mm512_mask_add_ps,
-    _mm512_mask_blend_ps, _mm512_mask_expand_ps, _mm512_mask_i32gather_ps,
-    _mm512_mask_i32scatter_ps, _mm512_mask_loadu_ps, _mm512_mask_mov_ps, _mm512_mask_mul_ps,
-    _mm512_mask_storeu_ps, _mm512_maskz_compress_ps, _mm512_max_ps, _mm512_min_ps,
-    _mm512_movehdup_ps, _mm512_moveldup_ps, _mm512_mul_ps, _mm512_or_si512, _mm512_permute_ps,
-    _mm512_reduce_add_ps, _mm512_roundscale_ps, _mm512_rsqrt14_ps, _mm512_set1_ps,
-    _mm512_setzero_ps, _mm512_setzero_si512, _mm512_sqrt_ps, _mm512_store_ps, _mm512_storeu_ps,
-    _mm512_stream_ps, _mm512_sub_ps, _mm512_xor_si512, _CMP_EQ_OQ, _CMP_GE_OQ, _CMP_GT_OQ,
-    _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ, _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT,
+    __m512, __m512i, __mmask16, _mm512_add_ps, _mm512_and_si512, _mm512_andnot_si512,
+    _mm512_castps_si512, _mm512_castsi512_ps, _mm512_cmp_ps_mask, _mm512_cmplt_epi32_mask,
+    _mm512_div_ps, _mm512_fmadd_ps, _mm512_fmaddsub_ps, _mm512_fmsub_ps, _mm512_fmsubadd_ps,
+    _mm512_fnmadd_ps, _mm512_i32gather_ps, _mm512_i32scatter_ps, _mm512_load_ps, _mm512_loadu_ps,
+    _mm512_mask3_fmadd_ps, _mm512_mask_add_ps, _mm512_mask_blend_ps, _mm512_mask_expand_ps,
+    _mm512_mask_i32gather_ps, _mm512_mask_i32scatter_ps, _mm512_mask_loadu_ps, _mm512_mask_mov_ps,
+    _mm512_mask_mul_ps, _mm512_mask_storeu_ps, _mm512_maskz_compress_ps, _mm512_max_ps,
+    _mm512_min_ps, _mm512_movehdup_ps, _mm512_moveldup_ps, _mm512_mul_ps, _mm512_or_si512,
+    _mm512_permute_ps, _mm512_reduce_add_ps, _mm512_roundscale_ps, _mm512_rsqrt14_ps,
+    _mm512_set1_ps, _mm512_setzero_ps, _mm512_setzero_si512, _mm512_sqrt_ps, _mm512_store_ps,
+    _mm512_storeu_ps, _mm512_stream_ps, _mm512_sub_ps, _mm512_xor_si512, _CMP_EQ_OQ, _CMP_GE_OQ,
+    _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ, _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT,
     _MM_FROUND_TO_NEG_INF, _MM_FROUND_TO_POS_INF, _MM_FROUND_TO_ZERO,
 };
 #[cfg(not(hermes_benchmark_generic_default))]
 use core::arch::x86_64::{
-    _mm512_castpd_ps, _mm512_permutex2var_ps, _mm512_permutexvar_ps, _mm512_set1_pd,
-    _mm512_setr_epi32, _mm512_shuffle_f32x4, _mm512_shuffle_ps, _mm512_unpackhi_ps,
+    _mm512_alignr_epi32, _mm512_castpd_ps, _mm512_permutex2var_ps, _mm512_permutexvar_ps,
+    _mm512_set1_pd, _mm512_setr_epi32, _mm512_shuffle_f32x4, _mm512_shuffle_ps, _mm512_unpackhi_ps,
     _mm512_unpacklo_ps,
 };
 use hermes_simd_core::kernel::BackendKernel;
