@@ -151,7 +151,24 @@ tracing = { version = "0.1", default-features = false }
 # checks use explicit `checked_*` arithmetic (see `tiling::dims`) so operand-span
 # safety holds independently of this profile flag.
 [profile.dev]
+debug = "line-tables-only"
 overflow-checks = true
+
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.dev.build-override]
+debug = false
+
+[profile.test]
+debug = "line-tables-only"
+
+[profile.test.package."*"]
+debug = false
+
+[profile.test.build-override]
+debug = false
 
 [profile.release]
 opt-level = 3
