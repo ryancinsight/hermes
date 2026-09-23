@@ -344,3 +344,25 @@ marked delivered.
 - **[patch] Default provider feature policy**: every Hermes package defaults `parallel` and `mnemosyne-memory`; the default …
 - **[arch] NUMA consolidation onto themis/mnemosyne** (delivered 2026-06-12): `numa.rs` detection now delegates to themis …
 
+
+<a id="hermes-pair-permute-arity"></a>
+### HERMES-PAIR-PERMUTE-ARITY — One const-generic pair permute per direction [arch] [major] — todo
+
+- **Outcome:** `deinterleave_pairs{,4,8}` and `interleave_pairs{,3,5}` collapse to
+  `deinterleave_pairs::<N>([V; N]) -> [V; N]` and `interleave_pairs::<N>` on
+  `BackendKernel`, `SimdPermute`, and `Vector`; arity leaves the names.
+- **Design:** the power-of-two default is one level loop (block size 2, 4, .., N;
+  pairwise split of `x_k, y_k` per block), written once as an inner routine the
+  overrides reuse; non-power-of-two `N` keeps scalar emulation; AVX2/AVX-512/NEON
+  overrides branch on `const N` (`if N == 4`/`8`), so each instance is straight-line.
+- **Acceptance:** `cargo asm` of the apollo radix-4/8 split gathers and the AVX2
+  f32/f64 `N = 4, 8` instances matches the arity-named methods (no stack spill of
+  the register array); property test per `N` in {2,3,4,5,8} against the scalar
+  reference, generic over shipped backends and scalars; apollo 14 call sites
+  migrated in the same co-evolution unit; semver-checks classifies major.
+- **priority:** tightening. **needs:** the in-flight `vector_reg` split landing.
+- **scope:** `crates/hermes-simd-core/src/kernel/{backend.rs,roles/permute.rs}`,
+  `crates/hermes-simd-core/src/view/vector_reg/permute.rs`,
+  `crates/hermes-simd-intrinsics/src/{x86_64,aarch64}/`; apollo consumers.
+- **Next step:** ADR recording the `const N` branch design versus
+  `generic_const_exprs` recursion (nightly-only, rejected).
