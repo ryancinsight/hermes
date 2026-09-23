@@ -32,3 +32,4 @@
 | [021](021-exact-processor-binding.md) | Exact Processor Binding | Accepted |
 | [022](022-unrunnable-isa-evidence-standard.md) | Evidence Standard for Kernels on Un-runnable ISAs | Proposed |
 | [023](023-first-party-memory-source-identity.md) | One First-Party Memory Source Identity During Provider Co-Evolution | Accepted |
+| [024](024-const-generic-pair-permutes.md) | Const-Generic Pair Decimation and Interleave | Accepted |

@@ -34,6 +34,8 @@ use core::arch::x86_64::{
     _mm256_shuffle_ps, _mm256_unpackhi_pd, _mm256_unpackhi_ps, _mm256_unpacklo_pd,
     _mm256_unpacklo_ps,
 };
+#[cfg(not(hermes_benchmark_generic_default))]
+use hermes_simd_core::kernel::pair_permute::{self, cast_arity};
 use hermes_simd_core::kernel::BackendKernel;
 
 /// Newtype over `__m256` so `Send + Sync` can be implemented on the wrapper.
@@ -381,104 +383,129 @@ impl BackendKernel<f32> for Avx2 {
         )
     }
 
-    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    /// Specialized at `N = 2, 4, 8`; other arities take the portable route.
+    ///
+    /// At `N = 4` a fused two-level network: lane-local 64-bit unpacks group
+    /// each half's even/odd pairs, then one half concatenation per output —
+    /// four unpacks and four `vperm2f128`, half the shuffle count of two
+    /// pairwise levels (the cross-half permute is the expensive step on
+    /// efficiency cores). With four pairs a register, the eight stride-8
+    /// subsequences are two independent stride-4 problems: the even-indexed
+    /// registers carry subsequences 0 to 3 and the odd-indexed ones 4 to 7.
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); no pointer operands.
     #[target_feature(enable = "avx2")]
     #[inline]
     #[cfg(not(hermes_benchmark_generic_default))]
-    unsafe fn deinterleave_pairs(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
-        // Regroup the 128-bit halves so each `shuffle_ps` operand holds four
-        // consecutive source pairs; the shuffles then pick alternating 64-bit
-        // pairs, keeping each pair's lanes adjacent.
-        let t0 = _mm256_permute2f128_ps::<0x20>(a.0, b.0);
-        let t1 = _mm256_permute2f128_ps::<0x31>(a.0, b.0);
-        (
-            Avx2F32Vec(_mm256_shuffle_ps::<0b01_00_01_00>(t0, t1)),
-            Avx2F32Vec(_mm256_shuffle_ps::<0b11_10_11_10>(t0, t1)),
-        )
+    unsafe fn deinterleave_pairs<const N: usize>(regs: [Self::Vector; N]) -> [Self::Vector; N] {
+        if N == 2 {
+            // Regroup the 128-bit halves so each `shuffle_ps` operand holds
+            // four consecutive source pairs; the shuffles then pick
+            // alternating 64-bit pairs, keeping each pair's lanes adjacent.
+            let [a, b] = cast_arity(regs);
+            let t0 = _mm256_permute2f128_ps::<0x20>(a.0, b.0);
+            let t1 = _mm256_permute2f128_ps::<0x31>(a.0, b.0);
+            cast_arity([
+                Avx2F32Vec(_mm256_shuffle_ps::<0b01_00_01_00>(t0, t1)),
+                Avx2F32Vec(_mm256_shuffle_ps::<0b11_10_11_10>(t0, t1)),
+            ])
+        } else if N == 4 {
+            let [a, b, c, d] = cast_arity(regs);
+            let a = _mm256_castps_pd(a.0);
+            let b = _mm256_castps_pd(b.0);
+            let c = _mm256_castps_pd(c.0);
+            let d = _mm256_castps_pd(d.0);
+            let s0 = _mm256_unpacklo_pd(a, b);
+            let s2 = _mm256_unpackhi_pd(a, b);
+            let s1 = _mm256_unpacklo_pd(c, d);
+            let s3 = _mm256_unpackhi_pd(c, d);
+            cast_arity([
+                Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x20>(s0, s1))),
+                Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x20>(s2, s3))),
+                Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x31>(s0, s1))),
+                Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x31>(s2, s3))),
+            ])
+        } else if N == 8 {
+            let [a, b, c, d, e, f, g, h] = cast_arity(regs);
+            // SAFETY: the target feature above covers both nested calls.
+            let ([s0, s1, s2, s3], [s4, s5, s6, s7]) = unsafe {
+                (
+                    <Self as BackendKernel<f32>>::deinterleave_pairs([a, c, e, g]),
+                    <Self as BackendKernel<f32>>::deinterleave_pairs([b, d, f, h]),
+                )
+            };
+            cast_arity([s0, s1, s2, s3, s4, s5, s6, s7])
+        } else {
+            // SAFETY: the target feature above covers the portable route.
+            unsafe { pair_permute::deinterleave::<f32, Self, N>(regs) }
+        }
     }
 
-    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    /// Specialized at `N = 2, 3, 5`; other arities take the portable route.
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); no pointer operands.
     #[target_feature(enable = "avx2")]
     #[inline]
     #[cfg(not(hermes_benchmark_generic_default))]
-    unsafe fn interleave_pairs(
-        even: Self::Vector,
-        odd: Self::Vector,
-    ) -> (Self::Vector, Self::Vector) {
-        // Undo the forward shuffles first, rebuilding four consecutive source
-        // pairs per 128-bit block, then restore the original half order.
-        let lo = _mm256_shuffle_ps::<0b01_00_01_00>(even.0, odd.0);
-        let hi = _mm256_shuffle_ps::<0b11_10_11_10>(even.0, odd.0);
-        (
-            Avx2F32Vec(_mm256_permute2f128_ps::<0x20>(lo, hi)),
-            Avx2F32Vec(_mm256_permute2f128_ps::<0x31>(lo, hi)),
-        )
-    }
-
-    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime selection in the hermes-simd dispatcher); the operands are register values.
-    #[target_feature(enable = "avx2")]
-    #[inline]
-    #[cfg(not(hermes_benchmark_generic_default))]
-    unsafe fn interleave_pairs3(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-    ) -> (Self::Vector, Self::Vector, Self::Vector) {
-        // Lane-local 64-bit unpacks pair the first two arms' even pairs and
-        // the last two's odd pairs, one pair shuffle takes the third arm's
-        // even pairs beside the first's odd, and three half permutes
-        // assemble the outputs: six shuffles, no padding.
-        let (a, b, c) = (
-            _mm256_castps_pd(a.0),
-            _mm256_castps_pd(b.0),
-            _mm256_castps_pd(c.0),
-        );
-        let ab = _mm256_unpacklo_pd(a, b);
-        let bc = _mm256_unpackhi_pd(b, c);
-        let ca = _mm256_shuffle_pd::<0b1010>(c, a);
-        (
-            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x20>(ab, ca))),
-            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x30>(bc, ab))),
-            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x31>(ca, bc))),
-        )
-    }
-
-    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime selection in the hermes-simd dispatcher); the operands are register values.
-    #[target_feature(enable = "avx2")]
-    #[inline]
-    #[cfg(not(hermes_benchmark_generic_default))]
-    unsafe fn interleave_pairs5(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-        d: Self::Vector,
-        e: Self::Vector,
-    ) -> [Self::Vector; 5] {
-        // Four lane-local unpacks pair neighbouring arms' even and odd
-        // pairs, one blend pairs the last arm's even pairs beside the
-        // first's odd, and four half permutes and one blend assemble the
-        // outputs: ten shuffles for twenty pairs.
-        let (a, b, c, d, e) = (
-            _mm256_castps_pd(a.0),
-            _mm256_castps_pd(b.0),
-            _mm256_castps_pd(c.0),
-            _mm256_castps_pd(d.0),
-            _mm256_castps_pd(e.0),
-        );
-        let ab = _mm256_unpacklo_pd(a, b);
-        let bc = _mm256_unpackhi_pd(b, c);
-        let cd = _mm256_unpacklo_pd(c, d);
-        let de = _mm256_unpackhi_pd(d, e);
-        let ea = core::arch::x86_64::_mm256_blend_pd::<0b0101>(a, e);
-        [
-            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x20>(ab, cd))),
-            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x20>(ea, bc))),
-            Avx2F32Vec(_mm256_castpd_ps(core::arch::x86_64::_mm256_blend_pd::<
-                0b0011,
-            >(ab, de))),
-            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x31>(cd, ea))),
-            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x31>(bc, de))),
-        ]
+    unsafe fn interleave_pairs<const N: usize>(regs: [Self::Vector; N]) -> [Self::Vector; N] {
+        if N == 2 {
+            // Undo the forward shuffles first, rebuilding four consecutive
+            // source pairs per 128-bit block, then restore the half order.
+            let [even, odd] = cast_arity(regs);
+            let lo = _mm256_shuffle_ps::<0b01_00_01_00>(even.0, odd.0);
+            let hi = _mm256_shuffle_ps::<0b11_10_11_10>(even.0, odd.0);
+            cast_arity([
+                Avx2F32Vec(_mm256_permute2f128_ps::<0x20>(lo, hi)),
+                Avx2F32Vec(_mm256_permute2f128_ps::<0x31>(lo, hi)),
+            ])
+        } else if N == 3 {
+            // Lane-local 64-bit unpacks pair the first two arms' even pairs
+            // and the last two's odd pairs, one pair shuffle takes the third
+            // arm's even pairs beside the first's odd, and three half
+            // permutes assemble the outputs: six shuffles, no padding.
+            let [a, b, c] = cast_arity(regs);
+            let (a, b, c) = (
+                _mm256_castps_pd(a.0),
+                _mm256_castps_pd(b.0),
+                _mm256_castps_pd(c.0),
+            );
+            let ab = _mm256_unpacklo_pd(a, b);
+            let bc = _mm256_unpackhi_pd(b, c);
+            let ca = _mm256_shuffle_pd::<0b1010>(c, a);
+            cast_arity([
+                Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x20>(ab, ca))),
+                Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x30>(bc, ab))),
+                Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x31>(ca, bc))),
+            ])
+        } else if N == 5 {
+            // Four lane-local unpacks pair neighbouring arms' even and odd
+            // pairs, one blend pairs the last arm's even pairs beside the
+            // first's odd, and four half permutes and one blend assemble the
+            // outputs: ten shuffles for twenty pairs.
+            let [a, b, c, d, e] = cast_arity(regs);
+            let (a, b, c, d, e) = (
+                _mm256_castps_pd(a.0),
+                _mm256_castps_pd(b.0),
+                _mm256_castps_pd(c.0),
+                _mm256_castps_pd(d.0),
+                _mm256_castps_pd(e.0),
+            );
+            let ab = _mm256_unpacklo_pd(a, b);
+            let bc = _mm256_unpackhi_pd(b, c);
+            let cd = _mm256_unpacklo_pd(c, d);
+            let de = _mm256_unpackhi_pd(d, e);
+            let ea = core::arch::x86_64::_mm256_blend_pd::<0b0101>(a, e);
+            cast_arity([
+                Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x20>(ab, cd))),
+                Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x20>(ea, bc))),
+                Avx2F32Vec(_mm256_castpd_ps(core::arch::x86_64::_mm256_blend_pd::<
+                    0b0011,
+                >(ab, de))),
+                Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x31>(cd, ea))),
+                Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x31>(bc, de))),
+            ])
+        } else {
+            // SAFETY: the target feature above covers the portable route.
+            unsafe { pair_permute::interleave::<f32, Self, N>(regs) }
+        }
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
@@ -552,62 +579,6 @@ impl BackendKernel<f32> for Avx2 {
                 2 => <Self as BackendKernel<f32>>::concat_shift_pairs::<2>(a, b),
                 _ => <Self as BackendKernel<f32>>::concat_shift_pairs::<3>(a, b),
             }
-        }
-    }
-
-    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
-    #[target_feature(enable = "avx2")]
-    #[inline]
-    #[cfg(not(hermes_benchmark_generic_default))]
-    unsafe fn deinterleave_pairs4(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-        d: Self::Vector,
-    ) -> (Self::Vector, Self::Vector, Self::Vector, Self::Vector) {
-        // Fused two-level network: lane-local 64-bit unpacks group each
-        // half's even/odd pairs, then one half concatenation per output —
-        // four cheap unpacks and four `vperm2f128`, half the shuffle count
-        // of composing the pairwise deinterleave twice (the cross-half
-        // permute is the expensive step on efficiency cores).
-        let a = _mm256_castps_pd(a.0);
-        let b = _mm256_castps_pd(b.0);
-        let c = _mm256_castps_pd(c.0);
-        let d = _mm256_castps_pd(d.0);
-        let s0 = _mm256_unpacklo_pd(a, b);
-        let s2 = _mm256_unpackhi_pd(a, b);
-        let s1 = _mm256_unpacklo_pd(c, d);
-        let s3 = _mm256_unpackhi_pd(c, d);
-        (
-            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x20>(s0, s1))),
-            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x20>(s2, s3))),
-            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x31>(s0, s1))),
-            Avx2F32Vec(_mm256_castpd_ps(_mm256_permute2f128_pd::<0x31>(s2, s3))),
-        )
-    }
-
-    /// Four pairs per register, so the eight stride-8 subsequences are two
-    /// independent stride-4 problems: the even-indexed registers carry
-    /// subsequences 0 to 3 and the odd-indexed ones carry 4 to 7. Two fused
-    /// four-way networks, against the default's two plus a pairwise level.
-    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above).
-    #[target_feature(enable = "avx2")]
-    #[inline]
-    unsafe fn deinterleave_pairs8(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-        d: Self::Vector,
-        e: Self::Vector,
-        f: Self::Vector,
-        g: Self::Vector,
-        h: Self::Vector,
-    ) -> [Self::Vector; 8] {
-        // SAFETY: the target feature above covers both nested calls.
-        unsafe {
-            let (s0, s1, s2, s3) = <Self as BackendKernel<f32>>::deinterleave_pairs4(a, c, e, g);
-            let (s4, s5, s6, s7) = <Self as BackendKernel<f32>>::deinterleave_pairs4(b, d, f, h);
-            [s0, s1, s2, s3, s4, s5, s6, s7]
         }
     }
 

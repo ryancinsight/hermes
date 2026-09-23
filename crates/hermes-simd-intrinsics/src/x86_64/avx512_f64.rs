@@ -31,6 +31,8 @@ use core::arch::x86_64::{
     _mm512_alignr_epi64, _mm512_broadcast_f64x2, _mm512_permutex2var_pd, _mm512_permutexvar_pd,
     _mm512_setr_epi64, _mm512_unpackhi_pd, _mm512_unpacklo_pd, _mm_set_pd,
 };
+#[cfg(not(hermes_benchmark_generic_default))]
+use hermes_simd_core::kernel::pair_permute::{self, cast_arity};
 use hermes_simd_core::kernel::BackendKernel;
 
 /// Newtype over `__m512d` providing `Send + Sync`.
@@ -454,35 +456,47 @@ impl BackendKernel<f64> for Avx512 {
         )
     }
 
-    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    /// Specialized at `N = 2`, one two-source permute a result; every
+    /// power of two above composes those levels through the portable route.
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); no pointer operands.
     #[target_feature(enable = "avx512f")]
     #[inline]
     #[cfg(not(hermes_benchmark_generic_default))]
-    unsafe fn deinterleave_pairs(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
-        // Alternating 64-bit lane pairs of `a || b`.
-        let even_idx = _mm512_setr_epi64(0, 1, 4, 5, 8, 9, 12, 13);
-        let odd_idx = _mm512_setr_epi64(2, 3, 6, 7, 10, 11, 14, 15);
-        (
-            Avx512F64Vec(_mm512_permutex2var_pd(a.0, even_idx, b.0)),
-            Avx512F64Vec(_mm512_permutex2var_pd(a.0, odd_idx, b.0)),
-        )
+    unsafe fn deinterleave_pairs<const N: usize>(regs: [Self::Vector; N]) -> [Self::Vector; N] {
+        if N == 2 {
+            // Alternating 64-bit lane pairs of `a || b`.
+            let [a, b] = cast_arity(regs);
+            let even_idx = _mm512_setr_epi64(0, 1, 4, 5, 8, 9, 12, 13);
+            let odd_idx = _mm512_setr_epi64(2, 3, 6, 7, 10, 11, 14, 15);
+            cast_arity([
+                Avx512F64Vec(_mm512_permutex2var_pd(a.0, even_idx, b.0)),
+                Avx512F64Vec(_mm512_permutex2var_pd(a.0, odd_idx, b.0)),
+            ])
+        } else {
+            // SAFETY: the target feature above covers the portable route.
+            unsafe { pair_permute::deinterleave::<f64, Self, N>(regs) }
+        }
     }
 
-    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.
+    /// Specialized at `N = 2`; other arities take the portable route.
+    // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); no pointer operands.
     #[target_feature(enable = "avx512f")]
     #[inline]
     #[cfg(not(hermes_benchmark_generic_default))]
-    unsafe fn interleave_pairs(
-        even: Self::Vector,
-        odd: Self::Vector,
-    ) -> (Self::Vector, Self::Vector) {
-        // Alternate pairs from `even` and `odd`, indices 8..15 selecting `odd`.
-        let first_idx = _mm512_setr_epi64(0, 1, 8, 9, 2, 3, 10, 11);
-        let second_idx = _mm512_setr_epi64(4, 5, 12, 13, 6, 7, 14, 15);
-        (
-            Avx512F64Vec(_mm512_permutex2var_pd(even.0, first_idx, odd.0)),
-            Avx512F64Vec(_mm512_permutex2var_pd(even.0, second_idx, odd.0)),
-        )
+    unsafe fn interleave_pairs<const N: usize>(regs: [Self::Vector; N]) -> [Self::Vector; N] {
+        if N == 2 {
+            // Alternate pairs from `even` and `odd`, indices 8..15 selecting `odd`.
+            let [even, odd] = cast_arity(regs);
+            let first_idx = _mm512_setr_epi64(0, 1, 8, 9, 2, 3, 10, 11);
+            let second_idx = _mm512_setr_epi64(4, 5, 12, 13, 6, 7, 14, 15);
+            cast_arity([
+                Avx512F64Vec(_mm512_permutex2var_pd(even.0, first_idx, odd.0)),
+                Avx512F64Vec(_mm512_permutex2var_pd(even.0, second_idx, odd.0)),
+            ])
+        } else {
+            // SAFETY: the target feature above covers the portable route.
+            unsafe { pair_permute::interleave::<f64, Self, N>(regs) }
+        }
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx512f` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 8-lane vector width within caller-validated bounds.

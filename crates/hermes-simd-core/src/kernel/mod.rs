@@ -1,6 +1,7 @@
 //! SIMD kernel contracts and operation-family capability facets.
 
 mod backend;
+pub mod pair_permute;
 mod roles;
 
 pub use backend::{BackendKernel, MAX_SIMD_LANES};

@@ -35,6 +35,9 @@
 //! - **Adjacent-pair shuffles** — `swap_adjacent`, `dup_even`, `dup_odd`,
 //!   `fmaddsub`, `fmsubadd`: the minimal set for register-resident interleaved
 //!   complex arithmetic.
+//! - **Pair decimation** — `deinterleave_pairs` and `interleave_pairs`, the
+//!   stride-`N` gather and scatter of `N` registers at lane-pair granularity,
+//!   generic over `N`; defaults and override fallbacks in [`pair_permute`].
 //!
 //! # Architecture Mapping
 //!
@@ -43,6 +46,8 @@
 //! | `masked_add` | `_mm512_mask_add_ps` | `_mm256_blendv_ps(src,add,mask)` | `vbslq_f32` | loop+if |
 //! | `compress` | `_mm512_mask_compressstoreu_ps` | emulated | emulated | loop+if |
 //! | `gather` | `_mm512_i32gather_ps` | `_mm256_i32gather_ps` | emulated | loop |
+
+use super::pair_permute;
 
 /// Lane capacity of the fixed scalar-fallback stack buffers used by the default
 /// `BackendKernel` methods (`scan_vector`, `swap_adjacent`, `dup_even`/`dup_odd`,
@@ -1281,223 +1286,52 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         )
     }
 
-    /// Deinterleaves two registers at adjacent-lane-pair granularity: reading
-    /// `a || b` as a flat sequence of lane pairs (interleaved complex
-    /// samples), the results hold the even-indexed and odd-indexed pairs.
+    /// Stride-`N` decimation of `N` registers at adjacent-lane-pair
+    /// granularity: reading `regs` as one flat sequence of lane pairs
+    /// (interleaved complex samples), output `k` holds the pairs congruent to
+    /// `k` modulo `N`, in order.
     ///
-    /// The pair analog of [`BackendKernel::deinterleave`]: with two complex
-    /// samples per pair-register half this is the split of a stride-2
-    /// complex decimation. Requires an even `LANE_COUNT`.
-    ///
-    /// Default: scalar emulation.
-    ///
-    /// # Safety
-    /// Processor must support the required target feature.
-    #[inline(always)]
-    unsafe fn deinterleave_pairs(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
-        const { Self::LANE_BOUND_CHECK };
-        let lanes = Self::LANE_COUNT;
-        debug_assert!(
-            lanes.is_multiple_of(2),
-            "pair granularity needs whole pairs"
-        );
-        let mut buf_a = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        let mut buf_b = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        Self::store_unaligned(buf_a.as_mut_ptr().cast::<T>(), a);
-        Self::store_unaligned(buf_b.as_mut_ptr().cast::<T>(), b);
-
-        let mut even = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        let mut odd = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        let pick = |flat: usize| {
-            if flat < lanes {
-                // SAFETY: `store_unaligned` above initialized lanes `0..lanes`
-                // of both buffers, and `flat` is bounded by the caller loop.
-                unsafe { buf_a[flat].assume_init() }
-            } else {
-                // SAFETY: as above for the second buffer.
-                unsafe { buf_b[flat - lanes].assume_init() }
-            }
-        };
-        for p in 0..lanes / 2 {
-            even[2 * p].write(pick(4 * p));
-            even[2 * p + 1].write(pick(4 * p + 1));
-            odd[2 * p].write(pick(4 * p + 2));
-            odd[2 * p + 1].write(pick(4 * p + 3));
-        }
-        (
-            Self::load_unaligned(even.as_ptr().cast::<T>()),
-            Self::load_unaligned(odd.as_ptr().cast::<T>()),
-        )
-    }
-
-    /// Reassembles the even-pair and odd-pair registers produced by
-    /// [`BackendKernel::deinterleave_pairs`] into the original operand pair,
-    /// so a pair-granular permutation can round-trip in registers rather than
-    /// through a stack buffer.
-    ///
-    /// Reading the result `a || b` as a flat lane sequence, for every pair
-    /// index `p` below `LANE_COUNT / 2`: `out[4p] = even[2p]`,
-    /// `out[4p + 1] = even[2p + 1]`, `out[4p + 2] = odd[2p]`, and
-    /// `out[4p + 3] = odd[2p + 1]`. Requires an even `LANE_COUNT`.
-    ///
-    /// Default: scalar emulation.
-    ///
-    /// # Safety
-    /// Processor must support the required target feature.
-    #[inline(always)]
-    unsafe fn interleave_pairs(
-        even: Self::Vector,
-        odd: Self::Vector,
-    ) -> (Self::Vector, Self::Vector) {
-        const { Self::LANE_BOUND_CHECK };
-        let lanes = Self::LANE_COUNT;
-        debug_assert!(
-            lanes.is_multiple_of(2),
-            "pair granularity needs whole pairs"
-        );
-        let mut buf_even = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        let mut buf_odd = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        Self::store_unaligned(buf_even.as_mut_ptr().cast::<T>(), even);
-        Self::store_unaligned(buf_odd.as_mut_ptr().cast::<T>(), odd);
-
-        let mut first = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        let mut second = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        for p in 0..lanes / 2 {
-            // SAFETY: `store_unaligned` above initialized lanes `0..lanes` of
-            // both buffers, and every index below stays within that range.
-            let (e0, e1, o0, o1) = unsafe {
-                (
-                    buf_even[2 * p].assume_init(),
-                    buf_even[2 * p + 1].assume_init(),
-                    buf_odd[2 * p].assume_init(),
-                    buf_odd[2 * p + 1].assume_init(),
-                )
-            };
-            for (offset, value) in [e0, e1, o0, o1].into_iter().enumerate() {
-                let flat = 4 * p + offset;
-                if flat < lanes {
-                    first[flat].write(value);
-                } else {
-                    second[flat - lanes].write(value);
-                }
-            }
-        }
-        (
-            Self::load_unaligned(first.as_ptr().cast::<T>()),
-            Self::load_unaligned(second.as_ptr().cast::<T>()),
-        )
-    }
-
-    /// Interleaves three registers' adjacent-lane pairs into the flat
-    /// sequence `a0 b0 c0 a1 b1 c1 ...`, three registers long.
-    ///
-    /// Reading `x || y || z` as a flat pair sequence, pair `3p + k` is pair
-    /// `p` of operand `k`: the inverse of a stride-3 pair decimation, and the
-    /// store shape of a three-arm scatter whose registers hold one group per
-    /// pair. Requires an even `LANE_COUNT`.
-    ///
-    /// Default: scalar emulation.
-    ///
-    /// # Safety
-    /// Processor must support the required target feature.
-    #[inline(always)]
-    unsafe fn interleave_pairs3(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-    ) -> (Self::Vector, Self::Vector, Self::Vector) {
-        const { Self::LANE_BOUND_CHECK };
-        let lanes = Self::LANE_COUNT;
-        debug_assert!(
-            lanes.is_multiple_of(2),
-            "pair granularity needs whole pairs"
-        );
-        let mut src = [core::mem::MaybeUninit::<T>::uninit(); 3 * MAX_SIMD_LANES];
-        let mut out = [core::mem::MaybeUninit::<T>::uninit(); 3 * MAX_SIMD_LANES];
-        let base = src.as_mut_ptr().cast::<T>();
-        // SAFETY: `src` holds `3 * MAX_SIMD_LANES >= 3 * lanes` lanes, the
-        // three stores fill `0..3 * lanes`, every read below stays inside
-        // that range, and every write lands inside `0..3 * lanes` of `out`,
-        // which the three loads then read in full.
-        unsafe {
-            Self::store_unaligned(base, a);
-            Self::store_unaligned(base.add(lanes), b);
-            Self::store_unaligned(base.add(2 * lanes), c);
-            for p in 0..lanes / 2 {
-                for k in 0..3 {
-                    let from = k * lanes + 2 * p;
-                    let to = 2 * (3 * p + k);
-                    out[to].write(src[from].assume_init());
-                    out[to + 1].write(src[from + 1].assume_init());
-                }
-            }
-            let packed = out.as_ptr().cast::<T>();
-            (
-                Self::load_unaligned(packed),
-                Self::load_unaligned(packed.add(lanes)),
-                Self::load_unaligned(packed.add(2 * lanes)),
-            )
-        }
-    }
-
-    /// Interleaves five registers' adjacent-lane pairs into the flat
-    /// sequence `a0 b0 c0 d0 e0 a1 b1 c1 d1 e1 ...`, five registers long.
-    ///
-    /// Reading `a || b || c || d || e` as a flat pair sequence, pair
-    /// `5p + k` is pair `p` of operand `k`: the inverse of a stride-5 pair
-    /// decimation, and the store shape of a five-row column pass whose
-    /// registers hold one row's consecutive columns — the transpose that
-    /// writes `n = 5 m` in natural order after five `m`-point transforms.
+    /// The pair analog of [`BackendKernel::deinterleave`]. On interleaved
+    /// complex data it is the radix-`N` complex decimation of `N` registers —
+    /// the strided gather a mixed-radix transform performs between passes —
+    /// and at `N = LANE_COUNT / 2` the transpose of a square complex tile.
     /// Requires an even `LANE_COUNT`.
     ///
-    /// Default: scalar emulation.
+    /// Default: [`pair_permute::deinterleave`] — for a power of two `N > 2`,
+    /// `log2 N` levels of this method at `N = 2`, so a backend overriding only
+    /// the two-register arm gets every power of two from it; scalar emulation
+    /// otherwise. An override specializes the arities it has a dedicated
+    /// network for and forwards the rest to [`pair_permute::deinterleave`].
     ///
     /// # Safety
     /// Processor must support the required target feature.
     #[inline(always)]
-    unsafe fn interleave_pairs5(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-        d: Self::Vector,
-        e: Self::Vector,
-    ) -> [Self::Vector; 5] {
-        const { Self::LANE_BOUND_CHECK };
-        let lanes = Self::LANE_COUNT;
-        debug_assert!(
-            lanes.is_multiple_of(2),
-            "pair granularity needs whole pairs"
-        );
-        let mut src = [core::mem::MaybeUninit::<T>::uninit(); 5 * MAX_SIMD_LANES];
-        let mut out = [core::mem::MaybeUninit::<T>::uninit(); 5 * MAX_SIMD_LANES];
-        let base = src.as_mut_ptr().cast::<T>();
-        // SAFETY: `src` holds `5 * MAX_SIMD_LANES >= 5 * lanes` lanes, the
-        // five stores fill `0..5 * lanes`, every read below stays inside
-        // that range, and every write lands inside `0..5 * lanes` of `out`,
-        // which the five loads then read in full.
-        unsafe {
-            Self::store_unaligned(base, a);
-            Self::store_unaligned(base.add(lanes), b);
-            Self::store_unaligned(base.add(2 * lanes), c);
-            Self::store_unaligned(base.add(3 * lanes), d);
-            Self::store_unaligned(base.add(4 * lanes), e);
-            for p in 0..lanes / 2 {
-                for k in 0..5 {
-                    let from = k * lanes + 2 * p;
-                    let to = 2 * (5 * p + k);
-                    out[to].write(src[from].assume_init());
-                    out[to + 1].write(src[from + 1].assume_init());
-                }
-            }
-            let packed = out.as_ptr().cast::<T>();
-            [
-                Self::load_unaligned(packed),
-                Self::load_unaligned(packed.add(lanes)),
-                Self::load_unaligned(packed.add(2 * lanes)),
-                Self::load_unaligned(packed.add(3 * lanes)),
-                Self::load_unaligned(packed.add(4 * lanes)),
-            ]
-        }
+    unsafe fn deinterleave_pairs<const N: usize>(regs: [Self::Vector; N]) -> [Self::Vector; N] {
+        // SAFETY: the caller's feature obligation.
+        unsafe { pair_permute::deinterleave::<T, Self, N>(regs) }
+    }
+
+    /// Stride-`N` interleave of `N` registers at adjacent-lane-pair
+    /// granularity, the inverse of [`BackendKernel::deinterleave_pairs`]:
+    /// reading the result as one flat pair sequence, pair `N q + k` is pair
+    /// `q` of operand `k`.
+    ///
+    /// On interleaved complex data it is the radix-`N` scatter: the store
+    /// shape of an `N`-arm butterfly whose registers hold one arm each, and
+    /// the transpose that writes `n = N m` in natural order after `N`
+    /// `m`-point transforms held one row a register. Requires an even
+    /// `LANE_COUNT`.
+    ///
+    /// Default: [`pair_permute::interleave`], the reverse of the
+    /// decimation's levels for a power of two `N > 2` and scalar emulation
+    /// otherwise; overrides forward unspecialized arities there.
+    ///
+    /// # Safety
+    /// Processor must support the required target feature.
+    #[inline(always)]
+    unsafe fn interleave_pairs<const N: usize>(regs: [Self::Vector; N]) -> [Self::Vector; N] {
+        // SAFETY: the caller's feature obligation.
+        unsafe { pair_permute::interleave::<T, Self, N>(regs) }
     }
 
     /// Concatenates the two registers' low halves, and their high halves:
@@ -1670,81 +1504,6 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         }
     }
 
-    /// Splits four registers' adjacent-lane pairs into the four stride-4
-    /// subsequences: reading `a || b || c || d` as a flat pair sequence,
-    /// output `i` holds the pairs congruent to `i` modulo 4, in order.
-    ///
-    /// The two-level composition of [`BackendKernel::deinterleave_pairs`],
-    /// exposed as one operation because a fused network halves the shuffle
-    /// count on backends where cross-half permutes are the expensive step
-    /// (the radix-4 complex decimation of an FFT split gather).
-    ///
-    /// Default: two levels of `deinterleave_pairs`.
-    ///
-    /// # Safety
-    /// Processor must support the required target feature.
-    #[inline(always)]
-    unsafe fn deinterleave_pairs4(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-        d: Self::Vector,
-    ) -> (Self::Vector, Self::Vector, Self::Vector, Self::Vector) {
-        // SAFETY: the caller's feature obligation covers every nested call.
-        unsafe {
-            let (e0, o0) = Self::deinterleave_pairs(a, b);
-            let (e1, o1) = Self::deinterleave_pairs(c, d);
-            let (r0, r2) = Self::deinterleave_pairs(e0, e1);
-            let (r1, r3) = Self::deinterleave_pairs(o0, o1);
-            (r0, r1, r2, r3)
-        }
-    }
-
-    /// Splits eight registers' adjacent-lane pairs into the eight stride-8
-    /// subsequences.
-    ///
-    /// The strided gather a mixed-radix transform performs between passes —
-    /// subsequence `k` of stride `N` starting at pair `k` — is this operation
-    /// at register width. Exposing it for eight lets a consumer reach a
-    /// radix-8 decimation without hand-writing a third blend network per
-    /// backend; a Stockham pass moving data between stages wants the same
-    /// permutation for the same reason.
-    ///
-    /// Default: two four-way networks and one pairwise level, the same shape
-    /// by which `deinterleave_pairs4` defaults to two pairwise levels. The
-    /// composition is independent of how many pairs a register holds, so it is
-    /// correct on every backend; where a backend can do better with its own
-    /// shuffles it overrides.
-    ///
-    /// # Safety
-    /// Processor must support the required target feature.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "eight registers is the operation's arity, not a parameter list"
-    )]
-    #[inline(always)]
-    unsafe fn deinterleave_pairs8(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-        d: Self::Vector,
-        e: Self::Vector,
-        f: Self::Vector,
-        g: Self::Vector,
-        h: Self::Vector,
-    ) -> [Self::Vector; 8] {
-        // SAFETY: the caller's feature obligation covers every nested call.
-        unsafe {
-            let (x0, x1, x2, x3) = Self::deinterleave_pairs4(a, b, c, d);
-            let (y0, y1, y2, y3) = Self::deinterleave_pairs4(e, f, g, h);
-            let (r0, r4) = Self::deinterleave_pairs(x0, y0);
-            let (r1, r5) = Self::deinterleave_pairs(x1, y1);
-            let (r2, r6) = Self::deinterleave_pairs(x2, y2);
-            let (r3, r7) = Self::deinterleave_pairs(x3, y3);
-            [r0, r1, r2, r3, r4, r5, r6, r7]
-        }
-    }
-
     // -------------------------------------------------------------------------
     // Adjacent-Pair Shuffles & Alternating FMA (interleaved complex support)
     // -------------------------------------------------------------------------
@@ -1862,8 +1621,7 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
     ///
     /// Default: the square read as one flat pair sequence is the
     /// stride-`LANE_COUNT / 2` pair decimation, so output `i` is the
-    /// [`Self::deinterleave_pairs`], [`Self::deinterleave_pairs4`] or
-    /// [`Self::deinterleave_pairs8`] result `i` — column `i` of the tile —
+    /// [`Self::deinterleave_pairs`] result `i` — column `i` of the tile —
     /// and the transpose costs what the backend's decimation costs, in
     /// registers. A backend overrides this only where a dedicated network
     /// measures better than its decimation.
@@ -1885,24 +1643,13 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
             match tile {
                 // One sample per register (or none): a 1x1 tile is its own transpose.
                 [] | [_] => {}
-                [a, b] => {
-                    let (even, odd) = Self::deinterleave_pairs(*a, *b);
-                    *a = even;
-                    *b = odd;
-                }
+                [a, b] => [*a, *b] = Self::deinterleave_pairs([*a, *b]),
                 [a, b, c, d] => {
-                    let (r0, r1, r2, r3) = Self::deinterleave_pairs4(*a, *b, *c, *d);
-                    *a = r0;
-                    *b = r1;
-                    *c = r2;
-                    *d = r3;
+                    [*a, *b, *c, *d] = Self::deinterleave_pairs([*a, *b, *c, *d]);
                 }
                 [a, b, c, d, e, f, g, h] => {
-                    let columns = Self::deinterleave_pairs8(*a, *b, *c, *d, *e, *f, *g, *h);
-                    [a, b, c, d, e, f, g, h]
-                        .into_iter()
-                        .zip(columns)
-                        .for_each(|(row, column)| *row = column);
+                    [*a, *b, *c, *d, *e, *f, *g, *h] =
+                        Self::deinterleave_pairs([*a, *b, *c, *d, *e, *f, *g, *h]);
                 }
                 _ => unreachable!(
                     "invariant: LANE_COUNT is a power of two at most MAX_SIMD_LANES, so a complex square has 0, 1, 2, 4 or 8 rows; wider widths add their decimation here"

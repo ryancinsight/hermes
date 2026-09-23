@@ -80,6 +80,23 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch][HERMES-VIEW-LEAF-SPLIT] The `view` module root and its two largest
+  leaves are split into operation-family modules. `view/mod.rs` (527 lines)
+  carried real implementation and is now a passthrough facade over
+  `view/error.rs` (`SimdError`) and `view/simd_view.rs` (`SimdView` with its
+  typestate operations). `view/reduce.rs` (749) becomes
+  `reduce/{fold,popcount,arg}.rs` by reduction family, with the popcount
+  accumulator-flush policy moving to the family that uses it.
+  `view/vector_reg.rs` (1237) held 76 inherent methods from eight unrelated
+  families in one impl block; the parent now keeps only the type, its trait
+  impls, the runtime-support helpers and the const-assert probes, and the
+  methods live in
+  `vector_reg/{construct,memory,reduce,arith,compare,lanes,view_bridge,permute}.rs`.
+  The largest file in the module falls from 1237 to 445 lines. Every public
+  path, signature and re-export is unchanged, so no consumer is affected.
+  Pure code motion, verified by function-definition-set equality against the
+  previous revision.
+
 - [patch][HERMES-COMPLEX-TRANSPOSE-BY-DECIMATION] The default
   `BackendKernel::transpose_interleaved_square` is the backend's pair
   decimation (`deinterleave_pairs`, `deinterleave_pairs4` or
@@ -386,6 +403,18 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   repository root contains only sanctioned manifest artifacts.
 
 ### Breaking
+
+- [major][HERMES-PAIR-PERMUTE-ARITY] The arity-named pair permutes collapse
+  to one const-generic method per direction on `BackendKernel`,
+  `SimdPermute`, and `Vector`: `deinterleave_pairs::<N>([V; N]) -> [V; N]`
+  (output `k` holds flat pairs `N q + k`) and its inverse
+  `interleave_pairs::<N>`. `deinterleave_pairs4`, `deinterleave_pairs8`,
+  `interleave_pairs3`, and `interleave_pairs5` are removed; migrate
+  `a.deinterleave_pairs4(b, c, d)` to
+  `Vector::deinterleave_pairs([a, b, c, d])` and destructure the returned
+  array. Every arity works on every backend: powers of two compose the
+  backend's two-register arm, other arities emulate. Defaults and override
+  fallbacks live in `kernel::pair_permute` (ADR 024).
 
 - [major][HS-LANE-THROUGHPUT] `LaneKernel::call` now accepts
   `self, Simd<T, A>` so kernels construct vectors, masks, views, and chunks from

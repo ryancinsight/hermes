@@ -29,6 +29,8 @@ use core::arch::x86_64::{
     _mm256_blend_pd, _mm256_castpd128_pd256, _mm256_insertf128_pd, _mm256_unpackhi_pd,
     _mm256_unpacklo_pd, _mm_set_pd,
 };
+#[cfg(not(hermes_benchmark_generic_default))]
+use hermes_simd_core::kernel::pair_permute::{self, cast_arity};
 use hermes_simd_core::kernel::BackendKernel;
 
 /// Newtype over `__m256d` so `Send + Sync` can be implemented on the wrapper.
@@ -290,73 +292,83 @@ impl BackendKernel<f64> for Avx2 {
         )
     }
 
-    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
+    /// A 64-bit pair is a 128-bit half here, so every stride-`N` output is
+    /// one half concatenation: output `k` takes flat pairs `k` and `N + k`,
+    /// the halves `k mod 2` of registers `k / 2` and `(N + k) / 2`.
+    /// Specialized at `N = 2, 4, 8`; other arities take the portable route.
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); no pointer operands.
     #[target_feature(enable = "avx2")]
     #[inline]
     #[cfg(not(hermes_benchmark_generic_default))]
-    unsafe fn deinterleave_pairs(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
-        // A 64-bit pair is a 128-bit half here, so the even pairs are the two
-        // low halves and the odd pairs the two high halves — one half
-        // concatenation each.
-        (
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(a.0, b.0)),
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(a.0, b.0)),
-        )
+    unsafe fn deinterleave_pairs<const N: usize>(regs: [Self::Vector; N]) -> [Self::Vector; N] {
+        if N == 2 {
+            let [a, b] = cast_arity(regs);
+            cast_arity([
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(a.0, b.0)),
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(a.0, b.0)),
+            ])
+        } else if N == 4 {
+            let [a, b, c, d] = cast_arity(regs);
+            cast_arity([
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(a.0, c.0)),
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(a.0, c.0)),
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(b.0, d.0)),
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(b.0, d.0)),
+            ])
+        } else if N == 8 {
+            let [a, b, c, d, e, f, g, h] = cast_arity(regs);
+            cast_arity([
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(a.0, e.0)),
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(a.0, e.0)),
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(b.0, f.0)),
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(b.0, f.0)),
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(c.0, g.0)),
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(c.0, g.0)),
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(d.0, h.0)),
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(d.0, h.0)),
+            ])
+        } else {
+            // SAFETY: the target feature above covers the portable route.
+            unsafe { pair_permute::deinterleave::<f64, Self, N>(regs) }
+        }
     }
 
-    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
+    /// The inverse half concatenations: output `k` takes flat pairs `2k` and
+    /// `2k + 1`, pair `j / N` of operand `j mod N` for each. Specialized at
+    /// `N = 2, 3, 5`; other arities take the portable route.
+    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); no pointer operands.
     #[target_feature(enable = "avx2")]
     #[inline]
     #[cfg(not(hermes_benchmark_generic_default))]
-    unsafe fn interleave_pairs(
-        even: Self::Vector,
-        odd: Self::Vector,
-    ) -> (Self::Vector, Self::Vector) {
-        // With a 64-bit pair occupying a 128-bit half, the split is its own
-        // inverse: the first result takes both low halves, the second both
-        // high halves.
-        (
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(even.0, odd.0)),
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(even.0, odd.0)),
-        )
-    }
-
-    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime selection in the hermes-simd dispatcher); the operands are register values.
-    #[target_feature(enable = "avx2")]
-    #[inline]
-    #[cfg(not(hermes_benchmark_generic_default))]
-    unsafe fn interleave_pairs3(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-    ) -> (Self::Vector, Self::Vector, Self::Vector) {
-        // A pair is a 128-bit half, so each output is one half concatenation.
-        (
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(a.0, b.0)),
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x30>(c.0, a.0)),
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(b.0, c.0)),
-        )
-    }
-
-    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime selection in the hermes-simd dispatcher); the operands are register values.
-    #[target_feature(enable = "avx2")]
-    #[inline]
-    #[cfg(not(hermes_benchmark_generic_default))]
-    unsafe fn interleave_pairs5(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-        d: Self::Vector,
-        e: Self::Vector,
-    ) -> [Self::Vector; 5] {
-        // A pair is a 128-bit half, so each output is one half concatenation.
-        [
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(a.0, b.0)),
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(c.0, d.0)),
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x30>(e.0, a.0)),
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(b.0, c.0)),
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(d.0, e.0)),
-        ]
+    unsafe fn interleave_pairs<const N: usize>(regs: [Self::Vector; N]) -> [Self::Vector; N] {
+        if N == 2 {
+            // With a pair occupying a half, the two-register split is its own
+            // inverse.
+            let [even, odd] = cast_arity(regs);
+            cast_arity([
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(even.0, odd.0)),
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(even.0, odd.0)),
+            ])
+        } else if N == 3 {
+            let [a, b, c] = cast_arity(regs);
+            cast_arity([
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(a.0, b.0)),
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x30>(c.0, a.0)),
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(b.0, c.0)),
+            ])
+        } else if N == 5 {
+            let [a, b, c, d, e] = cast_arity(regs);
+            cast_arity([
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(a.0, b.0)),
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(c.0, d.0)),
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x30>(e.0, a.0)),
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(b.0, c.0)),
+                Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(d.0, e.0)),
+            ])
+        } else {
+            // SAFETY: the target feature above covers the portable route.
+            unsafe { pair_permute::interleave::<f64, Self, N>(regs) }
+        }
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
@@ -414,54 +426,6 @@ impl BackendKernel<f64> for Avx2 {
         );
         // SAFETY: the caller's feature obligation covers the constant shuffles.
         unsafe { <Self as BackendKernel<f64>>::concat_shift_pairs::<1>(a, b) }
-    }
-
-    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
-    #[target_feature(enable = "avx2")]
-    #[inline]
-    #[cfg(not(hermes_benchmark_generic_default))]
-    unsafe fn deinterleave_pairs4(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-        d: Self::Vector,
-    ) -> (Self::Vector, Self::Vector, Self::Vector, Self::Vector) {
-        // A pair is a 128-bit half, so each stride-4 subsequence is one half
-        // concatenation: a quarter of the composed two-level cost.
-        (
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(a.0, c.0)),
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(a.0, c.0)),
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(b.0, d.0)),
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(b.0, d.0)),
-        )
-    }
-
-    /// A pair is a 128-bit half, so a stride-8 subsequence over eight
-    /// registers is one half concatenation of the register four apart: eight
-    /// `vperm2f128` against the default's sixteen.
-    // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above).
-    #[target_feature(enable = "avx2")]
-    #[inline]
-    unsafe fn deinterleave_pairs8(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-        d: Self::Vector,
-        e: Self::Vector,
-        f: Self::Vector,
-        g: Self::Vector,
-        h: Self::Vector,
-    ) -> [Self::Vector; 8] {
-        [
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(a.0, e.0)),
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(a.0, e.0)),
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(b.0, f.0)),
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(b.0, f.0)),
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(c.0, g.0)),
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(c.0, g.0)),
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x20>(d.0, h.0)),
-            Avx2F64Vec(_mm256_permute2f128_pd::<0x31>(d.0, h.0)),
-        ]
     }
 
     /// Alternating FMA requires `avx2` + `fma` target features.

@@ -58,82 +58,21 @@ pub trait SimdPermute<T: Scalar>: SimdStorage<T> + Sealed {
         b: Self::Vector,
     ) -> (Self::Vector, Self::Vector);
 
-    /// Deinterleaves two registers at adjacent-lane-pair granularity into
-    /// even-pair and odd-pair result registers.
+    /// Stride-`N` decimation of `N` registers at lane-pair granularity:
+    /// output `k` holds the flat pairs congruent to `k` modulo `N`. See
+    /// [`BackendKernel::deinterleave_pairs`].
     ///
     /// # Safety
     /// The backend's target features must be available.
-    unsafe fn deinterleave_pairs(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector);
+    unsafe fn deinterleave_pairs<const N: usize>(regs: [Self::Vector; N]) -> [Self::Vector; N];
 
-    /// Reassembles the even-pair and odd-pair registers produced by
-    /// [`SimdPermute::deinterleave_pairs`] into the original operand pair.
+    /// Stride-`N` interleave of `N` registers at lane-pair granularity, the
+    /// inverse of [`SimdPermute::deinterleave_pairs`]. See
+    /// [`BackendKernel::interleave_pairs`].
     ///
     /// # Safety
     /// The backend's target features must be available.
-    unsafe fn interleave_pairs(
-        even: Self::Vector,
-        odd: Self::Vector,
-    ) -> (Self::Vector, Self::Vector);
-
-    /// Interleaves three registers' adjacent-lane pairs into the flat
-    /// sequence `a0 b0 c0 a1 b1 c1 ...`, three registers long.
-    ///
-    /// # Safety
-    /// The backend's target features must be available.
-    unsafe fn interleave_pairs3(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-    ) -> (Self::Vector, Self::Vector, Self::Vector);
-
-    /// Interleaves five registers' adjacent-lane pairs into the flat
-    /// sequence `a0 b0 c0 d0 e0 a1 b1 c1 d1 e1 ...`, five registers long.
-    ///
-    /// # Safety
-    /// The backend's target features must be available.
-    unsafe fn interleave_pairs5(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-        d: Self::Vector,
-        e: Self::Vector,
-    ) -> [Self::Vector; 5];
-
-    /// Splits four registers' adjacent-lane pairs into the four stride-4
-    /// subsequences.
-    ///
-    /// # Safety
-    /// The backend's target features must be available.
-    unsafe fn deinterleave_pairs4(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-        d: Self::Vector,
-    ) -> (Self::Vector, Self::Vector, Self::Vector, Self::Vector);
-
-    /// Splits eight registers' adjacent-lane pairs into the eight stride-8
-    /// subsequences.
-    ///
-    /// The register-width form of the strided gather a mixed-radix transform
-    /// performs between passes. See
-    /// [`BackendKernel::deinterleave_pairs8`](crate::kernel::BackendKernel::deinterleave_pairs8).
-    ///
-    /// # Safety
-    /// The backend's target features must be available.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "eight registers is the operation's arity, not a parameter list"
-    )]
-    unsafe fn deinterleave_pairs8(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-        d: Self::Vector,
-        e: Self::Vector,
-        f: Self::Vector,
-        g: Self::Vector,
-        h: Self::Vector,
-    ) -> [Self::Vector; 8];
+    unsafe fn interleave_pairs<const N: usize>(regs: [Self::Vector; N]) -> [Self::Vector; N];
 
     /// Concatenates the two registers' low halves, and their high halves.
     ///
@@ -258,55 +197,12 @@ impl<T: Scalar, A: BackendKernel<T>> SimdPermute<T> for A {
         <A as BackendKernel<T>>::deinterleave_sublanes(a, b)
     }
 
-    unsafe fn deinterleave_pairs(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
-        <A as BackendKernel<T>>::deinterleave_pairs(a, b)
+    unsafe fn deinterleave_pairs<const N: usize>(regs: [Self::Vector; N]) -> [Self::Vector; N] {
+        <A as BackendKernel<T>>::deinterleave_pairs(regs)
     }
 
-    unsafe fn interleave_pairs(
-        even: Self::Vector,
-        odd: Self::Vector,
-    ) -> (Self::Vector, Self::Vector) {
-        <A as BackendKernel<T>>::interleave_pairs(even, odd)
-    }
-
-    unsafe fn interleave_pairs3(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-    ) -> (Self::Vector, Self::Vector, Self::Vector) {
-        <A as BackendKernel<T>>::interleave_pairs3(a, b, c)
-    }
-
-    unsafe fn interleave_pairs5(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-        d: Self::Vector,
-        e: Self::Vector,
-    ) -> [Self::Vector; 5] {
-        <A as BackendKernel<T>>::interleave_pairs5(a, b, c, d, e)
-    }
-
-    unsafe fn deinterleave_pairs4(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-        d: Self::Vector,
-    ) -> (Self::Vector, Self::Vector, Self::Vector, Self::Vector) {
-        <A as BackendKernel<T>>::deinterleave_pairs4(a, b, c, d)
-    }
-
-    unsafe fn deinterleave_pairs8(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-        d: Self::Vector,
-        e: Self::Vector,
-        f: Self::Vector,
-        g: Self::Vector,
-        h: Self::Vector,
-    ) -> [Self::Vector; 8] {
-        <A as BackendKernel<T>>::deinterleave_pairs8(a, b, c, d, e, f, g, h)
+    unsafe fn interleave_pairs<const N: usize>(regs: [Self::Vector; N]) -> [Self::Vector; N] {
+        <A as BackendKernel<T>>::interleave_pairs(regs)
     }
 
     unsafe fn interleave_halves(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {

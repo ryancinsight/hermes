@@ -7,6 +7,7 @@
 use crate::Neon;
 #[cfg(target_arch = "aarch64")]
 use core::arch::aarch64::*;
+use hermes_simd_core::kernel::pair_permute::{self, cast_arity};
 use hermes_simd_core::kernel::BackendKernel;
 
 /// Newtype over `float32x4_t` providing `Send + Sync`.
@@ -191,50 +192,53 @@ impl BackendKernel<f32> for Neon {
         )
     }
 
-    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
+    /// Specialized at `N = 2`: a lane pair is 64 bits, so the f64 unzips
+    /// collect alternating pairs with each pair's lanes kept adjacent. Every
+    /// power of two above composes those levels through the portable route.
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); no pointer operands.
     #[target_feature(enable = "neon")]
     #[inline]
-    unsafe fn deinterleave_pairs(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
-        // A lane pair is 64 bits, so the f64 unzips collect alternating pairs
-        // with each pair's lanes kept adjacent.
-        let a64 = vreinterpretq_f64_f32(a.0);
-        let b64 = vreinterpretq_f64_f32(b.0);
-        (
-            NeonF32Vec(vreinterpretq_f32_f64(vuzp1q_f64(a64, b64))),
-            NeonF32Vec(vreinterpretq_f32_f64(vuzp2q_f64(a64, b64))),
-        )
+    unsafe fn deinterleave_pairs<const N: usize>(regs: [Self::Vector; N]) -> [Self::Vector; N] {
+        if N == 2 {
+            let [a, b] = cast_arity(regs);
+            let a64 = vreinterpretq_f64_f32(a.0);
+            let b64 = vreinterpretq_f64_f32(b.0);
+            cast_arity([
+                NeonF32Vec(vreinterpretq_f32_f64(vuzp1q_f64(a64, b64))),
+                NeonF32Vec(vreinterpretq_f32_f64(vuzp2q_f64(a64, b64))),
+            ])
+        } else {
+            // SAFETY: the target feature above covers the portable route.
+            unsafe { pair_permute::deinterleave::<f32, Self, N>(regs) }
+        }
     }
 
-    #[inline]
-    unsafe fn interleave_pairs(
-        even: Self::Vector,
-        odd: Self::Vector,
-    ) -> (Self::Vector, Self::Vector) {
-        // A lane pair is 64 bits, so the f64 zips rebuild each operand from
-        // its even and odd pair with the pair's lanes kept adjacent.
-        let even64 = vreinterpretq_f64_f32(even.0);
-        let odd64 = vreinterpretq_f64_f32(odd.0);
-        (
-            NeonF32Vec(vreinterpretq_f32_f64(vzip1q_f64(even64, odd64))),
-            NeonF32Vec(vreinterpretq_f32_f64(vzip2q_f64(even64, odd64))),
-        )
-    }
-
-    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus runtime selection in the hermes-simd dispatcher); the operands are register values.
+    /// Specialized at `N = 2` (the f64 zips rebuild each operand from its
+    /// even and odd pair) and `N = 3` (a pair is a 64-bit half, so each
+    /// output is one half combine); other arities take the portable route.
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); no pointer operands.
     #[target_feature(enable = "neon")]
     #[inline]
-    #[cfg(not(hermes_benchmark_generic_default))]
-    unsafe fn interleave_pairs3(
-        a: Self::Vector,
-        b: Self::Vector,
-        c: Self::Vector,
-    ) -> (Self::Vector, Self::Vector, Self::Vector) {
-        // A pair is a 64-bit half, so each output is one half combine.
-        (
-            NeonF32Vec(vcombine_f32(vget_low_f32(a.0), vget_low_f32(b.0))),
-            NeonF32Vec(vcombine_f32(vget_low_f32(c.0), vget_high_f32(a.0))),
-            NeonF32Vec(vcombine_f32(vget_high_f32(b.0), vget_high_f32(c.0))),
-        )
+    unsafe fn interleave_pairs<const N: usize>(regs: [Self::Vector; N]) -> [Self::Vector; N] {
+        if N == 2 {
+            let [even, odd] = cast_arity(regs);
+            let even64 = vreinterpretq_f64_f32(even.0);
+            let odd64 = vreinterpretq_f64_f32(odd.0);
+            cast_arity([
+                NeonF32Vec(vreinterpretq_f32_f64(vzip1q_f64(even64, odd64))),
+                NeonF32Vec(vreinterpretq_f32_f64(vzip2q_f64(even64, odd64))),
+            ])
+        } else if N == 3 && !cfg!(hermes_benchmark_generic_default) {
+            let [a, b, c] = cast_arity(regs);
+            cast_arity([
+                NeonF32Vec(vcombine_f32(vget_low_f32(a.0), vget_low_f32(b.0))),
+                NeonF32Vec(vcombine_f32(vget_low_f32(c.0), vget_high_f32(a.0))),
+                NeonF32Vec(vcombine_f32(vget_high_f32(b.0), vget_high_f32(c.0))),
+            ])
+        } else {
+            // SAFETY: the target feature above covers the portable route.
+            unsafe { pair_permute::interleave::<f32, Self, N>(regs) }
+        }
     }
 
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.

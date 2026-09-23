@@ -187,140 +187,106 @@ where
     assert_eq!(restored, values, "gather∘scatter is not the identity");
 }
 
-/// `interleave_pairs` reassembles what `deinterleave_pairs` split, checked two
-/// ways that fail independently: against the flat placement specification, and
-/// as the round-trip identity the pair split's inverse must satisfy.
+/// The stride-`N` pair decimation and interleave against the flat
+/// specification, and as inverses of each other.
 ///
-/// A backend override that transposed its two results would satisfy the
-/// round-trip on symmetric inputs, so the operands carry distinct value ranges
-/// and the specification check pins each output register separately.
-/// `interleave_pairs3` is the flat sequence `a0 b0 c0 a1 b1 c1 ...`: pair
-/// `3p + k` of the three outputs is pair `p` of operand `k`.
-fn check_interleave_pairs3<T, A>()
+/// Reading `N` operands as one flat pair sequence, output `k` of the
+/// decimation is every `N`-th pair starting at `k`, and pair `N q + k` of the
+/// interleave is pair `q` of operand `k`. Each operand carries its own value
+/// range and every output register is compared separately, so an
+/// implementation that transposed two outputs cannot pass by symmetry; the
+/// arities cover the portable level network (4, 8), scalar emulation (1, 3,
+/// 5, 6), and every backend-specialized arm (2, 3, 4, 5, 8).
+fn check_pair_permute<T, A, const N: usize>()
 where
     T: hermes_simd_core::Scalar + PartialEq + core::fmt::Debug + From<u16>,
     A: SimdKernel<T>,
 {
     let lanes = A::LANE_COUNT;
-    let operand = |k: usize| -> Vec<T> {
+    let operands: [Vec<T>; N] = core::array::from_fn(|k| {
         (0..lanes)
             .map(|i| T::from(u16::try_from(100 * k + i + 1).expect("fixture fits in u16")))
             .collect()
-    };
-    let (a_vals, b_vals, c_vals) = (operand(0), operand(1), operand(2));
-    let mut out = vec![T::default(); 3 * lanes];
+    });
+    let mut split = vec![vec![T::default(); lanes]; N];
+    let mut packed = vec![vec![T::default(); lanes]; N];
+    let mut split_then_packed = vec![vec![T::default(); lanes]; N];
+    let mut packed_then_split = vec![vec![T::default(); lanes]; N];
 
     // SAFETY: caller gates on the required target features for `A`.
     unsafe {
-        let a = A::load_unaligned(a_vals.as_ptr());
-        let b = A::load_unaligned(b_vals.as_ptr());
-        let c = A::load_unaligned(c_vals.as_ptr());
-        let (x, y, z) = A::interleave_pairs3(a, b, c);
-        A::store_unaligned(out.as_mut_ptr(), x);
-        A::store_unaligned(out.as_mut_ptr().add(lanes), y);
-        A::store_unaligned(out.as_mut_ptr().add(2 * lanes), z);
-    }
-
-    let mut expected: Vec<T> = Vec::with_capacity(3 * lanes);
-    for p in 0..lanes / 2 {
-        for vals in [&a_vals, &b_vals, &c_vals] {
-            expected.extend_from_slice(&vals[2 * p..2 * p + 2]);
+        let mut regs = [A::zero(); N];
+        for (reg, vals) in regs.iter_mut().zip(&operands) {
+            *reg = A::load_unaligned(vals.as_ptr());
         }
-    }
-    assert_eq!(out, expected, "interleave_pairs3 mismatch ({lanes} lanes)");
-}
-
-/// `interleave_pairs5` is the flat sequence `a0 b0 c0 d0 e0 a1 ...`: pair
-/// `5p + k` of the five outputs is pair `p` of operand `k`. Distinct value
-/// ranges per operand and a per-register comparison, as for three.
-fn check_interleave_pairs5<T, A>()
-where
-    T: hermes_simd_core::Scalar + PartialEq + core::fmt::Debug + From<u16>,
-    A: SimdKernel<T>,
-{
-    let lanes = A::LANE_COUNT;
-    let operand = |k: usize| -> Vec<T> {
-        (0..lanes)
-            .map(|i| T::from(u16::try_from(100 * k + i + 1).expect("fixture fits in u16")))
-            .collect()
-    };
-    let operands: [Vec<T>; 5] = core::array::from_fn(operand);
-    let mut out = vec![T::default(); 5 * lanes];
-
-    // SAFETY: caller gates on the required target features for `A`.
-    unsafe {
-        let [a, b, c, d, e] = core::array::from_fn(|k| A::load_unaligned(operands[k].as_ptr()));
-        let packed = A::interleave_pairs5(a, b, c, d, e);
-        for (k, register) in packed.into_iter().enumerate() {
-            A::store_unaligned(out.as_mut_ptr().add(k * lanes), register);
-        }
+        let store = |out: &mut [Vec<T>], result: [A::Vector; N]| {
+            for (slot, reg) in out.iter_mut().zip(result) {
+                A::store_unaligned(slot.as_mut_ptr(), reg);
+            }
+        };
+        let decimated = A::deinterleave_pairs(regs);
+        let interleaved = A::interleave_pairs(regs);
+        store(&mut split, decimated);
+        store(&mut packed, interleaved);
+        store(&mut split_then_packed, A::interleave_pairs(decimated));
+        store(&mut packed_then_split, A::deinterleave_pairs(interleaved));
     }
 
-    let mut expected: Vec<T> = Vec::with_capacity(5 * lanes);
-    for p in 0..lanes / 2 {
+    let flat: Vec<T> = operands.iter().flatten().copied().collect();
+    let pairs: Vec<&[T]> = flat.chunks_exact(2).collect();
+    for (k, got) in split.iter().enumerate() {
+        let expected: Vec<T> = pairs
+            .iter()
+            .skip(k)
+            .step_by(N)
+            .flat_map(|p| p.iter().copied())
+            .collect();
+        assert_eq!(
+            *got, expected,
+            "deinterleave_pairs::<{N}> output {k} mismatch ({lanes} lanes)"
+        );
+    }
+    let mut expected_packed: Vec<T> = Vec::with_capacity(N * lanes);
+    for q in 0..lanes / 2 {
         for vals in &operands {
-            expected.extend_from_slice(&vals[2 * p..2 * p + 2]);
+            expected_packed.extend_from_slice(&vals[2 * q..2 * q + 2]);
         }
     }
-    assert_eq!(out, expected, "interleave_pairs5 mismatch ({lanes} lanes)");
+    for (k, (got, expected)) in packed
+        .iter()
+        .zip(expected_packed.chunks_exact(lanes))
+        .enumerate()
+    {
+        assert_eq!(
+            got.as_slice(),
+            expected,
+            "interleave_pairs::<{N}> output {k} mismatch ({lanes} lanes)"
+        );
+    }
+    assert_eq!(
+        split_then_packed, operands,
+        "interleave_pairs::<{N}> does not invert deinterleave_pairs ({lanes} lanes)"
+    );
+    assert_eq!(
+        packed_then_split, operands,
+        "deinterleave_pairs::<{N}> does not invert interleave_pairs ({lanes} lanes)"
+    );
 }
 
-fn check_interleave_pairs<T, A>()
+/// [`check_pair_permute`] at every arity the backends specialize or compose,
+/// in one precision.
+fn check_pair_permutes<T, A>()
 where
     T: hermes_simd_core::Scalar + PartialEq + core::fmt::Debug + From<u16>,
     A: SimdKernel<T>,
 {
-    let lanes = A::LANE_COUNT;
-    let value = |flat: usize| T::from(u16::try_from(flat + 1).expect("fixture fits in u16"));
-    let first: Vec<T> = (0..lanes).map(value).collect();
-    let second: Vec<T> = (0..lanes).map(|i| value(lanes + i)).collect();
-
-    let mut even = vec![T::default(); lanes];
-    let mut odd = vec![T::default(); lanes];
-    let mut restored_first = vec![T::default(); lanes];
-    let mut restored_second = vec![T::default(); lanes];
-
-    // SAFETY: caller gates on the required target features for `A`.
-    unsafe {
-        let a = A::load_unaligned(first.as_ptr());
-        let b = A::load_unaligned(second.as_ptr());
-        let (split_even, split_odd) = A::deinterleave_pairs(a, b);
-        A::store_unaligned(even.as_mut_ptr(), split_even);
-        A::store_unaligned(odd.as_mut_ptr(), split_odd);
-
-        let (joined_first, joined_second) = A::interleave_pairs(split_even, split_odd);
-        A::store_unaligned(restored_first.as_mut_ptr(), joined_first);
-        A::store_unaligned(restored_second.as_mut_ptr(), joined_second);
-    }
-
-    // Specification: reading the results as one flat sequence, each pair index
-    // takes its even-register pair then its odd-register pair.
-    let mut expected: Vec<T> = Vec::with_capacity(2 * lanes);
-    for p in 0..lanes / 2 {
-        expected.push(even[2 * p]);
-        expected.push(even[2 * p + 1]);
-        expected.push(odd[2 * p]);
-        expected.push(odd[2 * p + 1]);
-    }
-    let (expected_first, expected_second) = expected.split_at(lanes);
-    assert_eq!(
-        restored_first, expected_first,
-        "interleave_pairs first output mismatch ({lanes} lanes)"
-    );
-    assert_eq!(
-        restored_second, expected_second,
-        "interleave_pairs second output mismatch ({lanes} lanes)"
-    );
-
-    // Round-trip: the split's inverse must restore the original operands.
-    assert_eq!(
-        restored_first, first,
-        "interleave_pairs is not the inverse of deinterleave_pairs ({lanes} lanes)"
-    );
-    assert_eq!(
-        restored_second, second,
-        "interleave_pairs is not the inverse of deinterleave_pairs ({lanes} lanes)"
-    );
+    check_pair_permute::<T, A, 1>();
+    check_pair_permute::<T, A, 2>();
+    check_pair_permute::<T, A, 3>();
+    check_pair_permute::<T, A, 4>();
+    check_pair_permute::<T, A, 5>();
+    check_pair_permute::<T, A, 6>();
+    check_pair_permute::<T, A, 8>();
 }
 
 /// Cross-lane permutes must match the flat reference reordering, and satisfy
@@ -330,52 +296,6 @@ where
 /// The reference is written on plain slices, independent of any lane
 /// arithmetic in the kernel defaults, so a backend override and the default it
 /// replaces are both checked against the same external specification.
-/// The eight-way pair split against the same external specification the
-/// four-way uses: subsequence `k` is every eighth pair starting at `k`.
-///
-/// Eight distinct registers rather than a repeated pair, so an implementation
-/// that transposed two of the outputs could not pass by symmetry.
-fn check_deinterleave_pairs8<A: SimdKernel<f32>>() {
-    let lanes = A::LANE_COUNT;
-    let inputs: Vec<Vec<f32>> = (0..8)
-        .map(|r| {
-            (0..lanes)
-                .map(|i| (r * lanes + i + 1) as f32)
-                .collect::<Vec<f32>>()
-        })
-        .collect();
-    let mut outputs = vec![vec![0.0f32; lanes]; 8];
-
-    // SAFETY: caller gates on the required target features for `A`.
-    unsafe {
-        let loaded: Vec<A::Vector> = inputs
-            .iter()
-            .map(|v| A::load_unaligned(v.as_ptr()))
-            .collect();
-        let split = A::deinterleave_pairs8(
-            loaded[0], loaded[1], loaded[2], loaded[3], loaded[4], loaded[5], loaded[6], loaded[7],
-        );
-        for (slot, vector) in outputs.iter_mut().zip(split) {
-            A::store_unaligned(slot.as_mut_ptr(), vector);
-        }
-    }
-
-    let concat: Vec<f32> = inputs.iter().flatten().copied().collect();
-    let pairs: Vec<&[f32]> = concat.chunks_exact(2).collect();
-    for subsequence in 0..8usize {
-        let expected: Vec<f32> = pairs
-            .iter()
-            .skip(subsequence)
-            .step_by(8)
-            .flat_map(|p| p.iter().copied())
-            .collect();
-        assert_eq!(
-            outputs[subsequence], expected,
-            "deinterleave_pairs8 output {subsequence} mismatch ({lanes} lanes)"
-        );
-    }
-}
-
 fn check_permutes<A: SimdKernel<f32>>() {
     let lanes = A::LANE_COUNT;
     let a_vals: Vec<f32> = (0..lanes).map(|i| (i + 1) as f32).collect();
@@ -389,9 +309,6 @@ fn check_permutes<A: SimdKernel<f32>>() {
     let mut rt_a = vec![0.0f32; lanes];
     let mut rt_b = vec![0.0f32; lanes];
     let mut rev_twice = vec![0.0f32; lanes];
-    let mut pair_even = vec![0.0f32; lanes];
-    let mut pair_odd = vec![0.0f32; lanes];
-    let mut quad = vec![vec![0.0f32; lanes]; 4];
 
     // SAFETY: caller gates on the required target features for `A`.
     unsafe {
@@ -413,16 +330,6 @@ fn check_permutes<A: SimdKernel<f32>>() {
         let (r_a, r_b) = A::deinterleave(i_lo, i_hi);
         A::store_unaligned(rt_a.as_mut_ptr(), r_a);
         A::store_unaligned(rt_b.as_mut_ptr(), r_b);
-
-        let (p_even, p_odd) = A::deinterleave_pairs(a, b);
-        A::store_unaligned(pair_even.as_mut_ptr(), p_even);
-        A::store_unaligned(pair_odd.as_mut_ptr(), p_odd);
-
-        let (q0, q1, q2, q3) = A::deinterleave_pairs4(a, b, a, b);
-        A::store_unaligned(quad[0].as_mut_ptr(), q0);
-        A::store_unaligned(quad[1].as_mut_ptr(), q1);
-        A::store_unaligned(quad[2].as_mut_ptr(), q2);
-        A::store_unaligned(quad[3].as_mut_ptr(), q3);
     }
 
     // Reference reversal.
@@ -446,45 +353,6 @@ fn check_permutes<A: SimdKernel<f32>>() {
     let expected_odd: Vec<f32> = concat.iter().skip(1).step_by(2).copied().collect();
     assert_eq!(even, expected_even, "deinterleave even mismatch");
     assert_eq!(odd, expected_odd, "deinterleave odd mismatch");
-
-    // Reference pair deinterleave: alternating adjacent-lane pairs of the
-    // concatenation, each pair's lanes kept adjacent.
-    let pairs: Vec<&[f32]> = concat.chunks_exact(2).collect();
-    let expected_pair_even: Vec<f32> = pairs
-        .iter()
-        .step_by(2)
-        .flat_map(|p| p.iter().copied())
-        .collect();
-    let expected_pair_odd: Vec<f32> = pairs
-        .iter()
-        .skip(1)
-        .step_by(2)
-        .flat_map(|p| p.iter().copied())
-        .collect();
-    assert_eq!(
-        pair_even, expected_pair_even,
-        "deinterleave_pairs even mismatch"
-    );
-    assert_eq!(
-        pair_odd, expected_pair_odd,
-        "deinterleave_pairs odd mismatch"
-    );
-
-    // Reference stride-4 pair split over `a || b || a || b`.
-    let concat4: Vec<f32> = concat.iter().chain(concat.iter()).copied().collect();
-    let pairs4: Vec<&[f32]> = concat4.chunks_exact(2).collect();
-    for lane_class in 0..4usize {
-        let expected: Vec<f32> = pairs4
-            .iter()
-            .skip(lane_class)
-            .step_by(4)
-            .flat_map(|p| p.iter().copied())
-            .collect();
-        assert_eq!(
-            quad[lane_class], expected,
-            "deinterleave_pairs4 output {lane_class} mismatch"
-        );
-    }
 
     assert_eq!(
         rt_a, a_vals,
@@ -724,10 +592,6 @@ fn check_permutes_f64<A: SimdKernel<f64>>() {
     let mut rt_a = vec![0.0f64; lanes];
     let mut rt_b = vec![0.0f64; lanes];
 
-    let mut pair_even = vec![0.0f64; lanes];
-    let mut pair_odd = vec![0.0f64; lanes];
-    let mut quad = vec![vec![0.0f64; lanes]; 4];
-
     // SAFETY: caller gates on the required target features for `A`.
     unsafe {
         let a = A::load_unaligned(a_vals.as_ptr());
@@ -737,16 +601,6 @@ fn check_permutes_f64<A: SimdKernel<f64>>() {
         let (r_a, r_b) = A::deinterleave(i_lo, i_hi);
         A::store_unaligned(rt_a.as_mut_ptr(), r_a);
         A::store_unaligned(rt_b.as_mut_ptr(), r_b);
-
-        let (p_even, p_odd) = A::deinterleave_pairs(a, b);
-        A::store_unaligned(pair_even.as_mut_ptr(), p_even);
-        A::store_unaligned(pair_odd.as_mut_ptr(), p_odd);
-
-        let (q0, q1, q2, q3) = A::deinterleave_pairs4(a, b, a, b);
-        A::store_unaligned(quad[0].as_mut_ptr(), q0);
-        A::store_unaligned(quad[1].as_mut_ptr(), q1);
-        A::store_unaligned(quad[2].as_mut_ptr(), q2);
-        A::store_unaligned(quad[3].as_mut_ptr(), q3);
     }
 
     let mut expected_rev = a_vals.clone();
@@ -754,43 +608,6 @@ fn check_permutes_f64<A: SimdKernel<f64>>() {
     assert_eq!(rev, expected_rev, "f64 reverse mismatch ({lanes} lanes)");
     assert_eq!(rt_a, a_vals, "f64 round-trip lost the first operand");
     assert_eq!(rt_b, b_vals, "f64 round-trip lost the second operand");
-
-    let concat: Vec<f64> = a_vals.iter().chain(b_vals.iter()).copied().collect();
-    let pairs: Vec<&[f64]> = concat.chunks_exact(2).collect();
-    let expected_pair_even: Vec<f64> = pairs
-        .iter()
-        .step_by(2)
-        .flat_map(|p| p.iter().copied())
-        .collect();
-    let expected_pair_odd: Vec<f64> = pairs
-        .iter()
-        .skip(1)
-        .step_by(2)
-        .flat_map(|p| p.iter().copied())
-        .collect();
-    assert_eq!(
-        pair_even, expected_pair_even,
-        "f64 deinterleave_pairs even mismatch"
-    );
-    assert_eq!(
-        pair_odd, expected_pair_odd,
-        "f64 deinterleave_pairs odd mismatch"
-    );
-
-    let concat4: Vec<f64> = concat.iter().chain(concat.iter()).copied().collect();
-    let pairs4: Vec<&[f64]> = concat4.chunks_exact(2).collect();
-    for lane_class in 0..4usize {
-        let expected: Vec<f64> = pairs4
-            .iter()
-            .skip(lane_class)
-            .step_by(4)
-            .flat_map(|p| p.iter().copied())
-            .collect();
-        assert_eq!(
-            quad[lane_class], expected,
-            "f64 deinterleave_pairs4 output {lane_class} mismatch"
-        );
-    }
 }
 
 /// The half concatenation must match the flat reference: the low halves of
@@ -1049,13 +866,8 @@ fn check_pair_family<A: SimdKernel<f32> + SimdKernel<f64>>() {
     check_permutes::<A>();
     check_sublane_interleave::<f32, A>();
     check_sublane_interleave::<f64, A>();
-    check_deinterleave_pairs8::<A>();
-    check_interleave_pairs::<f32, A>();
-    check_interleave_pairs::<f64, A>();
-    check_interleave_pairs3::<f32, A>();
-    check_interleave_pairs3::<f64, A>();
-    check_interleave_pairs5::<f32, A>();
-    check_interleave_pairs5::<f64, A>();
+    check_pair_permutes::<f32, A>();
+    check_pair_permutes::<f64, A>();
     check_interleave_halves::<A>();
     check_splat_pair::<A>();
     check_blend_halves::<A>();
