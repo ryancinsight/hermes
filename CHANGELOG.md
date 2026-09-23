@@ -404,6 +404,18 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Breaking
 
+- [major][HERMES-PAIR-PERMUTE-ARITY] The arity-named pair permutes collapse
+  to one const-generic method per direction on `BackendKernel`,
+  `SimdPermute`, and `Vector`: `deinterleave_pairs::<N>([V; N]) -> [V; N]`
+  (output `k` holds flat pairs `N q + k`) and its inverse
+  `interleave_pairs::<N>`. `deinterleave_pairs4`, `deinterleave_pairs8`,
+  `interleave_pairs3`, and `interleave_pairs5` are removed; migrate
+  `a.deinterleave_pairs4(b, c, d)` to
+  `Vector::deinterleave_pairs([a, b, c, d])` and destructure the returned
+  array. Every arity works on every backend: powers of two compose the
+  backend's two-register arm, other arities emulate. Defaults and override
+  fallbacks live in `kernel::pair_permute` (ADR 024).
+
 - [major][HS-LANE-THROUGHPUT] `LaneKernel::call` now accepts
   `self, Simd<T, A>` so kernels construct vectors, masks, views, and chunks from
   the already-proven capability. Migrate implementations to accept `simd` and

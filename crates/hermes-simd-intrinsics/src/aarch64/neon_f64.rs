@@ -178,22 +178,21 @@ impl BackendKernel<f64> for Neon {
         )
     }
 
-    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 2-lane vector width within caller-validated bounds.
+    /// Two lanes are one pair, so a register holds one pair and the
+    /// stride-`N` decimation of `N` registers is the identity at every `N`.
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); no pointer operands.
     #[target_feature(enable = "neon")]
     #[inline]
-    unsafe fn deinterleave_pairs(a: Self::Vector, b: Self::Vector) -> (Self::Vector, Self::Vector) {
-        // Two lanes are one pair: the even pair is `a` whole and the odd
-        // pair is `b` whole.
-        (a, b)
+    unsafe fn deinterleave_pairs<const N: usize>(regs: [Self::Vector; N]) -> [Self::Vector; N] {
+        regs
     }
 
+    /// One pair a register, so the interleave is the identity at every `N`.
+    // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); no pointer operands.
+    #[target_feature(enable = "neon")]
     #[inline]
-    unsafe fn interleave_pairs(
-        even: Self::Vector,
-        odd: Self::Vector,
-    ) -> (Self::Vector, Self::Vector) {
-        // Two lanes are one pair, so the operands already are the results.
-        (even, odd)
+    unsafe fn interleave_pairs<const N: usize>(regs: [Self::Vector; N]) -> [Self::Vector; N] {
+        regs
     }
 
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 2-lane vector width within caller-validated bounds.

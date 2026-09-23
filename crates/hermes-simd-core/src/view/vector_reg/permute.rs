@@ -69,117 +69,36 @@ where
         (Self::new(even), Self::new(odd))
     }
 
-    /// Deinterleaves two vectors at adjacent-lane-pair granularity: reading
-    /// `self || other` as a flat sequence of lane pairs, the results hold the
-    /// even-indexed and odd-indexed pairs.
+    /// Stride-`N` decimation of `N` vectors at adjacent-lane-pair
+    /// granularity: reading `regs` as one flat sequence of lane pairs, output
+    /// `k` holds the pairs congruent to `k` modulo `N`, in order.
     ///
-    /// On interleaved complex data this splits a stride-2 complex decimation:
-    /// the even and odd complex samples of the concatenated registers, each
-    /// with its real/imaginary lanes still adjacent.
+    /// On interleaved complex data this is the radix-`N` complex decimation
+    /// of `N` registers — at `N = 2` the even and odd samples, at `N = 8` the
+    /// movement a mixed-radix transform performs between passes — each sample
+    /// keeping its real/imaginary lanes adjacent.
     #[inline(always)]
     #[must_use]
-    pub fn deinterleave_pairs(self, other: Self) -> (Self, Self) {
+    pub fn deinterleave_pairs<const N: usize>(regs: [Self; N]) -> [Self; N] {
         // SAFETY: constructing the operand vectors proved host support for `Arch`.
-        let (even, odd) = unsafe { Arch::deinterleave_pairs(self.raw, other.raw) };
-        (Self::new(even), Self::new(odd))
+        let raw = unsafe { Arch::deinterleave_pairs(regs.map(|v| v.raw)) };
+        raw.map(Self::new)
     }
 
-    /// Reassembles the even-pair and odd-pair vectors produced by
-    /// [`Vector::deinterleave_pairs`] into the original operand pair.
+    /// Stride-`N` interleave of `N` vectors at adjacent-lane-pair
+    /// granularity, the inverse of [`Vector::deinterleave_pairs`]: reading
+    /// the result as one flat pair sequence, pair `N q + k` is pair `q` of
+    /// operand `k`.
     ///
-    /// On interleaved complex data this is the radix-2 complex interleave: the
-    /// inverse of a stride-2 decimation, run in registers rather than through
-    /// a stack buffer.
-    #[inline(always)]
-    #[must_use]
-    pub fn interleave_pairs(self, other: Self) -> (Self, Self) {
-        // SAFETY: constructing the operand vectors proved host support for `Arch`.
-        let (first, second) = unsafe { Arch::interleave_pairs(self.raw, other.raw) };
-        (Self::new(first), Self::new(second))
-    }
-
-    /// Interleaves three registers' adjacent-lane pairs into the flat
-    /// sequence `self0 b0 c0 self1 b1 c1 ...`, three registers long: the
-    /// inverse of a stride-3 pair decimation, and the store shape of a
-    /// three-arm scatter whose registers hold one group per pair.
-    ///
-    /// Six shuffles on AVX2 at `f32` (two lane-local unpacks, one pair
-    /// shuffle, three half permutes), three half permutes at `f64`, three
-    /// half combines on NEON, scalar emulation by default.
-    #[inline(always)]
-    #[must_use]
-    pub fn interleave_pairs3(self, b: Self, c: Self) -> (Self, Self, Self) {
-        // SAFETY: constructing the operand vectors proved host support for `Arch`.
-        let (x, y, z) = unsafe { Arch::interleave_pairs3(self.raw, b.raw, c.raw) };
-        (Self::new(x), Self::new(y), Self::new(z))
-    }
-
-    /// Interleaves five registers' adjacent-lane pairs into the flat
-    /// sequence `self0 b0 c0 d0 e0 self1 b1 c1 d1 e1 ...`, five registers
-    /// long: the inverse of a stride-5 pair decimation, and the transpose
-    /// that writes `n = 5 m` in natural order after five `m`-point
+    /// On interleaved complex data this is the radix-`N` scatter: the store
+    /// shape of an `N`-arm butterfly holding one arm a register, and the
+    /// transpose that writes `n = N m` in natural order after `N` `m`-point
     /// transforms held one row a register.
-    ///
-    /// Ten shuffles on AVX2 at `f32` (four lane-local unpacks, two blends,
-    /// four half permutes), five half permutes at `f64`, scalar emulation by
-    /// default.
     #[inline(always)]
     #[must_use]
-    pub fn interleave_pairs5(self, b: Self, c: Self, d: Self, e: Self) -> [Self; 5] {
+    pub fn interleave_pairs<const N: usize>(regs: [Self; N]) -> [Self; N] {
         // SAFETY: constructing the operand vectors proved host support for `Arch`.
-        let [r0, r1, r2, r3, r4] =
-            unsafe { Arch::interleave_pairs5(self.raw, b.raw, c.raw, d.raw, e.raw) };
-        [
-            Self::new(r0),
-            Self::new(r1),
-            Self::new(r2),
-            Self::new(r3),
-            Self::new(r4),
-        ]
-    }
-
-    /// Splits four vectors' adjacent-lane pairs into the four stride-4
-    /// subsequences: reading the concatenation as a flat pair sequence,
-    /// output `i` holds the pairs congruent to `i` modulo 4.
-    ///
-    /// On interleaved complex data this is the radix-4 complex decimation of
-    /// four registers in one operation.
-    #[inline(always)]
-    #[must_use]
-    pub fn deinterleave_pairs4(self, b: Self, c: Self, d: Self) -> (Self, Self, Self, Self) {
-        // SAFETY: constructing the operand vectors proved host support for `Arch`.
-        let (r0, r1, r2, r3) = unsafe { Arch::deinterleave_pairs4(self.raw, b.raw, c.raw, d.raw) };
-        (Self::new(r0), Self::new(r1), Self::new(r2), Self::new(r3))
-    }
-
-    /// Splits eight vectors' adjacent-lane pairs into the eight stride-8
-    /// subsequences: reading the concatenation as a flat pair sequence,
-    /// output `i` holds the pairs congruent to `i` modulo 8.
-    ///
-    /// On interleaved complex data this is the radix-8 complex decimation of
-    /// eight registers in one operation — the movement a mixed-radix
-    /// transform performs between passes, and the shuffle a radix-8 Stockham
-    /// stage would otherwise route through memory.
-    #[inline(always)]
-    #[must_use]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "eight registers is the operation's arity, not a parameter list"
-    )]
-    pub fn deinterleave_pairs8(
-        self,
-        b: Self,
-        c: Self,
-        d: Self,
-        e: Self,
-        f: Self,
-        g: Self,
-        h: Self,
-    ) -> [Self; 8] {
-        // SAFETY: constructing the operand vectors proved host support for `Arch`.
-        let raw = unsafe {
-            Arch::deinterleave_pairs8(self.raw, b.raw, c.raw, d.raw, e.raw, f.raw, g.raw, h.raw)
-        };
+        let raw = unsafe { Arch::interleave_pairs(regs.map(|v| v.raw)) };
         raw.map(Self::new)
     }
 
