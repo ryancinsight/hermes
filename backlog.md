@@ -15,17 +15,19 @@
   Miri cannot execute the six NUMA cases that call Windows affinity APIs;
   hosted Linux Miri remains the applicable platform gate.
 - **Dependency:** Mnemosyne source revision `26726d2`; the original Eunomia
-  identity driver is Mnemosyne PR #123 (`7f17375`); **Last-update:** 2026-09-06.
+  identity driver is mnemosyne#123 (closed unmerged 2026-09-04, branch
+  tip); **Last-update:** 2026-09-06.
 - **Acceptance corrected, 2026-09-06 — the oracle could not see the failure
   it was written for.** "Standalone lock resolves only Mnemosyne `26726d2`"
   is satisfied by construction: any member's standalone lock resolves one
   identity. Measured from the integrator instead, Apollo's `apollo-fft`
   graph carries **three** Mnemosyne stacks over normal edges — `26726d2`
-  through hermes-simd-core, `7f17375` through moirai-core, and the unpinned
-  branch head through Apollo's own crates. Cargo refuses
-  `-p mnemosyne-arena` as ambiguous and names all three. `26726d2` and
-  `7f17375` are two points on one chain: Hermes advanced, Moirai did not,
-  and pinning by `rev` is what preserved the split.
+  through hermes-simd-core, the mnemosyne#123 branch tip (closed unmerged)
+  through moirai-core, and the unpinned branch head through Apollo's own
+  crates. Cargo refuses `-p mnemosyne-arena` as ambiguous and names all
+  three. `26726d2` and the mnemosyne#123 branch tip are two points on one
+  chain: Hermes advanced, Moirai did not, and pinning by `rev` is what
+  preserved the split.
 - **Change:** the `rev =` is removed, so the requirement states git+version
   and the lock holds the commit — Apollo's own model, and the reason its
   eighteen crates share one identity. The standalone lock re-resolves to a
