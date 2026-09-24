@@ -5,7 +5,9 @@
 //! Compress/expand are emulated via scalar loops — AVX2 has no native
 //! `vcompress` instruction (that requires AVX-512F).
 
-use super::{debug_assert_mask_within_valid_lanes, sfence};
+use super::{
+    compress_selected_lanes, debug_assert_mask_within_valid_lanes, expand_selected_lanes, sfence,
+};
 use crate::Avx2;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::{
@@ -715,14 +717,7 @@ impl BackendKernel<f32> for Avx2 {
         let mask_bits = _mm256_movemask_ps(mask.0) as u32;
         let mut arr = [0.0f32; 8];
         _mm256_storeu_ps(arr.as_mut_ptr(), src.0);
-        let mut out = [0.0f32; 8];
-        let mut k = 0usize;
-        for i in 0..8 {
-            if (mask_bits >> i) & 1 != 0 {
-                out[k] = arr[i];
-                k += 1;
-            }
-        }
+        let out = compress_selected_lanes(arr, mask_bits);
         Avx2F32Vec(_mm256_loadu_ps(out.as_ptr()))
     }
 
@@ -735,13 +730,7 @@ impl BackendKernel<f32> for Avx2 {
         _mm256_storeu_ps(src_arr.as_mut_ptr(), src.0);
         let mut out_arr = [0.0f32; 8];
         _mm256_storeu_ps(out_arr.as_mut_ptr(), fill.0);
-        let mut k = 0usize;
-        for i in 0..8 {
-            if (mask_bits >> i) & 1 != 0 {
-                out_arr[i] = src_arr[k];
-                k += 1;
-            }
-        }
+        let out_arr = expand_selected_lanes(src_arr, out_arr, mask_bits);
         Avx2F32Vec(_mm256_loadu_ps(out_arr.as_ptr()))
     }
 
