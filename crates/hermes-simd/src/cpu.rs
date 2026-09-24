@@ -20,6 +20,39 @@ pub trait FmaSupport {
     fn has_fma() -> bool;
 }
 
+macro_rules! impl_shared_probe_trait {
+    ($trait:ident, $method:ident => $probe:expr; $($ty:ty),+ $(,)?) => {
+        $(
+            impl $trait for $ty {
+                #[inline]
+                fn $method() -> bool {
+                    $probe
+                }
+            }
+        )+
+    };
+}
+
+macro_rules! impl_x86_typed_probe_trait {
+    ($trait:ident, $method:ident; $($ty:ty => $probe:ident),+ $(,)?) => {
+        $(
+            impl $trait for $ty {
+                #[inline]
+                fn $method() -> bool {
+                    #[cfg(target_arch = "x86_64")]
+                    {
+                        $probe()
+                    }
+                    #[cfg(not(target_arch = "x86_64"))]
+                    {
+                        false
+                    }
+                }
+            }
+        )+
+    };
+}
+
 /// Global OnceLock-cached FMA3 probe.
 ///
 /// Separate from the per-type traits above because FMA availability is
@@ -49,82 +82,14 @@ pub fn has_fma3() -> bool {
     false
 }
 
-impl FmaSupport for f32 {
-    #[inline]
-    fn has_fma() -> bool {
-        has_fma3()
-    }
-}
-
-impl FmaSupport for f64 {
-    #[inline]
-    fn has_fma() -> bool {
-        has_fma3()
-    }
-}
-
-impl FmaSupport for Bf16 {
-    #[inline]
-    fn has_fma() -> bool {
-        has_fma3()
-    }
-}
-
-impl AmxSupport for Bf16 {
-    #[inline]
-    fn has_amx() -> bool {
-        #[cfg(target_arch = "x86_64")]
-        {
-            has_amx_bf16()
-        }
-        #[cfg(not(target_arch = "x86_64"))]
-        {
-            false
-        }
-    }
-}
-
-impl AmxSupport for i8 {
-    #[inline]
-    fn has_amx() -> bool {
-        #[cfg(target_arch = "x86_64")]
-        {
-            has_amx_int8()
-        }
-        #[cfg(not(target_arch = "x86_64"))]
-        {
-            false
-        }
-    }
-}
-
-impl Avx512Support for Bf16 {
-    #[inline]
-    fn has_avx512() -> bool {
-        #[cfg(target_arch = "x86_64")]
-        {
-            has_avx512_bf16_tile()
-        }
-        #[cfg(not(target_arch = "x86_64"))]
-        {
-            false
-        }
-    }
-}
-
-impl Avx512Support for i8 {
-    #[inline]
-    fn has_avx512() -> bool {
-        #[cfg(target_arch = "x86_64")]
-        {
-            has_avx512_vnni_tile()
-        }
-        #[cfg(not(target_arch = "x86_64"))]
-        {
-            false
-        }
-    }
-}
+impl_shared_probe_trait!(FmaSupport, has_fma => has_fma3(); f32, f64, Bf16);
+impl_x86_typed_probe_trait!(AmxSupport, has_amx; Bf16 => has_amx_bf16, i8 => has_amx_int8);
+impl_x86_typed_probe_trait!(
+    Avx512Support,
+    has_avx512;
+    Bf16 => has_avx512_bf16_tile,
+    i8 => has_avx512_vnni_tile
+);
 
 // AMX / AVX-512 tile-kernel capability probes.
 //
