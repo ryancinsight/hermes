@@ -5,7 +5,7 @@
 //! Compress/expand are emulated via scalar loops — AVX2 has no native
 //! `vcompress` instruction (that requires AVX-512F).
 
-use super::sfence;
+use super::{debug_assert_mask_within_valid_lanes, sfence};
 use crate::Avx2;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::{
@@ -476,15 +476,7 @@ impl BackendKernel<f64> for Avx2 {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        debug_assert!(valid_lanes <= <Self as BackendKernel<f64>>::LANE_COUNT);
-        #[cfg(debug_assertions)]
-        {
-            let valid_mask = (1_u64 << valid_lanes) - 1;
-            debug_assert_eq!(
-                <Self as BackendKernel<f64>>::mask_to_bitmask(mask) & !valid_mask,
-                0
-            );
-        }
+        debug_assert_mask_within_valid_lanes::<f64, Self>(valid_lanes, mask);
         let loaded = _mm256_maskload_pd(ptr, _mm256_castpd_si256(mask.0));
         Avx2F64Vec(_mm256_blendv_pd(src.0, loaded, mask.0))
     }
@@ -500,15 +492,7 @@ impl BackendKernel<f64> for Avx2 {
         mask: Self::Mask,
         val: Self::Vector,
     ) {
-        debug_assert!(valid_lanes <= <Self as BackendKernel<f64>>::LANE_COUNT);
-        #[cfg(debug_assertions)]
-        {
-            let valid_mask = (1_u64 << valid_lanes) - 1;
-            debug_assert_eq!(
-                <Self as BackendKernel<f64>>::mask_to_bitmask(mask) & !valid_mask,
-                0
-            );
-        }
+        debug_assert_mask_within_valid_lanes::<f64, Self>(valid_lanes, mask);
         _mm256_maskstore_pd(ptr, _mm256_castpd_si256(mask.0), val.0);
     }
 
