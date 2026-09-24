@@ -1,6 +1,14 @@
 //! `x86_64` hardware specialized SIMD kernels module.
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[inline(always)]
+pub(crate) fn sfence() {
+    // SAFETY: `_mm_sfence` (SSE) is baseline on x86_64 and part of the x86
+    // intrinsic surface used by the x86 backends in this module.
+    unsafe { core::arch::x86_64::_mm_sfence() };
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub mod avx2_f16;
 

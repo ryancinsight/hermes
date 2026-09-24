@@ -5,6 +5,7 @@
 //! Compress/expand are emulated via scalar loops — AVX2 has no native
 //! `vcompress` instruction (that requires AVX-512F).
 
+use super::sfence;
 use crate::Avx2;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::{
@@ -33,41 +34,26 @@ use core::arch::x86_64::{
 use hermes_simd_core::kernel::pair_permute::{self, cast_arity};
 use hermes_simd_core::kernel::BackendKernel;
 
-/// Newtype over `__m256d` so `Send + Sync` can be implemented on the wrapper.
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub struct Avx2F64Vec(pub __m256d);
+crate::define_simd_newtype!(
+    cfg(any(target_arch = "x86", target_arch = "x86_64"));
+    /// Newtype over `__m256d` so `Send + Sync` can be implemented on the wrapper.
+    pub struct Avx2F64Vec(pub __m256d);
+);
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-unsafe impl Send for Avx2F64Vec {}
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-unsafe impl Sync for Avx2F64Vec {}
+crate::define_simd_newtype!(
+    cfg(any(target_arch = "x86", target_arch = "x86_64"));
+    /// AVX2 f64 blend mask.
+    ///
+    /// Stored as a `__m256d` register. Lane `i` is active when the sign bit
+    /// of `mask[i]` is set.
+    pub struct Avx2F64Mask(pub __m256d);
+);
 
-/// AVX2 f64 blend mask.
-///
-/// Stored as a `__m256d` register. Lane `i` is active when the sign bit
-/// of `mask[i]` is set.
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub struct Avx2F64Mask(pub __m256d);
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-unsafe impl Send for Avx2F64Mask {}
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-unsafe impl Sync for Avx2F64Mask {}
-
-/// AVX2 gather index vector.
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub struct Avx2F64Idx(pub __m128i);
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-unsafe impl Send for Avx2F64Idx {}
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-unsafe impl Sync for Avx2F64Idx {}
+crate::define_simd_newtype!(
+    cfg(any(target_arch = "x86", target_arch = "x86_64"));
+    /// AVX2 gather index vector.
+    pub struct Avx2F64Idx(pub __m128i);
+);
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 impl BackendKernel<f64> for Avx2 {
@@ -119,10 +105,9 @@ impl BackendKernel<f64> for Avx2 {
         _mm256_stream_pd(ptr, val.0);
     }
 
-    #[inline]
+    #[inline(always)]
     fn stream_write_barrier() {
-        // SAFETY: `_mm_sfence` (SSE) is unconditionally available on x86_64.
-        unsafe { core::arch::x86_64::_mm_sfence() };
+        sfence();
     }
 
     // -----------------------------------------------------------------------

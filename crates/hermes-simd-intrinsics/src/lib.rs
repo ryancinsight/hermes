@@ -38,6 +38,29 @@ extern crate alloc;
 
 use hermes_simd_core::arch::SimdArch;
 
+/// Defines a transparent SIMD wrapper newtype and its `Send + Sync` impls.
+///
+/// The wrappers in this crate are plain register containers; keeping the
+/// boilerplate in one macro avoids repeating the same safety claim for each ISA
+/// width while preserving the exact public struct shapes.
+macro_rules! define_simd_newtype {
+    ($cfg:meta; $(#[$meta:meta])* $vis:vis struct $name:ident(pub $inner:ty);) => {
+        #[$cfg]
+        $(#[$meta])*
+        #[repr(transparent)]
+        #[derive(Copy, Clone)]
+        $vis struct $name(pub $inner);
+
+        #[$cfg]
+        unsafe impl Send for $name {}
+
+        #[$cfg]
+        unsafe impl Sync for $name {}
+    };
+}
+
+pub(crate) use define_simd_newtype;
+
 /// Implements `BackendKernel<$t>` for `$arch` as a lane-emulated `[T; N]` backend.
 ///
 /// Used for the `Scalar` marker and for `(type, arch)` pairs without native

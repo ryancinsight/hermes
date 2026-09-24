@@ -9,6 +9,7 @@
 //! - Gather: `_mm512_i32gather_pd`, `_mm512_mask_i32gather_pd`.
 //! - Mask register: `__mmask8` (8-bit integer).
 
+use super::sfence;
 use crate::Avx512;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::{
@@ -35,16 +36,11 @@ use core::arch::x86_64::{
 use hermes_simd_core::kernel::pair_permute::{self, cast_arity};
 use hermes_simd_core::kernel::BackendKernel;
 
-/// Newtype over `__m512d` providing `Send + Sync`.
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub struct Avx512F64Vec(pub __m512d);
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-unsafe impl Send for Avx512F64Vec {}
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-unsafe impl Sync for Avx512F64Vec {}
+crate::define_simd_newtype!(
+    cfg(any(target_arch = "x86", target_arch = "x86_64"));
+    /// Newtype over `__m512d` providing `Send + Sync`.
+    pub struct Avx512F64Vec(pub __m512d);
+);
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 impl BackendKernel<f64> for Avx512 {
@@ -98,10 +94,9 @@ impl BackendKernel<f64> for Avx512 {
         _mm512_stream_pd(ptr, val.0);
     }
 
-    #[inline]
+    #[inline(always)]
     fn stream_write_barrier() {
-        // SAFETY: `_mm_sfence` (SSE) is unconditionally available on x86_64.
-        unsafe { core::arch::x86_64::_mm_sfence() };
+        sfence();
     }
 
     // -----------------------------------------------------------------------
