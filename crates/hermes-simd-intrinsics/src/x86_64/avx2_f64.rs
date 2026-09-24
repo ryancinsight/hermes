@@ -57,6 +57,18 @@ crate::define_simd_newtype!(
     pub struct Avx2F64Idx(pub __m128i);
 );
 
+#[cfg(all(
+    any(target_arch = "x86", target_arch = "x86_64"),
+    not(hermes_benchmark_generic_default)
+))]
+#[inline(always)]
+unsafe fn unpack_lo_hi_pd(a: Avx2F64Vec, b: Avx2F64Vec) -> (Avx2F64Vec, Avx2F64Vec) {
+    (
+        Avx2F64Vec(_mm256_unpacklo_pd(a.0, b.0)),
+        Avx2F64Vec(_mm256_unpackhi_pd(a.0, b.0)),
+    )
+}
+
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 impl BackendKernel<f64> for Avx2 {
     type Vector = Avx2F64Vec;
@@ -226,10 +238,7 @@ impl BackendKernel<f64> for Avx2 {
         // interleave of the 8-lane sequence.
         let ta = _mm256_permute4x64_pd::<0b11_01_10_00>(a.0);
         let tb = _mm256_permute4x64_pd::<0b11_01_10_00>(b.0);
-        (
-            Avx2F64Vec(_mm256_unpacklo_pd(ta, tb)),
-            Avx2F64Vec(_mm256_unpackhi_pd(ta, tb)),
-        )
+        unpack_lo_hi_pd(Avx2F64Vec(ta), Avx2F64Vec(tb))
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
@@ -240,11 +249,10 @@ impl BackendKernel<f64> for Avx2 {
         // `unpacklo/hi_pd` split evens/odds within 128-bit halves in
         // [a, b | a, b] block order; the closing [0, 2, 1, 3] permute
         // restores flat lane order.
-        let t0 = _mm256_unpacklo_pd(a.0, b.0);
-        let t1 = _mm256_unpackhi_pd(a.0, b.0);
+        let (t0, t1) = unpack_lo_hi_pd(a, b);
         (
-            Avx2F64Vec(_mm256_permute4x64_pd::<0b11_01_10_00>(t0)),
-            Avx2F64Vec(_mm256_permute4x64_pd::<0b11_01_10_00>(t1)),
+            Avx2F64Vec(_mm256_permute4x64_pd::<0b11_01_10_00>(t0.0)),
+            Avx2F64Vec(_mm256_permute4x64_pd::<0b11_01_10_00>(t1.0)),
         )
     }
 
@@ -257,10 +265,7 @@ impl BackendKernel<f64> for Avx2 {
         b: Self::Vector,
     ) -> (Self::Vector, Self::Vector) {
         // Two lanes per sub-lane: the unpacks are the whole operation.
-        (
-            Avx2F64Vec(_mm256_unpacklo_pd(a.0, b.0)),
-            Avx2F64Vec(_mm256_unpackhi_pd(a.0, b.0)),
-        )
+        unpack_lo_hi_pd(a, b)
     }
 
     // SAFETY: caller must ensure the target CPU supports `avx2` (enforced by the `#[target_feature]` gate above plus runtime `is_x86_feature_detected!` selection in the hermes-simd dispatcher (`target.rs`/`lib.rs`)); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.
@@ -273,10 +278,7 @@ impl BackendKernel<f64> for Avx2 {
     ) -> (Self::Vector, Self::Vector) {
         // With two lanes per sub-lane the split of evens and odds is the
         // same unpack pair as the interleave.
-        (
-            Avx2F64Vec(_mm256_unpacklo_pd(a.0, b.0)),
-            Avx2F64Vec(_mm256_unpackhi_pd(a.0, b.0)),
-        )
+        unpack_lo_hi_pd(a, b)
     }
 
     /// A 64-bit pair is a 128-bit half here, so every stride-`N` output is
