@@ -31,6 +31,44 @@ where
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[inline(always)]
+pub(crate) fn compress_selected_lanes<T: Copy + Default, const LANES: usize>(
+    src: [T; LANES],
+    mask_bits: u32,
+) -> [T; LANES] {
+    let mut out = [T::default(); LANES];
+    let mut k = 0usize;
+    let mut i = 0usize;
+    while i < LANES {
+        if ((mask_bits >> i) & 1) != 0 {
+            out[k] = src[i];
+            k += 1;
+        }
+        i += 1;
+    }
+    out
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[inline(always)]
+pub(crate) fn expand_selected_lanes<T: Copy, const LANES: usize>(
+    src: [T; LANES],
+    mut out: [T; LANES],
+    mask_bits: u32,
+) -> [T; LANES] {
+    let mut k = 0usize;
+    let mut i = 0usize;
+    while i < LANES {
+        if ((mask_bits >> i) & 1) != 0 {
+            out[i] = src[k];
+            k += 1;
+        }
+        i += 1;
+    }
+    out
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub mod avx2_f16;
 
