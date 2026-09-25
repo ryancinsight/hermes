@@ -128,11 +128,7 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
     #[inline(always)]
     #[must_use]
     pub fn chunks_remaining(&self) -> usize {
-        if self.simd_end > self.pos {
-            (self.simd_end - self.pos) / Arch::LANE_COUNT
-        } else {
-            0
-        }
+        super::remaining_chunks(self.pos, self.simd_end, Arch::LANE_COUNT)
     }
 }
 
@@ -286,11 +282,7 @@ impl<'a, T: Scalar + 'a, Arch: SimdArch + SimdKernel<T>, Align: Alignment, Mode:
     #[inline(always)]
     #[must_use]
     pub fn chunks_remaining(&self) -> usize {
-        if self.simd_end > self.pos {
-            (self.simd_end - self.pos) / Arch::LANE_COUNT
-        } else {
-            0
-        }
+        super::remaining_chunks(self.pos, self.simd_end, Arch::LANE_COUNT)
     }
 }
 
