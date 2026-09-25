@@ -85,7 +85,7 @@ where
     #[inline(always)]
     #[must_use]
     pub fn chunks_remaining(&self) -> usize {
-        self.simd_end.saturating_sub(self.pos) / Arch::LANE_COUNT
+        super::remaining_chunks(self.pos, self.simd_end, Arch::LANE_COUNT)
     }
 
     /// Consume the iterator and return the unprocessed suffix of every plane.
