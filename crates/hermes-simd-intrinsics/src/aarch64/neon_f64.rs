@@ -9,33 +9,23 @@ use crate::Neon;
 use core::arch::aarch64::*;
 use hermes_simd_core::kernel::BackendKernel;
 
-/// Newtype over `float64x2_t` providing `Send + Sync`.
-#[cfg(target_arch = "aarch64")]
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub struct NeonF64Vec(pub float64x2_t);
+crate::define_simd_newtype!(
+    cfg(target_arch = "aarch64");
+    /// Newtype over `float64x2_t` providing `Send + Sync`.
+    pub struct NeonF64Vec(pub float64x2_t);
+);
 
-#[cfg(target_arch = "aarch64")]
-unsafe impl Send for NeonF64Vec {}
-#[cfg(target_arch = "aarch64")]
-unsafe impl Sync for NeonF64Vec {}
-
-/// NEON f64 mask: `uint64x2_t` used as a bitwise select mask.
-///
-/// Lane `i` is active iff bit 63 of `mask[i]` is set — the sign-bit
-/// convention shared with `mask_to_bitmask`. Every constructor
-/// (`mask_from_bools`, `leading_k_mask`, `vector_to_mask`) produces canonical
-/// all-ones/all-zero lanes, which is what the bitwise `vbslq_f64` merges rely
-/// on.
-#[cfg(target_arch = "aarch64")]
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub struct NeonF64Mask(pub uint64x2_t);
-
-#[cfg(target_arch = "aarch64")]
-unsafe impl Send for NeonF64Mask {}
-#[cfg(target_arch = "aarch64")]
-unsafe impl Sync for NeonF64Mask {}
+crate::define_simd_newtype!(
+    cfg(target_arch = "aarch64");
+    /// NEON f64 mask: `uint64x2_t` used as a bitwise select mask.
+    ///
+    /// Lane `i` is active iff bit 63 of `mask[i]` is set — the sign-bit
+    /// convention shared with `mask_to_bitmask`. Every constructor
+    /// (`mask_from_bools`, `leading_k_mask`, `vector_to_mask`) produces canonical
+    /// all-ones/all-zero lanes, which is what the bitwise `vbslq_f64` merges rely
+    /// on.
+    pub struct NeonF64Mask(pub uint64x2_t);
+);
 
 /// Per-lane active flags keyed on bit 63, the mask-active criterion every
 /// other consumer (`mask_to_bitmask` included) uses — a plain nonzero test

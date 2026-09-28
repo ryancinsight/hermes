@@ -1,6 +1,75 @@
 //! `x86_64` hardware specialized SIMD kernels module.
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[inline(always)]
+pub(crate) fn sfence() {
+    // SAFETY: `_mm_sfence` (SSE) is baseline on x86_64 and part of the x86
+    // intrinsic surface used by the x86 backends in this module.
+    unsafe { core::arch::x86_64::_mm_sfence() };
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[inline(always)]
+#[cfg_attr(not(debug_assertions), allow(unused_variables))]
+pub(crate) fn debug_assert_mask_within_valid_lanes<T, K>(valid_lanes: usize, mask: K::Mask)
+where
+    T: hermes_simd_core::scalar::Scalar,
+    K: hermes_simd_core::kernel::BackendKernel<T>,
+{
+    debug_assert!(valid_lanes <= K::LANE_COUNT);
+    #[cfg(debug_assertions)]
+    {
+        let valid_mask = if valid_lanes >= u64::BITS as usize {
+            u64::MAX
+        } else {
+            (1_u64 << valid_lanes) - 1
+        };
+        // SAFETY: callers invoke this only from backend methods already gated
+        // to the corresponding target feature set.
+        let mask_bits = unsafe { K::mask_to_bitmask(mask) };
+        debug_assert_eq!(mask_bits & !valid_mask, 0);
+    }
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[inline(always)]
+pub(crate) fn compress_selected_lanes<T: Copy + Default, const LANES: usize>(
+    src: [T; LANES],
+    mask_bits: u32,
+) -> [T; LANES] {
+    let mut out = [T::default(); LANES];
+    let mut k = 0usize;
+    let mut i = 0usize;
+    while i < LANES {
+        if ((mask_bits >> i) & 1) != 0 {
+            out[k] = src[i];
+            k += 1;
+        }
+        i += 1;
+    }
+    out
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[inline(always)]
+pub(crate) fn expand_selected_lanes<T: Copy, const LANES: usize>(
+    src: [T; LANES],
+    mut out: [T; LANES],
+    mask_bits: u32,
+) -> [T; LANES] {
+    let mut k = 0usize;
+    let mut i = 0usize;
+    while i < LANES {
+        if ((mask_bits >> i) & 1) != 0 {
+            out[i] = src[k];
+            k += 1;
+        }
+        i += 1;
+    }
+    out
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub mod avx2_f16;
 

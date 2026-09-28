@@ -9,6 +9,7 @@
 //! - Gather: `_mm512_i32gather_ps`, `_mm512_mask_i32gather_ps`.
 //! - Mask register: `__mmask16` (16-bit integer).
 
+use super::{debug_assert_mask_within_valid_lanes, sfence};
 use crate::Avx512;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::{
@@ -36,16 +37,11 @@ use core::arch::x86_64::{
 use hermes_simd_core::kernel::pair_permute::{self, cast_arity};
 use hermes_simd_core::kernel::BackendKernel;
 
-/// Newtype over `__m512` providing `Send + Sync`.
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub struct Avx512F32Vec(pub __m512);
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-unsafe impl Send for Avx512F32Vec {}
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-unsafe impl Sync for Avx512F32Vec {}
+crate::define_simd_newtype!(
+    cfg(any(target_arch = "x86", target_arch = "x86_64"));
+    /// Newtype over `__m512` providing `Send + Sync`.
+    pub struct Avx512F32Vec(pub __m512);
+);
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 impl BackendKernel<f32> for Avx512 {
@@ -99,10 +95,9 @@ impl BackendKernel<f32> for Avx512 {
         _mm512_stream_ps(ptr, val.0);
     }
 
-    #[inline]
+    #[inline(always)]
     fn stream_write_barrier() {
-        // SAFETY: `_mm_sfence` (SSE) is unconditionally available on x86_64.
-        unsafe { core::arch::x86_64::_mm_sfence() };
+        sfence();
     }
 
     // -----------------------------------------------------------------------
@@ -281,12 +276,7 @@ impl BackendKernel<f32> for Avx512 {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        debug_assert!(valid_lanes <= <Self as BackendKernel<f32>>::LANE_COUNT);
-        #[cfg(debug_assertions)]
-        {
-            let valid_mask = (1_u64 << valid_lanes) - 1;
-            debug_assert_eq!(u64::from(mask) & !valid_mask, 0);
-        }
+        debug_assert_mask_within_valid_lanes::<f32, Self>(valid_lanes, mask);
         Avx512F32Vec(_mm512_mask_loadu_ps(src.0, mask, ptr))
     }
 
@@ -301,12 +291,7 @@ impl BackendKernel<f32> for Avx512 {
         mask: Self::Mask,
         val: Self::Vector,
     ) {
-        debug_assert!(valid_lanes <= <Self as BackendKernel<f32>>::LANE_COUNT);
-        #[cfg(debug_assertions)]
-        {
-            let valid_mask = (1_u64 << valid_lanes) - 1;
-            debug_assert_eq!(u64::from(mask) & !valid_mask, 0);
-        }
+        debug_assert_mask_within_valid_lanes::<f32, Self>(valid_lanes, mask);
         _mm512_mask_storeu_ps(ptr, mask, val.0);
     }
 

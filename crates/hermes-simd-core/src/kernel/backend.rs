@@ -58,6 +58,28 @@ use super::pair_permute;
 /// future wider backend fails to build rather than silently overflowing the stack.
 pub const MAX_SIMD_LANES: usize = 64;
 
+#[inline(always)]
+#[cfg_attr(not(debug_assertions), allow(unused_variables))]
+fn debug_assert_mask_within_valid_lanes<T, K>(valid_lanes: usize, mask: K::Mask)
+where
+    T: crate::scalar::Scalar,
+    K: BackendKernel<T>,
+{
+    debug_assert!(valid_lanes <= K::LANE_COUNT);
+    #[cfg(debug_assertions)]
+    {
+        let valid_mask = if valid_lanes >= u64::BITS as usize {
+            u64::MAX
+        } else {
+            (1_u64 << valid_lanes) - 1
+        };
+        // SAFETY: this helper is called from backend methods already running
+        // under the backend's required target-feature contract.
+        let mask_bits = unsafe { K::mask_to_bitmask(mask) };
+        debug_assert_eq!(mask_bits & !valid_mask, 0);
+    }
+}
+
 /// Abstract trait defining low-level vector operations.
 ///
 /// Implemented by ZST architecture markers. All methods are `unsafe` — the caller is
@@ -365,13 +387,7 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        debug_assert!(valid_lanes <= Self::LANE_COUNT);
-        let valid_mask = if valid_lanes == u64::BITS as usize {
-            u64::MAX
-        } else {
-            (1_u64 << valid_lanes) - 1
-        };
-        debug_assert_eq!(Self::mask_to_bitmask(mask) & !valid_mask, 0);
+        debug_assert_mask_within_valid_lanes::<T, Self>(valid_lanes, mask);
         // SAFETY: the caller guarantees validity for every active mask lane;
         // the generic implementation dereferences active lanes only.
         unsafe { crate::kernel_helpers::generic_masked_load::<T, Self>(ptr, mask, src) }
@@ -396,13 +412,7 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
         mask: Self::Mask,
         val: Self::Vector,
     ) {
-        debug_assert!(valid_lanes <= Self::LANE_COUNT);
-        let valid_mask = if valid_lanes == u64::BITS as usize {
-            u64::MAX
-        } else {
-            (1_u64 << valid_lanes) - 1
-        };
-        debug_assert_eq!(Self::mask_to_bitmask(mask) & !valid_mask, 0);
+        debug_assert_mask_within_valid_lanes::<T, Self>(valid_lanes, mask);
         // SAFETY: the caller guarantees validity for every active mask lane;
         // the generic implementation dereferences active lanes only.
         unsafe { crate::kernel_helpers::generic_masked_store::<T, Self>(ptr, mask, val) }

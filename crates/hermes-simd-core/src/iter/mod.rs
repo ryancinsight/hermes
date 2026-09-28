@@ -31,3 +31,8 @@ pub mod zip;
 pub use chunks::{SimdChunks, SimdChunksMut};
 pub use io::SimdIoChunks;
 pub use zip::{ZipChunks, ZipChunksMut};
+
+#[inline(always)]
+fn remaining_chunks(pos: usize, simd_end: usize, lane_count: usize) -> usize {
+    simd_end.saturating_sub(pos) / lane_count
+}

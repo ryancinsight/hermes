@@ -10,33 +10,23 @@ use core::arch::aarch64::*;
 use hermes_simd_core::kernel::pair_permute::{self, cast_arity};
 use hermes_simd_core::kernel::BackendKernel;
 
-/// Newtype over `float32x4_t` providing `Send + Sync`.
-#[cfg(target_arch = "aarch64")]
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub struct NeonF32Vec(pub float32x4_t);
+crate::define_simd_newtype!(
+    cfg(target_arch = "aarch64");
+    /// Newtype over `float32x4_t` providing `Send + Sync`.
+    pub struct NeonF32Vec(pub float32x4_t);
+);
 
-#[cfg(target_arch = "aarch64")]
-unsafe impl Send for NeonF32Vec {}
-#[cfg(target_arch = "aarch64")]
-unsafe impl Sync for NeonF32Vec {}
-
-/// NEON f32 mask: `uint32x4_t` used as a bitwise select mask.
-///
-/// Lane `i` is active iff bit 31 of `mask[i]` is set — the sign-bit
-/// convention shared with `mask_to_bitmask`. Every constructor
-/// (`mask_from_bools`, `leading_k_mask`, `vector_to_mask`) produces canonical
-/// all-ones/all-zero lanes, which is what the bitwise `vbslq_f32` merges rely
-/// on (true lane selects from the first argument).
-#[cfg(target_arch = "aarch64")]
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub struct NeonF32Mask(pub uint32x4_t);
-
-#[cfg(target_arch = "aarch64")]
-unsafe impl Send for NeonF32Mask {}
-#[cfg(target_arch = "aarch64")]
-unsafe impl Sync for NeonF32Mask {}
+crate::define_simd_newtype!(
+    cfg(target_arch = "aarch64");
+    /// NEON f32 mask: `uint32x4_t` used as a bitwise select mask.
+    ///
+    /// Lane `i` is active iff bit 31 of `mask[i]` is set — the sign-bit
+    /// convention shared with `mask_to_bitmask`. Every constructor
+    /// (`mask_from_bools`, `leading_k_mask`, `vector_to_mask`) produces canonical
+    /// all-ones/all-zero lanes, which is what the bitwise `vbslq_f32` merges rely
+    /// on (true lane selects from the first argument).
+    pub struct NeonF32Mask(pub uint32x4_t);
+);
 
 /// Per-lane active flags keyed on bit 31, the mask-active criterion every
 /// other consumer (`mask_to_bitmask` included) uses — a plain nonzero test

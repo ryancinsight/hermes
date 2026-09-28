@@ -5,6 +5,9 @@
 //! Compress/expand are emulated via scalar loops — AVX2 has no native
 //! `vcompress` instruction (that requires AVX-512F).
 
+use super::{
+    compress_selected_lanes, debug_assert_mask_within_valid_lanes, expand_selected_lanes, sfence,
+};
 use crate::Avx2;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::{
@@ -38,41 +41,26 @@ use core::arch::x86_64::{
 use hermes_simd_core::kernel::pair_permute::{self, cast_arity};
 use hermes_simd_core::kernel::BackendKernel;
 
-/// Newtype over `__m256` so `Send + Sync` can be implemented on the wrapper.
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub struct Avx2F32Vec(pub __m256);
+crate::define_simd_newtype!(
+    cfg(any(target_arch = "x86", target_arch = "x86_64"));
+    /// Newtype over `__m256` so `Send + Sync` can be implemented on the wrapper.
+    pub struct Avx2F32Vec(pub __m256);
+);
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-unsafe impl Send for Avx2F32Vec {}
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-unsafe impl Sync for Avx2F32Vec {}
+crate::define_simd_newtype!(
+    cfg(any(target_arch = "x86", target_arch = "x86_64"));
+    /// AVX2 f32 blend mask.
+    ///
+    /// Stored as a `__m256` register. Lane `i` is active when the sign bit
+    /// of `mask[i]` is set.
+    pub struct Avx2F32Mask(pub __m256);
+);
 
-/// AVX2 f32 blend mask.
-///
-/// Stored as a `__m256` register. Lane `i` is active when the sign bit
-/// of `mask[i]` is set.
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub struct Avx2F32Mask(pub __m256);
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-unsafe impl Send for Avx2F32Mask {}
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-unsafe impl Sync for Avx2F32Mask {}
-
-/// AVX2 gather index vector.
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub struct Avx2IdxI32(pub __m256i);
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-unsafe impl Send for Avx2IdxI32 {}
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-unsafe impl Sync for Avx2IdxI32 {}
+crate::define_simd_newtype!(
+    cfg(any(target_arch = "x86", target_arch = "x86_64"));
+    /// AVX2 gather index vector.
+    pub struct Avx2IdxI32(pub __m256i);
+);
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 impl BackendKernel<f32> for Avx2 {
@@ -152,10 +140,9 @@ impl BackendKernel<f32> for Avx2 {
         _mm256_stream_ps(ptr, val.0);
     }
 
-    #[inline]
+    #[inline(always)]
     fn stream_write_barrier() {
-        // SAFETY: `_mm_sfence` (SSE) is unconditionally available on x86_64.
-        unsafe { core::arch::x86_64::_mm_sfence() };
+        sfence();
     }
 
     // -----------------------------------------------------------------------
@@ -647,15 +634,7 @@ impl BackendKernel<f32> for Avx2 {
         mask: Self::Mask,
         src: Self::Vector,
     ) -> Self::Vector {
-        debug_assert!(valid_lanes <= <Self as BackendKernel<f32>>::LANE_COUNT);
-        #[cfg(debug_assertions)]
-        {
-            let valid_mask = (1_u64 << valid_lanes) - 1;
-            debug_assert_eq!(
-                <Self as BackendKernel<f32>>::mask_to_bitmask(mask) & !valid_mask,
-                0
-            );
-        }
+        debug_assert_mask_within_valid_lanes::<f32, Self>(valid_lanes, mask);
         let loaded = _mm256_maskload_ps(ptr, _mm256_castps_si256(mask.0));
         Avx2F32Vec(_mm256_blendv_ps(src.0, loaded, mask.0))
     }
@@ -671,15 +650,7 @@ impl BackendKernel<f32> for Avx2 {
         mask: Self::Mask,
         val: Self::Vector,
     ) {
-        debug_assert!(valid_lanes <= <Self as BackendKernel<f32>>::LANE_COUNT);
-        #[cfg(debug_assertions)]
-        {
-            let valid_mask = (1_u64 << valid_lanes) - 1;
-            debug_assert_eq!(
-                <Self as BackendKernel<f32>>::mask_to_bitmask(mask) & !valid_mask,
-                0
-            );
-        }
+        debug_assert_mask_within_valid_lanes::<f32, Self>(valid_lanes, mask);
         _mm256_maskstore_ps(ptr, _mm256_castps_si256(mask.0), val.0);
     }
 
@@ -746,14 +717,7 @@ impl BackendKernel<f32> for Avx2 {
         let mask_bits = _mm256_movemask_ps(mask.0) as u32;
         let mut arr = [0.0f32; 8];
         _mm256_storeu_ps(arr.as_mut_ptr(), src.0);
-        let mut out = [0.0f32; 8];
-        let mut k = 0usize;
-        for i in 0..8 {
-            if (mask_bits >> i) & 1 != 0 {
-                out[k] = arr[i];
-                k += 1;
-            }
-        }
+        let out = compress_selected_lanes(arr, mask_bits);
         Avx2F32Vec(_mm256_loadu_ps(out.as_ptr()))
     }
 
@@ -766,13 +730,7 @@ impl BackendKernel<f32> for Avx2 {
         _mm256_storeu_ps(src_arr.as_mut_ptr(), src.0);
         let mut out_arr = [0.0f32; 8];
         _mm256_storeu_ps(out_arr.as_mut_ptr(), fill.0);
-        let mut k = 0usize;
-        for i in 0..8 {
-            if (mask_bits >> i) & 1 != 0 {
-                out_arr[i] = src_arr[k];
-                k += 1;
-            }
-        }
+        let out_arr = expand_selected_lanes(src_arr, out_arr, mask_bits);
         Avx2F32Vec(_mm256_loadu_ps(out_arr.as_ptr()))
     }
 
