@@ -59,6 +59,7 @@ use super::pair_permute;
 pub const MAX_SIMD_LANES: usize = 64;
 
 #[inline(always)]
+#[cfg_attr(not(debug_assertions), allow(unused_variables))]
 fn debug_assert_mask_within_valid_lanes<T, K>(valid_lanes: usize, mask: K::Mask)
 where
     T: crate::scalar::Scalar,
