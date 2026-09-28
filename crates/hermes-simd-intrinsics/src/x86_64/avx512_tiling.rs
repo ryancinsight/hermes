@@ -271,7 +271,6 @@ pub fn unpack_int4(packed: &[u8], unpacked: &mut [i8]) {
         // SAFETY: this branch is compiled only when `avx2` is a static target feature,
         // satisfying `unpack_int4_avx2`'s ISA precondition; the `unpacked.len() >= len * 2`
         // assertion above upholds its bounds precondition.
-        // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
         unsafe {
             unpack_int4_avx2(packed, unpacked);
         }

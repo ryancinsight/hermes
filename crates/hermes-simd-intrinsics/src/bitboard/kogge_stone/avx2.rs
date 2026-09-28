@@ -8,6 +8,7 @@ use super::{east_mask, west_mask};
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[target_feature(enable = "avx2")]
 #[must_use]
+#[inline]
 pub unsafe fn kogge_stone_rook_avx2(slider: u64, occupancy: u64) -> u64 {
     use core::arch::x86_64::{
         _mm256_and_si256, _mm256_extract_epi64, _mm256_or_si256, _mm256_set1_epi64x,
@@ -103,6 +104,7 @@ pub unsafe fn kogge_stone_rook_avx2(slider: u64, occupancy: u64) -> u64 {
 /// Caller must ensure AVX2 is available.
 #[target_feature(enable = "avx2")]
 #[must_use]
+#[inline]
 pub unsafe fn kogge_stone_bishop_avx2(slider: u64, occupancy: u64) -> u64 {
     use core::arch::x86_64::{
         _mm256_and_si256, _mm256_extract_epi64, _mm256_or_si256, _mm256_set1_epi64x,
@@ -197,183 +199,10 @@ pub unsafe fn kogge_stone_bishop_avx2(slider: u64, occupancy: u64) -> u64 {
 /// Caller must ensure AVX2 is available.
 #[target_feature(enable = "avx2")]
 #[must_use]
-#[expect(
-    clippy::too_many_lines,
-    reason = "The queen fill keeps four direction lanes in one AVX2 kernel boundary"
-)]
 pub unsafe fn kogge_stone_queen_avx2(slider: u64, occupancy: u64) -> u64 {
-    use core::arch::x86_64::{
-        _mm256_and_si256, _mm256_extract_epi64, _mm256_or_si256, _mm256_set1_epi64x,
-        _mm256_set_epi64x, _mm256_slli_epi64, _mm256_sllv_epi64, _mm256_srlv_epi64,
-    };
-
-    let p_scalar = !occupancy;
-
-    // --- Rook Setup ---
-    let left_shifts_r = _mm256_set_epi64x(0, 0, 1, 8);
-    let mut g_left_r = _mm256_set1_epi64x(slider as i64);
-    let mut p_left_r = _mm256_set_epi64x(0, 0, p_scalar as i64, p_scalar as i64);
-
-    let right_shifts_r = _mm256_set_epi64x(0, 0, 1, 8);
-    let mut g_right_r = _mm256_set1_epi64x(slider as i64);
-    let mut p_right_r = _mm256_set_epi64x(0, 0, p_scalar as i64, p_scalar as i64);
-
-    // --- Bishop Setup ---
-    let left_shifts_b = _mm256_set_epi64x(0, 0, 7, 9);
-    let mut g_left_b = _mm256_set1_epi64x(slider as i64);
-    let mut p_left_b = _mm256_set_epi64x(0, 0, p_scalar as i64, p_scalar as i64);
-
-    let right_shifts_b = _mm256_set_epi64x(0, 0, 9, 7);
-    let mut g_right_b = _mm256_set1_epi64x(slider as i64);
-    let mut p_right_b = _mm256_set_epi64x(0, 0, p_scalar as i64, p_scalar as i64);
-
-    // --- Step 0 (shift amount = 1) ---
-    {
-        // Rook mask
-        let left_mask_r = _mm256_set_epi64x(0, 0, east_mask(1) as i64, -1);
-        let right_mask_r = _mm256_set_epi64x(0, 0, west_mask(1) as i64, -1);
-        // Bishop mask
-        let left_mask_b = _mm256_set_epi64x(0, 0, west_mask(1) as i64, east_mask(1) as i64);
-        let right_mask_b = _mm256_set_epi64x(0, 0, west_mask(1) as i64, east_mask(1) as i64);
-
-        // Rook left
-        let sg_lr = _mm256_and_si256(_mm256_sllv_epi64(g_left_r, left_shifts_r), left_mask_r);
-        let sp_lr = _mm256_and_si256(_mm256_sllv_epi64(p_left_r, left_shifts_r), left_mask_r);
-        g_left_r = _mm256_or_si256(g_left_r, _mm256_and_si256(sg_lr, p_left_r));
-        p_left_r = _mm256_and_si256(p_left_r, sp_lr);
-
-        // Bishop left
-        let sg_lb = _mm256_and_si256(_mm256_sllv_epi64(g_left_b, left_shifts_b), left_mask_b);
-        let sp_lb = _mm256_and_si256(_mm256_sllv_epi64(p_left_b, left_shifts_b), left_mask_b);
-        g_left_b = _mm256_or_si256(g_left_b, _mm256_and_si256(sg_lb, p_left_b));
-        p_left_b = _mm256_and_si256(p_left_b, sp_lb);
-
-        // Rook right
-        let sg_rr = _mm256_and_si256(_mm256_srlv_epi64(g_right_r, right_shifts_r), right_mask_r);
-        let sp_rr = _mm256_and_si256(_mm256_srlv_epi64(p_right_r, right_shifts_r), right_mask_r);
-        g_right_r = _mm256_or_si256(g_right_r, _mm256_and_si256(sg_rr, p_right_r));
-        p_right_r = _mm256_and_si256(p_right_r, sp_rr);
-
-        // Bishop right
-        let sg_rb = _mm256_and_si256(_mm256_srlv_epi64(g_right_b, right_shifts_b), right_mask_b);
-        let sp_rb = _mm256_and_si256(_mm256_srlv_epi64(p_right_b, right_shifts_b), right_mask_b);
-        g_right_b = _mm256_or_si256(g_right_b, _mm256_and_si256(sg_rb, p_right_b));
-        p_right_b = _mm256_and_si256(p_right_b, sp_rb);
-    }
-
-    // --- Step 1 (shift amount = 2) ---
-    {
-        let left_shift_amt_r = _mm256_slli_epi64(left_shifts_r, 1);
-        let right_shift_amt_r = _mm256_slli_epi64(right_shifts_r, 1);
-        let left_shift_amt_b = _mm256_slli_epi64(left_shifts_b, 1);
-        let right_shift_amt_b = _mm256_slli_epi64(right_shifts_b, 1);
-
-        // Rook mask
-        let left_mask_r = _mm256_set_epi64x(0, 0, east_mask(2) as i64, -1);
-        let right_mask_r = _mm256_set_epi64x(0, 0, west_mask(2) as i64, -1);
-        // Bishop mask
-        let left_mask_b = _mm256_set_epi64x(0, 0, west_mask(2) as i64, east_mask(2) as i64);
-        let right_mask_b = _mm256_set_epi64x(0, 0, west_mask(2) as i64, east_mask(2) as i64);
-
-        // Rook left
-        let sg_lr = _mm256_and_si256(_mm256_sllv_epi64(g_left_r, left_shift_amt_r), left_mask_r);
-        let sp_lr = _mm256_and_si256(_mm256_sllv_epi64(p_left_r, left_shift_amt_r), left_mask_r);
-        g_left_r = _mm256_or_si256(g_left_r, _mm256_and_si256(sg_lr, p_left_r));
-        p_left_r = _mm256_and_si256(p_left_r, sp_lr);
-
-        // Bishop left
-        let sg_lb = _mm256_and_si256(_mm256_sllv_epi64(g_left_b, left_shift_amt_b), left_mask_b);
-        let sp_lb = _mm256_and_si256(_mm256_sllv_epi64(p_left_b, left_shift_amt_b), left_mask_b);
-        g_left_b = _mm256_or_si256(g_left_b, _mm256_and_si256(sg_lb, p_left_b));
-        p_left_b = _mm256_and_si256(p_left_b, sp_lb);
-
-        // Rook right
-        let sg_rr = _mm256_and_si256(
-            _mm256_srlv_epi64(g_right_r, right_shift_amt_r),
-            right_mask_r,
-        );
-        let sp_rr = _mm256_and_si256(
-            _mm256_srlv_epi64(p_right_r, right_shift_amt_r),
-            right_mask_r,
-        );
-        g_right_r = _mm256_or_si256(g_right_r, _mm256_and_si256(sg_rr, p_right_r));
-        p_right_r = _mm256_and_si256(p_right_r, sp_rr);
-
-        // Bishop right
-        let sg_rb = _mm256_and_si256(
-            _mm256_srlv_epi64(g_right_b, right_shift_amt_b),
-            right_mask_b,
-        );
-        let sp_rb = _mm256_and_si256(
-            _mm256_srlv_epi64(p_right_b, right_shift_amt_b),
-            right_mask_b,
-        );
-        g_right_b = _mm256_or_si256(g_right_b, _mm256_and_si256(sg_rb, p_right_b));
-        p_right_b = _mm256_and_si256(p_right_b, sp_rb);
-    }
-
-    // --- Step 2 (shift amount = 4) ---
-    {
-        let left_shift_amt_r = _mm256_slli_epi64(left_shifts_r, 2);
-        let right_shift_amt_r = _mm256_slli_epi64(right_shifts_r, 2);
-        let left_shift_amt_b = _mm256_slli_epi64(left_shifts_b, 2);
-        let right_shift_amt_b = _mm256_slli_epi64(right_shifts_b, 2);
-
-        // Rook mask
-        let left_mask_r = _mm256_set_epi64x(0, 0, east_mask(4) as i64, -1);
-        let right_mask_r = _mm256_set_epi64x(0, 0, west_mask(4) as i64, -1);
-        // Bishop mask
-        let left_mask_b = _mm256_set_epi64x(0, 0, west_mask(4) as i64, east_mask(4) as i64);
-        let right_mask_b = _mm256_set_epi64x(0, 0, west_mask(4) as i64, east_mask(4) as i64);
-
-        // Rook left
-        let sg_lr = _mm256_and_si256(_mm256_sllv_epi64(g_left_r, left_shift_amt_r), left_mask_r);
-        g_left_r = _mm256_or_si256(g_left_r, _mm256_and_si256(sg_lr, p_left_r));
-
-        // Bishop left
-        let sg_lb = _mm256_and_si256(_mm256_sllv_epi64(g_left_b, left_shift_amt_b), left_mask_b);
-        g_left_b = _mm256_or_si256(g_left_b, _mm256_and_si256(sg_lb, p_left_b));
-
-        // Rook right
-        let sg_rr = _mm256_and_si256(
-            _mm256_srlv_epi64(g_right_r, right_shift_amt_r),
-            right_mask_r,
-        );
-        g_right_r = _mm256_or_si256(g_right_r, _mm256_and_si256(sg_rr, p_right_r));
-
-        // Bishop right
-        let sg_rb = _mm256_and_si256(
-            _mm256_srlv_epi64(g_right_b, right_shift_amt_b),
-            right_mask_b,
-        );
-        g_right_b = _mm256_or_si256(g_right_b, _mm256_and_si256(sg_rb, p_right_b));
-    }
-
-    // Final shifts
-    let left_shifted_r = _mm256_and_si256(
-        _mm256_sllv_epi64(g_left_r, left_shifts_r),
-        _mm256_set_epi64x(0, 0, east_mask(1) as i64, -1),
-    );
-    let right_shifted_r = _mm256_and_si256(
-        _mm256_srlv_epi64(g_right_r, right_shifts_r),
-        _mm256_set_epi64x(0, 0, west_mask(1) as i64, -1),
-    );
-
-    let left_shifted_b = _mm256_and_si256(
-        _mm256_sllv_epi64(g_left_b, left_shifts_b),
-        _mm256_set_epi64x(0, 0, west_mask(1) as i64, east_mask(1) as i64),
-    );
-    let right_shifted_b = _mm256_and_si256(
-        _mm256_srlv_epi64(g_right_b, right_shifts_b),
-        _mm256_set_epi64x(0, 0, west_mask(1) as i64, east_mask(1) as i64),
-    );
-
-    // Combine all 4 in registers
-    let comb_r = _mm256_or_si256(left_shifted_r, right_shifted_r);
-    let comb_b = _mm256_or_si256(left_shifted_b, right_shifted_b);
-    let combined_all = _mm256_or_si256(comb_r, comb_b);
-
-    let val0 = _mm256_extract_epi64(combined_all, 0) as u64;
-    let val1 = _mm256_extract_epi64(combined_all, 1) as u64;
-    val0 | val1
+    // The AVX2 rook and bishop fills each use only lanes 0 and 1 with every
+    // other mask lane zeroed, so a "fused" body would perform exactly the two
+    // kernels' work with no lane sharing. The union is written directly, as in
+    // the scalar and NEON reference backends.
+    kogge_stone_rook_avx2(slider, occupancy) | kogge_stone_bishop_avx2(slider, occupancy)
 }

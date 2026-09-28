@@ -2,11 +2,7 @@
 
 use alloc::vec::Vec;
 
-#[cfg(target_arch = "aarch64")]
-use crate::Neon;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use crate::{Avx2, Avx512};
-use crate::{DispatchedView, Scalar, SveArch};
+use crate::{Avx2, Avx512, DispatchedView, Neon, Scalar, SveArch};
 use hermes_simd_core::{
     align::Alignment, arch::SimdArch, execution::Unmasked, scalar::FloatElement, view::SimdView,
 };
@@ -103,46 +99,209 @@ impl TargetId {
         match self {
             // `SveArch` is lane-emulated and safe to construct on every host.
             Self::Scalar | Self::Sve => true,
-            Self::Avx2 => avx2_supported(),
-            Self::Avx512 => avx512_supported(),
-            Self::Neon => neon_supported(),
+            // Each marker's `is_runtime_supported` is the single source of truth
+            // for the host-capability question (false wherever the ISA cannot
+            // exist), so this table does not restate feature detection.
+            Self::Avx2 => <Avx2 as SimdArch>::is_runtime_supported(),
+            Self::Avx512 => <Avx512 as SimdArch>::is_runtime_supported(),
+            Self::Neon => <Neon as SimdArch>::is_runtime_supported(),
         }
     }
 }
 
-#[inline]
-fn avx2_supported() -> bool {
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+/// Builds a [`DispatchedView`] for the architecture marker it is implemented for.
+///
+/// An implementation owns its marker's `#[cfg]` gate and host-capability check,
+/// so the runtime-detected and explicitly-requested ladders below share one
+/// target → marker mapping instead of each restating the whole ISA ladder.
+trait BuildDispatchedView {
+    fn build<T, Align>(data: &[T]) -> Option<DispatchedView<'_, T, Align, Unmasked, &[T]>>
+    where
+        T: FloatElement,
+        Align: Alignment;
+
+    fn build_mut<T, Align>(
+        data: &mut [T],
+    ) -> Option<DispatchedView<'_, T, Align, Unmasked, &mut [T]>>
+    where
+        T: FloatElement,
+        Align: Alignment;
+}
+
+impl BuildDispatchedView for Scalar {
+    #[inline]
+    fn build<T, Align>(data: &[T]) -> Option<DispatchedView<'_, T, Align, Unmasked, &[T]>>
+    where
+        T: FloatElement,
+        Align: Alignment,
     {
-        Avx2::is_runtime_supported()
+        SimdView::<T, Scalar, Align, Unmasked, &[T]>::new(data).map(DispatchedView::Scalar)
     }
-    #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+
+    #[inline]
+    fn build_mut<T, Align>(
+        data: &mut [T],
+    ) -> Option<DispatchedView<'_, T, Align, Unmasked, &mut [T]>>
+    where
+        T: FloatElement,
+        Align: Alignment,
     {
-        false
+        SimdView::<T, Scalar, Align, Unmasked, &mut [T]>::new_mut(data).map(DispatchedView::Scalar)
     }
 }
 
-#[inline]
-fn avx512_supported() -> bool {
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+impl BuildDispatchedView for SveArch {
+    #[inline]
+    fn build<T, Align>(data: &[T]) -> Option<DispatchedView<'_, T, Align, Unmasked, &[T]>>
+    where
+        T: FloatElement,
+        Align: Alignment,
     {
-        Avx512::is_runtime_supported()
+        SimdView::<T, SveArch, Align, Unmasked, &[T]>::new(data).map(DispatchedView::Sve)
     }
-    #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+
+    #[inline]
+    fn build_mut<T, Align>(
+        data: &mut [T],
+    ) -> Option<DispatchedView<'_, T, Align, Unmasked, &mut [T]>>
+    where
+        T: FloatElement,
+        Align: Alignment,
     {
-        false
+        SimdView::<T, SveArch, Align, Unmasked, &mut [T]>::new_mut(data).map(DispatchedView::Sve)
     }
 }
 
+impl BuildDispatchedView for Avx2 {
+    #[inline]
+    fn build<T, Align>(data: &[T]) -> Option<DispatchedView<'_, T, Align, Unmasked, &[T]>>
+    where
+        T: FloatElement,
+        Align: Alignment,
+    {
+        // The marker only has a view where its ISA can exist; elsewhere `data`
+        // is intentionally unused and no view is produced.
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        if <Avx2 as SimdArch>::is_runtime_supported() {
+            return SimdView::<T, Avx2, Align, Unmasked, &[T]>::new(data).map(DispatchedView::Avx2);
+        }
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+        let _ = data;
+        None
+    }
+
+    #[inline]
+    fn build_mut<T, Align>(
+        data: &mut [T],
+    ) -> Option<DispatchedView<'_, T, Align, Unmasked, &mut [T]>>
+    where
+        T: FloatElement,
+        Align: Alignment,
+    {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        if <Avx2 as SimdArch>::is_runtime_supported() {
+            return SimdView::<T, Avx2, Align, Unmasked, &mut [T]>::new_mut(data)
+                .map(DispatchedView::Avx2);
+        }
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+        let _ = data;
+        None
+    }
+}
+
+impl BuildDispatchedView for Avx512 {
+    #[inline]
+    fn build<T, Align>(data: &[T]) -> Option<DispatchedView<'_, T, Align, Unmasked, &[T]>>
+    where
+        T: FloatElement,
+        Align: Alignment,
+    {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        if <Avx512 as SimdArch>::is_runtime_supported() {
+            return SimdView::<T, Avx512, Align, Unmasked, &[T]>::new(data)
+                .map(DispatchedView::Avx512);
+        }
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+        let _ = data;
+        None
+    }
+
+    #[inline]
+    fn build_mut<T, Align>(
+        data: &mut [T],
+    ) -> Option<DispatchedView<'_, T, Align, Unmasked, &mut [T]>>
+    where
+        T: FloatElement,
+        Align: Alignment,
+    {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        if <Avx512 as SimdArch>::is_runtime_supported() {
+            return SimdView::<T, Avx512, Align, Unmasked, &mut [T]>::new_mut(data)
+                .map(DispatchedView::Avx512);
+        }
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+        let _ = data;
+        None
+    }
+}
+
+impl BuildDispatchedView for Neon {
+    #[inline]
+    fn build<T, Align>(data: &[T]) -> Option<DispatchedView<'_, T, Align, Unmasked, &[T]>>
+    where
+        T: FloatElement,
+        Align: Alignment,
+    {
+        #[cfg(target_arch = "aarch64")]
+        if <Neon as SimdArch>::is_runtime_supported() {
+            return SimdView::<T, Neon, Align, Unmasked, &[T]>::new(data).map(DispatchedView::Neon);
+        }
+        #[cfg(not(target_arch = "aarch64"))]
+        let _ = data;
+        None
+    }
+
+    #[inline]
+    fn build_mut<T, Align>(
+        data: &mut [T],
+    ) -> Option<DispatchedView<'_, T, Align, Unmasked, &mut [T]>>
+    where
+        T: FloatElement,
+        Align: Alignment,
+    {
+        #[cfg(target_arch = "aarch64")]
+        if <Neon as SimdArch>::is_runtime_supported() {
+            return SimdView::<T, Neon, Align, Unmasked, &mut [T]>::new_mut(data)
+                .map(DispatchedView::Neon);
+        }
+        #[cfg(not(target_arch = "aarch64"))]
+        let _ = data;
+        None
+    }
+}
+
+/// Selects the widest backend the running host implements.
+///
+/// Vector targets are only considered where their ISA can exist at all; every
+/// other build falls through to [`TargetId::Scalar`].
 #[inline]
-fn neon_supported() -> bool {
+pub(crate) fn best_target() -> TargetId {
     #[cfg(target_arch = "aarch64")]
     {
-        Neon::is_runtime_supported()
+        TargetId::Neon
     }
     #[cfg(not(target_arch = "aarch64"))]
     {
-        false
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if <Avx512 as SimdArch>::is_runtime_supported() {
+                return TargetId::Avx512;
+            }
+            if <Avx2 as SimdArch>::is_runtime_supported() {
+                return TargetId::Avx2;
+            }
+        }
+        TargetId::Scalar
     }
 }
 
@@ -151,68 +310,20 @@ fn neon_supported() -> bool {
 /// Returns `None` when the target is not supported by the host or when the
 /// requested alignment typestate is not satisfied by `data`.
 #[inline]
-pub fn dispatch_view_to<'a, T, Align>(
+pub fn dispatch_view_to<T, Align>(
     target: TargetId,
-    data: &'a [T],
-) -> Option<DispatchedView<'a, T, Align, Unmasked, &'a [T]>>
+    data: &[T],
+) -> Option<DispatchedView<'_, T, Align, Unmasked, &[T]>>
 where
     T: FloatElement,
     Align: Alignment,
 {
     match target {
-        TargetId::Scalar => {
-            SimdView::<T, Scalar, Align, Unmasked, &'a [T]>::new(data).map(DispatchedView::Scalar)
-        }
-        TargetId::Avx2 => {
-            if target.is_supported() {
-                #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-                {
-                    SimdView::<T, Avx2, Align, Unmasked, &'a [T]>::new(data)
-                        .map(DispatchedView::Avx2)
-                }
-                #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
-                {
-                    None
-                }
-            } else {
-                None
-            }
-        }
-        TargetId::Avx512 => {
-            if target.is_supported() {
-                #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-                {
-                    SimdView::<T, Avx512, Align, Unmasked, &'a [T]>::new(data)
-                        .map(DispatchedView::Avx512)
-                }
-                #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
-                {
-                    None
-                }
-            } else {
-                None
-            }
-        }
-        TargetId::Neon => {
-            if target.is_supported() {
-                #[cfg(target_arch = "aarch64")]
-                {
-                    SimdView::<T, Neon, Align, Unmasked, &'a [T]>::new(data)
-                        .map(DispatchedView::Neon)
-                }
-                #[cfg(not(target_arch = "aarch64"))]
-                {
-                    None
-                }
-            } else {
-                None
-            }
-        }
-        // The emulated SVE backend is unconditional, so this arm mirrors the
-        // scalar path: no capability gate, no cfg gate.
-        TargetId::Sve => {
-            SimdView::<T, SveArch, Align, Unmasked, &'a [T]>::new(data).map(DispatchedView::Sve)
-        }
+        TargetId::Scalar => Scalar::build(data),
+        TargetId::Avx2 => Avx2::build(data),
+        TargetId::Avx512 => Avx512::build(data),
+        TargetId::Neon => Neon::build(data),
+        TargetId::Sve => SveArch::build(data),
     }
 }
 
@@ -221,65 +332,19 @@ where
 /// Returns `None` when the target is not supported by the host or when the
 /// requested alignment typestate is not satisfied by `data`.
 #[inline]
-pub fn dispatch_view_mut_to<'a, T, Align>(
+pub fn dispatch_view_mut_to<T, Align>(
     target: TargetId,
-    data: &'a mut [T],
-) -> Option<DispatchedView<'a, T, Align, Unmasked, &'a mut [T]>>
+    data: &mut [T],
+) -> Option<DispatchedView<'_, T, Align, Unmasked, &mut [T]>>
 where
     T: FloatElement,
     Align: Alignment,
 {
     match target {
-        TargetId::Scalar => SimdView::<T, Scalar, Align, Unmasked, &'a mut [T]>::new_mut(data)
-            .map(DispatchedView::Scalar),
-        TargetId::Avx2 => {
-            if target.is_supported() {
-                #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-                {
-                    SimdView::<T, Avx2, Align, Unmasked, &'a mut [T]>::new_mut(data)
-                        .map(DispatchedView::Avx2)
-                }
-                #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
-                {
-                    None
-                }
-            } else {
-                None
-            }
-        }
-        TargetId::Avx512 => {
-            if target.is_supported() {
-                #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-                {
-                    SimdView::<T, Avx512, Align, Unmasked, &'a mut [T]>::new_mut(data)
-                        .map(DispatchedView::Avx512)
-                }
-                #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
-                {
-                    None
-                }
-            } else {
-                None
-            }
-        }
-        TargetId::Neon => {
-            if target.is_supported() {
-                #[cfg(target_arch = "aarch64")]
-                {
-                    SimdView::<T, Neon, Align, Unmasked, &'a mut [T]>::new_mut(data)
-                        .map(DispatchedView::Neon)
-                }
-                #[cfg(not(target_arch = "aarch64"))]
-                {
-                    None
-                }
-            } else {
-                None
-            }
-        }
-        // The emulated SVE backend is unconditional, so this arm mirrors the
-        // scalar path: no capability gate, no cfg gate.
-        TargetId::Sve => SimdView::<T, SveArch, Align, Unmasked, &'a mut [T]>::new_mut(data)
-            .map(DispatchedView::Sve),
+        TargetId::Scalar => Scalar::build_mut(data),
+        TargetId::Avx2 => Avx2::build_mut(data),
+        TargetId::Avx512 => Avx512::build_mut(data),
+        TargetId::Neon => Neon::build_mut(data),
+        TargetId::Sve => SveArch::build_mut(data),
     }
 }

@@ -307,99 +307,24 @@ where
 
 /// Dispatches a shared slice into the best matching `DispatchedView` based on runtime CPU feature detection.
 #[inline]
-#[cfg_attr(
-    target_arch = "aarch64",
-    expect(
-        unreachable_code,
-        reason = "Architecture-specific dispatch returns are cfg-selected before scalar fallback"
-    )
-)]
-pub fn dispatch_view<'a, T, Align>(
-    data: &'a [T],
-) -> Option<DispatchedView<'a, T, Align, Unmasked, &'a [T]>>
+pub fn dispatch_view<T, Align>(data: &[T]) -> Option<DispatchedView<'_, T, Align, Unmasked, &[T]>>
 where
     T: FloatElement,
     Align: Alignment,
 {
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    {
-        #[cfg(feature = "std")]
-        {
-            if std::is_x86_feature_detected!("avx512f") {
-                return SimdView::<T, Avx512, Align, Unmasked, &'a [T]>::new(data)
-                    .map(DispatchedView::Avx512);
-            }
-            if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
-                return SimdView::<T, Avx2, Align, Unmasked, &'a [T]>::new(data)
-                    .map(DispatchedView::Avx2);
-            }
-        }
-        #[cfg(not(feature = "std"))]
-        {
-            if cfg!(target_feature = "avx512f") {
-                return SimdView::<T, Avx512, Align, Unmasked, &'a [T]>::new(data)
-                    .map(DispatchedView::Avx512);
-            }
-            if cfg!(target_feature = "avx2") && cfg!(target_feature = "fma") {
-                return SimdView::<T, Avx2, Align, Unmasked, &'a [T]>::new(data)
-                    .map(DispatchedView::Avx2);
-            }
-        }
-    }
-    #[cfg(target_arch = "aarch64")]
-    {
-        return SimdView::<T, Neon, Align, Unmasked, &'a [T]>::new(data).map(DispatchedView::Neon);
-    }
-    SimdView::<T, Scalar, Align, Unmasked, &'a [T]>::new(data).map(DispatchedView::Scalar)
+    target::dispatch_view_to(target::best_target(), data)
 }
 
 /// Dispatches a mutable slice into the best matching `DispatchedView` based on runtime CPU feature detection.
 #[inline]
-#[cfg_attr(
-    target_arch = "aarch64",
-    expect(
-        unreachable_code,
-        reason = "Architecture-specific dispatch returns are cfg-selected before scalar fallback"
-    )
-)]
-pub fn dispatch_view_mut<'a, T, Align>(
-    data: &'a mut [T],
-) -> Option<DispatchedView<'a, T, Align, Unmasked, &'a mut [T]>>
+pub fn dispatch_view_mut<T, Align>(
+    data: &mut [T],
+) -> Option<DispatchedView<'_, T, Align, Unmasked, &mut [T]>>
 where
     T: FloatElement,
     Align: Alignment,
 {
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    {
-        #[cfg(feature = "std")]
-        {
-            if std::is_x86_feature_detected!("avx512f") {
-                return SimdView::<T, Avx512, Align, Unmasked, &'a mut [T]>::new_mut(data)
-                    .map(DispatchedView::Avx512);
-            }
-            if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
-                return SimdView::<T, Avx2, Align, Unmasked, &'a mut [T]>::new_mut(data)
-                    .map(DispatchedView::Avx2);
-            }
-        }
-        #[cfg(not(feature = "std"))]
-        {
-            if cfg!(target_feature = "avx512f") {
-                return SimdView::<T, Avx512, Align, Unmasked, &'a mut [T]>::new_mut(data)
-                    .map(DispatchedView::Avx512);
-            }
-            if cfg!(target_feature = "avx2") && cfg!(target_feature = "fma") {
-                return SimdView::<T, Avx2, Align, Unmasked, &'a mut [T]>::new_mut(data)
-                    .map(DispatchedView::Avx2);
-            }
-        }
-    }
-    #[cfg(target_arch = "aarch64")]
-    {
-        return SimdView::<T, Neon, Align, Unmasked, &'a mut [T]>::new_mut(data)
-            .map(DispatchedView::Neon);
-    }
-    SimdView::<T, Scalar, Align, Unmasked, &'a mut [T]>::new_mut(data).map(DispatchedView::Scalar)
+    target::dispatch_view_mut_to(target::best_target(), data)
 }
 
 /// Extension trait for `SimdCow` providing vector-register level operations.

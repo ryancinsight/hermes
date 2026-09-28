@@ -1,6 +1,13 @@
 //! Kogge-Stone bitboard sliding attack generation.
 
 use hermes_simd_core::bitboard::BitBoardKernel;
+use hermes_simd_macros::runtime_dispatch;
+
+#[cfg(target_arch = "aarch64")]
+use crate::Neon;
+use crate::Scalar;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+use crate::{Avx2, Avx512};
 
 /// Portable scalar Kogge-Stone fill (always available reference backend).
 pub mod scalar;
@@ -112,187 +119,132 @@ pub(crate) fn step_sw(g: u64, p: u64, s: usize) -> (u64, u64) {
     (g | (sg & p), p & sp)
 }
 
-impl BitBoardKernel for KoggeStone {
-    #[inline(always)]
-    #[cfg_attr(
-        target_arch = "aarch64",
-        expect(
-            unreachable_code,
-            reason = "Architecture-specific returns are cfg-selected before scalar fallback"
-        )
-    )]
-    fn rook_attacks(square: u8, occupancy: u64) -> u64 {
-        let slider = 1u64 << square;
+/// Per-ISA Kogge-Stone sliding-attack fill, one method per attack set.
+///
+/// The methods are `unsafe` because a vectorized backend's precondition is that
+/// its instruction set is present on the host. `#[runtime_dispatch]` selects the
+/// marker whose ISA is available and enters that marker's `#[target_feature]`
+/// frame, which is what discharges the obligation at each call.
+trait KoggeFill {
+    /// # Safety
+    /// Caller must ensure the backend's ISA is available.
+    unsafe fn rook(slider: u64, occupancy: u64) -> u64;
 
-        // SAFETY: each ISA-specific fill (`kogge_stone_rook_avx512`/`_avx2`) is
-        // `#[target_feature]`-gated and is only reached inside the matching
-        // `is_x86_feature_detected!` branch (or the `cfg!(target_feature)` guard in
-        // no-std), so its ISA precondition holds at the call. The NEON path is baseline
-        // on AArch64, and the scalar fallback is safe. Inputs are `u64` bitboards with
-        // no memory access, so no bounds obligation applies.
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-        {
-            #[cfg(feature = "std")]
-            {
-                if std::is_x86_feature_detected!("avx512f") {
-                    // SAFETY: `kogge_stone_rook_avx512` is `#[target_feature(enable = "avx512f")]`-gated and this
-                    // branch is entered only when that feature is present — probed by
-                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
-                    return unsafe { avx512::kogge_stone_rook_avx512(slider, occupancy) };
-                }
-                if std::is_x86_feature_detected!("avx2") {
-                    // SAFETY: `kogge_stone_rook_avx2` is `#[target_feature(enable = "avx2")]`-gated and this
-                    // branch is entered only when that feature is present — probed by
-                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
-                    return unsafe { avx2::kogge_stone_rook_avx2(slider, occupancy) };
-                }
-            }
-            #[cfg(not(feature = "std"))]
-            {
-                if cfg!(target_feature = "avx512f") {
-                    // SAFETY: `kogge_stone_rook_avx512` is `#[target_feature(enable = "avx512f")]`-gated and this
-                    // branch is entered only when that feature is present — probed by
-                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
-                    return unsafe { avx512::kogge_stone_rook_avx512(slider, occupancy) };
-                }
-                if cfg!(target_feature = "avx2") {
-                    // SAFETY: `kogge_stone_rook_avx2` is `#[target_feature(enable = "avx2")]`-gated and this
-                    // branch is entered only when that feature is present — probed by
-                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
-                    return unsafe { avx2::kogge_stone_rook_avx2(slider, occupancy) };
-                }
-            }
-        }
+    /// # Safety
+    /// Caller must ensure the backend's ISA is available.
+    unsafe fn bishop(slider: u64, occupancy: u64) -> u64;
 
-        #[cfg(target_arch = "aarch64")]
-        {
-            // SAFETY: `kogge_stone_rook_neon` requires `neon`, which is baseline on
-            // every aarch64 target, so its precondition holds unconditionally here.
-            return unsafe { neon::kogge_stone_rook_neon(slider, occupancy) };
-        }
+    /// Queen attacks default to the union of the rook and bishop fills.
+    ///
+    /// # Safety
+    /// Caller must ensure the backend's ISA is available.
+    unsafe fn queen(slider: u64, occupancy: u64) -> u64 {
+        unsafe { Self::rook(slider, occupancy) | Self::bishop(slider, occupancy) }
+    }
+}
 
+impl KoggeFill for Scalar {
+    #[inline]
+    unsafe fn rook(slider: u64, occupancy: u64) -> u64 {
         scalar::kogge_stone_rook(slider, occupancy)
     }
 
-    #[inline(always)]
-    #[cfg_attr(
-        target_arch = "aarch64",
-        expect(
-            unreachable_code,
-            reason = "Architecture-specific returns are cfg-selected before scalar fallback"
-        )
-    )]
-    fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
-        let slider = 1u64 << square;
-
-        // SAFETY: each ISA-specific fill (`kogge_stone_bishop_avx512`/`_avx2`) is
-        // `#[target_feature]`-gated and is only reached inside the matching
-        // `is_x86_feature_detected!` branch (or the `cfg!(target_feature)` guard in
-        // no-std), so its ISA precondition holds at the call. The NEON path is baseline
-        // on AArch64, and the scalar fallback is safe. Inputs are `u64` bitboards with
-        // no memory access, so no bounds obligation applies.
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-        {
-            #[cfg(feature = "std")]
-            {
-                if std::is_x86_feature_detected!("avx512f") {
-                    // SAFETY: `kogge_stone_bishop_avx512` is `#[target_feature(enable = "avx512f")]`-gated and this
-                    // branch is entered only when that feature is present — probed by
-                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
-                    return unsafe { avx512::kogge_stone_bishop_avx512(slider, occupancy) };
-                }
-                if std::is_x86_feature_detected!("avx2") {
-                    // SAFETY: `kogge_stone_bishop_avx2` is `#[target_feature(enable = "avx2")]`-gated and this
-                    // branch is entered only when that feature is present — probed by
-                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
-                    return unsafe { avx2::kogge_stone_bishop_avx2(slider, occupancy) };
-                }
-            }
-            #[cfg(not(feature = "std"))]
-            {
-                if cfg!(target_feature = "avx512f") {
-                    // SAFETY: `kogge_stone_bishop_avx512` is `#[target_feature(enable = "avx512f")]`-gated and this
-                    // branch is entered only when that feature is present — probed by
-                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
-                    return unsafe { avx512::kogge_stone_bishop_avx512(slider, occupancy) };
-                }
-                if cfg!(target_feature = "avx2") {
-                    // SAFETY: `kogge_stone_bishop_avx2` is `#[target_feature(enable = "avx2")]`-gated and this
-                    // branch is entered only when that feature is present — probed by
-                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
-                    return unsafe { avx2::kogge_stone_bishop_avx2(slider, occupancy) };
-                }
-            }
-        }
-
-        #[cfg(target_arch = "aarch64")]
-        {
-            // SAFETY: `kogge_stone_bishop_neon` requires `neon`, which is baseline on
-            // every aarch64 target, so its precondition holds unconditionally here.
-            return unsafe { neon::kogge_stone_bishop_neon(slider, occupancy) };
-        }
-
+    #[inline]
+    unsafe fn bishop(slider: u64, occupancy: u64) -> u64 {
         scalar::kogge_stone_bishop(slider, occupancy)
+    }
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+impl KoggeFill for Avx2 {
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn rook(slider: u64, occupancy: u64) -> u64 {
+        avx2::kogge_stone_rook_avx2(slider, occupancy)
+    }
+
+    #[target_feature(enable = "avx2")]
+    #[inline]
+    unsafe fn bishop(slider: u64, occupancy: u64) -> u64 {
+        avx2::kogge_stone_bishop_avx2(slider, occupancy)
+    }
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+impl KoggeFill for Avx512 {
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn rook(slider: u64, occupancy: u64) -> u64 {
+        avx512::kogge_stone_rook_avx512(slider, occupancy)
+    }
+
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn bishop(slider: u64, occupancy: u64) -> u64 {
+        avx512::kogge_stone_bishop_avx512(slider, occupancy)
+    }
+
+    // The AVX-512 queen fill is a genuine two-times kernel — the rook fill alone
+    // leaves lanes 2,3,6,7 as masked padding, so the fused body really uses all
+    // eight lanes — so it keeps a method of its own instead of the default union.
+    #[target_feature(enable = "avx512f")]
+    #[inline]
+    unsafe fn queen(slider: u64, occupancy: u64) -> u64 {
+        avx512::kogge_stone_queen_avx512(slider, occupancy)
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+impl KoggeFill for Neon {
+    #[inline]
+    unsafe fn rook(slider: u64, occupancy: u64) -> u64 {
+        neon::kogge_stone_rook_neon(slider, occupancy)
+    }
+
+    #[inline]
+    unsafe fn bishop(slider: u64, occupancy: u64) -> u64 {
+        neon::kogge_stone_bishop_neon(slider, occupancy)
+    }
+}
+
+/// Rook attacks for `square`, generated for the widest ISA the host implements.
+#[runtime_dispatch(avx512f, avx2, neon, scalar)]
+fn dispatch_rook_attacks_kernel<A: KoggeFill>(square: u8, occupancy: u64) -> u64 {
+    let slider = 1u64 << square;
+    // SAFETY: `A` is the marker for the ISA whose feature frame
+    // `#[runtime_dispatch]` selected, so `A::rook`'s ISA precondition holds.
+    unsafe { A::rook(slider, occupancy) }
+}
+
+/// Bishop attacks for `square`, generated for the widest ISA the host implements.
+#[runtime_dispatch(avx512f, avx2, neon, scalar)]
+fn dispatch_bishop_attacks_kernel<A: KoggeFill>(square: u8, occupancy: u64) -> u64 {
+    let slider = 1u64 << square;
+    // SAFETY: as for `dispatch_rook_attacks_kernel`.
+    unsafe { A::bishop(slider, occupancy) }
+}
+
+/// Queen attacks for `square`, generated for the widest ISA the host implements.
+#[runtime_dispatch(avx512f, avx2, neon, scalar)]
+fn dispatch_queen_attacks_kernel<A: KoggeFill>(square: u8, occupancy: u64) -> u64 {
+    let slider = 1u64 << square;
+    // SAFETY: as for `dispatch_rook_attacks_kernel`.
+    unsafe { A::queen(slider, occupancy) }
+}
+
+impl BitBoardKernel for KoggeStone {
+    #[inline(always)]
+    fn rook_attacks(square: u8, occupancy: u64) -> u64 {
+        dispatch_rook_attacks(square, occupancy)
     }
 
     #[inline(always)]
-    #[cfg_attr(
-        target_arch = "aarch64",
-        expect(
-            unreachable_code,
-            reason = "Architecture-specific returns are cfg-selected before scalar fallback"
-        )
-    )]
+    fn bishop_attacks(square: u8, occupancy: u64) -> u64 {
+        dispatch_bishop_attacks(square, occupancy)
+    }
+
+    #[inline(always)]
     fn queen_attacks(square: u8, occupancy: u64) -> u64 {
-        let slider = 1u64 << square;
-
-        // SAFETY: each ISA-specific fill (`kogge_stone_queen_avx512`/`_avx2`) is
-        // `#[target_feature]`-gated and is only reached inside the matching
-        // `is_x86_feature_detected!` branch (or the `cfg!(target_feature)` guard in
-        // no-std), so its ISA precondition holds at the call. The NEON path is baseline
-        // on AArch64, and the scalar fallback is safe. Inputs are `u64` bitboards with
-        // no memory access, so no bounds obligation applies.
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-        {
-            #[cfg(feature = "std")]
-            {
-                if std::is_x86_feature_detected!("avx512f") {
-                    // SAFETY: `kogge_stone_queen_avx512` is `#[target_feature(enable = "avx512f")]`-gated and this
-                    // branch is entered only when that feature is present — probed by
-                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
-                    return unsafe { avx512::kogge_stone_queen_avx512(slider, occupancy) };
-                }
-                if std::is_x86_feature_detected!("avx2") {
-                    // SAFETY: `kogge_stone_queen_avx2` is `#[target_feature(enable = "avx2")]`-gated and this
-                    // branch is entered only when that feature is present — probed by
-                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
-                    return unsafe { avx2::kogge_stone_queen_avx2(slider, occupancy) };
-                }
-            }
-            #[cfg(not(feature = "std"))]
-            {
-                if cfg!(target_feature = "avx512f") {
-                    // SAFETY: `kogge_stone_queen_avx512` is `#[target_feature(enable = "avx512f")]`-gated and this
-                    // branch is entered only when that feature is present — probed by
-                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
-                    return unsafe { avx512::kogge_stone_queen_avx512(slider, occupancy) };
-                }
-                if cfg!(target_feature = "avx2") {
-                    // SAFETY: `kogge_stone_queen_avx2` is `#[target_feature(enable = "avx2")]`-gated and this
-                    // branch is entered only when that feature is present — probed by
-                    // `is_x86_feature_detected!` under std, by `cfg!(target_feature)` otherwise.
-                    return unsafe { avx2::kogge_stone_queen_avx2(slider, occupancy) };
-                }
-            }
-        }
-
-        #[cfg(target_arch = "aarch64")]
-        {
-            // SAFETY: `kogge_stone_queen_neon` requires `neon`, which is baseline on
-            // every aarch64 target, so its precondition holds unconditionally here.
-            return unsafe { neon::kogge_stone_queen_neon(slider, occupancy) };
-        }
-
-        scalar::kogge_stone_queen(slider, occupancy)
+        dispatch_queen_attacks(square, occupancy)
     }
 }
