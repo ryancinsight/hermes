@@ -10,6 +10,7 @@ pub(crate) fn sfence() {
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[inline(always)]
+#[cfg_attr(not(debug_assertions), allow(unused_variables))]
 pub(crate) fn debug_assert_mask_within_valid_lanes<T, K>(valid_lanes: usize, mask: K::Mask)
 where
     T: hermes_simd_core::scalar::Scalar,
