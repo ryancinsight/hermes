@@ -112,10 +112,17 @@ jobs:
   benchmark-budgets:
     name: benchmark runtime budgets
     runs-on: ubuntu-latest
-    # Twelve smoke targets at 60 seconds plus two canonical full targets at
-    # 300 seconds yield a 22-minute analytical ceiling. Compilation and runner
-    # overhead retain eight minutes of margin without admitting an unbounded job.
-    timeout-minutes: 30
+    # Fifteen smoke targets at 60 seconds yield a 15-minute analytical
+    # ceiling. Compilation and runner overhead retain five minutes of margin
+    # without admitting an unbounded job. Full criterion timing runs are a
+    # local instrument (performance_engineering: benchmarks are local
+    # instruments), never a pull-request gate: the smoke above already
+    # exercises every benchmark binary, including the two that previously
+    # ran a full 300-second timing pass here, in --test (single-iteration)
+    # mode, which is the budget assertion this job enforces. Measure actual
+    # regressions with `cargo bench` locally against a stored criterion
+    # baseline (engineering_gates: performance gate).
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: hermes
@@ -141,15 +148,6 @@ jobs:
             timeout --foreground --kill-after=10s 60s \
               cargo bench --locked -p "$package" --bench "$benchmark" -- --test
           done
-      - name: Run changed canonical benchmarks within 300 seconds (pull requests and manual runs)
-        if: github.event_name != 'push'
-        shell: bash
-        run: |
-          set -euo pipefail
-          timeout --foreground --kill-after=10s 300s \
-            cargo bench --locked -p hermes-simd --bench dense
-          timeout --foreground --kill-after=10s 300s \
-            cargo bench --locked -p hermes-simd-benches --bench simd_bench
 
   miri:
     name: miri (core + intrinsics boundary)
