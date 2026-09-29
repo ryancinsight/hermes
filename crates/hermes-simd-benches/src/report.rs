@@ -3,17 +3,53 @@ use crate::host::HostCapabilities;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-#[derive(PartialEq, PartialOrd)]
+#[derive(PartialEq)]
 enum ParamValue {
     Numeric(f64),
     String(String),
     None,
 }
 
+impl ParamValue {
+    /// Total order over the three variants: `Numeric` sorts before `String`
+    /// before `None` (the declaration order), and same-variant values compare
+    /// by payload. `f64::partial_cmp` returns `None` for a NaN operand, so that
+    /// pair is ordered `Equal` — the resolution the previous `Ord::cmp`
+    /// (`partial_cmp(..).unwrap_or(Equal)`) already applied.
+    fn total_cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (Self::Numeric(a), Self::Numeric(b)) => {
+                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+            }
+            (Self::String(a), Self::String(b)) => a.cmp(b),
+            _ => self.rank().cmp(&other.rank()),
+        }
+    }
+
+    fn rank(&self) -> u8 {
+        match self {
+            Self::Numeric(_) => 0,
+            Self::String(_) => 1,
+            Self::None => 2,
+        }
+    }
+}
+
+// `Ord` and `PartialOrd` are both written by hand from the single `total_cmp`
+// order. Deriving `PartialOrd` beside a hand-written `Ord` is the
+// `derive_ord_xor_partial_ord` defect (the two can disagree), which is what the
+// removed crate-level allow in `main.rs` used to silence.
 impl Eq for ParamValue {}
+
 impl Ord for ParamValue {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+        self.total_cmp(other)
+    }
+}
+
+impl PartialOrd for ParamValue {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 

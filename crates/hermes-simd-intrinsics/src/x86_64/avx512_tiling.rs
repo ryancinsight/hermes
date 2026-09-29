@@ -268,10 +268,10 @@ pub fn unpack_int4(packed: &[u8], unpacked: &mut [i8]) {
 
     #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
     {
-        // SAFETY: this branch is compiled only when `avx2` is a static target feature,
-        // satisfying `unpack_int4_avx2`'s ISA precondition; the `unpacked.len() >= len * 2`
-        // assertion above upholds its bounds precondition.
-        // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
+        // SAFETY: this branch is compiled only when `avx2` is a static target
+        // feature, satisfying `unpack_int4_avx2`'s ISA precondition; the
+        // `unpacked.len() >= len * 2` assertion above upholds its bounds
+        // precondition.
         unsafe {
             unpack_int4_avx2(packed, unpacked);
         }
@@ -346,127 +346,107 @@ pub unsafe fn unpack_int4_avx2(packed: &[u8], unpacked: &mut [i8]) {
     }
 }
 
+/// Feature-gated dispatch for the AVX-512 `eunomia` unpackers.
+///
+/// The four `unpack_*` entry points below share one body shape: probe the
+/// required AVX-512 features, call the `eunomia` intrinsic kernel, and fall
+/// back to the portable `eunomia` scalar unpacker when the probe fails. The
+/// macro states that shape once so the ISA gate cannot drift between the four
+/// sites, and so the `std` and `no_std` arms probe the *same* feature set —
+/// the earlier hand-written `no_std` arm checked only the first feature, a
+/// strictly weaker gate than the `std` arm.
+///
+/// The probe is passed as an expression rather than as feature-name literals:
+/// `is_x86_feature_detected!` reads its argument as a literal token, which a
+/// `literal` metavariable no longer is after substitution.
+macro_rules! avx512_unpack_dispatch {
+    (
+        $packed:expr,
+        $unpacked:expr,
+        $std_probe:expr,
+        $nostd_probe:expr,
+        $fast:path,
+        $scalar:path
+    ) => {{
+        #[cfg(target_arch = "x86_64")]
+        let fast_supported = {
+            #[cfg(feature = "std")]
+            {
+                $std_probe
+            }
+            #[cfg(not(feature = "std"))]
+            {
+                $nostd_probe
+            }
+        };
+        #[cfg(not(target_arch = "x86_64"))]
+        let fast_supported = false;
+
+        if fast_supported {
+            // SAFETY: `fast_supported` is true only when the runtime probe (or,
+            // in no-std, the static `target_feature` gate) confirmed every
+            // AVX-512 feature `$fast` requires, so the delegated `eunomia`
+            // unpacker's ISA precondition holds; the slice bounds are its
+            // documented contract.
+            unsafe {
+                $fast($packed, $unpacked);
+            }
+        } else {
+            $scalar($packed, $unpacked);
+        }
+    }};
+}
+
 /// Unpacks Bf8 elements to Bf16 for accumulation.
 #[inline]
 pub fn unpack_bf8_to_bf16(packed: &[Bf8], unpacked: &mut [Bf16]) {
-    #[cfg(target_arch = "x86_64")]
-    {
-        #[cfg(feature = "std")]
-        {
-            if std::is_x86_feature_detected!("avx512bw")
-                && std::is_x86_feature_detected!("avx512vl")
-            {
-                // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
-                unsafe {
-                    eunomia::unsafe_intrinsics::avx512::unpack_bf8_to_bf16(packed, unpacked);
-                    return;
-                }
-            }
-        }
-        #[cfg(not(feature = "std"))]
-        {
-            if cfg!(target_feature = "avx512bw") {
-                // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
-                unsafe {
-                    eunomia::unsafe_intrinsics::avx512::unpack_bf8_to_bf16(packed, unpacked);
-                    return;
-                }
-            }
-        }
-    }
-    eunomia::unpack_bf8_to_bf16(packed, unpacked);
+    avx512_unpack_dispatch!(
+        packed,
+        unpacked,
+        std::is_x86_feature_detected!("avx512bw") && std::is_x86_feature_detected!("avx512vl"),
+        cfg!(all(target_feature = "avx512bw", target_feature = "avx512vl")),
+        eunomia::unsafe_intrinsics::avx512::unpack_bf8_to_bf16,
+        eunomia::unpack_bf8_to_bf16
+    );
 }
 
 /// Unpacks Bf4 elements to Bf16 for accumulation.
 #[inline]
 pub fn unpack_bf4_to_bf16(packed: &[Bf4], unpacked: &mut [Bf16]) {
-    #[cfg(target_arch = "x86_64")]
-    {
-        #[cfg(feature = "std")]
-        {
-            if std::is_x86_feature_detected!("avx512bw")
-                && std::is_x86_feature_detected!("avx512vl")
-            {
-                // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
-                unsafe {
-                    eunomia::unsafe_intrinsics::avx512::unpack_bf4_to_bf16(packed, unpacked);
-                    return;
-                }
-            }
-        }
-        #[cfg(not(feature = "std"))]
-        {
-            if cfg!(target_feature = "avx512bw") {
-                // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
-                unsafe {
-                    eunomia::unsafe_intrinsics::avx512::unpack_bf4_to_bf16(packed, unpacked);
-                    return;
-                }
-            }
-        }
-    }
-    eunomia::unpack_bf4_to_bf16(packed, unpacked);
+    avx512_unpack_dispatch!(
+        packed,
+        unpacked,
+        std::is_x86_feature_detected!("avx512bw") && std::is_x86_feature_detected!("avx512vl"),
+        cfg!(all(target_feature = "avx512bw", target_feature = "avx512vl")),
+        eunomia::unsafe_intrinsics::avx512::unpack_bf4_to_bf16,
+        eunomia::unpack_bf4_to_bf16
+    );
 }
 
 /// Unpacks packed Bf4 elements (stored 2 per byte in `packed`) into a Bf16 slice.
 #[inline]
 pub fn unpack_packed_bf4_to_bf16(packed: &[u8], unpacked: &mut [Bf16]) {
-    #[cfg(target_arch = "x86_64")]
-    {
-        #[cfg(feature = "std")]
-        {
-            if std::is_x86_feature_detected!("avx512bw")
-                && std::is_x86_feature_detected!("avx512vl")
-            {
-                // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
-                unsafe {
-                    eunomia::unsafe_intrinsics::avx512::unpack_bf4_to_bf16_packed(packed, unpacked);
-                    return;
-                }
-            }
-        }
-        #[cfg(not(feature = "std"))]
-        {
-            if cfg!(target_feature = "avx512bw") {
-                // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
-                unsafe {
-                    eunomia::unsafe_intrinsics::avx512::unpack_bf4_to_bf16_packed(packed, unpacked);
-                    return;
-                }
-            }
-        }
-    }
-    eunomia::unpack_bf4_to_bf16_packed(packed, unpacked);
+    avx512_unpack_dispatch!(
+        packed,
+        unpacked,
+        std::is_x86_feature_detected!("avx512bw") && std::is_x86_feature_detected!("avx512vl"),
+        cfg!(all(target_feature = "avx512bw", target_feature = "avx512vl")),
+        eunomia::unsafe_intrinsics::avx512::unpack_bf4_to_bf16_packed,
+        eunomia::unpack_bf4_to_bf16_packed
+    );
 }
 
 /// Unpacks packed F4 elements (stored 2 per byte in `packed`) into an F32 slice.
 #[inline]
 pub fn unpack_packed_f4_to_f32(packed: &[u8], unpacked: &mut [F32]) {
-    #[cfg(target_arch = "x86_64")]
-    {
-        #[cfg(feature = "std")]
-        {
-            if std::is_x86_feature_detected!("avx512f") && std::is_x86_feature_detected!("avx512vl")
-            {
-                // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
-                unsafe {
-                    eunomia::unsafe_intrinsics::avx512::unpack_f4_to_f32_packed(packed, unpacked);
-                    return;
-                }
-            }
-        }
-        #[cfg(not(feature = "std"))]
-        {
-            if cfg!(target_feature = "avx512f") {
-                // SAFETY: reached only after the guarding `is_x86_feature_detected!` check (or `cfg!(target_feature)` in no-std) confirms the required AVX-512 features, so the delegated `eunomia` unpacker's ISA precondition holds; the slice bounds are its documented contract.
-                unsafe {
-                    eunomia::unsafe_intrinsics::avx512::unpack_f4_to_f32_packed(packed, unpacked);
-                    return;
-                }
-            }
-        }
-    }
-    eunomia::unpack_f4_to_f32_packed(packed, unpacked);
+    avx512_unpack_dispatch!(
+        packed,
+        unpacked,
+        std::is_x86_feature_detected!("avx512f") && std::is_x86_feature_detected!("avx512vl"),
+        cfg!(all(target_feature = "avx512f", target_feature = "avx512vl")),
+        eunomia::unsafe_intrinsics::avx512::unpack_f4_to_f32_packed,
+        eunomia::unpack_f4_to_f32_packed
+    );
 }
 
 #[cfg(test)]
