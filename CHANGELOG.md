@@ -80,6 +80,9 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Changed
 
+- [patch][ATLAS-VERSION-COHERENCE-SWEEP-2026-09-30] Require `themis-topology`
+  0.11.0 (was 0.10.1) and advance `Cargo.lock` to it; no source change.
+
 - [patch][HERMES-VIEW-LEAF-SPLIT] The `view` module root and its two largest
   leaves are split into operation-family modules. `view/mod.rs` (527 lines)
   carried real implementation and is now a passthrough facade over
