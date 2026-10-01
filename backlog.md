@@ -66,6 +66,16 @@
   provider lock during unlocked local commands; its derived lock changes were
   discarded. Hosted locked CI remains the delivery gate.
 
+## HERMES-RESCUE-QUEUE — Complete or close the rescue PR queue [patch] — todo <a id="hermes-rescue-queue"></a>
+
+- Status: todo; priority: correctness; needs: none; scope: `crates/hermes-simd-core`, `crates/hermes-simd-intrinsics`, `crates/hermes-simd`, `crates/hermes-simd-benches`, `gap_audit.md`.
+- **Outcome:** each listed rescue PR is completed onto current main (ported, verified, merged) or closed once its diff resolves empty against main.
+- **Acceptance:** no open `rescue/` PR for hermes remains unaccounted for; each closed PR records an empty resolved diff against main, each completed one its landing PR.
+- **Next step:** port the oldest PR (#220) onto current main and resolve its diff hunk by hunk; both bases predate main by 60+ commits.
+- **Rescue PRs (draft parking records, not claims):**
+  - `ryancinsight/hermes#220` (`rescue/hermes-simd-consolidation-batch`): 9 refactor commits, 25 files (+965/-1691), code only: SIMD wrapper/scalar/AVX2/AVX-512 de-duplication, iter chunk and mask validation helpers, Kogge-Stone bitboard and target consolidation.
+  - `ryancinsight/hermes#221` (`rescue/hermes-audit-20260928`): 1 audit commit, 22 files (+1857/-1831), code, tests and `gap_audit.md`: sparse/tiling/tensor view, x86_64 and AMX modules, axpy dispatch, dense/tiling/slice tests, benches.
+
 ## Legacy HS-4xx record — open items and measured limits
 
 In full: the open measurement items, the limits they rest on, and the rejected refactors. The rest of the era is one line each below.
