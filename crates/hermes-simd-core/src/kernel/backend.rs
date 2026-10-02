@@ -1017,9 +1017,10 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
     /// # Safety
     /// Processor must support the required target feature.
     unsafe fn popcount(a: Self::Vector) -> Self::Vector {
-        crate::kernel_helpers::generic_unary_op::<T, Self, _>(a, |x| {
-            T::cast_from(x.count_ones() as i32)
-        })
+        crate::kernel_helpers::generic_unary_op::<T, Self, _>(
+            a,
+            crate::kernel_helpers::popcount_element,
+        )
     }
 
     /// Horizontal bitwise AND across all lanes.

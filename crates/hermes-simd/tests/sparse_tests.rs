@@ -90,21 +90,21 @@ fn test_spmv_dense_masked_word_boundary_rows() {
     assert_eq!(y, want);
 }
 
-fn assert_dense_masked_short_rows<T: SimdOps>() {
+fn assert_dense_masked_short_rows<T: SimdOps + FloatElement>() {
     const WIDTHS: [usize; 6] = [3, 4, 5, 6, 7, 15];
     const NROWS: usize = 3;
 
     for ncols in WIDTHS {
         let values: Vec<T> = (0..NROWS * ncols)
-            .map(|index| T::cast_from((index % 5 + 1) as i32))
+            .map(|index| T::from_count(index % 5 + 1))
             .collect();
         let x: Vec<T> = (0..ncols)
-            .map(|column| T::cast_from((column % 4 + 1) as i32))
+            .map(|column| T::from_count(column % 4 + 1))
             .collect();
         let mask_bits: Vec<bool> = (0..NROWS * ncols).map(|index| index % 3 != 1).collect();
         let mask = PackedMask::from_bools(&mask_bits);
         let data = DenseWithMaskData::new(&values, mask.as_view(), NROWS, ncols);
-        let mut actual = vec![T::cast_from(2); NROWS];
+        let mut actual = vec![T::from_count(2); NROWS];
         let mut expected = actual.clone();
 
         for row in 0..NROWS {

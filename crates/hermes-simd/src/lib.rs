@@ -70,7 +70,7 @@ pub use hermes_simd_core::{
     },
     mask::{BitMask, PackedMask},
     refresh_numa_node,
-    scalar::{CastFrom, CastTo, FloatElement, Scalar as SimdScalar},
+    scalar::{CastFrom, FloatElement, Scalar as SimdScalar},
     vec::AlignedVec,
     verify_numa_locality,
     view::{

@@ -1919,8 +1919,13 @@ macro_rules! test_select_ops_for_arch {
         let mut mask = vec![false; len];
 
         for i in 0..len {
-            data_a[i] = <$t as CastFrom<f64>>::cast_from(i as f64);
-            data_b[i] = <$t as CastFrom<f64>>::cast_from((i + 100) as f64);
+            // Residues below 60 and 60 above them fit every shipped element,
+            // `i8` included, so no lane saturates and `data_a` differs from
+            // `data_b` at every index.
+            data_a[i] = <$t as eunomia::TryFromCount>::try_from_count(i % 60)
+                .expect("invariant: a residue below 60 fits every element type");
+            data_b[i] = <$t as eunomia::TryFromCount>::try_from_count(60 + i % 60)
+                .expect("invariant: a value below 120 fits every element type");
             mask[i] = i % 2 == 0;
         }
 
