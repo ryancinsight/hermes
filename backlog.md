@@ -76,6 +76,13 @@
   - `ryancinsight/hermes#220` (`rescue/hermes-simd-consolidation-batch`): 9 refactor commits, 25 files (+965/-1691), code only: SIMD wrapper/scalar/AVX2/AVX-512 de-duplication, iter chunk and mask validation helpers, Kogge-Stone bitboard and target consolidation.
   - `ryancinsight/hermes#221` (`rescue/hermes-audit-20260928`): 1 audit commit, 22 files (+1857/-1831), code, tests and `gap_audit.md`: sparse/tiling/tensor view, x86_64 and AMX modules, axpy dispatch, dense/tiling/slice tests, benches.
 
+## HERMES-CASTFROM-MIGRATE — Retire the `CastFrom`/`CastTo` uses [arch] [major] — todo <a id="hermes-castfrom-migrate"></a>
+
+- Status: todo; priority: architecture; needs: none; basis: 22c4b74c0; scope: `crates/hermes-simd-core`, `crates/hermes-simd-intrinsics`, `crates/hermes-simd`.
+- **Outcome:** no `CastFrom`/`CastTo` in hermes. Hermes slice of [EUNOMIA-CASTFROM-RETIRE](../eunomia/backlog.md#eunomia-castfrom-retire).
+- **Acceptance:** `git grep -c -E '\b(cast_from|cast_to|CastFrom|CastTo)\b' -- '*.rs'` is empty at hermes origin/main, the equal-lane conversion seam below having been replaced or deleted.
+- **Next step:** 14 sites remain, all the equal-lane numeric conversion seam: `Vector::cast` (`view/vector_reg/lanes.rs`), `SimdLoadStore::try_cast`, `BackendKernel::try_cast`, its AVX2 f32 to i32 override, `cast_with_public_bounds` in `tests/types_tests.rs`, and the `CastFrom` re-exports in `scalar.rs` and `lib.rs`. Neither std nor eunomia converts between arbitrary element pairs; the bound needs an upstream eunomia conversion method with `as` semantics (float to integer truncates toward zero and saturates, NaN to zero; integer to float rounds to nearest; narrower integers wrap), which the AVX2 override and `avx2_float_to_int_cast_matches_rust_semantics` pin. `Vector::cast` has no caller outside that test, so deleting the seam is the alternative; decide with the eunomia item.
+
 ## Legacy HS-4xx record — open items and measured limits
 
 In full: the open measurement items, the limits they rest on, and the rejected refactors. The rest of the era is one line each below.

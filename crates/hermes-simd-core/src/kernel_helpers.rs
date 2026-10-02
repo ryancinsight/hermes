@@ -175,6 +175,20 @@ where
     Arch::load_unaligned(buf_a.as_ptr().cast::<T>())
 }
 
+/// The population count of `x`, expressed as an element of `T`.
+///
+/// This is the scalar contract of [`BackendKernel::popcount`]: each lane holds
+/// the number of set bits of the corresponding input lane. The count is at
+/// most 64, which every element type represents (the narrowest integer element
+/// holds 127), so the conversion cannot fail.
+#[inline(always)]
+pub fn popcount_element<T: Scalar>(x: T) -> T {
+    let ones = usize::try_from(x.count_ones())
+        .expect("invariant: the bit count of a primitive-width element fits usize");
+    T::try_from_count(ones)
+        .expect("invariant: a bit count is at most 64, which every element type represents")
+}
+
 #[inline(always)]
 pub unsafe fn generic_unary_op<T, Arch, F>(a: Arch::Vector, mut op: F) -> Arch::Vector
 where

@@ -165,7 +165,7 @@ impl<T: Scalar> UnaryOp<T> for Popcount {
     }
     #[inline(always)]
     fn apply_scalar(self, a: T) -> T {
-        T::cast_from(a.count_ones() as i32)
+        crate::kernel_helpers::popcount_element(a)
     }
 }
 

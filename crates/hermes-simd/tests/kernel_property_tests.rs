@@ -20,7 +20,7 @@ use hermes_simd::{Scalar, SveArch};
 use hermes_simd_core::align::Unaligned;
 use hermes_simd_core::execution::Unmasked;
 use hermes_simd_core::kernel::{SimdArith, SimdKernel, SimdReduce};
-use hermes_simd_core::scalar::Scalar as ScalarElement;
+use hermes_simd_core::scalar::{FloatElement, Scalar as ScalarElement};
 use hermes_simd_core::view::SimdView;
 use proptest::prelude::*;
 
@@ -1015,29 +1015,21 @@ fn check_masked_merge_ops<A: SimdKernel<f32>>() {
 /// from `src`, and leave inactive stores and adjacent canaries unchanged.
 fn check_partial_masked_memory<T, A>()
 where
-    T: ScalarElement,
+    T: FloatElement,
     A: hermes_simd_core::arch::SimdArch + SimdKernel<T>,
 {
     let lanes = <A as hermes_simd::SimdStorage<T>>::LANE_COUNT;
     let src_values: Vec<T> = (0..lanes)
-        .map(|lane| {
-            T::cast_from(
-                -1000 - i32::try_from(lane).expect("invariant: a SIMD lane index fits in i32"),
-            )
-        })
+        .map(|lane| T::from_integer(-1000) - T::from_count(lane))
         .collect();
     let stored_values: Vec<T> = (0..lanes)
-        .map(|lane| {
-            T::cast_from(
-                100 + i32::try_from(lane).expect("invariant: a SIMD lane index fits in i32"),
-            )
-        })
+        .map(|lane| T::from_integer(100) + T::from_count(lane))
         .collect();
     let mut loaded = vec![T::ZERO; lanes];
 
     for valid_lanes in 0..=lanes {
         let data: Vec<T> = (0..valid_lanes)
-            .map(|lane| T::cast_from(10 + lane as i32))
+            .map(|lane| T::from_count(10 + lane))
             .collect();
         let valid_mask = if valid_lanes == u64::BITS as usize {
             u64::MAX
@@ -1048,7 +1040,7 @@ where
         let highest = valid_lanes.checked_sub(1).map_or(0, |lane| 1_u64 << lane);
 
         for mask_bits in [valid_mask, alternating, highest] {
-            let sentinel = T::cast_from(-77);
+            let sentinel = T::from_integer(-77);
             let mut destination = vec![sentinel; valid_lanes + 2];
 
             // SAFETY: the caller gates backend support. Every active bit is
