@@ -168,21 +168,6 @@ where
     };
 }
 
-struct AssertLaneCountSame<T, U, Arch>(PhantomData<(T, U, Arch)>);
-impl<T, U, Arch> AssertLaneCountSame<T, U, Arch>
-where
-    Arch: SimdArch + SimdKernel<T> + SimdKernel<U>,
-    T: Scalar,
-    U: Scalar,
-{
-    const OK: () = {
-        assert!(
-            <Arch as SimdStorage<T>>::LANE_COUNT == <Arch as SimdStorage<U>>::LANE_COUNT,
-            "Source and destination vectors must have the same lane count"
-        );
-    };
-}
-
 struct AssertLaneCount<T, Arch, const N: usize>(PhantomData<(T, Arch)>);
 impl<T, Arch, const N: usize> AssertLaneCount<T, Arch, N>
 where

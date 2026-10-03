@@ -5,9 +5,7 @@
 //! precisions. The permute groups compare the shared cross-lane operation
 //! surface. The comparison-mask group isolates the current public
 //! vector-to-mask route from the backend-native route and Fearless SIMD. The
-//! cast groups isolate supported equal-width numeric conversion from the
-//! current stack/scalar fallback and an AVX2-native ceiling. The interleaved
-//! group isolates Hermes wrapper overhead across checked,
+//! interleaved group isolates Hermes wrapper overhead across checked,
 //! view/chunk, and direct backend paths, then compares `ComplexReg` with the raw
 //! Hermes recipe and Fearless SIMD's public deinterleave/planar/reinterleave
 //! composition.
@@ -16,8 +14,6 @@ use core::time::Duration;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-#[path = "lane_throughput/cast.rs"]
-mod cast;
 #[path = "lane_throughput/comparison.rs"]
 mod comparison;
 #[path = "lane_throughput/comparison_mask.rs"]
@@ -39,6 +35,6 @@ criterion_group! {
         .warm_up_time(Duration::from_millis(20))
         .measurement_time(Duration::from_millis(200))
         .sample_size(20);
-    targets = dispatch::bench, planar::bench, permute::bench, comparison_mask::bench, cast::bench, interleaved::bench
+    targets = dispatch::bench, planar::bench, permute::bench, comparison_mask::bench, interleaved::bench
 }
 criterion_main!(benches);
