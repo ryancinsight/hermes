@@ -14,6 +14,7 @@
 use hermes_simd::*;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use hermes_simd_core::kernel::SimdKernel;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use hermes_simd_core::scalar::CastFrom;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use hermes_simd_core::scalar::Scalar as ScalarElement;
