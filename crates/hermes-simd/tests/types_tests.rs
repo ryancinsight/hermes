@@ -12,12 +12,6 @@
     reason = "The type conformance harness keeps compile-time dimensions beside the exercised case"
 )]
 use hermes_simd::*;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use hermes_simd_core::kernel::SimdKernel;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use hermes_simd_core::scalar::CastFrom;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use hermes_simd_core::scalar::Scalar as ScalarElement;
 
 macro_rules! assert_comparison_masks {
     ($t:ty, $arch:ident, $lanes:expr, $lhs:ident, $rhs:ident, $nan:expr) => {{
@@ -958,11 +952,7 @@ fn test_new_vector_features() {
     assert_eq!(vec_modified.extract::<2>(), 10.0f32);
     assert_eq!(vec_modified.extract::<0>(), 1.0f32); // others unchanged
 
-    // 3. Casting (f32 to i32, same lane count of 4)
-    let vec_cast = vec.cast::<i32>();
-    assert_eq!(vec_cast.to_array(), [1, 2, 3, 4]);
-
-    // 4. Mask operations (reductions: any, all, none; select; bitwise)
+    // 3. Mask operations (reductions: any, all, none; select; bitwise)
     let a = Vector::<f32, Scalar>::from_array([1.0f32, 2.0, 3.0, 4.0]);
     let b = Vector::<f32, Scalar>::from_array([1.0f32, 5.0, 3.0, 6.0]);
 
@@ -991,7 +981,7 @@ fn test_new_vector_features() {
     let not_mask = !eq_mask;
     assert_eq!(not_mask.to_bitmask().0, 0b1010);
 
-    // 5. Vector-View Integration (from_view_chunk / store_to_view_chunk)
+    // 4. Vector-View Integration (from_view_chunk / store_to_view_chunk)
     let view_data = [10.0f32, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0];
     let view_a = SimdView::<f32, Scalar, Unaligned>::new(&view_data).unwrap();
     let loaded_v0 = Vector::<f32, Scalar>::from_view_chunk(&view_a, 0);
@@ -1006,83 +996,12 @@ fn test_new_vector_features() {
     loaded_v1.store_to_view_chunk(&mut view_out, 0);
     assert_eq!(out_buf, [50.0, 60.0, 70.0, 80.0, 10.0, 20.0, 30.0, 40.0]);
 
-    // 6. SimdCowExt::transform_vectors
+    // 5. SimdCowExt::transform_vectors
     let mut cow = SimdCow::<f32, Scalar, Unaligned>::Owned(AlignedVec::from_slice(&[
         1.0, 2.0, 3.0, 4.0, 5.0, 6.0,
     ]));
     cow.transform_vectors(|v| v * Vector::splat(2.0));
     assert_eq!(&*cow, &[2.0, 4.0, 6.0, 8.0, 10.0, 12.0]);
-}
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-fn cast_with_public_bounds<T, U, Arch>(value: Vector<T, Arch>) -> Vector<U, Arch>
-where
-    T: ScalarElement,
-    U: ScalarElement + CastFrom<T>,
-    Arch: SimdArch + SimdKernel<T> + SimdKernel<U>,
-{
-    value.cast()
-}
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[test]
-fn avx2_float_to_int_cast_matches_rust_semantics() {
-    if !Avx2::is_runtime_supported() {
-        return;
-    }
-
-    let cases = [
-        [
-            0.0,
-            -0.0,
-            1.75,
-            -1.75,
-            f32::NAN,
-            f32::INFINITY,
-            f32::NEG_INFINITY,
-            2_147_483_648.0,
-        ],
-        [
-            -2_147_483_648.0,
-            2_147_483_520.0,
-            -2_147_483_904.0,
-            f32::MAX,
-            f32::MIN,
-            0.999,
-            -0.999,
-            42.0,
-        ],
-    ];
-
-    for input in cases {
-        let expected = input.map(|value| value as i32);
-        let actual =
-            cast_with_public_bounds::<f32, i32, Avx2>(Vector::<f32, Avx2>::from_array(input))
-                .to_array();
-        assert_eq!(actual, expected);
-    }
-}
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-mod cast_properties {
-    use super::*;
-    use proptest::prelude::*;
-
-    proptest! {
-        #[test]
-        fn avx2_float_to_int_cast_matches_rust_for_arbitrary_bits(
-            bits in prop::array::uniform8(any::<u32>()),
-        ) {
-            if Avx2::is_runtime_supported() {
-                let input = bits.map(f32::from_bits);
-                let expected = input.map(|value| value as i32);
-                let actual = Vector::<f32, Avx2>::from_array(input)
-                    .cast::<i32>()
-                    .to_array();
-                prop_assert_eq!(actual, expected);
-            }
-        }
-    }
 }
 
 #[test]

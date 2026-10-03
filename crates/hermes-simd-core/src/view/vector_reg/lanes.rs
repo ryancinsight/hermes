@@ -3,15 +3,12 @@
 use super::assert_runtime_supported;
 use super::runtime_support_result;
 use super::AssertLaneCount;
-use super::AssertLaneCountSame;
 use super::AssertLaneIndex;
 use super::Vector;
 use crate::arch::SimdArch;
 use crate::kernel::SimdKernel;
-use crate::kernel::SimdLoadStore;
 use crate::kernel::SimdStorage;
 use crate::kernel::MAX_SIMD_LANES;
-use crate::scalar::CastFrom;
 use crate::scalar::Scalar;
 use crate::view::SimdError;
 
@@ -56,42 +53,6 @@ where
         unsafe {
             self.store_unaligned(arr.as_mut_ptr().cast::<T>());
             core::ptr::read(arr.as_ptr().cast::<[T; N]>())
-        }
-    }
-
-    /// Cast the vector elements to another scalar type `U` where the lane counts match.
-    #[inline(always)]
-    pub fn cast<U>(self) -> Vector<U, Arch>
-    where
-        Arch: SimdKernel<U>,
-        U: Scalar,
-        U: CastFrom<T>,
-    {
-        let () = AssertLaneCountSame::<T, U, Arch>::OK;
-        const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
-        let mut buf_u = [core::mem::MaybeUninit::<U>::uninit(); MAX_SIMD_LANES];
-        let lanes = <Arch as SimdStorage<T>>::LANE_COUNT;
-        // SAFETY: target features for both `T` and `U` checked above;
-        // `AssertLaneCountSame` and `LANE_BOUND_CHECK` bound `lanes` within both
-        // buffers. A successful native hook initializes `buf_u[..lanes]`.
-        // Otherwise the `T` store initializes `buf_t[..lanes]` before
-        // `assume_init` reads it and the loop initializes `buf_u[..lanes]`.
-        // The `U` load reads exactly those initialized lanes.
-        unsafe {
-            if <Arch as SimdLoadStore<T>>::try_cast::<U>(self.raw, buf_u.as_mut_ptr().cast::<U>()) {
-                return Vector::<U, Arch>::new(<Arch as SimdLoadStore<U>>::load_unaligned(
-                    buf_u.as_ptr().cast::<U>(),
-                ));
-            }
-            let mut buf_t = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-            self.store_unaligned(buf_t.as_mut_ptr().cast::<T>());
-            for i in 0..lanes {
-                let val_t = buf_t[i].assume_init();
-                buf_u[i].write(U::cast_from(val_t));
-            }
-            Vector::<U, Arch>::new(<Arch as SimdLoadStore<U>>::load_unaligned(
-                buf_u.as_ptr().cast::<U>(),
-            ))
         }
     }
 
