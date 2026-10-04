@@ -8,29 +8,25 @@ Accepted (2026-09-03)
 
 Hermes PR #155 moved its Eunomia workspace edge to the derive-capable provider
 revision used by the Atlas provider sweep, but its Mnemosyne workspace edge
-still selected the clippy-fix commit proposed in mnemosyne#123 (closed
-unmerged 2026-09-04). Apollo and Leto select a later commit in the same
-proposal, the Eunomia-identity-pin commit. Cargo therefore resolved two
-nominal copies of the same `mnemosyne-memory` package in consumers that
-combine Hermes with those providers. The duplicate source identity increases
-compile work and prevents types from crossing the provider boundary when both
-copies appear in a public contract.
+still selected an older provider revision. Apollo and Leto selected a later
+commit in the same provider line. Cargo therefore resolved two nominal copies
+of the same `mnemosyne-memory` package in consumers that combine Hermes with
+those providers. The duplicate source identity increases compile work and
+prevents types from crossing the provider boundary when both copies appear in
+a public contract.
 
 ## Decision
 
-Advance Hermes' workspace `mnemosyne-memory` dependency to the
-Eunomia-identity-pin commit proposed in mnemosyne#123 while that PR is under
-review. Keep the exact revision as a temporary co-evolution pin with a
-removal trigger: once the provider change merges to main, remove `rev` and
-regenerate the standalone lockfile. The workspace manifest remains the single
-dependency source of truth; no downstream conversion, path override,
-compatibility layer, or duplicate API is added.
+Advance Hermes' workspace `mnemosyne-memory` dependency to Mnemosyne 0.9.0
+using its git-plus-version requirement. Cargo.lock records the resolved
+upstream commit; the manifest carries no temporary `rev` pin. The workspace
+manifest remains the single dependency source of truth; no downstream
+conversion, path override, compatibility layer, or duplicate API is added.
 
 ## Rejected alternatives
 
-- Keeping the clippy-fix commit proposed in mnemosyne#123 was rejected
-  because it preserves the duplicate nominal provider identity in the
-  consumer graph.
+- Keeping the older provider revision was rejected because it preserves the
+  duplicate nominal provider identity in the consumer graph.
 - Adding a conversion layer in Hermes or Apollo was rejected because source
   identity is owned by the provider dependency edge, not by each consumer.
 - A workspace-local path override was rejected because it changes standalone
@@ -39,23 +35,24 @@ compatibility layer, or duplicate API is added.
 ## Contract and verification
 
 The change preserves Hermes' public SIMD and memory behavior; it changes only
-the resolved first-party provider revision. At the initial decision revision,
-the standalone lockfile resolved the mnemosyne#123 Eunomia-identity-pin
-commit and Eunomia `fdbf122`. After the 2026-09-04 follow-up below, it
-resolves Mnemosyne `26726d2` and Eunomia main at `02397fa`. Workspace check
-and warning-denied Clippy pass, Nextest passes 548/548, 26 executable
-doctests pass, warning-denied rustdoc passes, and `git diff --check` passes.
+the resolved first-party provider revision. The standalone lockfile resolves
+all eight Mnemosyne packages to upstream commit
+`c5695f19008db63c508c30b22a9e84c78da4d380`, with no duplicate Mnemosyne
+source identity in Hermes. Workspace check and warning-denied Clippy pass;
+the PR's recorded gate also covers Nextest, doctests, rustdoc, and
+`git diff --check`.
 
 ## Consequences
 
 Hermes consumers that already use the current Atlas provider revisions now
-share one Mnemosyne source identity. The exact revision remains visible until
-PR #123 merges; the merge is the removal trigger, not a reason to retain the
-pin indefinitely.
+share one Mnemosyne source identity. Future compatible provider updates can
+advance through the version requirement and lockfile without editing a
+temporary review pin.
 
 ## Revision note
 
-2026-09-04: Eunomia PR #87 merged. The workspace Eunomia edge now follows the
-merged default branch, eliminating the obsolete review source identity while
-the independent Mnemosyne PR #123 pin remains in force. This lets unpinned Gaia
-and Leto consumers share Hermes' Eunomia scalar and derive traits directly.
+2026-10-04: Mnemosyne 0.9.0 is now the workspace dependency. The manifest
+uses the git-plus-version requirement without `rev`, and the standalone lock
+resolves all eight Mnemosyne packages to upstream commit
+`c5695f19008db63c508c30b22a9e84c78da4d380`. The earlier review-revision
+narrative and its removal trigger are obsolete.
