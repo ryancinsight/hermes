@@ -1,43 +1,23 @@
 # Backlog — hermes-simd
 
-## HERMES-MNEMOSYNE-IDENTITY-2026-09-03 — Align the workspace memory provider with the Eunomia co-evolution [patch] [arch] — in-progress <a id="hermes-mnemosyne-identity-2026-09-03"></a>
+## HERMES-MNEMOSYNE-IDENTITY-2026-09-03 — Align the workspace memory provider with Mnemosyne 0.9 [patch] [arch] — in-progress <a id="hermes-mnemosyne-identity-2026-09-03"></a>
 
-- **Integrator:** Codex on `build/mnemosyne-phase12`; **lease:** none.
-- **Outcome:** Advance Hermes' workspace Mnemosyne edge to PR #123 so all
-  provider consumers use one first-party memory source identity.
-- **Acceptance:** Standalone lock resolves only Mnemosyne `26726d2` and merged
-  Eunomia main `02397fa`; workspace check, Clippy, nextest, doctests, rustdoc, and
-  diff checks pass; no conversion or compatibility layer is added.
+- **Integrator:** Codex on `build/hermes-mnemosyne-09`; **lease:** none.
+- **Outcome:** Advance Hermes' workspace Mnemosyne edge to 0.9.0 so provider
+  consumers use one first-party memory source identity.
+- **Acceptance:** The manifest uses git-plus-version without `rev`; the
+  standalone lock resolves all eight Mnemosyne packages to one upstream
+  commit; workspace check, Clippy, nextest, doctests, rustdoc, and diff checks
+  pass; no conversion or compatibility layer is added.
 - **ADR:** [`023`](docs/adr/023-first-party-memory-source-identity.md).
-- **Evidence, 2026-09-04.** Mnemosyne is now `26726d2` in the standalone
-  lockfile; the locked workspace check, warning-denied Clippy, 548/548
-  Nextest, 26 executable doctests, and warning-denied rustdoc pass. Windows
-  Miri cannot execute the six NUMA cases that call Windows affinity APIs;
-  hosted Linux Miri remains the applicable platform gate.
-- **Dependency:** Mnemosyne source revision `26726d2`; the original Eunomia
-  identity driver is mnemosyne#123 (closed unmerged 2026-09-04, branch
-  tip); **Last-update:** 2026-09-06.
-- **Acceptance corrected, 2026-09-06 — the oracle could not see the failure
-  it was written for.** "Standalone lock resolves only Mnemosyne `26726d2`"
-  is satisfied by construction: any member's standalone lock resolves one
-  identity. Measured from the integrator instead, Apollo's `apollo-fft`
-  graph carries **three** Mnemosyne stacks over normal edges — `26726d2`
-  through hermes-simd-core, the mnemosyne#123 branch tip (closed unmerged)
-  through moirai-core, and the unpinned branch head through Apollo's own
-  crates. Cargo refuses `-p mnemosyne-arena` as ambiguous and names all
-  three. `26726d2` and the mnemosyne#123 branch tip are two points on one
-  chain: Hermes advanced, Moirai did not, and pinning by `rev` is what
-  preserved the split.
-- **Change:** the `rev =` is removed, so the requirement states git+version
-  and the lock holds the commit — Apollo's own model, and the reason its
-  eighteen crates share one identity. The standalone lock re-resolves to a
-  single Mnemosyne source (`3ebc4da1`) with one `mnemosyne-arena` entry.
-  Nothing about the pin was a live quarantine; it was an advance point that
-  was never cleaned up.
-- **Acceptance now:** one Mnemosyne source in Hermes' standalone lock **and**
-  no Hermes-attributable duplicate in the integrator's graph, tracked at
-  [`atlas#atlas-mnemosyne-source-triplication`](../../backlog.md#atlas-mnemosyne-source-triplication).
-  Collapsing all three additionally needs Moirai's pin and Apollo's two.
+- **Evidence, 2026-10-04.** Mnemosyne 0.9.0 is selected by git-plus-version
+  without `rev`; the standalone lock resolves all eight Mnemosyne packages to
+  `c5695f19008db63c508c30b22a9e84c78da4d380`. The PR records the locked
+  workspace check, warning-denied Clippy, Nextest, doctests, rustdoc, and diff
+  checks. Windows Miri cannot execute the six NUMA cases that call Windows
+  affinity APIs; hosted Linux Miri remains the applicable platform gate.
+- **Dependency:** Mnemosyne 0.9.0 git-plus-version requirement; **Last-update:**
+  2026-10-04.
 
 ## ATLAS-HERMES-CODEGEN-SSOT-2026-08-21 — Resolve SIMD codegen source of truth [arch] [minor] — in-progress (hosted verification pending)
 
