@@ -407,6 +407,15 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ### Breaking
 
+- [major][HS-EUNOMIA-09] The first-party requirement floor moves to
+  `eunomia 0.9.0` (and `themis-topology 0.11.0`), releasing the workspace
+  as `0.8.0`. The `Scalar`/`LaneScalar` impls for `F16`/`Bf16` now attach
+  to `eunomia 0.9`'s types: `hermes-simd 0.8` must be resolved alongside
+  `eunomia 0.9`, because the published `0.7.x` line requires `eunomia
+  ^0.8` and mixing the two `eunomia` copies leaves `eunomia::F16:
+  LaneScalar` unsatisfied (the trait impls and the caller see distinct
+  `F16` types).
+
 - [major][HERMES-PAIR-PERMUTE-ARITY] The arity-named pair permutes collapse
   to one const-generic method per direction on `BackendKernel`,
   `SimdPermute`, and `Vector`: `deinterleave_pairs::<N>([V; N]) -> [V; N]`
