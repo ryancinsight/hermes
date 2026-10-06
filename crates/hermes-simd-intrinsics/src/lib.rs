@@ -36,6 +36,11 @@
 )]
 extern crate alloc;
 
+// `#[runtime_dispatch]` emits absolute paths to the architecture markers
+// (`hermes_simd_intrinsics::Avx512`, …). This alias lets an expansion inside
+// this crate resolve those paths to the crate itself.
+extern crate self as hermes_simd_intrinsics;
+
 use hermes_simd_core::arch::SimdArch;
 
 /// Defines a transparent SIMD wrapper newtype and its `Send + Sync` impls.

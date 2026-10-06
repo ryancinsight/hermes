@@ -60,7 +60,19 @@ pub const MAX_SIMD_LANES: usize = 64;
 
 #[inline(always)]
 #[cfg_attr(not(debug_assertions), allow(unused_variables))]
-fn debug_assert_mask_within_valid_lanes<T, K>(valid_lanes: usize, mask: K::Mask)
+#[doc(hidden)]
+pub fn valid_lane_mask(valid_lanes: usize) -> u64 {
+    if valid_lanes >= u64::BITS as usize {
+        u64::MAX
+    } else {
+        (1_u64 << valid_lanes) - 1
+    }
+}
+
+#[inline(always)]
+#[cfg_attr(not(debug_assertions), allow(unused_variables))]
+#[doc(hidden)]
+pub fn debug_assert_mask_within_valid_lanes<T, K>(valid_lanes: usize, mask: K::Mask)
 where
     T: crate::scalar::Scalar,
     K: BackendKernel<T>,
@@ -68,15 +80,10 @@ where
     debug_assert!(valid_lanes <= K::LANE_COUNT);
     #[cfg(debug_assertions)]
     {
-        let valid_mask = if valid_lanes >= u64::BITS as usize {
-            u64::MAX
-        } else {
-            (1_u64 << valid_lanes) - 1
-        };
         // SAFETY: this helper is called from backend methods already running
         // under the backend's required target-feature contract.
         let mask_bits = unsafe { K::mask_to_bitmask(mask) };
-        debug_assert_eq!(mask_bits & !valid_mask, 0);
+        debug_assert_eq!(mask_bits & !valid_lane_mask(valid_lanes), 0);
     }
 }
 

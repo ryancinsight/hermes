@@ -1,10 +1,12 @@
 //! SIMD kernel contracts and operation-family capability facets.
 
-mod backend;
+pub mod backend;
 pub mod pair_permute;
 mod roles;
 
-pub use backend::{BackendKernel, MAX_SIMD_LANES};
+pub use backend::{
+    debug_assert_mask_within_valid_lanes, valid_lane_mask, BackendKernel, MAX_SIMD_LANES,
+};
 pub use roles::{
     SimdArith, SimdBitwise, SimdCompare, SimdGather, SimdLoadStore, SimdMask, SimdPermute,
     SimdReduce, SimdStorage,
