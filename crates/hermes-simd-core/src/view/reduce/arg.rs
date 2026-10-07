@@ -4,7 +4,7 @@ use crate::align::Alignment;
 use crate::arch::SimdArch;
 use crate::execution::ExecutionMode;
 use crate::kernel::{SimdArith, SimdCompare, SimdLoadStore, SimdMask, SimdReduce};
-use crate::scalar::{NumericElement, Scalar};
+use crate::scalar::Scalar;
 use crate::view::SimdView;
 
 impl<
@@ -16,7 +16,7 @@ impl<
         Ref: 'a,
     > SimdView<'a, T, Arch, Align, Mode, Ref>
 where
-    T: Scalar + NumericElement,
+    T: Scalar,
 {
     /// Returns `Some((index, value))` for the first minimum element.
     ///

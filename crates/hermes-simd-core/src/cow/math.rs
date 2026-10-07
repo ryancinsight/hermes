@@ -9,7 +9,7 @@
 //! # Norm and Normalize
 //!
 //! - `norm_sq` — squared Euclidean norm: `∑ self[i]²`. Delegates to `zip_reduce(Dot)`.
-//! - `norm`    — Euclidean norm: `sqrt(norm_sq)`. Uses `T::sqrt_scalar` from `FloatElement`.
+//! - `norm`    — Euclidean norm: `sqrt(norm_sq)`. Uses `T::sqrt` from `NumericElement`.
 //! - `normalize` — returns a unit-length owned `SimdCow<'static, T, Arch, Align>`.
 //!   Empty or zero-norm vectors return `zeros(self.len())` rather than NaN / division by zero.
 //!
@@ -138,7 +138,7 @@ where
 
 impl<'a, T: 'a, Arch, Align> SimdCow<'a, T, Arch, Align>
 where
-    T: Scalar + FloatElement,
+    T: FloatElement,
     Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
     Align: Alignment,
 {
@@ -163,7 +163,7 @@ where
 
 impl<'a, T: 'a, Arch, Align> SimdCow<'a, T, Arch, Align>
 where
-    T: Scalar + FloatElement,
+    T: FloatElement,
     Arch: SimdArch + SimdKernel<T>,
     Align: Alignment,
 {
