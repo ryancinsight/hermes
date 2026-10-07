@@ -138,7 +138,7 @@ where
 
 impl<'a, T: 'a, Arch, Align> SimdCow<'a, T, Arch, Align>
 where
-    T: Scalar + FloatElement,
+    T: FloatElement,
     Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdCompare<T> + SimdMask<T> + SimdReduce<T>,
     Align: Alignment,
 {
@@ -153,7 +153,7 @@ where
 
     /// Euclidean norm: `√(∑ self[i]²)`.
     ///
-    /// Delegates to `norm_sq` then `T::sqrt_scalar`.
+    /// Delegates to `norm_sq` then `T::sqrt` from `NumericElement`.
     #[inline]
     #[must_use]
     pub fn norm(&self) -> T {
@@ -163,7 +163,7 @@ where
 
 impl<'a, T: 'a, Arch, Align> SimdCow<'a, T, Arch, Align>
 where
-    T: Scalar + FloatElement,
+    T: FloatElement,
     Arch: SimdArch + SimdKernel<T>,
     Align: Alignment,
 {

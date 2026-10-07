@@ -59,6 +59,7 @@ use super::pair_permute;
 pub const MAX_SIMD_LANES: usize = 64;
 
 #[inline(always)]
+#[must_use]
 #[cfg_attr(not(debug_assertions), allow(unused_variables))]
 #[doc(hidden)]
 pub fn valid_lane_mask(valid_lanes: usize) -> u64 {
