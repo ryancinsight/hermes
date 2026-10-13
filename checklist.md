@@ -24,7 +24,10 @@ Target version: **0.8.2**. Active increment: **HERMES-MACOS-NATIVE-20261013 [pat
 - [x] Pass the added hosted macOS lane at [PR #258 source](https://github.com/ryancinsight/hermes/commit/f3355f1f9728cd5dfa393d424303c910b42c228b), run `38452038170`.
 - [x] Guard native-only imports with the kernel configuration predicate; pass
   strict workspace Clippy for native and generic comparison configurations.
-- [ ] Pass the final exact-head hosted matrix and merge PR #258.
+- [x] Pass both hosted ARM lanes, including the Linux generic benchmark
+  comparison, at [verified PR source](https://github.com/ryancinsight/hermes/commit/4119dda8f64cb6a2a02b221dbea996f5ffb6508d).
+  [PR #258](https://github.com/ryancinsight/hermes/pull/258) records the remaining
+  required merge gates; retire the completed native macOS backlog item.
 
 ## HERMES-SUBLANE-INTERLEAVE [minor] [perf] — claude/fable
 

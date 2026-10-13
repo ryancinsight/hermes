@@ -1,6 +1,6 @@
 # Gap Audit - hermes-simd
 
-## HERMES-MACOS-NATIVE-20261013 — ARM verification gap [patch] — resolved locally
+## HERMES-MACOS-NATIVE-20261013 — ARM verification gap [patch] — resolved on native and hosted macOS
 
 - Finding: strict native ARM checks expose diagnostics hidden by x86-only
   lint coverage and an ARM job that runs tests without strict Clippy/rustdoc.
@@ -25,8 +25,10 @@
 - Hosted Linux finding: native-only imports survive when the comparison build
   selects `hermes_benchmark_generic_default`; Rust rejects the unused imports.
   Apply the same configuration predicate as their kernel definitions. Native
-  and generic workspace strict Clippy pass locally; exact-head hosted rerun
-  and PR #258 merge remain acceptance gates.
+  and generic workspace strict Clippy pass locally. Both hosted ARM lanes,
+  including the Linux comparison, pass at [verified PR source](https://github.com/ryancinsight/hermes/commit/4119dda8f64cb6a2a02b221dbea996f5ffb6508d).
+  The completed native macOS backlog item is retired;
+  [PR #258](https://github.com/ryancinsight/hermes/pull/258) owns merge acceptance.
 
 Persistent gap register. Evidence tiers follow the repository instruction
 hierarchy: machine-checked proof > type-level invariant > property/fuzz >

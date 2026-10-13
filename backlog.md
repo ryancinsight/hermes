@@ -1,30 +1,5 @@
 # Backlog — hermes-simd
 
-## HERMES-MACOS-NATIVE-20261013 — Native macOS ARM verification [patch] — todo <a id="hermes-macos-native-20261013"></a>
-
-- Priority: correctness.
-- Remaining acceptance: exact-head Linux comparison rerun, remaining required
-  hosted checks, and PR #258 merge.
-- Outcome: current upstream code passes native Apple Silicon checks; the ARM
-  CI matrix now includes macOS and runs strict compiler/documentation gates.
-- Root cause: the prior ARM job omitted strict Clippy and rustdoc, allowing
-  architecture-gated imports, redundant/lossless casts, result annotations,
-  and an unavailable x86 documentation link to escape those gates.
-- Contract: mask output bit `i` equals lane `i`'s sign bit; disjoint one-bit
-  contributions OR into the same word as before. Public numerical APIs, test
-  data, value assertions, and native timeouts retain their contracts.
-- Evidence (2026-10-13, Rust 1.97.0, standalone `--locked` graph): 507 Nextest
-  tests pass with zero skips; required NEON detection, strict Clippy, minimal
-  builds, examples, 27 doctests, and warning-denied rustdoc pass.
-- Integration: a Rust 1.97.0 consumer of local Hermes and Hephaestus reduces
-  515 exact dyadic inputs to -37.625 on native NEON and Metal and verifies
-  unchanged input readback.
-- Target: 0.8.2; verified branch: `codex/macos-validation-20261013`.
-  Hosted macOS run `38452038170` passes at [PR #258 source](https://github.com/ryancinsight/hermes/commit/f3355f1f9728cd5dfa393d424303c910b42c228b); its Linux comparison
-  exposes native-only imports under the generic benchmark configuration. The
-  imports now share the kernels' configuration guard; both configurations
-  pass local strict workspace Clippy without changing benchmark workloads.
-
 ## HERMES-MNEMOSYNE-IDENTITY-2026-09-03 — Align the workspace memory provider with the Eunomia co-evolution [patch] [arch] — in-progress <a id="hermes-mnemosyne-identity-2026-09-03"></a>
 
 - **Integrator:** Codex on `build/mnemosyne-phase12`; **lease:** none.
