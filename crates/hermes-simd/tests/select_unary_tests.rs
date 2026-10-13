@@ -549,7 +549,7 @@ fn test_popcount_vectorized() {
             let data_f64 = [1.0f64, -2.5];
             let mut expected_f64 = [0.0f64; 2];
             for i in 0..2 {
-                expected_f64[i] = data_f64[i].to_bits().count_ones() as f64;
+                expected_f64[i] = f64::from(data_f64[i].to_bits().count_ones());
             }
             unsafe {
                 let vec = Vector::<f64, Neon>::load_unaligned(data_f64.as_ptr());

@@ -1,5 +1,27 @@
 # Gap Audit - hermes-simd
 
+## HERMES-MACOS-NATIVE-20261013 — ARM verification gap [patch] — resolved locally
+
+- Finding: strict native ARM checks expose diagnostics hidden by x86-only
+  lint coverage and an ARM job that runs tests without strict Clippy/rustdoc.
+  They include intrinsic wildcard imports, exact mask casts and identity
+  shifts, missing result/panic annotations, a stale test-lint expectation,
+  and a documentation link to an x86-only module.
+- Resolution: correct source imports, preserve mask sign-bit algebra with
+  infallible conversion and constant lane indices, move test imports before
+  statements, remove the obsolete expectation, and document the applicable
+  panic/result/platform contracts. Add macOS to the existing ARM CI matrix.
+- Evidence: 2026-10-13, aarch64 macOS, Rust 1.97.0, standalone locked graph:
+  507 tests pass with zero skips; the coverage report requires and observes
+  NEON. Strict Clippy, minimal workspace/facade checks, example builds,
+  27 doctests, and warning-denied rustdoc pass. External dependency versions
+  and Git revisions remain unchanged; the patch version is 0.8.2.
+  A shared consumer of local Hermes and Hephaestus verifies the exact native
+  NEON/Metal result -37.625 for 515 dyadic inputs and unchanged input readback.
+- Boundary: SVE is the existing emulated backend; x86/AMX execution and native
+  throughput measurements are outside this Mac's evidence. Ten existing
+  illustrative doctest snippets stay ignored; hosted macOS execution is pending.
+
 Persistent gap register. Evidence tiers follow the repository instruction
 hierarchy: machine-checked proof > type-level invariant > property/fuzz >
 differential/empirical > source audit.

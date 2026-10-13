@@ -286,7 +286,7 @@ where
     impl_simd_ops_methods!();
 }
 
-/// AArch64 specialized generic implementation of SimdOps.
+/// `AArch64` specialized generic implementation of `SimdOps`.
 #[cfg(target_arch = "aarch64")]
 impl<T> SimdOps for T
 where

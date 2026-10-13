@@ -664,6 +664,24 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   these must be `"0.4.0"` for Cargo to resolve the workspace graph. Tests and
   benchmarks now discover their targets.
 
+## [0.8.2] - 2026-10-13
+
+### Fixed
+
+- [patch] Native ARM strict diagnostics: explicit intrinsic/alias imports,
+  infallible mask-bit conversion, constant lane indices, result and panic
+  annotations, and architecture-valid documentation. Existing mask semantics
+  and numerical APIs remain unchanged.
+- [patch] Correct ARM test imports and lossless reference conversion while
+  retaining all value assertions and test input domains.
+
+### Changed
+
+- [patch] Extend the existing ARM CI matrix to macOS, require native NEON
+  coverage, and run strict Clippy, minimal-feature checks, examples, doctests,
+  and warning-denied documentation. Preserve the Linux status context and
+  timing instrument and the 60-second native per-test timeout.
+
 ## [0.5.0] - 2026-07-24
 
 ### Added

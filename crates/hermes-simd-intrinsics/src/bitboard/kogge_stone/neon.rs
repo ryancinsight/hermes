@@ -1,3 +1,9 @@
+#[cfg(target_arch = "aarch64")]
+use core::arch::aarch64::{
+    vandq_u64, vdupq_n_u64, vgetq_lane_u64, vnegq_s64, vorrq_u64, vreinterpretq_s64_u64,
+    vsetq_lane_u64, vshlq_n_u64, vshlq_u64,
+};
+
 use super::{east_mask, west_mask};
 
 /// Rook sliding attacks via NEON Kogge-Stone fill: orthogonal directions
@@ -10,9 +16,8 @@ use super::{east_mask, west_mask};
     unused_assignments,
     reason = "Each vector accumulator is updated across the staged Kogge-Stone fill"
 )]
+#[must_use]
 pub unsafe fn kogge_stone_rook_neon(slider: u64, occupancy: u64) -> u64 {
-    use core::arch::aarch64::*;
-
     let p_scalar = !occupancy;
 
     // NEON has 2-lane u64 registers (128-bit).
@@ -125,9 +130,8 @@ pub unsafe fn kogge_stone_rook_neon(slider: u64, occupancy: u64) -> u64 {
     unused_assignments,
     reason = "Each vector accumulator is updated across the staged Kogge-Stone fill"
 )]
+#[must_use]
 pub unsafe fn kogge_stone_bishop_neon(slider: u64, occupancy: u64) -> u64 {
-    use core::arch::aarch64::*;
-
     let p_scalar = !occupancy;
 
     // Left shifts: North-East (+9), North-West (+7)
@@ -234,6 +238,7 @@ pub unsafe fn kogge_stone_bishop_neon(slider: u64, occupancy: u64) -> u64 {
 /// # Safety
 /// NEON is mandatory on aarch64; no additional caller requirements.
 #[cfg(target_arch = "aarch64")]
+#[must_use]
 pub unsafe fn kogge_stone_queen_neon(slider: u64, occupancy: u64) -> u64 {
     kogge_stone_rook_neon(slider, occupancy) | kogge_stone_bishop_neon(slider, occupancy)
 }

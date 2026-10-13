@@ -1,4 +1,4 @@
-//! AArch64 NEON f32 hardware kernel.
+//! `AArch64` NEON f32 hardware kernel.
 //!
 //! 4-lane f32 (`float32x4_t`). Masked ops use `vbslq_f32` (bitwise select).
 //! Gather is emulated via four individual lane loads — NEON has no native gather.
@@ -6,7 +6,18 @@
 
 use crate::Neon;
 #[cfg(target_arch = "aarch64")]
-use core::arch::aarch64::*;
+use core::arch::aarch64::{
+    float32x4_t, uint32x4_t, vabsq_f32, vaddq_f32, vaddvq_f32, vandq_u32, vbslq_f32, vceqq_f32,
+    vcgeq_f32, vcgtq_f32, vcleq_f32, vcltq_f32, vcntq_u8, vcombine_f32, vcvtq_f32_u32, vdivq_f32,
+    vdupq_n_f32, vdupq_n_f64, vdupq_n_u32, veorq_u32, vextq_f32, vfmaq_f32, vget_high_f32,
+    vget_low_f32, vgetq_lane_u32, vld1q_f32, vld1q_u32, vmaxq_f32, vminq_f32, vmulq_f32, vmvnq_u32,
+    vnegq_f32, vorrq_u32, vpaddlq_u16, vpaddlq_u8, vreinterpretq_f32_f64, vreinterpretq_f32_u32,
+    vreinterpretq_f32_u64, vreinterpretq_f64_f32, vreinterpretq_s32_f32, vreinterpretq_u32_f32,
+    vreinterpretq_u32_s32, vreinterpretq_u64_f32, vreinterpretq_u8_f32, vrev64q_f32, vrndmq_f32,
+    vrndnq_f32, vrndpq_f32, vrndq_f32, vrsqrteq_f32, vrsqrtsq_f32, vshrq_n_s32, vsqrtq_f32,
+    vst1q_f32, vsubq_f32, vtrn1q_f32, vtrn2q_f32, vtstq_u32, vuzp1q_f32, vuzp1q_f64, vuzp2q_f32,
+    vuzp2q_f64, vzip1q_f32, vzip1q_f64, vzip1q_u64, vzip2q_f32, vzip2q_f64, vzip2q_u64,
+};
 use hermes_simd_core::kernel::pair_permute::{self, cast_arity};
 use hermes_simd_core::kernel::BackendKernel;
 
@@ -752,12 +763,12 @@ impl BackendKernel<f32> for Neon {
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn mask_to_bitmask(mask: Self::Mask) -> u64 {
-        let mut m = 0u64;
-        m |= ((vgetq_lane_u32::<0>(mask.0) >> 31) as u64) << 0;
-        m |= ((vgetq_lane_u32::<1>(mask.0) >> 31) as u64) << 1;
-        m |= ((vgetq_lane_u32::<2>(mask.0) >> 31) as u64) << 2;
-        m |= ((vgetq_lane_u32::<3>(mask.0) >> 31) as u64) << 3;
-        m
+        // Lane i contributes its sign bit at output bit i. From preserves
+        // the extracted one-bit value; the four bit positions are disjoint.
+        u64::from(vgetq_lane_u32::<0>(mask.0) >> 31)
+            | (u64::from(vgetq_lane_u32::<1>(mask.0) >> 31) << 1)
+            | (u64::from(vgetq_lane_u32::<2>(mask.0) >> 31) << 2)
+            | (u64::from(vgetq_lane_u32::<3>(mask.0) >> 31) << 3)
     }
 
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 4-lane vector width within caller-validated bounds.

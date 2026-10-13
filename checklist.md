@@ -1,5 +1,26 @@
 # Checklist — active sprint
 
+Target version: **0.8.2**. Active increment: **HERMES-MACOS-NATIVE-20261013 [patch]**.
+
+## HERMES-MACOS-NATIVE-20261013 [patch]
+
+- [x] Refresh the task branch from current upstream before native validation.
+- [x] Fix ARM-only strict diagnostics at their source: intrinsic imports,
+  lossless mask packing, result annotations, panic documentation, and test imports.
+- [x] Preserve the bitmask contract `bit i = sign bit of lane i`; retain every
+  value assertion and the existing property-test input domains.
+- [x] Validate the standalone locked graph on aarch64 macOS, Rust 1.97.0:
+  507 Nextest tests pass with zero skips; NEON capability is required and observed.
+- [x] Pass workspace strict Clippy, minimal workspace/facade builds, examples,
+  27 doctests, and warning-denied rustdoc. Ten existing illustrative doctest
+  snippets remain ignored under the repository's current documentation policy.
+- [x] Add macOS to the existing ARM CI matrix and retain the Linux status name
+  and timing instrument; keep the committed 60-second native test timeout.
+- [x] Compare local Hermes and Hephaestus in one consumer: native NEON and
+  Metal both reduce 515 exact dyadic inputs to -37.625 without input mutation.
+- [x] Prepare the verified task branch with its standalone lockfile and
+  synchronized version, changelog, backlog, and audit evidence.
+
 ## HERMES-SUBLANE-INTERLEAVE [minor] [perf] — claude/fable
 
 - [x] Specify the sub-lane pair against the flat pair, add the constant and the
@@ -704,4 +725,3 @@
   `cargo doc -p hermes-simd --no-deps --locked`. CI source policy is updated
   for the default providers and `cargo deny check` passes locally; the PR CI
   rerun remains the merge gate.
-
