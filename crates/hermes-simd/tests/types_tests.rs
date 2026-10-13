@@ -1064,6 +1064,40 @@ fn avx2_float_to_int_cast_matches_rust_semantics() {
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[test]
+fn avx512_float_to_int_cast_matches_rust_semantics() {
+    if !Avx512::is_runtime_supported() {
+        return;
+    }
+
+    // The AVX2 boundary table at 16 lanes: both 8-lane rows in one vector.
+    let input = [
+        0.0,
+        -0.0,
+        1.75,
+        -1.75,
+        f32::NAN,
+        f32::INFINITY,
+        f32::NEG_INFINITY,
+        2_147_483_648.0,
+        -2_147_483_648.0,
+        2_147_483_520.0,
+        -2_147_483_904.0,
+        f32::MAX,
+        f32::MIN,
+        0.999,
+        -0.999,
+        42.0,
+    ];
+
+    let expected = input.map(|value| value as i32);
+    let actual =
+        cast_with_public_bounds::<f32, i32, Avx512>(Vector::<f32, Avx512>::from_array(input))
+            .to_array();
+    assert_eq!(actual, expected);
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 mod cast_properties {
     use super::*;
     use proptest::prelude::*;
@@ -1077,6 +1111,20 @@ mod cast_properties {
                 let input = bits.map(f32::from_bits);
                 let expected = input.map(|value| value as i32);
                 let actual = Vector::<f32, Avx2>::from_array(input)
+                    .cast::<i32>()
+                    .to_array();
+                prop_assert_eq!(actual, expected);
+            }
+        }
+
+        #[test]
+        fn avx512_float_to_int_cast_matches_rust_for_arbitrary_bits(
+            bits in prop::array::uniform16(any::<u32>()),
+        ) {
+            if Avx512::is_runtime_supported() {
+                let input = bits.map(f32::from_bits);
+                let expected = input.map(|value| value as i32);
+                let actual = Vector::<f32, Avx512>::from_array(input)
                     .cast::<i32>()
                     .to_array();
                 prop_assert_eq!(actual, expected);
