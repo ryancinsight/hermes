@@ -1314,6 +1314,38 @@ where
     }
 }
 
+/// f64 twin of `check_vector_to_bitmask_sign_bit`: the native
+/// `mask_to_bitmask(vector_to_mask(v))` composition must report exactly the
+/// scalar sign bits on non-canonical lanes at this width too.
+fn check_vector_to_bitmask_sign_bit_f64<A>()
+where
+    A: hermes_simd_core::arch::SimdArch + SimdKernel<f64>,
+{
+    const PATTERNS: [f64; 8] = [
+        2.0,
+        -0.0,
+        0.0,
+        f64::from_bits(0x7ff8_0000_0000_0000),
+        f64::from_bits(0xfff8_0000_0000_0000),
+        -3.5,
+        f64::from_bits(!0),
+        f64::from_bits(0x0000_0000_0000_0001),
+    ];
+    let lanes = <A as hermes_simd::SimdStorage<f64>>::LANE_COUNT;
+    let mask_vals: Vec<f64> = (0..lanes).map(|i| PATTERNS[i % PATTERNS.len()]).collect();
+    let vector = hermes_simd::Vector::<f64, A>::load_unaligned_from_slice(&mask_vals)
+        .expect("mask buffer holds one register");
+    let bm = vector.to_bitmask().0;
+    for (i, &val) in mask_vals.iter().enumerate() {
+        assert_eq!(
+            (bm >> i) & 1 == 1,
+            val.is_sign_negative(),
+            "f64 to_bitmask lane {i} must report the sign bit (value {:#018x})",
+            val.to_bits()
+        );
+    }
+}
+
 /// Uniform fused multiply-subtract must match the scalar single-rounding
 /// contract lane for lane. Inputs stay finite and bounded, so exact bit
 /// equality is the correct oracle for every native and emulated backend.
@@ -1536,22 +1568,27 @@ fn blend_and_to_bitmask_honor_sign_bit_on_supported_backends() {
     check_blend_sign_bit_semantics::<SveArch>();
     check_vector_to_bitmask_sign_bit::<Scalar>();
     check_vector_to_bitmask_sign_bit::<SveArch>();
+    check_vector_to_bitmask_sign_bit_f64::<Scalar>();
+    check_vector_to_bitmask_sign_bit_f64::<SveArch>();
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
         if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
             check_blend_sign_bit_semantics::<hermes_simd::Avx2>();
             check_vector_to_bitmask_sign_bit::<hermes_simd::Avx2>();
+            check_vector_to_bitmask_sign_bit_f64::<hermes_simd::Avx2>();
         }
         if std::is_x86_feature_detected!("avx512f") {
             check_blend_sign_bit_semantics::<hermes_simd::Avx512>();
             check_vector_to_bitmask_sign_bit::<hermes_simd::Avx512>();
+            check_vector_to_bitmask_sign_bit_f64::<hermes_simd::Avx512>();
         }
     }
     #[cfg(target_arch = "aarch64")]
     {
         check_blend_sign_bit_semantics::<hermes_simd::Neon>();
         check_vector_to_bitmask_sign_bit::<hermes_simd::Neon>();
+        check_vector_to_bitmask_sign_bit_f64::<hermes_simd::Neon>();
     }
 }
 

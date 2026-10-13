@@ -3,8 +3,6 @@
 use super::Vector;
 use crate::arch::SimdArch;
 use crate::kernel::SimdKernel;
-use crate::kernel::SimdStorage;
-use crate::kernel::MAX_SIMD_LANES;
 use crate::mask::BitMask;
 use crate::scalar::Scalar;
 use crate::view::mask_reg::Mask;
@@ -66,28 +64,15 @@ where
     /// Convert this vector mask representation (sign bits) into a portable `BitMask`.
     #[inline(always)]
     pub fn to_bitmask(self) -> BitMask<64> {
-        const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
-        let mut buf = [core::mem::MaybeUninit::<T>::uninit(); MAX_SIMD_LANES];
-        let lanes = <Arch as SimdStorage<T>>::LANE_COUNT;
-        // SAFETY: constructing `self` proved host support; the store writes `lanes` elements
-        // into the `MAX_SIMD_LANES`-slot buffer (bounded by `LANE_BOUND_CHECK`),
-        // so `assume_init` reads only those initialized lanes.
-        unsafe {
-            self.store_unaligned(buf.as_mut_ptr().cast::<T>());
-            let mut m = 0u64;
-            for i in 0..lanes {
-                let val = buf[i].assume_init();
-                // A lane is active iff its sign bit is set — the documented
-                // mask convention (`BackendKernel::vector_to_mask`, hardware
-                // movemask semantics). Tested bit-level: a nonzero-or-NaN test
-                // would report `+2.0` active and `-0.0` inactive, diverging
-                // from the native movemask backends.
-                if val.bitand(T::SIGN_MASK).count_ones() != 0 {
-                    m |= 1u64 << i;
-                }
-            }
-            BitMask(m)
-        }
+        // SAFETY: constructing `self` proved host support for `Arch`. The
+        // `vector_to_mask` contract defines a lane as active iff its sign bit
+        // is set, for arbitrary (non-canonical) lanes — tested bit-level, so
+        // `+2.0` stays inactive and `-0.0` stays active, matching hardware
+        // movemask semantics — and `mask_to_bitmask` emits one bit per lane.
+        // The composition therefore reports exactly the documented sign bits
+        // while staying in registers (one `vmovmskps` on AVX2) instead of
+        // spilling to a stack buffer for scalar extraction.
+        BitMask(unsafe { Arch::mask_to_bitmask(Arch::vector_to_mask(self.raw)) })
     }
 
     /// Elementwise equal comparison returning a native `Mask`.
