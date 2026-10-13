@@ -60,6 +60,7 @@ macro_rules! impl_x86_typed_probe_trait {
 /// operation family can use that host capability.
 #[cfg(all(target_arch = "x86_64", feature = "std"))]
 #[inline]
+#[must_use]
 pub fn has_fma3() -> bool {
     use std::sync::OnceLock;
     static CACHED: OnceLock<bool> = OnceLock::new();
@@ -69,6 +70,7 @@ pub fn has_fma3() -> bool {
 #[cfg(all(target_arch = "x86_64", not(feature = "std")))]
 #[inline]
 /// Returns `false` because no-std builds cannot perform runtime CPU detection.
+#[must_use]
 pub fn has_fma3() -> bool {
     false
 }
@@ -78,6 +80,7 @@ pub fn has_fma3() -> bool {
 /// instructions, dispatched separately from this x86-specific probe).
 #[cfg(not(target_arch = "x86_64"))]
 #[inline]
+#[must_use]
 pub fn has_fma3() -> bool {
     false
 }

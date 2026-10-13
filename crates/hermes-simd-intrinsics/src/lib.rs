@@ -14,8 +14,8 @@
 //!
 //! Also here: the AVX-512 VNNI and 256-bit AVX-VNNI tile multipliers, packed
 //! 4-bit hardware unpacking, sliding-attack bitboard backends, and the Intel
-//! AMX engine, whose kernels dispatch only where
-//! [`x86_64::amx::probe`] establishes the full CPUID / `XCR0` /
+//! AMX engine, whose kernels dispatch only where the x86 probe
+//! `x86_64::amx::probe` establishes the full CPUID / `XCR0` /
 //! OS-permission chain (see the repository README for why all three are
 //! required, and for the probe's one-time opt-in side effect).
 
@@ -281,6 +281,7 @@ pub use bitboard::swar::{Swar, SwarUtils};
 /// separate from the AVX-512F/BW/VL conversion fallback and includes the OS
 /// register-state checks provided by Rust's runtime feature detector.
 #[inline]
+#[must_use]
 pub fn has_avx512_bf16() -> bool {
     #[cfg(all(target_arch = "x86_64", feature = "std"))]
     {

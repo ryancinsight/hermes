@@ -6,9 +6,17 @@ use core::arch::x86_64::{
 };
 
 #[cfg(target_arch = "aarch64")]
-use core::arch::aarch64::*;
+use core::arch::aarch64::{
+    vand_u8, vdup_n_u8, vget_high_s16, vget_high_s8, vget_low_s16, vget_low_s8, vld1_s8, vld1_u8,
+    vld1q_s8, vmovl_s16, vmovl_s8, vreinterpret_s8_u8, vshl_n_s8, vshr_n_s8, vshr_n_u8, vst1_s8,
+    vst1q_s16, vst1q_s32, vzip_s8,
+};
 
 /// Unpacks packed 4-bit signed integers (stored 2 per byte) into an 8-bit signed integer slice.
+///
+/// # Panics
+///
+/// Panics when `unpacked` contains fewer than `2 * packed.len()` elements.
 #[inline]
 pub fn unpack_int4(packed: &[u8], unpacked: &mut [i8]) {
     #[cfg(target_arch = "x86_64")]

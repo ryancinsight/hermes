@@ -361,6 +361,15 @@ cargo run -p hermes-simd-benches -- --parse-only --check-regressions
 
 Differential testing policy: the AVX2, AVX-512, and NEON backends are verified against the always-available `Scalar` backend — bitwise on dyadic-exact inputs, within analytically derived rounding bounds on arbitrary inputs. AVX-512 executes under Intel SDE emulating Sapphire Rapids (`test-avx512-sde`), with native timing captured best-effort on hosted silicon whenever it is present (`test-avx512-hosted`), and NEON runs on a native aarch64 runner (`test-aarch64`), so no backend is carried by a capability-gated skip. The AMX kernels are compile-checked only; they are not runtime-validated, because no available machine satisfies the permission chain — the SDE job cannot stand in, since `arch_prctl` reaches the host kernel rather than the emulator (see [Intel AMX status](#intel-amx-status)).
 
+The ARM job runs the same semantic suite on Linux and macOS. Both lanes require
+`HERMES_EXPECTED_TARGETS=scalar,neon,sve`, compile all targets with warnings
+denied, check minimal features, build examples, and generate warning-denied
+documentation. `sve` names the documented emulated backend; NEON executes
+through the native ARM instructions. Linux retains the existing NEON timing
+instrument; native-only imports share the kernels' configuration guard so
+the generic comparison also compiles with warnings denied. The per-test native
+timeout remains 60 seconds on both platforms.
+
 Benchmark regression policy: `benchmarks/benchmarks_baseline.json` is the structured
 Criterion baseline. `--check-regressions` fails when a committed baseline row is
 missing from the current run or when the current point estimate exceeds the

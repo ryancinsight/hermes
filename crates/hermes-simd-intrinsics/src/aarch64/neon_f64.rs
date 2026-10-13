@@ -1,4 +1,4 @@
-//! AArch64 NEON f64 hardware kernel.
+//! `AArch64` NEON f64 hardware kernel.
 //!
 //! 2-lane f64 (`float64x2_t`). Masked ops via `vbslq_f64`.
 //! Gather is emulated via individual lane loads — NEON has no native gather.
@@ -6,7 +6,21 @@
 
 use crate::Neon;
 #[cfg(target_arch = "aarch64")]
-use core::arch::aarch64::*;
+use core::arch::aarch64::{
+    float64x2_t, uint64x2_t, vabsq_f64, vaddq_f64, vaddvq_f64, vandq_u64, vbslq_f64, vceqq_f64,
+    vcgeq_f64, vcgtq_f64, vcleq_f64, vcltq_f64, vcntq_u8, vcvtq_f64_u64, vdivq_f64, vdupq_n_f64,
+    vdupq_n_u64, veorq_u64, vextq_f64, vfmaq_f64, vgetq_lane_u64, vld1q_f64, vld1q_u64, vmaxq_f64,
+    vminq_f64, vmulq_f64, vmvnq_u32, vnegq_f64, vorrq_u64, vpaddlq_u16, vpaddlq_u32, vpaddlq_u8,
+    vreinterpretq_f64_u64, vreinterpretq_s64_f64, vreinterpretq_u32_u64, vreinterpretq_u64_f64,
+    vreinterpretq_u64_s64, vreinterpretq_u64_u32, vreinterpretq_u8_f64, vrndmq_f64, vrndnq_f64,
+    vrndpq_f64, vrndq_f64, vshrq_n_s64, vsqrtq_f64, vst1q_f64, vsubq_f64, vtrn1q_f64, vtrn2q_f64,
+    vtstq_u64,
+};
+#[cfg(all(target_arch = "aarch64", not(hermes_benchmark_generic_default)))]
+use core::arch::aarch64::{
+    vcombine_f64, vdup_n_f64, vget_high_f64, vget_low_f64, vuzp1q_f64, vuzp2q_f64, vzip1q_f64,
+    vzip2q_f64,
+};
 use hermes_simd_core::kernel::BackendKernel;
 
 crate::define_simd_newtype!(
@@ -651,10 +665,8 @@ impl BackendKernel<f64> for Neon {
     #[target_feature(enable = "neon")]
     #[inline]
     unsafe fn mask_to_bitmask(mask: Self::Mask) -> u64 {
-        let mut m = 0u64;
-        m |= ((vgetq_lane_u64(mask.0, 0) >> 63) as u64) << 0;
-        m |= ((vgetq_lane_u64(mask.0, 1) >> 63) as u64) << 1;
-        m
+        // The two sign bits occupy disjoint output positions.
+        (vgetq_lane_u64::<0>(mask.0) >> 63) | ((vgetq_lane_u64::<1>(mask.0) >> 63) << 1)
     }
 
     // SAFETY: caller must ensure the target CPU supports `neon` (enforced by the `#[target_feature]` gate above plus `cfg(target_arch = "aarch64")` selection in the hermes-simd dispatcher; NEON is baseline-mandatory on AArch64); any pointer operands are valid for the 2-lane vector width within caller-validated bounds.

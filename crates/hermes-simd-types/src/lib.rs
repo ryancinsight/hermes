@@ -265,7 +265,7 @@ pub use aarch64_aliases::*;
 
 #[cfg(target_arch = "aarch64")]
 mod aarch64_aliases {
-    use super::*;
+    use super::{Bf16, Bf4, Bf8, Mask, Neon, Vector, F16, F32, F4, F64, F8, I16, I32, I8};
 
     // NEON Vector types
     /// Concrete NEON f32 vector register (4 lanes).

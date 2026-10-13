@@ -1,4 +1,4 @@
-//! AArch64 NEON f16 emulated SIMD kernel.
+//! `AArch64` NEON f16 emulated SIMD kernel.
 //!
 //! Provides a documented software-emulated fallback for half-precision float arithmetic
 //! with 8 lanes on NEON when native FP16 arithmetic instructions are not present/compiled.

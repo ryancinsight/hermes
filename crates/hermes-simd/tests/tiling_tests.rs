@@ -2,10 +2,6 @@
     clippy::float_cmp,
     reason = "Tiling tests compare exact manufactured matrix values"
 )]
-#![expect(
-    clippy::items_after_statements,
-    reason = "The tiling harness keeps architecture-specific imports beside the gated case"
-)]
 
 use hermes_simd::*;
 
@@ -305,11 +301,12 @@ fn test_tile_matrix_multiply_bf16() {
 #[cfg(target_arch = "x86_64")]
 #[test]
 fn test_native_bf16_tile_matches_scalar_when_available() {
+    use eunomia::{Bf16, F32};
+
     if !has_avx512_bf16() {
         return;
     }
 
-    use eunomia::{Bf16, F32};
     let c_initial: Vec<f32> = (0..16 * 16).map(|i| (i % 7) as f32 - 3.0).collect();
     let mut actual: Vec<F32> = c_initial.iter().copied().map(F32).collect();
     let a: Vec<Bf16> = (0..16 * 32)
