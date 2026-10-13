@@ -20,7 +20,7 @@
   515 exact dyadic inputs to -37.625 on native NEON and Metal and verifies
   unchanged input readback.
 - Target: 0.8.2; verified branch: `codex/macos-validation-20261013`.
-  Hosted macOS run `38452038170` passes at `f3355f1`; its Linux comparison
+  Hosted macOS run `38452038170` passes at [PR #258 source](https://github.com/ryancinsight/hermes/commit/f3355f1f9728cd5dfa393d424303c910b42c228b); its Linux comparison
   exposes native-only imports under the generic benchmark configuration. The
   imports now share the kernels' configuration guard; both configurations
   pass local strict workspace Clippy without changing benchmark workloads.

@@ -21,7 +21,7 @@
 - Boundary: SVE is the existing emulated backend; x86/AMX execution and native
   throughput measurements are outside this Mac's evidence. Ten existing
   illustrative doctest snippets stay ignored. Hosted macOS job
-  `115485119264` passes in run `38452038170` at `f3355f1`.
+  `115485119264` passes in run `38452038170` at [PR #258 source](https://github.com/ryancinsight/hermes/commit/f3355f1f9728cd5dfa393d424303c910b42c228b).
 - Hosted Linux finding: native-only imports survive when the comparison build
   selects `hermes_benchmark_generic_default`; Rust rejects the unused imports.
   Apply the same configuration predicate as their kernel definitions. Native
