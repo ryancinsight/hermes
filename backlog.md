@@ -3,7 +3,8 @@
 ## HERMES-MACOS-NATIVE-20261013 — Native macOS ARM verification [patch] — todo <a id="hermes-macos-native-20261013"></a>
 
 - Priority: correctness.
-- Remaining acceptance: hosted execution of the new macOS lane before release.
+- Remaining acceptance: exact-head Linux comparison rerun, remaining required
+  hosted checks, and PR #258 merge.
 - Outcome: current upstream code passes native Apple Silicon checks; the ARM
   CI matrix now includes macOS and runs strict compiler/documentation gates.
 - Root cause: the prior ARM job omitted strict Clippy and rustdoc, allowing
@@ -19,7 +20,10 @@
   515 exact dyadic inputs to -37.625 on native NEON and Metal and verifies
   unchanged input readback.
 - Target: 0.8.2; verified branch: `codex/macos-validation-20261013`.
-  Hosted execution of the added macOS lane remains an external evidence gate.
+  Hosted macOS run `38452038170` passes at `f3355f1`; its Linux comparison
+  exposes native-only imports under the generic benchmark configuration. The
+  imports now share the kernels' configuration guard; both configurations
+  pass local strict workspace Clippy without changing benchmark workloads.
 
 ## HERMES-MNEMOSYNE-IDENTITY-2026-09-03 — Align the workspace memory provider with the Eunomia co-evolution [patch] [arch] — in-progress <a id="hermes-mnemosyne-identity-2026-09-03"></a>
 

@@ -20,7 +20,13 @@
   NEON/Metal result -37.625 for 515 dyadic inputs and unchanged input readback.
 - Boundary: SVE is the existing emulated backend; x86/AMX execution and native
   throughput measurements are outside this Mac's evidence. Ten existing
-  illustrative doctest snippets stay ignored; hosted macOS execution is pending.
+  illustrative doctest snippets stay ignored. Hosted macOS job
+  `115485119264` passes in run `38452038170` at `f3355f1`.
+- Hosted Linux finding: native-only imports survive when the comparison build
+  selects `hermes_benchmark_generic_default`; Rust rejects the unused imports.
+  Apply the same configuration predicate as their kernel definitions. Native
+  and generic workspace strict Clippy pass locally; exact-head hosted rerun
+  and PR #258 merge remain acceptance gates.
 
 Persistent gap register. Evidence tiers follow the repository instruction
 hierarchy: machine-checked proof > type-level invariant > property/fuzz >

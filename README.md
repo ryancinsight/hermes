@@ -366,7 +366,9 @@ The ARM job runs the same semantic suite on Linux and macOS. Both lanes require
 denied, check minimal features, build examples, and generate warning-denied
 documentation. `sve` names the documented emulated backend; NEON executes
 through the native ARM instructions. Linux retains the existing NEON timing
-instrument; the per-test native timeout remains 60 seconds on both platforms.
+instrument; native-only imports share the kernels' configuration guard so
+the generic comparison also compiles with warnings denied. The per-test native
+timeout remains 60 seconds on both platforms.
 
 Benchmark regression policy: `benchmarks/benchmarks_baseline.json` is the structured
 Criterion baseline. `--check-regressions` fails when a committed baseline row is

@@ -21,6 +21,11 @@ Target version: **0.8.2**. Active increment: **HERMES-MACOS-NATIVE-20261013 [pat
 - [x] Prepare the verified task branch with its standalone lockfile and
   synchronized version, changelog, backlog, and audit evidence.
 
+- [x] Pass the added hosted macOS lane at `f3355f1`, run `38452038170`.
+- [x] Guard native-only imports with the kernel configuration predicate; pass
+  strict workspace Clippy for native and generic comparison configurations.
+- [ ] Pass the final exact-head hosted matrix and merge PR #258.
+
 ## HERMES-SUBLANE-INTERLEAVE [minor] [perf] — claude/fable
 
 - [x] Specify the sub-lane pair against the flat pair, add the constant and the

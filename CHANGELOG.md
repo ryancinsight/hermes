@@ -672,6 +672,8 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
   infallible mask-bit conversion, constant lane indices, result and panic
   annotations, and architecture-valid documentation. Existing mask semantics
   and numerical APIs remain unchanged.
+- [patch] Match native-only NEON intrinsic imports to their kernel configuration
+  so the generic benchmark comparison compiles with warnings denied.
 - [patch] Correct ARM test imports and lossless reference conversion while
   retaining all value assertions and test input domains.
 
