@@ -110,7 +110,7 @@ impl BackendKernel<f32> for Avx2 {
     #[inline]
     unsafe fn try_cast<U>(value: <Self as BackendKernel<f32>>::Vector, destination: *mut U) -> bool
     where
-        U: hermes_simd_core::scalar::Scalar + hermes_simd_core::scalar::CastFrom<f32>,
+        U: hermes_simd_core::scalar::Scalar + hermes_simd_core::scalar::LaneCast,
     {
         if core::any::TypeId::of::<U>() != core::any::TypeId::of::<i32>() {
             return false;
