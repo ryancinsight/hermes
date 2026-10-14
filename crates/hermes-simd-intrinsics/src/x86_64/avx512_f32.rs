@@ -15,19 +15,17 @@ use crate::Avx512;
 use core::arch::x86_64::{
     __m512, __m512i, __mmask16, _mm512_add_ps, _mm512_and_si512, _mm512_andnot_si512,
     _mm512_castps_si512, _mm512_castsi512_ps, _mm512_cmp_ps_mask, _mm512_cmplt_epi32_mask,
-    _mm512_cvttps_epi32, _mm512_div_ps, _mm512_fmadd_ps, _mm512_fmaddsub_ps, _mm512_fmsub_ps,
-    _mm512_fmsubadd_ps, _mm512_fnmadd_ps, _mm512_i32gather_ps, _mm512_i32scatter_ps,
-    _mm512_load_ps, _mm512_loadu_ps, _mm512_mask3_fmadd_ps, _mm512_mask_add_ps,
-    _mm512_mask_blend_ps, _mm512_mask_expand_ps, _mm512_mask_i32gather_ps,
-    _mm512_mask_i32scatter_ps, _mm512_mask_loadu_ps, _mm512_mask_mov_epi32, _mm512_mask_mov_ps,
-    _mm512_mask_mul_ps, _mm512_mask_storeu_ps, _mm512_maskz_compress_ps, _mm512_maskz_mov_epi32,
-    _mm512_max_ps, _mm512_min_ps, _mm512_movehdup_ps, _mm512_moveldup_ps, _mm512_mul_ps,
-    _mm512_or_si512, _mm512_permute_ps, _mm512_reduce_add_ps, _mm512_roundscale_ps,
-    _mm512_rsqrt14_ps, _mm512_set1_epi32, _mm512_set1_ps, _mm512_setzero_ps, _mm512_setzero_si512,
-    _mm512_sqrt_ps, _mm512_store_ps, _mm512_storeu_epi32, _mm512_storeu_ps, _mm512_stream_ps,
-    _mm512_sub_ps, _mm512_xor_si512, _CMP_EQ_OQ, _CMP_GE_OQ, _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ,
-    _CMP_NEQ_UQ, _CMP_ORD_Q, _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT, _MM_FROUND_TO_NEG_INF,
-    _MM_FROUND_TO_POS_INF, _MM_FROUND_TO_ZERO,
+    _mm512_div_ps, _mm512_fmadd_ps, _mm512_fmaddsub_ps, _mm512_fmsub_ps, _mm512_fmsubadd_ps,
+    _mm512_fnmadd_ps, _mm512_i32gather_ps, _mm512_i32scatter_ps, _mm512_load_ps, _mm512_loadu_ps,
+    _mm512_mask3_fmadd_ps, _mm512_mask_add_ps, _mm512_mask_blend_ps, _mm512_mask_expand_ps,
+    _mm512_mask_i32gather_ps, _mm512_mask_i32scatter_ps, _mm512_mask_loadu_ps, _mm512_mask_mov_ps,
+    _mm512_mask_mul_ps, _mm512_mask_storeu_ps, _mm512_maskz_compress_ps, _mm512_max_ps,
+    _mm512_min_ps, _mm512_movehdup_ps, _mm512_moveldup_ps, _mm512_mul_ps, _mm512_or_si512,
+    _mm512_permute_ps, _mm512_reduce_add_ps, _mm512_roundscale_ps, _mm512_rsqrt14_ps,
+    _mm512_set1_ps, _mm512_setzero_ps, _mm512_setzero_si512, _mm512_sqrt_ps, _mm512_store_ps,
+    _mm512_storeu_ps, _mm512_stream_ps, _mm512_sub_ps, _mm512_xor_si512, _CMP_EQ_OQ, _CMP_GE_OQ,
+    _CMP_GT_OQ, _CMP_LE_OQ, _CMP_LT_OQ, _CMP_NEQ_UQ, _MM_FROUND_NO_EXC, _MM_FROUND_TO_NEAREST_INT,
+    _MM_FROUND_TO_NEG_INF, _MM_FROUND_TO_POS_INF, _MM_FROUND_TO_ZERO,
 };
 #[cfg(not(hermes_benchmark_generic_default))]
 use core::arch::x86_64::{
@@ -99,42 +97,6 @@ impl BackendKernel<f32> for Avx512 {
     #[inline]
     unsafe fn store_unaligned(ptr: *mut f32, val: Self::Vector) {
         _mm512_storeu_ps(ptr, val.0);
-    }
-
-    // SAFETY: caller must ensure AVX-512F support and a valid equal-lane
-    // destination. The TypeId proof makes the destination exactly sixteen
-    // i32 lanes before the pointer is reinterpreted for the unaligned store.
-    //
-    // Exactness vs `LaneCast` (truncate toward zero, saturate,
-    // NaN -> 0), mirroring the AVX2 proof with mask-register blends:
-    // `vcvttps2dq` truncates and yields the indefinite value 0x8000_0000
-    // (== i32::MIN) for NaN and out-of-range lanes. Lanes below -2^31 are
-    // therefore already the saturated i32::MIN. Lanes >= 2^31 (including
-    // +inf) must become i32::MAX, applied where `input < 2^31` is false;
-    // NaN lanes also fail that test but are then zeroed by the ordered
-    // mask, leaving +inf/overflow at i32::MAX. The fixup is skipped when
-    // every lane is < 2^31 and ordered (in-range mask all-ones implies no
-    // NaN and no positive overflow).
-    #[target_feature(enable = "avx512f")]
-    #[inline]
-    unsafe fn try_cast<U>(value: <Self as BackendKernel<f32>>::Vector, destination: *mut U) -> bool
-    where
-        U: hermes_simd_core::scalar::Scalar + hermes_simd_core::scalar::LaneCast,
-    {
-        if core::any::TypeId::of::<U>() != core::any::TypeId::of::<i32>() {
-            return false;
-        }
-        let input = value.0;
-        let mut converted = _mm512_cvttps_epi32(input);
-        let in_range = _mm512_cmp_ps_mask(input, _mm512_set1_ps(2_147_483_648.0), _CMP_LT_OQ);
-        if in_range != 0xffff {
-            converted =
-                _mm512_mask_mov_epi32(converted, in_range ^ 0xffff, _mm512_set1_epi32(i32::MAX));
-            let ordered = _mm512_cmp_ps_mask(input, input, _CMP_ORD_Q);
-            converted = _mm512_maskz_mov_epi32(ordered, converted);
-        }
-        _mm512_storeu_epi32(destination.cast::<i32>(), converted);
-        true
     }
 
     const SUPPORTS_NT_STORE: bool = true;
