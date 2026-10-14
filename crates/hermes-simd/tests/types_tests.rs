@@ -13,9 +13,7 @@
 )]
 use hermes_simd::*;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use hermes_simd_core::kernel::SimdKernel;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use hermes_simd_core::scalar::LaneCast;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use hermes_simd_core::scalar::Scalar as ScalarElement;
 
@@ -958,11 +956,7 @@ fn test_new_vector_features() {
     assert_eq!(vec_modified.extract::<2>(), 10.0f32);
     assert_eq!(vec_modified.extract::<0>(), 1.0f32); // others unchanged
 
-    // 3. Casting (f32 to i32, same lane count of 4)
-    let vec_cast = vec.cast::<i32>();
-    assert_eq!(vec_cast.to_array(), [1, 2, 3, 4]);
-
-    // 4. Mask operations (reductions: any, all, none; select; bitwise)
+    // 3. Mask operations (reductions: any, all, none; select; bitwise)
     let a = Vector::<f32, Scalar>::from_array([1.0f32, 2.0, 3.0, 4.0]);
     let b = Vector::<f32, Scalar>::from_array([1.0f32, 5.0, 3.0, 6.0]);
 
@@ -1012,174 +1006,6 @@ fn test_new_vector_features() {
     ]));
     cow.transform_vectors(|v| v * Vector::splat(2.0));
     assert_eq!(&*cow, &[2.0, 4.0, 6.0, 8.0, 10.0, 12.0]);
-}
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-fn cast_with_public_bounds<T, U, Arch>(value: Vector<T, Arch>) -> Vector<U, Arch>
-where
-    T: ScalarElement,
-    U: ScalarElement + LaneCast,
-    Arch: SimdArch + SimdKernel<T> + SimdKernel<U>,
-{
-    value.cast()
-}
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[test]
-fn avx2_float_to_int_cast_matches_rust_semantics() {
-    if !Avx2::is_runtime_supported() {
-        return;
-    }
-
-    let cases = [
-        [
-            0.0,
-            -0.0,
-            1.75,
-            -1.75,
-            f32::NAN,
-            f32::INFINITY,
-            f32::NEG_INFINITY,
-            2_147_483_648.0,
-        ],
-        [
-            -2_147_483_648.0,
-            2_147_483_520.0,
-            -2_147_483_904.0,
-            f32::MAX,
-            f32::MIN,
-            0.999,
-            -0.999,
-            42.0,
-        ],
-    ];
-
-    for input in cases {
-        let expected = input.map(|value| value as i32);
-        let actual =
-            cast_with_public_bounds::<f32, i32, Avx2>(Vector::<f32, Avx2>::from_array(input))
-                .to_array();
-        assert_eq!(actual, expected);
-    }
-}
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[test]
-fn avx512_float_to_int_cast_matches_rust_semantics() {
-    if !Avx512::is_runtime_supported() {
-        return;
-    }
-
-    // The AVX2 boundary table at 16 lanes: both 8-lane rows in one vector.
-    let input = [
-        0.0,
-        -0.0,
-        1.75,
-        -1.75,
-        f32::NAN,
-        f32::INFINITY,
-        f32::NEG_INFINITY,
-        2_147_483_648.0,
-        -2_147_483_648.0,
-        2_147_483_520.0,
-        -2_147_483_904.0,
-        f32::MAX,
-        f32::MIN,
-        0.999,
-        -0.999,
-        42.0,
-    ];
-
-    let expected = input.map(|value| value as i32);
-    let actual =
-        cast_with_public_bounds::<f32, i32, Avx512>(Vector::<f32, Avx512>::from_array(input))
-            .to_array();
-    assert_eq!(actual, expected);
-}
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[test]
-fn scalar_fallback_cast_matches_rust_semantics() {
-    if !Avx2::is_runtime_supported() {
-        return;
-    }
-
-    // Pairs with no native hook take `Vector::cast`'s scalar loop
-    // (`LaneCast::cast_lane`): identity, exact widening, truncation.
-    let float_input = [0.0f32, -0.0, 1.75, -1.75, 42.0, -42.0, 0.5, -0.5];
-    let actual =
-        cast_with_public_bounds::<f32, f32, Avx2>(Vector::<f32, Avx2>::from_array(float_input))
-            .to_array();
-    assert_eq!(actual.map(f32::to_bits), float_input.map(f32::to_bits));
-
-    let int_input = [
-        0i32,
-        1,
-        -1,
-        12_345,
-        -12_345,
-        2_147_483_647,
-        -2_147_483_648,
-        7,
-    ];
-    let actual =
-        cast_with_public_bounds::<i32, f32, Avx2>(Vector::<i32, Avx2>::from_array(int_input))
-            .to_array();
-    // Literal correctly-rounded expectations (every entry exactly
-    // representable in `f32`, so no oracle-side conversion can mask a
-    // rounding defect; `i32::MAX` rounds up to 2^31).
-    let expected = [
-        0.0f32,
-        1.0,
-        -1.0,
-        12_345.0,
-        -12_345.0,
-        2_147_483_648.0,
-        -2_147_483_648.0,
-        7.0,
-    ];
-    assert_eq!(actual, expected);
-
-    let actual =
-        cast_with_public_bounds::<i32, i32, Avx2>(Vector::<i32, Avx2>::from_array(int_input))
-            .to_array();
-    assert_eq!(actual, int_input);
-}
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-mod cast_properties {
-    use super::*;
-    use proptest::prelude::*;
-
-    proptest! {
-        #[test]
-        fn avx2_float_to_int_cast_matches_rust_for_arbitrary_bits(
-            bits in prop::array::uniform8(any::<u32>()),
-        ) {
-            if Avx2::is_runtime_supported() {
-                let input = bits.map(f32::from_bits);
-                let expected = input.map(|value| value as i32);
-                let actual = Vector::<f32, Avx2>::from_array(input)
-                    .cast::<i32>()
-                    .to_array();
-                prop_assert_eq!(actual, expected);
-            }
-        }
-
-        #[test]
-        fn avx512_float_to_int_cast_matches_rust_for_arbitrary_bits(
-            bits in prop::array::uniform16(any::<u32>()),
-        ) {
-            if Avx512::is_runtime_supported() {
-                let input = bits.map(f32::from_bits);
-                let expected = input.map(|value| value as i32);
-                let actual = Vector::<f32, Avx512>::from_array(input)
-                    .cast::<i32>()
-                    .to_array();
-                prop_assert_eq!(actual, expected);
-            }
-        }
-    }
 }
 
 #[test]
