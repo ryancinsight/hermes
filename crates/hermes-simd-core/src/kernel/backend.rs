@@ -223,7 +223,7 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
     /// Attempts a backend-native equal-lane numeric conversion into `destination`.
     ///
     /// The default reports that no native route exists, so callers retain the
-    /// canonical scalar [`crate::scalar::CastFrom`] fallback. Backends override
+    /// canonical scalar [`crate::scalar::LaneCast`] fallback. Backends override
     /// this only for type pairs whose native instruction preserves that exact
     /// conversion contract.
     ///
@@ -237,7 +237,7 @@ pub trait BackendKernel<T: crate::scalar::Scalar>:
     #[inline(always)]
     unsafe fn try_cast<U>(_value: <Self as BackendKernel<T>>::Vector, _destination: *mut U) -> bool
     where
-        U: crate::scalar::Scalar + crate::scalar::CastFrom<T>,
+        U: crate::scalar::Scalar + crate::scalar::LaneCast,
     {
         false
     }

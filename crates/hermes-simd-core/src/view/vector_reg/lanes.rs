@@ -11,7 +11,7 @@ use crate::kernel::SimdKernel;
 use crate::kernel::SimdLoadStore;
 use crate::kernel::SimdStorage;
 use crate::kernel::MAX_SIMD_LANES;
-use crate::scalar::CastFrom;
+use crate::scalar::LaneCast;
 use crate::scalar::Scalar;
 use crate::view::SimdError;
 
@@ -65,7 +65,7 @@ where
     where
         Arch: SimdKernel<U>,
         U: Scalar,
-        U: CastFrom<T>,
+        U: LaneCast,
     {
         let () = AssertLaneCountSame::<T, U, Arch>::OK;
         const { <Arch as SimdStorage<T>>::LANE_BOUND_CHECK };
@@ -87,7 +87,7 @@ where
             self.store_unaligned(buf_t.as_mut_ptr().cast::<T>());
             for i in 0..lanes {
                 let val_t = buf_t[i].assume_init();
-                buf_u[i].write(U::cast_from(val_t));
+                buf_u[i].write(U::cast_lane(val_t.to_f64()));
             }
             Vector::<U, Arch>::new(<Arch as SimdLoadStore<U>>::load_unaligned(
                 buf_u.as_ptr().cast::<U>(),

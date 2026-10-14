@@ -15,7 +15,7 @@ use hermes_simd::*;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use hermes_simd_core::kernel::SimdKernel;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use hermes_simd_core::scalar::CastFrom;
+use hermes_simd_core::scalar::LaneCast;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use hermes_simd_core::scalar::Scalar as ScalarElement;
 
@@ -1018,7 +1018,7 @@ fn test_new_vector_features() {
 fn cast_with_public_bounds<T, U, Arch>(value: Vector<T, Arch>) -> Vector<U, Arch>
 where
     T: ScalarElement,
-    U: ScalarElement + CastFrom<T>,
+    U: ScalarElement + LaneCast,
     Arch: SimdArch + SimdKernel<T> + SimdKernel<U>,
 {
     value.cast()
@@ -1095,6 +1095,55 @@ fn avx512_float_to_int_cast_matches_rust_semantics() {
         cast_with_public_bounds::<f32, i32, Avx512>(Vector::<f32, Avx512>::from_array(input))
             .to_array();
     assert_eq!(actual, expected);
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[test]
+fn scalar_fallback_cast_matches_rust_semantics() {
+    if !Avx2::is_runtime_supported() {
+        return;
+    }
+
+    // Pairs with no native hook take `Vector::cast`'s scalar loop
+    // (`LaneCast::cast_lane`): identity, exact widening, truncation.
+    let float_input = [0.0f32, -0.0, 1.75, -1.75, 42.0, -42.0, 0.5, -0.5];
+    let actual =
+        cast_with_public_bounds::<f32, f32, Avx2>(Vector::<f32, Avx2>::from_array(float_input))
+            .to_array();
+    assert_eq!(actual.map(f32::to_bits), float_input.map(f32::to_bits));
+
+    let int_input = [
+        0i32,
+        1,
+        -1,
+        12_345,
+        -12_345,
+        2_147_483_647,
+        -2_147_483_648,
+        7,
+    ];
+    let actual =
+        cast_with_public_bounds::<i32, f32, Avx2>(Vector::<i32, Avx2>::from_array(int_input))
+            .to_array();
+    // Literal correctly-rounded expectations (every entry exactly
+    // representable in `f32`, so no oracle-side conversion can mask a
+    // rounding defect; `i32::MAX` rounds up to 2^31).
+    let expected = [
+        0.0f32,
+        1.0,
+        -1.0,
+        12_345.0,
+        -12_345.0,
+        2_147_483_648.0,
+        -2_147_483_648.0,
+        7.0,
+    ];
+    assert_eq!(actual, expected);
+
+    let actual =
+        cast_with_public_bounds::<i32, i32, Avx2>(Vector::<i32, Avx2>::from_array(int_input))
+            .to_array();
+    assert_eq!(actual, int_input);
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]

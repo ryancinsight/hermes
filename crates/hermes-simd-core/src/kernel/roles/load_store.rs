@@ -2,7 +2,7 @@
 
 use crate::kernel::BackendKernel;
 use crate::private::Sealed;
-use crate::scalar::{CastFrom, Scalar};
+use crate::scalar::{LaneCast, Scalar};
 
 use super::storage::SimdStorage;
 
@@ -10,7 +10,7 @@ use super::storage::SimdStorage;
 pub trait SimdLoadStore<T: Scalar>: SimdStorage<T> + Sealed {
     /// Attempts an equal-lane numeric conversion into `destination`.
     ///
-    /// The default preserves the canonical scalar [`CastFrom`] route. Sealed
+    /// The default preserves the canonical scalar [`LaneCast`] route. Sealed
     /// backend implementations override this when their native instruction has
     /// the same conversion contract.
     ///
@@ -24,7 +24,7 @@ pub trait SimdLoadStore<T: Scalar>: SimdStorage<T> + Sealed {
     #[inline(always)]
     unsafe fn try_cast<U>(_value: Self::Vector, _destination: *mut U) -> bool
     where
-        U: Scalar + CastFrom<T>,
+        U: Scalar + LaneCast,
     {
         false
     }
@@ -113,7 +113,7 @@ impl<T: Scalar, A: BackendKernel<T>> SimdLoadStore<T> for A {
     #[inline(always)]
     unsafe fn try_cast<U>(value: Self::Vector, destination: *mut U) -> bool
     where
-        U: Scalar + CastFrom<T>,
+        U: Scalar + LaneCast,
     {
         <A as BackendKernel<T>>::try_cast(value, destination)
     }

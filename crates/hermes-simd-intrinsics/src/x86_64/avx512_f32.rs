@@ -105,7 +105,7 @@ impl BackendKernel<f32> for Avx512 {
     // destination. The TypeId proof makes the destination exactly sixteen
     // i32 lanes before the pointer is reinterpreted for the unaligned store.
     //
-    // Exactness vs `CastFrom` (Rust `as`: truncate toward zero, saturate,
+    // Exactness vs `LaneCast` (truncate toward zero, saturate,
     // NaN -> 0), mirroring the AVX2 proof with mask-register blends:
     // `vcvttps2dq` truncates and yields the indefinite value 0x8000_0000
     // (== i32::MIN) for NaN and out-of-range lanes. Lanes below -2^31 are
@@ -119,7 +119,7 @@ impl BackendKernel<f32> for Avx512 {
     #[inline]
     unsafe fn try_cast<U>(value: <Self as BackendKernel<f32>>::Vector, destination: *mut U) -> bool
     where
-        U: hermes_simd_core::scalar::Scalar + hermes_simd_core::scalar::CastFrom<f32>,
+        U: hermes_simd_core::scalar::Scalar + hermes_simd_core::scalar::LaneCast,
     {
         if core::any::TypeId::of::<U>() != core::any::TypeId::of::<i32>() {
             return false;

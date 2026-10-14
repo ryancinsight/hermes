@@ -2,10 +2,11 @@
 
 use crate::private::Sealed;
 
+use eunomia::convert::IntegerTarget;
 /// Backward-compatible alias for `NumericElement`.
 pub use eunomia::NumericElement as Scalar;
 pub use eunomia::{Bf16, Bf4, Bf8, F16, F32, F4, F64, F8, I16, I32, I8};
-pub use eunomia::{CastFrom, FloatElement, NumericElement};
+pub use eunomia::{FloatElement, NumericElement};
 
 /// Float scalars with an exact round-to-nearest-ties-to-even primitive.
 ///
@@ -27,6 +28,12 @@ pub trait RoundTiesEven: Sealed + FloatElement {
 
 impl Sealed for f32 {}
 impl Sealed for f64 {}
+impl Sealed for I32 {}
+impl Sealed for I16 {}
+impl Sealed for I8 {}
+impl Sealed for i32 {}
+impl Sealed for i16 {}
+impl Sealed for i8 {}
 impl Sealed for F16 {}
 impl Sealed for F32 {}
 impl Sealed for Bf16 {}
@@ -93,5 +100,133 @@ impl RoundTiesEven for Bf8 {
 impl RoundTiesEven for Bf4 {
     fn round_ties_even(self) -> Self {
         Self::from_f32(f32::round_ties_even(self.to_f32()))
+    }
+}
+
+/// Scalar lane cast with a stated contract (replaces the retired pair-generic
+/// conversion trait from the numeric provider).
+///
+/// Converts through an exact `f64` intermediate (`NumericElement::to_f64`):
+/// float targets convert with `FloatElement::from_f64` (one rounding, identical
+/// to `as`); integer targets truncate toward zero and saturate with
+/// `IntegerTarget::from_truncated` (identical to `as` for float sources,
+/// including NaN-to-0; out-of-range integer sources saturate instead of
+/// wrapping, a deliberate hardening — every SIMD lane type is at most 32 bits
+/// wide, so the `f64` intermediate itself never rounds a lane value).
+pub trait LaneCast: Sealed {
+    /// Cast an `f64` lane value into this scalar type under the trait contract.
+    #[must_use]
+    fn cast_lane(x: f64) -> Self;
+}
+
+impl LaneCast for f32 {
+    #[inline(always)]
+    fn cast_lane(x: f64) -> Self {
+        Self::from_f64(x)
+    }
+}
+
+impl LaneCast for f64 {
+    #[inline(always)]
+    fn cast_lane(x: f64) -> Self {
+        Self::from_f64(x)
+    }
+}
+
+impl LaneCast for F16 {
+    #[inline(always)]
+    fn cast_lane(x: f64) -> Self {
+        Self::from_f64(x)
+    }
+}
+
+impl LaneCast for F32 {
+    #[inline(always)]
+    fn cast_lane(x: f64) -> Self {
+        Self::from_f64(x)
+    }
+}
+
+impl LaneCast for Bf16 {
+    #[inline(always)]
+    fn cast_lane(x: f64) -> Self {
+        Self::from_f64(x)
+    }
+}
+
+impl LaneCast for F64 {
+    #[inline(always)]
+    fn cast_lane(x: f64) -> Self {
+        Self::from_f64(x)
+    }
+}
+
+impl LaneCast for F8 {
+    #[inline(always)]
+    fn cast_lane(x: f64) -> Self {
+        Self::from_f64(x)
+    }
+}
+
+impl LaneCast for F4 {
+    #[inline(always)]
+    fn cast_lane(x: f64) -> Self {
+        Self::from_f64(x)
+    }
+}
+
+impl LaneCast for Bf8 {
+    #[inline(always)]
+    fn cast_lane(x: f64) -> Self {
+        Self::from_f64(x)
+    }
+}
+
+impl LaneCast for Bf4 {
+    #[inline(always)]
+    fn cast_lane(x: f64) -> Self {
+        Self::from_f64(x)
+    }
+}
+
+impl LaneCast for I32 {
+    #[inline(always)]
+    fn cast_lane(x: f64) -> Self {
+        Self(i32::from_truncated(x))
+    }
+}
+
+impl LaneCast for i32 {
+    #[inline(always)]
+    fn cast_lane(x: f64) -> Self {
+        Self::from_truncated(x)
+    }
+}
+
+impl LaneCast for I16 {
+    #[inline(always)]
+    fn cast_lane(x: f64) -> Self {
+        Self(i16::from_truncated(x))
+    }
+}
+
+impl LaneCast for i16 {
+    #[inline(always)]
+    fn cast_lane(x: f64) -> Self {
+        Self::from_truncated(x)
+    }
+}
+
+impl LaneCast for I8 {
+    #[inline(always)]
+    fn cast_lane(x: f64) -> Self {
+        Self(i8::from_truncated(x))
+    }
+}
+
+impl LaneCast for i8 {
+    #[inline(always)]
+    fn cast_lane(x: f64) -> Self {
+        Self::from_truncated(x)
     }
 }
