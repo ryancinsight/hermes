@@ -17,7 +17,7 @@ Target version: **0.9.0**. Active increment: **HERMES-EUNOMIA-010-COHORT [major]
 - [ ] Rerun standard verification of all five packages with registry Mnemosyne
       0.10 now available; no old-source fallback or verification bypass.
 - [x] Obtain authorization for the existing required Miri CI with all gates intact.
-- [x] Collect initial bb116d8 CI: all twelve executed jobs, including Miri, pass.
+- [x] Collect initial [initial candidate](https://github.com/ryancinsight/hermes/commit/bb116d8c098b75ca55a58d5d8464c7539b087bb7) CI: all twelve executed jobs, including Miri, pass.
 - [ ] Collect actual final-provider-lock required CI, including Miri, before acceptance.
 - [ ] Verify the final integrated published provider sources and package receipts.
 

@@ -35,7 +35,7 @@ with current Themis 63c54410 and Melinoe 681c550e. All 507 native cases and stri
 Clippy pass on the new lock. Clean package, minimal builds, docs, blocking API
 and final-head CI are being rerun before acceptance.
 
-All twelve executed initial bb116d8 CI jobs pass, including the existing required
+All twelve executed initial [initial candidate](https://github.com/ryancinsight/hermes/commit/bb116d8c098b75ca55a58d5d8464c7539b087bb7) CI jobs pass, including the existing required
 `miri (core + intrinsics boundary)` job. The user explicitly authorizes required
 Miri and publication through the normal default merge after all final-head
 checks/reviews pass. Initial-source evidence cannot replace final-provider-lock

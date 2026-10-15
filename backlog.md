@@ -27,7 +27,7 @@
   zero skips, and strict all-target/all-feature Clippy. Clean package, docs,
   minimal builds, blocking release API and required CI are being rerun.
 - **Required CI:** all twelve executed jobs, including actual Miri, passed at
-  initial bb116d8. They must pass again at the final provider-lock head.
+  initial [initial candidate](https://github.com/ryancinsight/hermes/commit/bb116d8c098b75ca55a58d5d8464c7539b087bb7). They must pass again at the final provider-lock head.
   The user authorizes the existing Miri and publication through normal default
   merge after all final-head checks/reviews pass. Preserve gates and held work.
 - **Decision:** [ADR 025](docs/adr/025-eunomia-010-cohort.md).

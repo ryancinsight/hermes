@@ -17,7 +17,7 @@ archives identify b7e0e1e with verified checksums; its publisher and final Miri,
 Loom, TSan, aggregate and blocking API/package gates pass. The final lock selects
 this published source. All 507 native cases and strict all-target/all-feature
 Clippy pass on it; clean package/docs/minimal/API/CI acceptance is being rerun.
-Initial bb116d8 passes all twelve executed CI jobs including actual Miri; those
+Initial [initial candidate](https://github.com/ryancinsight/hermes/commit/bb116d8c098b75ca55a58d5d8464c7539b087bb7) passes all twelve executed CI jobs including actual Miri; those
 results do not replace final-lock CI. Existing required Miri and publication
 through the normal merge are explicitly authorized after exact-head acceptance.
 Keep all gates, deadlines and held work intact.
