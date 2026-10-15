@@ -16,8 +16,10 @@ Target version: **0.9.0**. Active increment: **HERMES-EUNOMIA-010-COHORT [major]
       native tests and standard packaging cover it. No compatibility claim is made.
 - [x] Merge #260 normally with an identical reviewed tree; verify all five
       not-yanked registry archive checksums and published VCS sources (ADR 025).
-- [ ] Merge this receipt-only closure only after explicit Hermes documentation
-      deployment approval: legacy Pages deploys on every main push.
+- [x] Obtain explicit prospective automatic documentation deployment approval;
+      legacy Pages deploys on every main push.
+- [ ] Merge this receipt-only closure after final-head gates/reviews pass and
+      verify the resulting Pages build/deployment.
 
 ## HERMES-MACOS-NATIVE-20261013 [patch]
 

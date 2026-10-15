@@ -6,7 +6,8 @@
   exact-head required check, blocking API validation and standard package check.
   Independently verify all registry checksums and published VCS sources (ADR 025).
 - Record the unanticipated legacy Pages deployment from that merge; keep
-  further default merges open pending explicit documentation deployment approval.
+  prospective automatic documentation deployments are subsequently approved;
+  verify the resulting build/deployment after each guarded merge.
 
 
 All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; versioning: SemVer 2.0.0 (pre-1.0: minor releases may break, documented under **Breaking**).

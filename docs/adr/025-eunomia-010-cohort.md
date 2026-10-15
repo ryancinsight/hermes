@@ -67,6 +67,8 @@ which is already successful when inspected. The earlier review checked tracked
 workflow path filters but missed repository Pages configured for main at root.
 Only Aequitas documentation deployment had explicit approval. No settings were
 changed, and no additional deployment is triggered to undo or conceal it.
-Further Hermes default merges, including this receipt-only closure, stay open
-pending explicit documentation deployment approval. This five-Markdown-file
-change adds no package version, Rust source, lock, workflow or native deadline.
+The user subsequently approves automatic documentation deployment on merge for
+these repository repairs. That prospective approval clears the further-merge
+hold; retain all exact-head checks/reviews and verify each resulting deployment.
+The earlier unanticipated deployment remains recorded as such. This five-Markdown-
+file change adds no package version, Rust source, lock, workflow or native deadline.

@@ -19,9 +19,10 @@ receipts and the declared Miri scope. The completed owned backlog item is remove
 The merge also triggered an unanticipated successful built-in Pages deployment
 (run 38756241166). Review of tracked workflow path filters missed repository
 legacy Pages configured on main. It had already completed when inspected.
-No Pages/security setting was changed. Leave further default merges open until
-explicit Hermes documentation deployment approval; this receipt PR performs no
-additional merge/deployment. Held safety and performance work remains untouched.
+No Pages/security setting was changed. The user subsequently approves automatic
+documentation deployment on merge for these repairs, clearing that prospective
+hold. This receipt merge still requires final-head checks/reviews and verification
+of the resulting Pages build/deployment. Held safety/performance work stays.
 
 ## HERMES-MACOS-NATIVE-20261013 — ARM verification gap [patch] — resolved on native and hosted macOS
 
