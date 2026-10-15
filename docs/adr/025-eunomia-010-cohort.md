@@ -30,7 +30,8 @@ rules per library by design. Standard package verification is blocked by
 unpublished registry Mnemosyne-memory 0.10.0, before archive compilation.
 
 The existing required `miri (core + intrinsics boundary)` job runs on every PR,
-including drafts. Miri is explicitly deferred and unverified in this task.
-Prepare a feature branch but do not create a PR or merge that starts that job.
+including drafts. The user now authorizes these existing required Miri checks;
+their actual exact-head results remain pending. Prepare the reviewed PR without
+package publication or publication-triggering default merges in this turn.
 Do not alter the workflow, required status or tests to manufacture acceptance.
 No held safety work or performance experiments are resumed.

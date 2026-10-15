@@ -15,7 +15,8 @@ Target version: **0.9.0**. Active increment: **HERMES-EUNOMIA-010-COHORT [major]
       253 breaking-sensitive rules skip per library, with no compatibility claim.
 - [ ] Pass standard package verification after registry Mnemosyne-memory 0.10
       exists; the present attempt fails on the missing required registry version.
-- [ ] Resolve the deferred-Miri scope conflict before starting required PR CI.
+- [x] Obtain authorization for the existing required Miri CI with all gates intact.
+- [ ] Collect actual exact-head required CI, including Miri, before acceptance.
 - [ ] Verify the final integrated published provider sources and package receipts.
 
 ## HERMES-MACOS-NATIVE-20261013 [patch]

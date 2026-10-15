@@ -21,9 +21,10 @@
 - **Package blocker:** the standard package verification fails before building
   because registry `mnemosyne-memory ^0.10.0` is unavailable. No older-source
   fallback, package verification bypass or publication is attempted.
-- **Blocker:** the required Miri job is unconditional on PRs. Miri is deferred
-  and unverified, so no PR/default integration is authorized while this conflict
-  stands. Do not weaken the gate. Mnemosyne's default integration/publication
+- **Required CI:** the user now authorizes the existing unconditional Miri job;
+  actual exact-head results remain pending. Do not weaken the gate or resume
+  held safety work. This turn forbids package publication, including a default
+  merge that would trigger it. Mnemosyne's default integration/publication
   also awaits its optional guard telemetry failure and required gates.
 - **Decision:** [ADR 025](docs/adr/025-eunomia-010-cohort.md).
 

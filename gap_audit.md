@@ -15,8 +15,9 @@ boundaries, skipping 253 rules per library; it does not establish backward
 compatibility. Standard package verification fails before compilation because
 registry Mnemosyne-memory 0.10.0 is unpublished. No older-version fallback or
 verification bypass is used.
-Required Miri runs on all PRs and is explicitly deferred/unverified here, so
-prepare a feature branch without a PR/default merge or gate changes. Provider
+Required Miri runs on all PRs and is now explicitly authorized; actual results
+remain pending. Preserve all gates and held safety/performance work. Package
+publication and publication-triggering default merges remain prohibited. Provider
 prototype checks do not count as final published/default cohort acceptance.
 
 
