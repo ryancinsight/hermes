@@ -14,18 +14,22 @@
   minimal workspace, strict all-target/all-feature Clippy, warning-denied docs
   and 27 doctests pass (ten existing illustrative ignores). All Rust source
   remains unchanged. The lock selects published Eunomia 0.10 source a231e54d
-  and the [native-validated Mnemosyne candidate](https://github.com/ryancinsight/Mnemosyne/commit/3945b2174579f635724ff98c1f2dd2599d329832).
+  and the [published Mnemosyne source](https://github.com/ryancinsight/Mnemosyne/commit/b7e0e1e37130b0a317859b168cca16b5172d08d8).
   Automatic API classification accepts 0.8.2 to 0.9.0 for all five libraries;
   its 253 breaking-sensitive rules skip at this boundary, so this is no
   backward-compatibility claim.
-- **Package blocker:** the standard package verification fails before building
-  because registry `mnemosyne-memory ^0.10.0` is unavailable. No older-source
-  fallback, package verification bypass or publication is attempted.
-- **Required CI:** the user now authorizes the existing unconditional Miri job;
-  actual exact-head results remain pending. Do not weaken the gate or resume
-  held safety work. This turn forbids package publication, including a default
-  merge that would trigger it. Mnemosyne's default integration/publication
-  also awaits its optional guard telemetry failure and required gates.
+- **Provider receipts:** Mnemosyne #237 merged as b7e0e1e after final Miri,
+  Loom, TSan, native/aggregate and blocking API/package gates. Publisher
+  [38752721843](https://github.com/ryancinsight/Mnemosyne/actions/runs/38752721843)
+  succeeds; all six downloaded registry archives have verified checksums and
+  source identity. The canonical lock now selects that actual published source.
+- **Current acceptance:** the final provider lock passes all 507 native cases,
+  zero skips, and strict all-target/all-feature Clippy. Clean package, docs,
+  minimal builds, blocking release API and required CI are being rerun.
+- **Required CI:** all twelve executed jobs, including actual Miri, passed at
+  initial bb116d8. They must pass again at the final provider-lock head.
+  The user authorizes the existing Miri and publication through normal default
+  merge after all final-head checks/reviews pass. Preserve gates and held work.
 - **Decision:** [ADR 025](docs/adr/025-eunomia-010-cohort.md).
 
 ## HERMES-MNEMOSYNE-IDENTITY-2026-09-03 — Align the workspace memory provider with Mnemosyne 0.9 [patch] [arch] — in-progress <a id="hermes-mnemosyne-identity-2026-09-03"></a>

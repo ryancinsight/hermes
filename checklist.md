@@ -7,16 +7,18 @@ Target version: **0.9.0**. Active increment: **HERMES-EUNOMIA-010-COHORT [major]
 - [x] Inspect current main/open owner work and isolate the candidate.
 - [x] Record public provider identities and align the workspace/internal edges.
 - [x] Resolve canonical precise sources without manifest aliases: published
-      Eunomia 0.10 and the native-validated Mnemosyne 0.10 candidate branch.
+      Eunomia 0.10 and actual published Mnemosyne b7e0e1e (all six registry
+      archive checksums/source identities verified).
 - [x] Pass 507 all-feature native cases, zero skips, strict all-target/all-feature
       Clippy, minimal workspace and warning-denied docs; 27 doctests pass with
       ten existing illustrative ignores. Rust source is unchanged.
 - [x] Validate automatic API release classification for all five minor boundaries;
       253 breaking-sensitive rules skip per library, with no compatibility claim.
-- [ ] Pass standard package verification after registry Mnemosyne-memory 0.10
-      exists; the present attempt fails on the missing required registry version.
+- [ ] Rerun standard verification of all five packages with registry Mnemosyne
+      0.10 now available; no old-source fallback or verification bypass.
 - [x] Obtain authorization for the existing required Miri CI with all gates intact.
-- [ ] Collect actual exact-head required CI, including Miri, before acceptance.
+- [x] Collect initial bb116d8 CI: all twelve executed jobs, including Miri, pass.
+- [ ] Collect actual final-provider-lock required CI, including Miri, before acceptance.
 - [ ] Verify the final integrated published provider sources and package receipts.
 
 ## HERMES-MACOS-NATIVE-20261013 [patch]

@@ -26,12 +26,18 @@ The candidate passes 507 all-feature native cases with zero skips, strict
 all-target/all-feature Clippy, minimal workspace builds, warning-denied docs,
 and 27 doctests (ten existing ignores). Automatic API release classification
 accepts all five 0.8.2 to 0.9.0 boundaries, skipping 253 breaking-sensitive
-rules per library by design. Standard package verification is blocked by
-unpublished registry Mnemosyne-memory 0.10.0, before archive compilation.
+rules per library by design. Mnemosyne is now published from
+[b7e0e1e](https://github.com/ryancinsight/Mnemosyne/commit/b7e0e1e37130b0a317859b168cca16b5172d08d8).
+All six registry archives match their checksums and that reviewed merge source;
+publisher 38752721843 and exact-head Miri/Loom/TSan/native/aggregate plus blocking
+API/package validation pass. The final Hermes lock selects that actual source,
+with current Themis 63c54410 and Melinoe 681c550e. All 507 native cases and strict
+Clippy pass on the new lock. Clean package, minimal builds, docs, blocking API
+and final-head CI are being rerun before acceptance.
 
-The existing required `miri (core + intrinsics boundary)` job runs on every PR,
-including drafts. The user now authorizes these existing required Miri checks;
-their actual exact-head results remain pending. Prepare the reviewed PR without
-package publication or publication-triggering default merges in this turn.
-Do not alter the workflow, required status or tests to manufacture acceptance.
-No held safety work or performance experiments are resumed.
+All twelve executed initial bb116d8 CI jobs pass, including the existing required
+`miri (core + intrinsics boundary)` job. The user explicitly authorizes required
+Miri and publication through the normal default merge after all final-head
+checks/reviews pass. Initial-source evidence cannot replace final-provider-lock
+acceptance. Do not alter workflows, required statuses, tests or deadlines, and
+do not resume held safety work or performance experiments.
