@@ -3,7 +3,7 @@
 <a id="hermes-eunomia-010-cohort"></a>
 ## HERMES-EUNOMIA-010-COHORT [major] — adopt the current provider contract
 
-- **Priority:** verification; **Status:** blocked; **Owner:** coordinated Coeus integrator.
+- Status: blocked; priority: verification; owner: coordinated Coeus integrator.
 - **Scope:** workspace/internal dependency versions, precise canonical locks,
   ADR 025, changelog and existing planning artifacts.
 - **Outcome:** Hermes 0.9.0 exposes one Eunomia 0.10 identity and consumes
