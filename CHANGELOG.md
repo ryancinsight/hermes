@@ -1,5 +1,16 @@
 # Changelog
 
+## Eunomia 0.11 compatibility — Unreleased
+
+### Changed
+
+- [patch] four libraries 0.9.1; unchanged macros 0.9.0: admit Eunomia `>=0.10.0, <0.12.0` without
+  removing current-provider support. The 0.11 addition is a const constructor;
+  existing numeric APIs and implementation behavior remain unchanged.
+- Preserve all Rust sources, tests, features, deadlines and external lock
+  records. No compatibility adapter or provider-source override is introduced.
+  Final CI, publication and the actual 0.11 consumer gate remain pending.
+
 ## Hermes 0.9.0 release receipts - 2026-10-15
 
 - Publish all five aligned 0.9.0 packages through guarded #260 after every

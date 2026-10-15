@@ -1,5 +1,18 @@
 # Checklist — active sprint
 
+Target for this slice: four libraries 0.9.1; unchanged macros 0.9.0.
+
+## HERMES-EUNOMIA-011-RANGE [patch]
+
+- [x] Inspect current default, open PR ownership and repository instructions.
+- [x] Widen only the provider range; preserve all Rust/test/workflow bytes and
+      every external lock record. Record the compatible patch package targets.
+- [ ] Pass exact-head native, lint/docs, standard-package and API gates.
+- [ ] Pass applicable hosted checks and review; verify merge side effects.
+- [ ] Merge normally and verify actual registry archives; revalidate Coeus on
+      one canonical published Eunomia 0.11 source before closing this item.
+
+
 Target version: **0.9.0**. Active increment: **HERMES-EUNOMIA-010-COHORT [major]**.
 
 ## HERMES-EUNOMIA-010-COHORT [major] — published 2026-10-15
