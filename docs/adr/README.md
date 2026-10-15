@@ -33,3 +33,4 @@
 | [022](022-unrunnable-isa-evidence-standard.md) | Evidence Standard for Kernels on Un-runnable ISAs | Proposed |
 | [023](023-first-party-memory-source-identity.md) | One First-Party Memory Source Identity During Provider Co-Evolution | Accepted |
 | [024](024-const-generic-pair-permutes.md) | Const-Generic Pair Decimation and Interleave | Accepted |
+| [025](025-eunomia-010-cohort.md) | Adopt the Eunomia 0.10 provider cohort | Accepted |

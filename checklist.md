@@ -1,6 +1,25 @@
 # Checklist — active sprint
 
-Target version: **0.8.2**. Active increment: **HERMES-MACOS-NATIVE-20261013 [patch]**.
+Target version: **0.9.0**. Active increment: **HERMES-EUNOMIA-010-COHORT [major]**.
+
+## HERMES-EUNOMIA-010-COHORT [major]
+
+- [x] Inspect current main/open owner work and isolate the candidate.
+- [x] Record public provider identities and align the workspace/internal edges.
+- [x] Resolve canonical precise sources without manifest aliases: published
+      Eunomia 0.10 and actual published Mnemosyne b7e0e1e (all six registry
+      archive checksums/source identities verified).
+- [x] Pass 507 all-feature native cases, zero skips, strict all-target/all-feature
+      Clippy, minimal workspace and warning-denied docs; 27 doctests pass with
+      ten existing illustrative ignores. Rust source is unchanged.
+- [x] Validate automatic API release classification for all five minor boundaries;
+      253 breaking-sensitive rules skip per library, with no compatibility claim.
+- [ ] Rerun standard verification of all five packages with registry Mnemosyne
+      0.10 now available; no old-source fallback or verification bypass.
+- [x] Obtain authorization for the existing required Miri CI with all gates intact.
+- [x] Collect initial [initial candidate](https://github.com/ryancinsight/hermes/commit/bb116d8c098b75ca55a58d5d8464c7539b087bb7) CI: all twelve executed jobs, including Miri, pass.
+- [ ] Collect actual final-provider-lock required CI, including Miri, before acceptance.
+- [ ] Verify the final integrated published provider sources and package receipts.
 
 ## HERMES-MACOS-NATIVE-20261013 [patch]
 

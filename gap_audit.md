@@ -1,5 +1,28 @@
 # Gap Audit - hermes-simd
 
+## HERMES-EUNOMIA-010-COHORT [major] — candidate passes native; integration blocked
+
+Public scalar types/bounds expose Eunomia's nominal provider identity. The
+coordinated increment therefore targets the pre-1.0 minor line 0.9.0 with
+Eunomia 0.10.0 and Mnemosyne-memory 0.10.0. Preserve Rust implementations,
+fixtures, assertions and native deadlines. All Rust source is unchanged.
+The canonical lock selects published Eunomia source a231e54d and the
+[published Mnemosyne source](https://github.com/ryancinsight/Mnemosyne/commit/b7e0e1e37130b0a317859b168cca16b5172d08d8).
+All 507 all-feature native cases pass, zero skips, together with minimal builds,
+strict all-target/all-feature Clippy, warning-denied docs and 27 doctests (ten
+existing ignores). Automatic API classification accepts all five minor
+boundaries, skipping 253 rules per library; it does not establish backward
+compatibility. Mnemosyne #237 is now merged and all six registry
+archives identify b7e0e1e with verified checksums; its publisher and final Miri,
+Loom, TSan, aggregate and blocking API/package gates pass. The final lock selects
+this published source. All 507 native cases and strict all-target/all-feature
+Clippy pass on it; clean package/docs/minimal/API/CI acceptance is being rerun.
+Initial [initial candidate](https://github.com/ryancinsight/hermes/commit/bb116d8c098b75ca55a58d5d8464c7539b087bb7) passes all twelve executed CI jobs including actual Miri; those
+results do not replace final-lock CI. Existing required Miri and publication
+through the normal merge are explicitly authorized after exact-head acceptance.
+Keep all gates, deadlines and held work intact.
+
+
 ## HERMES-MACOS-NATIVE-20261013 — ARM verification gap [patch] — resolved on native and hosted macOS
 
 - Finding: strict native ARM checks expose diagnostics hidden by x86-only
