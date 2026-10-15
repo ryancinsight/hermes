@@ -2,24 +2,22 @@
 
 Target version: **0.9.0**. Active increment: **HERMES-EUNOMIA-010-COHORT [major]**.
 
-## HERMES-EUNOMIA-010-COHORT [major]
+## HERMES-EUNOMIA-010-COHORT [major] — published 2026-10-15
 
-- [x] Inspect current main/open owner work and isolate the candidate.
-- [x] Record public provider identities and align the workspace/internal edges.
-- [x] Resolve canonical precise sources without manifest aliases: published
-      Eunomia 0.10 and actual published Mnemosyne b7e0e1e (all six registry
-      archive checksums/source identities verified).
+- [x] Align the 0.9.0 workspace/internal versions and current public provider identity.
+- [x] Lock published Eunomia and Mnemosyne sources without aliases or path patches.
 - [x] Pass 507 all-feature native cases, zero skips, strict all-target/all-feature
-      Clippy, minimal workspace and warning-denied docs; 27 doctests pass with
-      ten existing illustrative ignores. Rust source is unchanged.
-- [x] Validate automatic API release classification for all five minor boundaries;
-      253 breaking-sensitive rules skip per library, with no compatibility claim.
-- [ ] Rerun standard verification of all five packages with registry Mnemosyne
-      0.10 now available; no old-source fallback or verification bypass.
-- [x] Obtain authorization for the existing required Miri CI with all gates intact.
-- [x] Collect initial [initial candidate](https://github.com/ryancinsight/hermes/commit/bb116d8c098b75ca55a58d5d8464c7539b087bb7) CI: all twelve executed jobs, including Miri, pass.
-- [ ] Collect actual final-provider-lock required CI, including Miri, before acceptance.
-- [ ] Verify the final integrated published provider sources and package receipts.
+      Clippy, minimal builds, warning-denied docs and 27 doctests (ten existing ignores).
+- [x] Verify all five clean exact-head standard all-feature packages.
+- [x] Pass all twelve executed final-head CI jobs, including actual Miri, SDE,
+      native ARM/macOS/x86 and unchanged runtime budgets; all ten required statuses pass.
+- [x] Pass the final blocking four-library API release classification and core
+      dry-run. The existing caller excludes unchanged proc-macro API; compiler,
+      native tests and standard packaging cover it. No compatibility claim is made.
+- [x] Merge #260 normally with an identical reviewed tree; verify all five
+      not-yanked registry archive checksums and published VCS sources (ADR 025).
+- [ ] Merge this receipt-only closure only after explicit Hermes documentation
+      deployment approval: legacy Pages deploys on every main push.
 
 ## HERMES-MACOS-NATIVE-20261013 [patch]
 

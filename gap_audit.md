@@ -1,27 +1,27 @@
 # Gap Audit - hermes-simd
 
-## HERMES-EUNOMIA-010-COHORT [major] — candidate passes native; integration blocked
+## HERMES-EUNOMIA-010-COHORT [major] — published and registry-verified
 
-Public scalar types/bounds expose Eunomia's nominal provider identity. The
-coordinated increment therefore targets the pre-1.0 minor line 0.9.0 with
-Eunomia 0.10.0 and Mnemosyne-memory 0.10.0. Preserve Rust implementations,
-fixtures, assertions and native deadlines. All Rust source is unchanged.
-The canonical lock selects published Eunomia source a231e54d and the
-[published Mnemosyne source](https://github.com/ryancinsight/Mnemosyne/commit/b7e0e1e37130b0a317859b168cca16b5172d08d8).
-All 507 all-feature native cases pass, zero skips, together with minimal builds,
-strict all-target/all-feature Clippy, warning-denied docs and 27 doctests (ten
-existing ignores). Automatic API classification accepts all five minor
-boundaries, skipping 253 rules per library; it does not establish backward
-compatibility. Mnemosyne #237 is now merged and all six registry
-archives identify b7e0e1e with verified checksums; its publisher and final Miri,
-Loom, TSan, aggregate and blocking API/package gates pass. The final lock selects
-this published source. All 507 native cases and strict all-target/all-feature
-Clippy pass on it; clean package/docs/minimal/API/CI acceptance is being rerun.
-Initial [initial candidate](https://github.com/ryancinsight/hermes/commit/bb116d8c098b75ca55a58d5d8464c7539b087bb7) passes all twelve executed CI jobs including actual Miri; those
-results do not replace final-lock CI. Existing required Miri and publication
-through the normal merge are explicitly authorized after exact-head acceptance.
-Keep all gates, deadlines and held work intact.
+All five Hermes 0.9.0 packages are published from the normally guarded #260
+[merge](https://github.com/ryancinsight/hermes/commit/7a584238c3da61b7d38f09b1da1b277ff20816aa),
+with a tree identical to the exact reviewed source. All twelve final CI jobs
+pass, including actual Miri, SDE and native runtime budgets; the blocking API
+release validation and all five clean standard packages pass. Four ordinary
+library baselines build/classify 0.8.2 to 0.9 with 260 rules skipped by the
+breaking-compatible release class. The existing selector excludes the unchanged
+proc-macro API; compiler/native and package checks cover it. No backward
+compatibility, unavailable-baseline fallback or gate override is claimed.
+All five registry archives independently match their checksums and published
+source, are not yanked, and identify successful publisher 38756242324. Rust
+implementations/tests, fixtures and deadlines remain unchanged; ADR 025 records
+receipts and the declared Miri scope. The completed owned backlog item is removed.
 
+The merge also triggered an unanticipated successful built-in Pages deployment
+(run 38756241166). Review of tracked workflow path filters missed repository
+legacy Pages configured on main. It had already completed when inspected.
+No Pages/security setting was changed. Leave further default merges open until
+explicit Hermes documentation deployment approval; this receipt PR performs no
+additional merge/deployment. Held safety and performance work remains untouched.
 
 ## HERMES-MACOS-NATIVE-20261013 — ARM verification gap [patch] — resolved on native and hosted macOS
 

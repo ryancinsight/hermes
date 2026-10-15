@@ -1,37 +1,5 @@
 # Backlog — hermes-simd
 
-<a id="hermes-eunomia-010-cohort"></a>
-## HERMES-EUNOMIA-010-COHORT [major] — adopt the current provider contract
-
-- Status: blocked; priority: verification; owner: coordinated Coeus integrator.
-- **Scope:** workspace/internal dependency versions, precise canonical locks,
-  ADR 025, changelog and existing planning artifacts.
-- **Outcome:** Hermes 0.9.0 exposes one Eunomia 0.10 identity and consumes
-  Mnemosyne-memory 0.10; Rust implementations and native test contracts stay.
-- **Acceptance:** ordinary native, strict lint, docs, minimal builds, package/API
-  classification, exact-head required CI, then published provider receipts.
-- **Current evidence:** 507 all-feature native cases pass, zero skips;
-  minimal workspace, strict all-target/all-feature Clippy, warning-denied docs
-  and 27 doctests pass (ten existing illustrative ignores). All Rust source
-  remains unchanged. The lock selects published Eunomia 0.10 source a231e54d
-  and the [published Mnemosyne source](https://github.com/ryancinsight/Mnemosyne/commit/b7e0e1e37130b0a317859b168cca16b5172d08d8).
-  Automatic API classification accepts 0.8.2 to 0.9.0 for all five libraries;
-  its 253 breaking-sensitive rules skip at this boundary, so this is no
-  backward-compatibility claim.
-- **Provider receipts:** Mnemosyne #237 merged as b7e0e1e after final Miri,
-  Loom, TSan, native/aggregate and blocking API/package gates. Publisher
-  [38752721843](https://github.com/ryancinsight/Mnemosyne/actions/runs/38752721843)
-  succeeds; all six downloaded registry archives have verified checksums and
-  source identity. The canonical lock now selects that actual published source.
-- **Current acceptance:** the final provider lock passes all 507 native cases,
-  zero skips, and strict all-target/all-feature Clippy. Clean package, docs,
-  minimal builds, blocking release API and required CI are being rerun.
-- **Required CI:** all twelve executed jobs, including actual Miri, passed at
-  initial [initial candidate](https://github.com/ryancinsight/hermes/commit/bb116d8c098b75ca55a58d5d8464c7539b087bb7). They must pass again at the final provider-lock head.
-  The user authorizes the existing Miri and publication through normal default
-  merge after all final-head checks/reviews pass. Preserve gates and held work.
-- **Decision:** [ADR 025](docs/adr/025-eunomia-010-cohort.md).
-
 ## HERMES-MNEMOSYNE-IDENTITY-2026-09-03 — Align the workspace memory provider with Mnemosyne 0.9 [patch] [arch] — in-progress <a id="hermes-mnemosyne-identity-2026-09-03"></a>
 
 - **Integrator:** Codex on `build/hermes-mnemosyne-09`; **lease:** none.
