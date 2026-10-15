@@ -7,7 +7,7 @@ Target for this slice: four libraries 0.9.1; unchanged macros 0.9.0.
 - [x] Inspect current default, open PR ownership and repository instructions.
 - [x] Widen only the provider range; preserve all Rust/test/workflow bytes and
       every external lock record. Record the compatible patch package targets.
-- [x] Pass source-head [3c9b348](https://github.com/ryancinsight/hermes/commit/3c9b348e01c89d4e0a08e06d3183ff62d00954ca) native (507 all-feature native cases, zero skips),
+- [x] Pass source-head [validated source](https://github.com/ryancinsight/hermes/commit/3c9b348e01c89d4e0a08e06d3183ff62d00954ca) native (507 all-feature native cases, zero skips),
       strict lint/docs/doctests, standard-package and API gates.
       All external locked records and implementation bytes remain unchanged.
 - [ ] Pass applicable hosted checks and review; verify merge side effects.

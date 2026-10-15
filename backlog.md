@@ -12,7 +12,7 @@
 - Target: four libraries 0.9.1; unchanged macros 0.9.0. Existing implementation, tests, features, native deadlines
   and every external locked package remain unchanged. No adapter is added.
 - Evidence: the unmodified Coeus resolver rejects the 0.11 candidate against
-  current `^0.10` requirements. Source-head [3c9b348](https://github.com/ryancinsight/hermes/commit/3c9b348e01c89d4e0a08e06d3183ff62d00954ca) passes
+  current `^0.10` requirements. Source-head [validated source](https://github.com/ryancinsight/hermes/commit/3c9b348e01c89d4e0a08e06d3183ff62d00954ca) passes
   507 all-feature native cases, zero skips, strict lint/docs/doctests, standard packages and API checks.
   Final-head hosted CI/review and publication remain pending.
 - Acceptance: exact-source native, strict lint/docs, standard packages and API
