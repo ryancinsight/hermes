@@ -1,6 +1,22 @@
 # Checklist — active sprint
 
-Target version: **0.8.2**. Active increment: **HERMES-MACOS-NATIVE-20261013 [patch]**.
+Target version: **0.9.0**. Active increment: **HERMES-EUNOMIA-010-COHORT [major]**.
+
+## HERMES-EUNOMIA-010-COHORT [major]
+
+- [x] Inspect current main/open owner work and isolate the candidate.
+- [x] Record public provider identities and align the workspace/internal edges.
+- [x] Resolve canonical precise sources without manifest aliases: published
+      Eunomia 0.10 and the native-validated Mnemosyne 0.10 candidate branch.
+- [x] Pass 507 all-feature native cases, zero skips, strict all-target/all-feature
+      Clippy, minimal workspace and warning-denied docs; 27 doctests pass with
+      ten existing illustrative ignores. Rust source is unchanged.
+- [x] Validate automatic API release classification for all five minor boundaries;
+      253 breaking-sensitive rules skip per library, with no compatibility claim.
+- [ ] Pass standard package verification after registry Mnemosyne-memory 0.10
+      exists; the present attempt fails on the missing required registry version.
+- [ ] Resolve the deferred-Miri scope conflict before starting required PR CI.
+- [ ] Verify the final integrated published provider sources and package receipts.
 
 ## HERMES-MACOS-NATIVE-20261013 [patch]
 

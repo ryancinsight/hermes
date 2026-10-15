@@ -4,6 +4,16 @@ All notable changes to the hermes-simd workspace. Format: [Keep a Changelog]; ve
 
 ## [Unreleased]
 
+### Breaking — 0.9.0 provider cohort
+
+- Advance the aligned Rust workspace/internal edges to 0.9.0, requiring Eunomia
+  0.10.0 and Mnemosyne-memory 0.10.0. Public scalar identities cross a pre-1.0
+  minor boundary; no conversion or compatibility layer is introduced.
+- Preserve all Rust implementations, fixtures, assertions, precision choices and
+  native deadlines. See [ADR 025](docs/adr/025-eunomia-010-cohort.md).
+- Final provider integration and required Miri CI remain blocked; no package
+  publication or backward-compatibility claim is recorded for this candidate.
+
 ### Added
 
 - [minor] `ComplexReg::conj`: the conjugate of every sample, one sign flip

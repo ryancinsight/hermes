@@ -1,5 +1,25 @@
 # Gap Audit - hermes-simd
 
+## HERMES-EUNOMIA-010-COHORT [major] — candidate passes native; integration blocked
+
+Public scalar types/bounds expose Eunomia's nominal provider identity. The
+coordinated increment therefore targets the pre-1.0 minor line 0.9.0 with
+Eunomia 0.10.0 and Mnemosyne-memory 0.10.0. Preserve Rust implementations,
+fixtures, assertions and native deadlines. All Rust source is unchanged.
+The canonical lock selects published Eunomia source a231e54d and the
+[Mnemosyne candidate](https://github.com/ryancinsight/Mnemosyne/commit/3945b2174579f635724ff98c1f2dd2599d329832).
+All 507 all-feature native cases pass, zero skips, together with minimal builds,
+strict all-target/all-feature Clippy, warning-denied docs and 27 doctests (ten
+existing ignores). Automatic API classification accepts all five minor
+boundaries, skipping 253 rules per library; it does not establish backward
+compatibility. Standard package verification fails before compilation because
+registry Mnemosyne-memory 0.10.0 is unpublished. No older-version fallback or
+verification bypass is used.
+Required Miri runs on all PRs and is explicitly deferred/unverified here, so
+prepare a feature branch without a PR/default merge or gate changes. Provider
+prototype checks do not count as final published/default cohort acceptance.
+
+
 ## HERMES-MACOS-NATIVE-20261013 — ARM verification gap [patch] — resolved on native and hosted macOS
 
 - Finding: strict native ARM checks expose diagnostics hidden by x86-only

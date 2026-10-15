@@ -1,5 +1,32 @@
 # Backlog — hermes-simd
 
+<a id="hermes-eunomia-010-cohort"></a>
+## HERMES-EUNOMIA-010-COHORT [major] — adopt the current provider contract
+
+- **Priority:** verification; **Status:** blocked; **Owner:** coordinated Coeus integrator.
+- **Scope:** workspace/internal dependency versions, precise canonical locks,
+  ADR 025, changelog and existing planning artifacts.
+- **Outcome:** Hermes 0.9.0 exposes one Eunomia 0.10 identity and consumes
+  Mnemosyne-memory 0.10; Rust implementations and native test contracts stay.
+- **Acceptance:** ordinary native, strict lint, docs, minimal builds, package/API
+  classification, exact-head required CI, then published provider receipts.
+- **Current evidence:** 507 all-feature native cases pass, zero skips;
+  minimal workspace, strict all-target/all-feature Clippy, warning-denied docs
+  and 27 doctests pass (ten existing illustrative ignores). All Rust source
+  remains unchanged. The lock selects published Eunomia 0.10 source a231e54d
+  and the [native-validated Mnemosyne candidate](https://github.com/ryancinsight/Mnemosyne/commit/3945b2174579f635724ff98c1f2dd2599d329832).
+  Automatic API classification accepts 0.8.2 to 0.9.0 for all five libraries;
+  its 253 breaking-sensitive rules skip at this boundary, so this is no
+  backward-compatibility claim.
+- **Package blocker:** the standard package verification fails before building
+  because registry `mnemosyne-memory ^0.10.0` is unavailable. No older-source
+  fallback, package verification bypass or publication is attempted.
+- **Blocker:** the required Miri job is unconditional on PRs. Miri is deferred
+  and unverified, so no PR/default integration is authorized while this conflict
+  stands. Do not weaken the gate. Mnemosyne's default integration/publication
+  also awaits its optional guard telemetry failure and required gates.
+- **Decision:** [ADR 025](docs/adr/025-eunomia-010-cohort.md).
+
 ## HERMES-MNEMOSYNE-IDENTITY-2026-09-03 — Align the workspace memory provider with Mnemosyne 0.9 [patch] [arch] — in-progress <a id="hermes-mnemosyne-identity-2026-09-03"></a>
 
 - **Integrator:** Codex on `build/hermes-mnemosyne-09`; **lease:** none.
