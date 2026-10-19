@@ -1,5 +1,23 @@
 # Gap Audit - hermes-simd
 
+## HERMES-EUNOMIA-011-RANGE [patch] — compatible bridge verification in progress
+
+The default `^0.10` requirement excludes approved Eunomia 0.11. Existing PR
+#264 admits `>=0.10.0, <0.12.0` without changing implementation or dropping
+current-version support. The committed canonical lock remains `a231e54d`.
+An isolated ordinary Git lock selection of reviewed combined source `22daa6c`
+passes 507 all-feature workspace tests, zero skips, plus strict lint,
+docs/doctests and applicable minimal builds. The feature-enabled metadata
+contains one canonical Eunomia identity and does not enable NumPy. The optional
+Python identity break is outside this workspace's bridge claim. This is source
+compatibility evidence, not a receipt for unpublished Eunomia 0.11 packages.
+
+All Rust/test/workflow bytes, existing test domains and time limits are preserved.
+Final-head Miri/required CI, independent review, MSRV/API/package gates, ordinary
+merge and registry acceptance remain explicit prerequisites. Held safety and
+performance branches are not integrated or marked complete.
+
+
 ## HERMES-EUNOMIA-010-COHORT [major] — published and registry-verified
 
 All five Hermes 0.9.0 packages are published from the normally guarded #260
