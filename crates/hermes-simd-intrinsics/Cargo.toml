@@ -12,7 +12,7 @@ readme = "README.md"
 keywords = ["simd", "intrinsics", "avx512", "neon", "vnni"]
 
 [dependencies]
-hermes-simd-core = { path = "../hermes-simd-core", version = "0.9.0" }
+hermes-simd-core = { path = "../hermes-simd-core", version = "0.9.1" }
 # The Kogge-Stone bitboard backends are dispatched by the shared
 # `#[runtime_dispatch]` generator rather than a hand-copied ISA ladder.
 hermes-simd-macros = { path = "../hermes-simd-macros", version = "0.9.0" }
