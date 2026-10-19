@@ -1,5 +1,20 @@
 # Changelog
 
+## Eunomia 0.11 compatibility — Unreleased
+
+### Changed
+
+- [patch] four libraries 0.9.1; unchanged macros 0.9.0: admit Eunomia `>=0.10.0, <0.12.0`
+  through one canonical Git edge while retaining the published 0.10 source lock.
+- Validate the provider boundary against published 0.10 and reviewed combined
+  0.11 sources. This workspace does not activate the provider's optional
+  NumPy/PyO3 0.30 boundary and does not claim 0.29 Python compatibility.
+- Require the compatible internal libraries (core/intrinsics/types0.9.1; macros0.9.0 unchanged) so normalized
+  packages cannot admit old components with a conflicting public scalar identity.
+- Preserve all Rust implementations, tests, features, workflows, native deadlines
+  and external committed lock records. Final-head required Miri/CI, review,
+  package/API gates and publication receipts remain required before closure.
+
 ## Hermes 0.9.0 release receipts - 2026-10-15
 
 - Publish all five aligned 0.9.0 packages through guarded #260 after every
