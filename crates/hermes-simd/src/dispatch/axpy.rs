@@ -639,15 +639,35 @@ mod tests {
         assert_eq!(out, expected);
     }
 
+    fn ramp64(start: f64, step: f64, len: usize) -> Vec<f64> {
+        (0..len)
+            .scan(start, |state, _| {
+                let value = *state;
+                *state += step;
+                Some(value)
+            })
+            .collect()
+    }
+
+    fn ramp32(start: f32, step: f32, len: usize) -> Vec<f32> {
+        (0..len)
+            .scan(start, |state, _| {
+                let value = *state;
+                *state += step;
+                Some(value)
+            })
+            .collect()
+    }
+
     #[test]
     fn axpy_pair_matches_two_axpy_fma_reference_across_tail_sizes() {
         for &len in &[0usize, 1, 3, 7, 8, 9, 15, 16, 17, 63, 64, 65, 1027] {
             let alpha_a = 1.75f64;
             let alpha_b = -0.375f64;
-            let x_a: Vec<f64> = (0..len).map(|i| i as f64 * 0.5 - 3.0).collect();
-            let x_b: Vec<f64> = (0..len).map(|i| 2.0 - i as f64 * 0.25).collect();
-            let mut out_a: Vec<f64> = (0..len).map(|i| 100.0 - i as f64).collect();
-            let mut out_b: Vec<f64> = (0..len).map(|i| i as f64 * 1.5 + 0.5).collect();
+            let x_a = ramp64(-3.0, 0.5, len);
+            let x_b = ramp64(2.0, -0.25, len);
+            let mut out_a = ramp64(100.0, -1.0, len);
+            let mut out_b = ramp64(0.5, 1.5, len);
             let expected_a: Vec<f64> = out_a
                 .iter()
                 .zip(&x_a)
@@ -670,10 +690,10 @@ mod tests {
         let len = 9usize;
         let alpha_a = 1.0_f32 / 3.0;
         let alpha_b = -2.0_f32 / 7.0;
-        let x_a: Vec<f32> = (0..len).map(|i| i as f32 + 0.125).collect();
-        let x_b: Vec<f32> = (0..len).map(|i| 0.75 - i as f32 * 0.0625).collect();
-        let mut out_a: Vec<f32> = (0..len).map(|i| i as f32 * 0.5 + 0.2).collect();
-        let mut out_b: Vec<f32> = (0..len).map(|i| 3.0 - i as f32 * 0.3).collect();
+        let x_a = ramp32(0.125, 1.0, len);
+        let x_b = ramp32(0.75, -0.0625, len);
+        let mut out_a = ramp32(0.2, 0.5, len);
+        let mut out_b = ramp32(3.0, -0.3, len);
         let expected_a: Vec<f32> = out_a
             .iter()
             .zip(&x_a)
