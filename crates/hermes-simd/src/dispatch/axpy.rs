@@ -227,6 +227,127 @@ where
     Ok(())
 }
 
+/// Fused dual-output update `out_a[i] += alpha_a * x_a[i]` and
+/// `out_b[i] += alpha_b * x_b[i]` in one traversal, with no temporaries.
+///
+/// Krylov recurrences update two vectors from two sources under one scalar
+/// step (CG: `x += αp; r -= αAp`); one pass keeps both output streams in
+/// the same cache residency window instead of paying a second pass over
+/// the outputs. Each output uses the same `fmadd` operation order as
+/// [`dispatch_axpy_kernel`], so a pair update is bit-identical to two
+/// separate AXPY calls with the same operands.
+#[runtime_dispatch(avx512f, avx2, neon, scalar)]
+pub(super) fn dispatch_axpy_pair_kernel<T, A>(
+    alpha_a: T,
+    x_a: &[T],
+    out_a: &mut [T],
+    alpha_b: T,
+    x_b: &[T],
+    out_b: &mut [T],
+) -> Result<(), SimdError>
+where
+    T: Scalar,
+    A: SimdArch + SimdKernel<T>,
+{
+    if x_a.len() != out_a.len() || x_b.len() != out_b.len() || out_a.len() != out_b.len() {
+        return Err(SimdError::LengthMismatch);
+    }
+    let len = out_a.len();
+    if len == 0 {
+        return Ok(());
+    }
+
+    let lane_count = A::LANE_COUNT;
+    let unroll_factor = A::UNROLL_FACTOR;
+    let chunk_size = lane_count * unroll_factor;
+    let unrolled_simd_len = (len / chunk_size) * chunk_size;
+    let x_a_ptr = x_a.as_ptr();
+    let out_a_ptr = out_a.as_mut_ptr();
+    let x_b_ptr = x_b.as_ptr();
+    let out_b_ptr = out_b.as_mut_ptr();
+
+    // SAFETY: length validation proves every unrolled and vector load/store
+    // is within its corresponding slice; the dispatch wrapper proves the
+    // target feature required by `A` before entering this kernel. The two
+    // output slices are disjoint mutable borrows, as are the inputs from
+    // the outputs they do not alias by construction of `&mut`/`&` pairs
+    // the caller presents as four separate slices.
+    unsafe {
+        let valpha_a = A::splat(alpha_a);
+        let valpha_b = A::splat(alpha_b);
+        let mut i = 0usize;
+        while i < unrolled_simd_len {
+            for offset in [0, lane_count, lane_count * 2, lane_count * 3] {
+                let pa = out_a_ptr.add(i + offset);
+                let pb = out_b_ptr.add(i + offset);
+                A::store_unaligned(
+                    pa,
+                    A::fmadd(
+                        A::load_unaligned(x_a_ptr.add(i + offset)),
+                        valpha_a,
+                        A::load_unaligned(pa),
+                    ),
+                );
+                A::store_unaligned(
+                    pb,
+                    A::fmadd(
+                        A::load_unaligned(x_b_ptr.add(i + offset)),
+                        valpha_b,
+                        A::load_unaligned(pb),
+                    ),
+                );
+            }
+            i += chunk_size;
+        }
+
+        let simd_len = (len / lane_count) * lane_count;
+        while i < simd_len {
+            let pa = out_a_ptr.add(i);
+            let pb = out_b_ptr.add(i);
+            A::store_unaligned(
+                pa,
+                A::fmadd(
+                    A::load_unaligned(x_a_ptr.add(i)),
+                    valpha_a,
+                    A::load_unaligned(pa),
+                ),
+            );
+            A::store_unaligned(
+                pb,
+                A::fmadd(
+                    A::load_unaligned(x_b_ptr.add(i)),
+                    valpha_b,
+                    A::load_unaligned(pb),
+                ),
+            );
+            i += lane_count;
+        }
+    }
+
+    let simd_len = (len / lane_count) * lane_count;
+    let tail = len - simd_len;
+    if tail != 0 {
+        // SAFETY: `simd_len` is the start of the remaining in-bounds prefix
+        // of every slice and `tail` is its exact length, strictly smaller
+        // than the lane width, for both output streams.
+        unsafe {
+            axpy_masked_tail::<T, A>(
+                alpha_a,
+                x_a.as_ptr().add(simd_len),
+                out_a.as_mut_ptr().add(simd_len),
+                tail,
+            );
+            axpy_masked_tail::<T, A>(
+                alpha_b,
+                x_b.as_ptr().add(simd_len),
+                out_b.as_mut_ptr().add(simd_len),
+                tail,
+            );
+        }
+    }
+    Ok(())
+}
+
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]
 pub(super) fn dispatch_axpy_rows_kernel<T, A>(
     alphas: &[T],
@@ -435,7 +556,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::{axpy, axpy_mul, axpy_rows, axpy_rows_batch};
+    use super::super::{axpy, axpy_mul, axpy_pair, axpy_rows, axpy_rows_batch};
     use hermes_simd_core::view::SimdError;
 
     #[test]
@@ -516,6 +637,79 @@ mod tests {
 
         axpy_mul(alpha, &a, &b, &mut out).unwrap();
         assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn axpy_pair_matches_two_axpy_fma_reference_across_tail_sizes() {
+        for &len in &[0usize, 1, 3, 7, 8, 9, 15, 16, 17, 63, 64, 65, 1027] {
+            let alpha_a = 1.75f64;
+            let alpha_b = -0.375f64;
+            let x_a: Vec<f64> = (0..len).map(|i| i as f64 * 0.5 - 3.0).collect();
+            let x_b: Vec<f64> = (0..len).map(|i| 2.0 - i as f64 * 0.25).collect();
+            let mut out_a: Vec<f64> = (0..len).map(|i| 100.0 - i as f64).collect();
+            let mut out_b: Vec<f64> = (0..len).map(|i| i as f64 * 1.5 + 0.5).collect();
+            let expected_a: Vec<f64> = out_a
+                .iter()
+                .zip(&x_a)
+                .map(|(&out, &x)| x.mul_add(alpha_a, out))
+                .collect();
+            let expected_b: Vec<f64> = out_b
+                .iter()
+                .zip(&x_b)
+                .map(|(&out, &x)| x.mul_add(alpha_b, out))
+                .collect();
+
+            axpy_pair(alpha_a, &x_a, &mut out_a, alpha_b, &x_b, &mut out_b).unwrap();
+            assert_eq!(out_a, expected_a, "out_a len {len}");
+            assert_eq!(out_b, expected_b, "out_b len {len}");
+        }
+    }
+
+    #[test]
+    fn axpy_pair_tail_preserves_fused_operation_order() {
+        let len = 9usize;
+        let alpha_a = 1.0_f32 / 3.0;
+        let alpha_b = -2.0_f32 / 7.0;
+        let x_a: Vec<f32> = (0..len).map(|i| i as f32 + 0.125).collect();
+        let x_b: Vec<f32> = (0..len).map(|i| 0.75 - i as f32 * 0.0625).collect();
+        let mut out_a: Vec<f32> = (0..len).map(|i| i as f32 * 0.5 + 0.2).collect();
+        let mut out_b: Vec<f32> = (0..len).map(|i| 3.0 - i as f32 * 0.3).collect();
+        let expected_a: Vec<f32> = out_a
+            .iter()
+            .zip(&x_a)
+            .map(|(&out, &x)| x.mul_add(alpha_a, out))
+            .collect();
+        let expected_b: Vec<f32> = out_b
+            .iter()
+            .zip(&x_b)
+            .map(|(&out, &x)| x.mul_add(alpha_b, out))
+            .collect();
+
+        axpy_pair(alpha_a, &x_a, &mut out_a, alpha_b, &x_b, &mut out_b).unwrap();
+        assert_eq!(out_a, expected_a);
+        assert_eq!(out_b, expected_b);
+    }
+
+    #[test]
+    fn axpy_pair_rejects_length_mismatch() {
+        let x = [1.0f64, 2.0];
+        let mut out_a = [0.0f64; 2];
+        let mut out_b = [0.0f64; 2];
+        assert_eq!(
+            axpy_pair(1.0, &[1.0], &mut out_a, 1.0, &x, &mut out_b),
+            Err(SimdError::LengthMismatch)
+        );
+        assert_eq!(
+            axpy_pair(1.0, &x, &mut out_a, 1.0, &x, &mut [0.0f64; 3]),
+            Err(SimdError::LengthMismatch)
+        );
+        assert_eq!(
+            axpy_pair(1.0, &x, &mut out_a, 1.0, &[1.0], &mut out_b),
+            Err(SimdError::LengthMismatch)
+        );
+        // Rejection happens before any mutation.
+        assert_eq!(out_a.map(f64::to_bits), [0, 0]);
+        assert_eq!(out_b.map(f64::to_bits), [0, 0]);
     }
 
     #[test]

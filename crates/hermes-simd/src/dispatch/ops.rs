@@ -100,6 +100,25 @@ pub fn axpy_mul<T: SimdOps>(alpha: T, a: &[T], b: &[T], out: &mut [T]) -> Result
     T::axpy_mul(alpha, a, b, out)
 }
 
+/// Fused dual-output update `out_a[i] += alpha_a * x_a[i]` and
+/// `out_b[i] += alpha_b * x_b[i]` in one runtime-dispatched SIMD pass with
+/// no temporary allocation. Bit-identical to two separate [`axpy`] calls.
+///
+/// # Errors
+/// Returns [`SimdError::LengthMismatch`] when the four slices do not have
+/// equal lengths.
+#[inline(always)]
+pub fn axpy_pair<T: SimdOps>(
+    alpha_a: T,
+    x_a: &[T],
+    out_a: &mut [T],
+    alpha_b: T,
+    x_b: &[T],
+    out_b: &mut [T],
+) -> Result<(), SimdError> {
+    T::axpy_pair(alpha_a, x_a, out_a, alpha_b, x_b, out_b)
+}
+
 /// Fused multi-row update `out[row, i] += alphas[row] * x[i]` via one
 /// runtime-dispatched SIMD kernel. `out` is a row-major strided window.
 ///

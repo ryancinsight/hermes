@@ -80,6 +80,17 @@ macro_rules! impl_simd_ops_methods {
             axpy::dispatch_axpy_mul::<Self>(alpha, a, b, out)
         }
         #[inline(always)]
+        fn axpy_pair(
+            alpha_a: Self,
+            x_a: &[Self],
+            out_a: &mut [Self],
+            alpha_b: Self,
+            x_b: &[Self],
+            out_b: &mut [Self],
+        ) -> Result<(), SimdError> {
+            axpy::dispatch_axpy_pair::<Self>(alpha_a, x_a, out_a, alpha_b, x_b, out_b)
+        }
+        #[inline(always)]
         fn axpy_rows(
             alphas: &[Self],
             x: &[Self],
