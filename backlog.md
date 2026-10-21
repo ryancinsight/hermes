@@ -18,7 +18,9 @@
   provider identities. No broad cohort advance or downstream speedup is claimed.
 - Local evidence: baseline accepts the explicit 0.11.1 source; the new minimum
   rejects that same source with the expected `^0.11.3` constraint. All 511
-  native cases pass, zero skips; no-default/Miri typed absence passes. Required
+  native cases pass, zero skips; unsupported-platform/Miri typed absence passes.
+  No-default compilation passes separately; dependency feature unification can
+  still enable Themis `std`. Required
   core/intrinsics Miri passes 27/18 cases with two existing core skips. Both
   strict patch API comparisons pass 223 rules/30 inapplicable rules; Rust 1.95,
   strict lint and docs pass. Clean packages, final review/hooks and hosted

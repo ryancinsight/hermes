@@ -26,9 +26,12 @@ its exact source after the floor update rejects `^0.11.3` as expected. The
 1.95, strict diagnostics, docs and doctests pass. Required Miri core/intrinsics
 executes 27/18 passing tests with two existing core skips; a focused facade
 absence case passes with isolation enabled. Both patch API comparisons execute
-223 passing checks/30 inapplicable skips. Test tracing uses no wall clock and
-does not enable `std` in the library's no-default build. Initial test-harness
-import/tracing failures are retained in the task evidence, not product findings.
+223 passing checks/30 inapplicable skips. Test tracing uses no wall clock.
+Independent review caught a test assumption: disabling the facade's `std` flag
+does not disable Themis `std` after dependency feature unification. The absence
+case is therefore limited to unsupported native platforms and Miri; the macOS
+no-default pass does not establish provider feature absence. Initial test-harness
+failures and this corrected portability finding are retained in task evidence.
 
 ## HERMES-EUNOMIA-011-RANGE [patch] — compatible bridge verification in progress
 

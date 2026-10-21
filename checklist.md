@@ -19,7 +19,9 @@ Target for this slice: core/facade 0.9.3; intrinsics/types 0.9.2 and macros 0.9.
       acceptance; no merge, publication or deployment in this initial pass.
 
 Local source qualification: 511 all-feature native tests pass, zero skips;
-the absence case passes without default features and under Miri isolation.
+the unsupported-platform absence case passes on macOS with and without default
+features, and under Miri isolation. No-default compilation is checked separately;
+it does not establish that dependency feature unification disables Themis `std`.
 Required core/intrinsics Miri executes 27/18 passing cases (two existing core
 skips); both affected public API comparisons pass 223 rules/30 inapplicable
 rules. Formatting, strict diagnostics, Rust 1.95 and docs/doctests pass.

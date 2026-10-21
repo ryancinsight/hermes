@@ -1,6 +1,6 @@
 //! A missing platform locality remains typed absence through both providers.
 
-#![cfg(any(miri, not(feature = "std"), not(any(target_os = "linux", windows))))]
+#![cfg(any(miri, not(any(target_os = "linux", windows))))]
 
 use tracing_subscriber::fmt::format::FmtSpan;
 
