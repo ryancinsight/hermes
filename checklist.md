@@ -7,7 +7,7 @@ Target for this slice: core/facade 0.9.3; intrinsics/types 0.9.2 and macros 0.9.
 - [x] Verify current main, all open PRs, local branches and the existing
       authorized registered-hook context; preserve AXPY and other owner work.
 - [x] Verify published Themis 0.11.3 checksum/source and raise its canonical
-      direct minimum; select shipped `ce395b01` without a manifest revision pin.
+      direct minimum; select the [shipped source](https://github.com/ryancinsight/themis/commit/ce395b01a7c0eb7878a8b25a11031b3d2887cc91) without a manifest revision pin.
 - [x] Limit release bookkeeping to the two direct consumers, core/facade 0.9.3;
       retain all unrelated external lock identities and other package versions.
 - [x] Qualify stale-provider resolver rejection and typed locality absence.
@@ -28,7 +28,7 @@ skips); both affected public API comparisons pass 223 rules/30 inapplicable
 rules. Formatting, strict diagnostics, Rust 1.95 and docs/doctests pass.
 Package/review receipts are retained in local task evidence. The initial
 registered-store import failed at the task sandbox boundary; a sanctioned
-per-command approval imported reviewed `b4b938a0` through the same store after
+per-command approval imported reviewed pre-delivery source through the same store after
 read-only partial-outcome checks. Owner refs, clean status, hooks and configuration
 are preserved. Final hook/draft/hosted acceptance remains revision-scoped; no
 merge, publication or deployment is authorized in this pass. Initial online

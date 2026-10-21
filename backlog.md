@@ -1,16 +1,16 @@
 # Backlog — hermes-simd
 
 <a id="HERMES-THEMIS-0113-ADOPTION"></a>
-## HERMES-THEMIS-0113-ADOPTION — Require consistent CPU sibling partitions [patch] — in-progress
+## HERMES-THEMIS-0113-ADOPTION — Require consistent CPU sibling partitions [patch] — todo
 
-- priority: correctness; status: in-progress; owner: Codex;
+- priority: correctness; status: todo; owner: Codex;
   needs: final registered-hook and exact-head hosted acceptance.
 - Scope: the two direct topology consumers, core/facade 0.9.3, and their
   canonical Themis minimum/lock. Intrinsics/types stay 0.9.2; macros stay 0.9.0.
 - Finding: main `06ff7752` still permits Themis 0.11.1, predating the shipped
   sibling-partition repair. Themis #109 requires equal normalized sibling sets
   along every membership, preserving valid partitions and typed absence.
-- Source: published Themis 0.11.3 at `ce395b01a7c0eb7878a8b25a11031b3d2887cc91`;
+- Source: published Themis 0.11.3 at [shipped source](https://github.com/ryancinsight/themis/commit/ce395b01a7c0eb7878a8b25a11031b3d2887cc91);
   canonical Git URL plus version, without `rev`, branch, tag or path override.
 - Acceptance: reject the formerly admitted stale provider; preserve unsupported
   locality as `None`; pass native/MSRV/Miri, API and normalized-package checks,
@@ -31,7 +31,7 @@
 - Delivery history: the initial corrected-commit import failed with `Operation
   not permitted` at the task sandbox boundary. Read-only checks found all nine
   new objects absent. A sanctioned per-command approval then imported reviewed
-  `b4b938a0` through the same registered store, preserving owner refs, clean
+  pre-delivery source through the same registered store, preserving owner refs, clean
   status, hooks and configuration. No persistent access or permissions changed.
   Final independent review, unchanged hooks, draft and hosted outcomes are
   recorded as revision-scoped acceptance evidence; they are not merge approval.

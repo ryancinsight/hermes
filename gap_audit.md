@@ -3,7 +3,7 @@
 ## HERMES-THEMIS-0113-ADOPTION [patch] — provider qualification in progress
 
 Main `06ff7752` selects Themis 0.11.1 at `63c54410`. The published 0.11.3
-repair (`ce395b01`) rejects symmetric but non-transitive CPU sibling reports
+repair ([shipped source](https://github.com/ryancinsight/themis/commit/ce395b01a7c0eb7878a8b25a11031b3d2887cc91)) rejects symmetric but non-transitive CPU sibling reports
 instead of accepting an inconsistent core partition. The provider preserves
 valid results and its public API; no Hermes kernel change is required.
 
@@ -40,7 +40,7 @@ DNS; subsequent sanctioned standard verification refreshed the index and passed.
 The initial registered-context import failed while writing Git objects
 (`Operation not permitted`). Read-only diagnosis found a task sandbox boundary,
 matching OS ownership with no immutable flags, and all nine new objects absent.
-A sanctioned per-command approval then imported reviewed `b4b938a0` into the same
+A sanctioned per-command approval then imported reviewed pre-delivery source into the same
 store. The owner checkout HEAD/branch/clean status, hooks and configuration remain
 unchanged. No persistent access, permission, alternate store or hook bypass is
 introduced. Final review, registered pre-push, draft and hosted outcomes are
