@@ -4,7 +4,7 @@
 ## HERMES-THEMIS-0113-ADOPTION — Require consistent CPU sibling partitions [patch] — in-progress
 
 - priority: correctness; status: in-progress; owner: Codex;
-  needs: registered-hook execution, blocked by Git object-store write permission.
+  needs: final registered-hook and exact-head hosted acceptance.
 - Scope: the two direct topology consumers, core/facade 0.9.3, and their
   canonical Themis minimum/lock. Intrinsics/types stay 0.9.2; macros stay 0.9.0.
 - Finding: main `06ff7752` still permits Themis 0.11.1, predating the shipped
@@ -28,11 +28,13 @@
   passes with the real registry Themis dependency; final receipts remain
   revision-scoped. Online package refresh is unavailable because crates.io DNS
   resolution failed.
-- Delivery blocker: importing the corrected commit into the existing registered
-  hook context failed with `Operation not permitted` while writing Git objects.
-  No push or draft PR was attempted; hooks, configuration and owner checkout
-  identity are unchanged. Final independent review is recorded in task evidence;
-  unchanged registered hooks and exact-head hosted gates remain unverified.
+- Delivery history: the initial corrected-commit import failed with `Operation
+  not permitted` at the task sandbox boundary. Read-only checks found all nine
+  new objects absent. A sanctioned per-command approval then imported reviewed
+  `b4b938a0` through the same registered store, preserving owner refs, clean
+  status, hooks and configuration. No persistent access or permissions changed.
+  Final independent review, unchanged hooks, draft and hosted outcomes are
+  recorded as revision-scoped acceptance evidence; they are not merge approval.
 - Delivery: draft only in this pass. Merge, publication, registry receipts and
   downstream performance/cohort acceptance remain later qualification.
 

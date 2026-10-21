@@ -36,12 +36,14 @@ failures and this corrected portability finding are retained in task evidence.
 Standard grouped package verification passes offline with a single registry
 Themis 0.11.3 identity; it uses Cargo's temporary registry for unpublished core
 0.9.3 and does not claim publication acceptance. Online index refresh failed DNS.
-The registered-context import of the corrected commit failed while writing Git
-objects (`Operation not permitted`). That route is stopped without a push,
-alternative hook context, configuration change or bypass. The owner checkout
-HEAD/branch, hooks and Git configuration remain unchanged. Final review and local
-receipts are retained separately; registered pre-push and hosted gates are still
-unverified, and no draft PR, merge, upload or deployment occurred.
+The initial registered-context import failed while writing Git objects
+(`Operation not permitted`). Read-only diagnosis found a task sandbox boundary,
+matching OS ownership with no immutable flags, and all nine new objects absent.
+A sanctioned per-command approval then imported reviewed `b4b938a0` into the same
+store. The owner checkout HEAD/branch/clean status, hooks and configuration remain
+unchanged. No persistent access, permission, alternate store or hook bypass is
+introduced. Final review, registered pre-push, draft and hosted outcomes are
+recorded by exact revision; these do not establish merge/publication acceptance.
 
 ## HERMES-EUNOMIA-011-RANGE [patch] — compatible bridge verification in progress
 

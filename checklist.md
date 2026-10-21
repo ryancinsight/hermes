@@ -26,11 +26,13 @@ it does not establish that dependency feature unification disables Themis `std`.
 Required core/intrinsics Miri executes 27/18 passing cases (two existing core
 skips); both affected public API comparisons pass 223 rules/30 inapplicable
 rules. Formatting, strict diagnostics, Rust 1.95 and docs/doctests pass.
-Package/review receipts are retained in local task evidence. Importing the
-corrected commit into the registered hook context failed while writing Git
-objects (`Operation not permitted`), so no push or draft exists and registered
-hook/hosted acceptance remains blocked. An online package refresh also failed
-crates.io DNS; standard offline verification uses the existing registry cache.
+Package/review receipts are retained in local task evidence. The initial
+registered-store import failed at the task sandbox boundary; a sanctioned
+per-command approval imported reviewed `b4b938a0` through the same store after
+read-only partial-outcome checks. Owner refs, clean status, hooks and configuration
+are preserved. Final hook/draft/hosted acceptance remains revision-scoped; no
+merge, publication or deployment is authorized in this pass. An online package
+refresh failed crates.io DNS; standard offline verification uses the registry cache.
 
 ## HERMES-EUNOMIA-011-RANGE [patch]
 
