@@ -1,5 +1,31 @@
 # Backlog — hermes-simd
 
+<a id="HERMES-THEMIS-0113-ADOPTION"></a>
+## HERMES-THEMIS-0113-ADOPTION — Require consistent CPU sibling partitions [patch] — in-progress
+
+- priority: correctness; status: in-progress; owner: Codex; needs: none.
+- Scope: the two direct topology consumers, core/facade 0.9.3, and their
+  canonical Themis minimum/lock. Intrinsics/types stay 0.9.2; macros stay 0.9.0.
+- Finding: main `06ff7752` still permits Themis 0.11.1, predating the shipped
+  sibling-partition repair. Themis #109 requires equal normalized sibling sets
+  along every membership, preserving valid partitions and typed absence.
+- Source: published Themis 0.11.3 at `ce395b01a7c0eb7878a8b25a11031b3d2887cc91`;
+  canonical Git URL plus version, without `rev`, branch, tag or path override.
+- Acceptance: reject the formerly admitted stale provider; preserve unsupported
+  locality as `None`; pass native/MSRV/Miri, API and normalized-package checks,
+  final-commit independent review, intact hooks and exact-head hosted checks.
+- Preserve all AXPY implementations, native deadlines and unrelated external
+  provider identities. No broad cohort advance or downstream speedup is claimed.
+- Local evidence: baseline accepts the explicit 0.11.1 source; the new minimum
+  rejects that same source with the expected `^0.11.3` constraint. All 511
+  native cases pass, zero skips; no-default/Miri typed absence passes. Required
+  core/intrinsics Miri passes 27/18 cases with two existing core skips. Both
+  strict patch API comparisons pass 223 rules/30 inapplicable rules; Rust 1.95,
+  strict lint and docs pass. Clean packages, final review/hooks and hosted
+  outcomes remain revision-scoped draft acceptance evidence.
+- Delivery: draft only in this pass. Merge, publication, registry receipts and
+  downstream performance/cohort acceptance remain later qualification.
+
 <a id="HERMES-EUNOMIA-011-RANGE"></a>
 ## HERMES-EUNOMIA-011-RANGE — Admit the approved Eunomia provider bundle [patch] — todo
 

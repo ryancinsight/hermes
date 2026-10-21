@@ -1,6 +1,29 @@
 # Checklist — active sprint
 
-Target for this slice: four libraries 0.9.1; unchanged macros 0.9.0.
+Target for this slice: core/facade 0.9.3; intrinsics/types 0.9.2 and macros 0.9.0 unchanged.
+
+## HERMES-THEMIS-0113-ADOPTION [patch]
+
+- [x] Verify current main, all open PRs, local branches and the existing
+      authorized registered-hook context; preserve AXPY and other owner work.
+- [x] Verify published Themis 0.11.3 checksum/source and raise its canonical
+      direct minimum; select shipped `ce395b01` without a manifest revision pin.
+- [x] Limit release bookkeeping to the two direct consumers, core/facade 0.9.3;
+      retain all unrelated external lock identities and other package versions.
+- [x] Qualify stale-provider resolver rejection and typed locality absence.
+- [x] Pass native/MSRV/Miri and strict patch public API comparisons.
+- [ ] Verify clean final-commit standard packages and normalized source identity.
+- [ ] Obtain independent review of the final commit and pass unchanged hooks.
+- [ ] Open a draft PR and record its exact-head hosted outcomes.
+- [ ] Later qualification only: normal merge/publication and registry/downstream
+      acceptance; no merge, publication or deployment in this initial pass.
+
+Local source qualification: 511 all-feature native tests pass, zero skips;
+the absence case passes without default features and under Miri isolation.
+Required core/intrinsics Miri executes 27/18 passing cases (two existing core
+skips); both affected public API comparisons pass 223 rules/30 inapplicable
+rules. Formatting, strict diagnostics, Rust 1.95 and docs/doctests pass.
+Final-commit package/review/hook/hosted outcomes are recorded on the draft PR.
 
 ## HERMES-EUNOMIA-011-RANGE [patch]
 

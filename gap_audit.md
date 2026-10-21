@@ -1,5 +1,35 @@
 # Gap Audit - hermes-simd
 
+## HERMES-THEMIS-0113-ADOPTION [patch] — provider qualification in progress
+
+Main `06ff7752` selects Themis 0.11.1 at `63c54410`. The published 0.11.3
+repair (`ce395b01`) rejects symmetric but non-transitive CPU sibling reports
+instead of accepting an inconsistent core partition. The provider preserves
+valid results and its public API; no Hermes kernel change is required.
+
+Raise the canonical direct minimum to 0.11.3 and select that exact shipped
+source in the lock. Only core/facade, the direct consumers, target 0.9.3;
+intrinsics/types remain 0.9.2, macros 0.9.0. Preserve the shared workspace
+version and unrelated locked identities. The facade requires the updated core.
+
+Qualification distinguishes resolver-floor regression, unsupported-platform
+locality absence, existing native/Miri coverage, public API and normalized
+packages. The sibling-assembly fixtures are private Linux/Windows provider
+tests; local macOS consumer checks do not claim to execute those fixtures or
+invent a public injection API. Exact-commit review, hooks and hosted gates are
+pending. No merge, publication, deployment or broad cohort acceptance occurs.
+
+Executed source qualification: only the Themis and two versioned Hermes lock
+records change. The baseline resolver admits explicit Themis 0.11.1; forcing
+its exact source after the floor update rejects `^0.11.3` as expected. The
+511-case all-feature native suite, minimal build, focused absence test, Rust
+1.95, strict diagnostics, docs and doctests pass. Required Miri core/intrinsics
+executes 27/18 passing tests with two existing core skips; a focused facade
+absence case passes with isolation enabled. Both patch API comparisons execute
+223 passing checks/30 inapplicable skips. Test tracing uses no wall clock and
+does not enable `std` in the library's no-default build. Initial test-harness
+import/tracing failures are retained in the task evidence, not product findings.
+
 ## HERMES-EUNOMIA-011-RANGE [patch] — compatible bridge verification in progress
 
 The default `^0.10` requirement excludes approved Eunomia 0.11. Existing PR

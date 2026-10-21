@@ -1,6 +1,6 @@
 [package]
 name = "hermes-simd-core"
-version.workspace = true
+version = "0.9.3"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

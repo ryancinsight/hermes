@@ -1,5 +1,17 @@
 # Changelog
 
+## Core/facade 0.9.3 — Unreleased
+
+### Fixed
+
+- [patch] Require Themis 0.11.3 in both direct topology consumers and lock its
+  shipped sibling-partition repair. Invalid overlapping sibling reports remain
+  absent; valid results, typed locality absence and Hermes public APIs remain
+  unchanged. Item: HERMES-THEMIS-0113-ADOPTION.
+- Publish only the affected core/facade patch versions; keep intrinsics/types
+  at 0.9.2 and macros at 0.9.0. The facade requires core 0.9.3. Preserve all
+  AXPY implementations and unrelated provider identities.
+
 ## Dual-output AXPY — Unreleased
 
 ### Added
