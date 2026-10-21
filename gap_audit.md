@@ -35,7 +35,8 @@ failures and this corrected portability finding are retained in task evidence.
 
 Standard grouped package verification passes offline with a single registry
 Themis 0.11.3 identity; it uses Cargo's temporary registry for unpublished core
-0.9.3 and does not claim publication acceptance. Online index refresh failed DNS.
+0.9.3 and does not claim publication acceptance. Initial online refresh failed
+DNS; subsequent sanctioned standard verification refreshed the index and passed.
 The initial registered-context import failed while writing Git objects
 (`Operation not permitted`). Read-only diagnosis found a task sandbox boundary,
 matching OS ownership with no immutable flags, and all nine new objects absent.

@@ -26,8 +26,8 @@
   strict patch API comparisons pass 223 rules/30 inapplicable rules; Rust 1.95,
   strict lint and docs pass. Standard grouped offline package verification
   passes with the real registry Themis dependency; final receipts remain
-  revision-scoped. Online package refresh is unavailable because crates.io DNS
-  resolution failed.
+  revision-scoped. Initial online refresh failed DNS inside the task sandbox;
+  subsequent sanctioned standard verification refreshed the index and passed.
 - Delivery history: the initial corrected-commit import failed with `Operation
   not permitted` at the task sandbox boundary. Read-only checks found all nine
   new objects absent. A sanctioned per-command approval then imported reviewed

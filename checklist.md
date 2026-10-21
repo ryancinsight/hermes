@@ -31,8 +31,9 @@ registered-store import failed at the task sandbox boundary; a sanctioned
 per-command approval imported reviewed `b4b938a0` through the same store after
 read-only partial-outcome checks. Owner refs, clean status, hooks and configuration
 are preserved. Final hook/draft/hosted acceptance remains revision-scoped; no
-merge, publication or deployment is authorized in this pass. An online package
-refresh failed crates.io DNS; standard offline verification uses the registry cache.
+merge, publication or deployment is authorized in this pass. Initial online
+refresh failed DNS; subsequent sanctioned standard package verification refreshed
+the index and passed. Earlier offline receipts remain separately qualified.
 
 ## HERMES-EUNOMIA-011-RANGE [patch]
 
