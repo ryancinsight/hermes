@@ -11,7 +11,7 @@ use crate::scalar::Scalar;
 // ---------------------------------------------------------------------------
 
 /// Sealed ZST trait for prefix scan operations.
-pub trait ScanOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
+pub trait ScanOp<T: Scalar>: crate::private::SealedOp {
     /// Returns the identity element of the operation.
     fn identity() -> T;
     /// Combine two values using the operation: `a op b`.
@@ -88,7 +88,7 @@ impl<T: Scalar> ScanOp<T> for ScanMax {
 // ---------------------------------------------------------------------------
 
 /// Sealed ZST trait for prefix scan inclusion modes.
-pub trait ScanMode: crate::private::Sealed + Copy + 'static {
+pub trait ScanMode: crate::private::SealedOp {
     /// Whether the scan is inclusive of the current element.
     const IS_INCLUSIVE: bool;
 }

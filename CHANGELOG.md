@@ -1,5 +1,16 @@
 # Changelog
 
+## Sealed-op marker supertraits — Unreleased
+
+### Changed
+
+- [patch] `hermes-simd-core`: the op-marker traits spell their bounds through
+  two collapsed supertraits in `crate::private` — `SealedOp` for
+  `ScanOp`/`ScanMode`/`ReductionOp`/`ElementOp`/`UnaryOp`, `SimdMarker` for
+  `SimdArch`/`Alignment`. Blanket impls make both exact synonyms of the bound
+  lists they replace; no implementor, caller, or sealing change.
+  `ExecutionMode` deliberately keeps its own privately sealed module.
+
 ## Dual-output AXPY — Unreleased
 
 ### Added

@@ -25,7 +25,7 @@ pub enum IsaFamily {
 ///
 /// Implemented by Zero-Sized Types (ZSTs). Constants are queryable without a scalar
 /// type parameter — contrast with `SimdKernel<T>` which requires `T` to be known.
-pub trait SimdArch: crate::private::Sealed + Send + Sync + 'static + Copy + Clone {
+pub trait SimdArch: crate::private::SimdMarker {
     /// Human-readable ISA name (`"avx2"`, `"avx512"`, `"neon"`, `"scalar"`).
     const NAME: &'static str;
 

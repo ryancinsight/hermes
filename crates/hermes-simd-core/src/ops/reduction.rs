@@ -26,7 +26,7 @@ pub use product::Product;
 /// `identity_scalar()` returns the reduction identity (0 for Sum, `T::MAX_VALUE` for Min,
 /// `T::MIN_VALUE` for Max). It is used for empty-slice fast paths and for combining the
 /// scalar tail with the SIMD result via `scalar_combine`.
-pub trait ReductionOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
+pub trait ReductionOp<T: Scalar>: crate::private::SealedOp {
     /// Whether the final partial vector should use the masked reduction path.
     ///
     /// Masking a tail can change floating-point grouping, so each operation opts

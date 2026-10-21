@@ -23,7 +23,7 @@ use crate::scalar::{FloatElement, NumericElement, Scalar};
 /// Every `impl UnaryOp<T>` passes through to an `#[inline(always)]`
 /// operation-family facet method. The ZST strategy parameter is erased at every
 /// monomorphization site: `size_of::<Abs>() == 0`.
-pub trait UnaryOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
+pub trait UnaryOp<T: Scalar>: crate::private::SealedOp {
     /// Apply the operation to a vector: `self.apply::<Arch>(v) -> result`.
     ///
     /// Takes `self` by value so `Clamp<T>` can access its bounds; for true ZST

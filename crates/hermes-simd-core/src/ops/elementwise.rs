@@ -22,7 +22,7 @@ use crate::scalar::Scalar;
 /// Implementations use direct `T: Scalar` arithmetic so no vector load/store
 /// boundary conditions apply. The default does NOT exist — every impl must provide
 /// both `apply` (vector) and `apply_scalar` (scalar element).
-pub trait ElementOp<T: Scalar>: crate::private::Sealed + Copy + 'static {
+pub trait ElementOp<T: Scalar>: crate::private::SealedOp {
     /// Apply the operation to two vectors lane-wise.
     ///
     /// Takes `self` by value — for ZSTs this is free; for `Clamp` it captures the bounds.

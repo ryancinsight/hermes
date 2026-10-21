@@ -7,7 +7,7 @@
 /// Trait representing a memory alignment guarantee.
 ///
 /// Implemented by Zero-Sized Types (ZSTs) representing the alignment layout of the slice.
-pub trait Alignment: crate::private::Sealed + Send + Sync + 'static + Copy + Clone {
+pub trait Alignment: crate::private::SimdMarker {
     /// The alignment boundary in bytes, if statically guaranteed.
     ///
     /// Set to `Some(N)` for aligned views where `N` is a power of two, or `None` if
