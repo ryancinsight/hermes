@@ -23,8 +23,15 @@
   still enable Themis `std`. Required
   core/intrinsics Miri passes 27/18 cases with two existing core skips. Both
   strict patch API comparisons pass 223 rules/30 inapplicable rules; Rust 1.95,
-  strict lint and docs pass. Clean packages, final review/hooks and hosted
-  outcomes remain revision-scoped draft acceptance evidence.
+  strict lint and docs pass. Standard grouped offline package verification
+  passes with the real registry Themis dependency; final receipts remain
+  revision-scoped. Online package refresh is unavailable because crates.io DNS
+  resolution failed.
+- Delivery blocker: importing the corrected commit into the existing registered
+  hook context failed with `Operation not permitted` while writing Git objects.
+  No push or draft PR was attempted; hooks, configuration and owner checkout
+  identity are unchanged. Final independent review is recorded in task evidence;
+  unchanged registered hooks and exact-head hosted gates remain unverified.
 - Delivery: draft only in this pass. Merge, publication, registry receipts and
   downstream performance/cohort acceptance remain later qualification.
 

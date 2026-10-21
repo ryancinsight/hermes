@@ -33,6 +33,16 @@ case is therefore limited to unsupported native platforms and Miri; the macOS
 no-default pass does not establish provider feature absence. Initial test-harness
 failures and this corrected portability finding are retained in task evidence.
 
+Standard grouped package verification passes offline with a single registry
+Themis 0.11.3 identity; it uses Cargo's temporary registry for unpublished core
+0.9.3 and does not claim publication acceptance. Online index refresh failed DNS.
+The registered-context import of the corrected commit failed while writing Git
+objects (`Operation not permitted`). That route is stopped without a push,
+alternative hook context, configuration change or bypass. The owner checkout
+HEAD/branch, hooks and Git configuration remain unchanged. Final review and local
+receipts are retained separately; registered pre-push and hosted gates are still
+unverified, and no draft PR, merge, upload or deployment occurred.
+
 ## HERMES-EUNOMIA-011-RANGE [patch] — compatible bridge verification in progress
 
 The default `^0.10` requirement excludes approved Eunomia 0.11. Existing PR

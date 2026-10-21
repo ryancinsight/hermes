@@ -12,7 +12,8 @@ Target for this slice: core/facade 0.9.3; intrinsics/types 0.9.2 and macros 0.9.
       retain all unrelated external lock identities and other package versions.
 - [x] Qualify stale-provider resolver rejection and typed locality absence.
 - [x] Pass native/MSRV/Miri and strict patch public API comparisons.
-- [ ] Verify clean final-commit standard packages and normalized source identity.
+- [x] Verify clean standard offline packages and normalized source identity;
+      preserve exact final-commit receipts in task evidence.
 - [ ] Obtain independent review of the final commit and pass unchanged hooks.
 - [ ] Open a draft PR and record its exact-head hosted outcomes.
 - [ ] Later qualification only: normal merge/publication and registry/downstream
@@ -25,7 +26,11 @@ it does not establish that dependency feature unification disables Themis `std`.
 Required core/intrinsics Miri executes 27/18 passing cases (two existing core
 skips); both affected public API comparisons pass 223 rules/30 inapplicable
 rules. Formatting, strict diagnostics, Rust 1.95 and docs/doctests pass.
-Final-commit package/review/hook/hosted outcomes are recorded on the draft PR.
+Package/review receipts are retained in local task evidence. Importing the
+corrected commit into the registered hook context failed while writing Git
+objects (`Operation not permitted`), so no push or draft exists and registered
+hook/hosted acceptance remains blocked. An online package refresh also failed
+crates.io DNS; standard offline verification uses the existing registry cache.
 
 ## HERMES-EUNOMIA-011-RANGE [patch]
 
