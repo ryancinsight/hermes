@@ -3,7 +3,8 @@
 <a id="HERMES-THEMIS-0113-ADOPTION"></a>
 ## HERMES-THEMIS-0113-ADOPTION — Require consistent CPU sibling partitions [patch] — in-progress
 
-- priority: correctness; status: in-progress; owner: Codex; needs: none.
+- priority: correctness; status: in-progress; owner: Codex;
+  needs: registered-hook execution, blocked by Git object-store write permission.
 - Scope: the two direct topology consumers, core/facade 0.9.3, and their
   canonical Themis minimum/lock. Intrinsics/types stay 0.9.2; macros stay 0.9.0.
 - Finding: main `06ff7752` still permits Themis 0.11.1, predating the shipped
