@@ -37,6 +37,21 @@
   recorded as revision-scoped acceptance evidence; they are not merge approval.
 - Delivery: draft only in this pass. Merge, publication, registry receipts and
   downstream performance/cohort acceptance remain later qualification.
+- Local reconciliation after [main PR #267](https://github.com/ryancinsight/hermes/pull/267):
+  preserve all seven owner source edits introducing `SealedOp`/`SimdMarker` and
+  retain both changelog entries. The only textual merge conflict was the changelog.
+  The helper traits have blanket implementations for exactly the previous bounds;
+  this does not introduce a new sealing boundary. Four renewed registry-baseline
+  patch API comparisons pass 223 rules each. An identical downstream consumer
+  implements all seven interfaces on published core 0.9.2 and the reconciled
+  workspace, with computed scalar values and independently checked implied bounds.
+  Renewed local native coverage passes 512 cases, zero skips; strict diagnostics,
+  Rust 1.95, minimal builds, docs/doctests and required Miri pass. Clean normalized
+  package and final independent-review results belong to the local candidate receipt.
+- Current scope/hold: local preparation only; do not push, mark ready, merge,
+  publish or deploy. Remote #266 still names the older conflicting head. The
+  repeated lifecycle approval rejection remains in force. Historical pre-rebase
+  checks do not qualify this changed source, and no publication outcome is claimed.
 
 <a id="HERMES-EUNOMIA-011-RANGE"></a>
 ## HERMES-EUNOMIA-011-RANGE — Admit the approved Eunomia provider bundle [patch] — todo

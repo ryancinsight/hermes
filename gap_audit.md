@@ -1,5 +1,29 @@
 # Gap Audit - hermes-simd
 
+## Reconciliation with main #267 — local qualification
+
+The previous draft became conflicting after the owner merged collapsed marker
+supertraits. Preserve the seven production source changes and both changelog
+entries; the sole textual conflict is in the changelog. `private` remains a
+public, documentation-hidden module. Each new helper has a blanket implementation
+for the exact old bound conjunction, so the new names do not impose a new sealing
+boundary. An external consumer implementing all seven interfaces compiles and
+computes the same exact scalar results on published core 0.9.2 and this workspace.
+Each public trait is also checked separately for its old implied bounds.
+
+Reassess release classification rather than carrying the old plan forward:
+all four library comparisons against registry 0.9.2 pass 223 rules each with patch
+classification. Core/facade 0.9.3 remains the qualified local target; intrinsics/types
+0.9.2 and macros 0.9.0 remain unchanged. Re-run normalized package composition and
+independent final-candidate review before local handoff. Renewed native coverage is
+512 passing cases with zero skips; lint, MSRV, minimal builds, docs/doctests and Miri
+pass on the new source. Original gate outcomes are historical evidence only.
+
+Remote PR #266 is unchanged in this preparation-only pass. Push, ready, server
+merge, publication and deployment remain forbidden; the repeated direct-approval
+hold is preserved. Leto's separate sealing/version failures are not qualified
+provider releases and do not expand this Hermes lane into Leto repair.
+
 ## HERMES-THEMIS-0113-ADOPTION [patch] — provider qualification in progress
 
 Main `06ff7752` selects Themis 0.11.1 at `63c54410`. The published 0.11.3

@@ -35,6 +35,20 @@ merge, publication or deployment is authorized in this pass. Initial online
 refresh failed DNS; subsequent sanctioned standard package verification refreshed
 the index and passed. Earlier offline receipts remain separately qualified.
 
+Local reconciliation after main #267:
+
+- [x] Preserve the new owner code and both changelog entries in an isolated lane.
+- [x] Reassess both collapsed supertraits using four fresh strict patch API
+      comparisons and an unchanged external seven-interface consumer on 0.9.2.
+- [x] Renew native coverage (512 pass, zero skips), lint, MSRV, minimal builds,
+      docs/doctests and required Miri on the reconciled source.
+- [ ] Record clean final-candidate normalized packages, downstream consumer and
+      independent review in the local handoff receipt.
+- [ ] Later authorized work only: push the reconciliation and renew hosted checks.
+
+This bounded pass prepares local commits only. The direct-approval lifecycle
+hold is unchanged; no ready/merge/publication/deployment retry is authorized.
+
 ## HERMES-EUNOMIA-011-RANGE [patch]
 
 - [x] Recheck current defaults, existing PR ownership, instructions and active

@@ -11,6 +11,21 @@
 - Publish only the affected core/facade patch versions; keep intrinsics/types
   at 0.9.2 and macros at 0.9.0. The facade requires core 0.9.3. Preserve all
   AXPY implementations and unrelated provider identities.
+- Reconcile the owner marker-supertrait changes without removing them. Renew
+  patch API qualification and add an external-implementation/value regression
+  covering all seven marker interfaces; retain their previous caller and
+  implementor contracts. Local preparation does not authorize publication.
+
+## Sealed-op marker supertraits — Unreleased
+
+### Changed
+
+- [patch] `hermes-simd-core`: the op-marker traits spell their bounds through
+  two collapsed supertraits in `crate::private` — `SealedOp` for
+  `ScanOp`/`ScanMode`/`ReductionOp`/`ElementOp`/`UnaryOp`, `SimdMarker` for
+  `SimdArch`/`Alignment`. Blanket impls make both exact synonyms of the bound
+  lists they replace; no implementor, caller, or sealing change.
+  `ExecutionMode` deliberately keeps its own privately sealed module.
 
 ## Dual-output AXPY — Unreleased
 

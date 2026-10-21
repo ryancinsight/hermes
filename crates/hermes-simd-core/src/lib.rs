@@ -55,6 +55,14 @@ pub mod view;
 #[doc(hidden)]
 pub mod private {
     pub trait Sealed {}
+
+    /// Collapsed bound for all zero-sized operation-marker traits.
+    pub trait SealedOp: Sealed + Copy + 'static {}
+    impl<T: Sealed + Copy + 'static> SealedOp for T {}
+
+    /// Collapsed bound for SIMD arch/config ZST traits.
+    pub trait SimdMarker: Sealed + Send + Sync + 'static + Copy + Clone {}
+    impl<T: Sealed + Send + Sync + 'static + Copy + Clone> SimdMarker for T {}
 }
 
 // Re-exports for ergonomic use
