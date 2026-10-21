@@ -69,6 +69,22 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     /// Returns [`SimdError::LengthMismatch`] when the input and output lengths
     /// do not match.
     fn axpy_mul(alpha: Self, a: &[Self], b: &[Self], out: &mut [Self]) -> Result<(), SimdError>;
+    /// Fused dual-output update `out_a[i] += alpha_a * x_a[i]` and
+    /// `out_b[i] += alpha_b * x_b[i]` in one traversal, with no temporaries.
+    /// Bit-identical to two separate [`axpy`](Self::axpy) calls.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimdError::LengthMismatch`] when the four slices do not
+    /// have equal lengths.
+    fn axpy_pair(
+        alpha_a: Self,
+        x_a: &[Self],
+        out_a: &mut [Self],
+        alpha_b: Self,
+        x_b: &[Self],
+        out_b: &mut [Self],
+    ) -> Result<(), SimdError>;
     /// Fused multi-row update `out[row, i] += alphas[row] * x[i]`.
     ///
     /// # Errors

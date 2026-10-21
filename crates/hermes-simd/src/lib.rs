@@ -240,6 +240,7 @@ pub use dispatch::{
     argmin,
     axpy,
     axpy_mul,
+    axpy_pair,
     axpy_rows,
     axpy_rows_batch,
     dot,

@@ -1,5 +1,15 @@
 # Changelog
 
+## Dual-output AXPY — Unreleased
+
+### Added
+
+- [patch] four libraries 0.9.2; unchanged macros 0.9.0: `hermes_simd::axpy_pair`
+  computes `out_a += alpha_a * x_a; out_b += alpha_b * x_b` in one
+  runtime-dispatched SIMD pass (AVX-512/AVX2/NEON/scalar), bit-identical to
+  two separate `axpy` calls. Driver: athena's fused CG update via leto
+  `Scalar::axpy_pair_slice` (ATHENA-FUSED-UPDATE-20261020).
+
 ## Eunomia 0.11 compatibility — Unreleased
 
 ### Changed
