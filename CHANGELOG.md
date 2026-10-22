@@ -1,5 +1,21 @@
 # Changelog
 
+## Core/facade 0.9.3 — Unreleased
+
+### Fixed
+
+- [patch] Require Themis 0.11.3 in both direct topology consumers and lock its
+  shipped sibling-partition repair. Invalid overlapping sibling reports remain
+  absent; valid results, typed locality absence and Hermes public APIs remain
+  unchanged. Item: HERMES-THEMIS-0113-ADOPTION.
+- Publish only the affected core/facade patch versions; keep intrinsics/types
+  at 0.9.2 and macros at 0.9.0. The facade requires core 0.9.3. Preserve all
+  AXPY implementations and unrelated provider identities.
+- Reconcile the owner marker-supertrait changes without removing them. Renew
+  patch API qualification and add an external-implementation/value regression
+  covering all seven marker interfaces; retain their previous caller and
+  implementor contracts. Local preparation does not authorize publication.
+
 ## Sealed-op marker supertraits — Unreleased
 
 ### Changed

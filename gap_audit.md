@@ -1,5 +1,75 @@
 # Gap Audit - hermes-simd
 
+## Reconciliation with main #267 — local qualification
+
+The previous draft became conflicting after the owner merged collapsed marker
+supertraits. Preserve the seven production source changes and both changelog
+entries; the sole textual conflict is in the changelog. `private` remains a
+public, documentation-hidden module. Each new helper has a blanket implementation
+for the exact old bound conjunction, so the new names do not impose a new sealing
+boundary. An external consumer implementing all seven interfaces compiles and
+computes the same exact scalar results on published core 0.9.2 and this workspace.
+Each public trait is also checked separately for its old implied bounds.
+
+Reassess release classification rather than carrying the old plan forward:
+all four library comparisons against registry 0.9.2 pass 223 rules each with patch
+classification. Core/facade 0.9.3 remains the qualified local target; intrinsics/types
+0.9.2 and macros 0.9.0 remain unchanged. Re-run normalized package composition and
+independent final-candidate review before local handoff. Renewed native coverage is
+512 passing cases with zero skips; lint, MSRV, minimal builds, docs/doctests and Miri
+pass on the new source. Original gate outcomes are historical evidence only.
+
+Remote PR #266 is unchanged in this preparation-only pass. Push, ready, server
+merge, publication and deployment remain forbidden; the repeated direct-approval
+hold is preserved. Leto's separate sealing/version failures are not qualified
+provider releases and do not expand this Hermes lane into Leto repair.
+
+## HERMES-THEMIS-0113-ADOPTION [patch] — provider qualification in progress
+
+Main `06ff7752` selects Themis 0.11.1 at `63c54410`. The published 0.11.3
+repair ([shipped source](https://github.com/ryancinsight/themis/commit/ce395b01a7c0eb7878a8b25a11031b3d2887cc91)) rejects symmetric but non-transitive CPU sibling reports
+instead of accepting an inconsistent core partition. The provider preserves
+valid results and its public API; no Hermes kernel change is required.
+
+Raise the canonical direct minimum to 0.11.3 and select that exact shipped
+source in the lock. Only core/facade, the direct consumers, target 0.9.3;
+intrinsics/types remain 0.9.2, macros 0.9.0. Preserve the shared workspace
+version and unrelated locked identities. The facade requires the updated core.
+
+Qualification distinguishes resolver-floor regression, unsupported-platform
+locality absence, existing native/Miri coverage, public API and normalized
+packages. The sibling-assembly fixtures are private Linux/Windows provider
+tests; local macOS consumer checks do not claim to execute those fixtures or
+invent a public injection API. Exact-commit review, hooks and hosted gates are
+pending. No merge, publication, deployment or broad cohort acceptance occurs.
+
+Executed source qualification: only the Themis and two versioned Hermes lock
+records change. The baseline resolver admits explicit Themis 0.11.1; forcing
+its exact source after the floor update rejects `^0.11.3` as expected. The
+511-case all-feature native suite, minimal build, focused absence test, Rust
+1.95, strict diagnostics, docs and doctests pass. Required Miri core/intrinsics
+executes 27/18 passing tests with two existing core skips; a focused facade
+absence case passes with isolation enabled. Both patch API comparisons execute
+223 passing checks/30 inapplicable skips. Test tracing uses no wall clock.
+Independent review caught a test assumption: disabling the facade's `std` flag
+does not disable Themis `std` after dependency feature unification. The absence
+case is therefore limited to unsupported native platforms and Miri; the macOS
+no-default pass does not establish provider feature absence. Initial test-harness
+failures and this corrected portability finding are retained in task evidence.
+
+Standard grouped package verification passes offline with a single registry
+Themis 0.11.3 identity; it uses Cargo's temporary registry for unpublished core
+0.9.3 and does not claim publication acceptance. Initial online refresh failed
+DNS; subsequent sanctioned standard verification refreshed the index and passed.
+The initial registered-context import failed while writing Git objects
+(`Operation not permitted`). Read-only diagnosis found a task sandbox boundary,
+matching OS ownership with no immutable flags, and all nine new objects absent.
+A sanctioned per-command approval then imported reviewed pre-delivery source into the same
+store. The owner checkout HEAD/branch/clean status, hooks and configuration remain
+unchanged. No persistent access, permission, alternate store or hook bypass is
+introduced. Final review, registered pre-push, draft and hosted outcomes are
+recorded by exact revision; these do not establish merge/publication acceptance.
+
 ## HERMES-EUNOMIA-011-RANGE [patch] — compatible bridge verification in progress
 
 The default `^0.10` requirement excludes approved Eunomia 0.11. Existing PR

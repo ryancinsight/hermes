@@ -1,6 +1,53 @@
 # Checklist — active sprint
 
-Target for this slice: four libraries 0.9.1; unchanged macros 0.9.0.
+Target for this slice: core/facade 0.9.3; intrinsics/types 0.9.2 and macros 0.9.0 unchanged.
+
+## HERMES-THEMIS-0113-ADOPTION [patch]
+
+- [x] Verify current main, all open PRs, local branches and the existing
+      authorized registered-hook context; preserve AXPY and other owner work.
+- [x] Verify published Themis 0.11.3 checksum/source and raise its canonical
+      direct minimum; select the [shipped source](https://github.com/ryancinsight/themis/commit/ce395b01a7c0eb7878a8b25a11031b3d2887cc91) without a manifest revision pin.
+- [x] Limit release bookkeeping to the two direct consumers, core/facade 0.9.3;
+      retain all unrelated external lock identities and other package versions.
+- [x] Qualify stale-provider resolver rejection and typed locality absence.
+- [x] Pass native/MSRV/Miri and strict patch public API comparisons.
+- [x] Verify clean standard offline packages and normalized source identity;
+      preserve exact final-commit receipts in task evidence.
+- [ ] Obtain independent review of the final commit and pass unchanged hooks.
+- [ ] Open a draft PR and record its exact-head hosted outcomes.
+- [ ] Later qualification only: normal merge/publication and registry/downstream
+      acceptance; no merge, publication or deployment in this initial pass.
+
+Local source qualification: 511 all-feature native tests pass, zero skips;
+the unsupported-platform absence case passes on macOS with and without default
+features, and under Miri isolation. No-default compilation is checked separately;
+it does not establish that dependency feature unification disables Themis `std`.
+Required core/intrinsics Miri executes 27/18 passing cases (two existing core
+skips); both affected public API comparisons pass 223 rules/30 inapplicable
+rules. Formatting, strict diagnostics, Rust 1.95 and docs/doctests pass.
+Package/review receipts are retained in local task evidence. The initial
+registered-store import failed at the task sandbox boundary; a sanctioned
+per-command approval imported reviewed pre-delivery source through the same store after
+read-only partial-outcome checks. Owner refs, clean status, hooks and configuration
+are preserved. Final hook/draft/hosted acceptance remains revision-scoped; no
+merge, publication or deployment is authorized in this pass. Initial online
+refresh failed DNS; subsequent sanctioned standard package verification refreshed
+the index and passed. Earlier offline receipts remain separately qualified.
+
+Local reconciliation after main #267:
+
+- [x] Preserve the new owner code and both changelog entries in an isolated lane.
+- [x] Reassess both collapsed supertraits using four fresh strict patch API
+      comparisons and an unchanged external seven-interface consumer on 0.9.2.
+- [x] Renew native coverage (512 pass, zero skips), lint, MSRV, minimal builds,
+      docs/doctests and required Miri on the reconciled source.
+- [ ] Record clean final-candidate normalized packages, downstream consumer and
+      independent review in the local handoff receipt.
+- [ ] Later authorized work only: push the reconciliation and renew hosted checks.
+
+This bounded pass prepares local commits only. The direct-approval lifecycle
+hold is unchanged; no ready/merge/publication/deployment retry is authorized.
 
 ## HERMES-EUNOMIA-011-RANGE [patch]
 

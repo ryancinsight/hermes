@@ -1,5 +1,58 @@
 # Backlog — hermes-simd
 
+<a id="HERMES-THEMIS-0113-ADOPTION"></a>
+## HERMES-THEMIS-0113-ADOPTION — Require consistent CPU sibling partitions [patch] — todo
+
+- priority: correctness; status: todo; owner: Codex;
+  needs: final registered-hook and exact-head hosted acceptance.
+- Scope: the two direct topology consumers, core/facade 0.9.3, and their
+  canonical Themis minimum/lock. Intrinsics/types stay 0.9.2; macros stay 0.9.0.
+- Finding: main `06ff7752` still permits Themis 0.11.1, predating the shipped
+  sibling-partition repair. Themis #109 requires equal normalized sibling sets
+  along every membership, preserving valid partitions and typed absence.
+- Source: published Themis 0.11.3 at [shipped source](https://github.com/ryancinsight/themis/commit/ce395b01a7c0eb7878a8b25a11031b3d2887cc91);
+  canonical Git URL plus version, without `rev`, branch, tag or path override.
+- Acceptance: reject the formerly admitted stale provider; preserve unsupported
+  locality as `None`; pass native/MSRV/Miri, API and normalized-package checks,
+  final-commit independent review, intact hooks and exact-head hosted checks.
+- Preserve all AXPY implementations, native deadlines and unrelated external
+  provider identities. No broad cohort advance or downstream speedup is claimed.
+- Local evidence: baseline accepts the explicit 0.11.1 source; the new minimum
+  rejects that same source with the expected `^0.11.3` constraint. All 511
+  native cases pass, zero skips; unsupported-platform/Miri typed absence passes.
+  No-default compilation passes separately; dependency feature unification can
+  still enable Themis `std`. Required
+  core/intrinsics Miri passes 27/18 cases with two existing core skips. Both
+  strict patch API comparisons pass 223 rules/30 inapplicable rules; Rust 1.95,
+  strict lint and docs pass. Standard grouped offline package verification
+  passes with the real registry Themis dependency; final receipts remain
+  revision-scoped. Initial online refresh failed DNS inside the task sandbox;
+  subsequent sanctioned standard verification refreshed the index and passed.
+- Delivery history: the initial corrected-commit import failed with `Operation
+  not permitted` at the task sandbox boundary. Read-only checks found all nine
+  new objects absent. A sanctioned per-command approval then imported reviewed
+  pre-delivery source through the same registered store, preserving owner refs, clean
+  status, hooks and configuration. No persistent access or permissions changed.
+  Final independent review, unchanged hooks, draft and hosted outcomes are
+  recorded as revision-scoped acceptance evidence; they are not merge approval.
+- Delivery: draft only in this pass. Merge, publication, registry receipts and
+  downstream performance/cohort acceptance remain later qualification.
+- Local reconciliation after [main PR #267](https://github.com/ryancinsight/hermes/pull/267):
+  preserve all seven owner source edits introducing `SealedOp`/`SimdMarker` and
+  retain both changelog entries. The only textual merge conflict was the changelog.
+  The helper traits have blanket implementations for exactly the previous bounds;
+  this does not introduce a new sealing boundary. Four renewed registry-baseline
+  patch API comparisons pass 223 rules each. An identical downstream consumer
+  implements all seven interfaces on published core 0.9.2 and the reconciled
+  workspace, with computed scalar values and independently checked implied bounds.
+  Renewed local native coverage passes 512 cases, zero skips; strict diagnostics,
+  Rust 1.95, minimal builds, docs/doctests and required Miri pass. Clean normalized
+  package and final independent-review results belong to the local candidate receipt.
+- Current scope/hold: local preparation only; do not push, mark ready, merge,
+  publish or deploy. Remote #266 still names the older conflicting head. The
+  repeated lifecycle approval rejection remains in force. Historical pre-rebase
+  checks do not qualify this changed source, and no publication outcome is claimed.
+
 <a id="HERMES-EUNOMIA-011-RANGE"></a>
 ## HERMES-EUNOMIA-011-RANGE — Admit the approved Eunomia provider bundle [patch] — todo
 
