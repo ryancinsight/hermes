@@ -1,6 +1,6 @@
 [package]
 name = "hermes-simd"
-version.workspace = true
+version = "0.9.3"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -12,7 +12,7 @@ readme = "README.md"
 keywords = ["simd", "vectorization", "avx512", "neon", "performance"]
 
 [dependencies]
-hermes-simd-core = { path = "../hermes-simd-core", version = "0.9.1", default-features = false }
+hermes-simd-core = { path = "../hermes-simd-core", version = "0.9.3", default-features = false }
 hermes-simd-intrinsics = { path = "../hermes-simd-intrinsics", version = "0.9.1", default-features = false }
 eunomia = { workspace = true }
 hermes-simd-macros = { path = "../hermes-simd-macros", version = "0.9.0" }
