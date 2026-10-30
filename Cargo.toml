@@ -137,7 +137,7 @@ manual_is_multiple_of = "allow"        # 24 (24 prod)
 # Canonical source identities; Cargo.lock selects reviewed cohort revisions.
 mnemosyne = { package = "mnemosyne-memory", git = "https://github.com/ryancinsight/Mnemosyne.git", version = "0.10.0", default-features = false }
 themis = { package = "themis-topology", git = "https://github.com/ryancinsight/themis", version = "0.11.1", default-features = false }
-eunomia = { version = ">=0.10.0, <0.12.0", git = "https://github.com/ryancinsight/eunomia", default-features = false }
+eunomia = { version = ">=0.10.0, <0.13.0", git = "https://github.com/ryancinsight/eunomia", default-features = false }
 tracing = { version = "0.1", default-features = false }
 
 # Integer overflow must trap during development and tests (numerical-discipline
