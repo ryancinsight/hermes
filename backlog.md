@@ -1,10 +1,12 @@
 # Backlog — hermes-simd
 
 <a id="HERMES-TENSOR-STORAGE-20261030"></a>
-## HERMES-TENSOR-STORAGE-20261030 — Validate strided views and projections [patch] — in-progress
+## HERMES-TENSOR-STORAGE-20261030 — Validate strided views and projections [patch] — todo
 
-- status: in-progress; priority: correctness; owner: Codex task
+- status: todo; priority: correctness; owner: Codex task
   `01a17995-4c0b-701d-8625-8650165230c2`.
+- basis: accepted out-of-storage layouts and incorrect public projection values
+  violate the tensor storage contract; repair before optimizing these paths.
 - scope: `crates/hermes-simd-core/src/tensor`, public regression coverage,
   repaired-core package minimums and release documentation. Target: four
   libraries 0.9.3; unchanged macros 0.9.0.
