@@ -28,6 +28,20 @@ rather than on this crate directly.
 Alignment, execution mode, and reference mutability are compile-time type
 parameters with zero layout overhead.
 
+## Tensor storage contract
+
+`TensorView` validates logical cardinality and every reachable strided offset.
+For a nonempty shape, `1 + sum((shape[k] - 1) * stride[k])` must fit `usize`
+and the backing slice. Any zero axis makes the view empty; rank zero contains
+one scalar. Invalid layouts return `TensorError::ShapeMismatch` without relying
+on debug overflow checks.
+
+Explicit strides may repeat storage positions. Row/column projections preserve
+those strides and values; mutable element access requires an exclusive borrow.
+`as_slice` exposes physical storage order, including any padding. Contiguous
+row iteration and rank-one SIMD promotion instead honor the logical extent;
+SIMD promotion rejects empty or noncontiguous views.
+
 ## Feature flags
 
 | Feature | Description |

@@ -1,5 +1,20 @@
 # Checklist — active sprint
 
+## HERMES-TENSOR-STORAGE-20261030 [patch]
+
+- [x] Verify current main and non-overlap with open hook/provider work; preserve
+      closed rescue source records and the canonical isolated lane.
+- [x] Specify cardinality, reachable offsets and projection/aliasing contracts.
+- [x] Reproduce public behavior on base: 15 failures and one passing control.
+- [x] Repair constructors/projections and pass 18 focused tests, including
+      1,152 enumerated layouts and mutable backing-storage readback.
+- [x] Advance four library versions to 0.9.3 and direct core floors to 0.9.3;
+      preserve macros 0.9.0 and every external dependency/source lock record.
+- [ ] Complete exact-revision native, docs, minimal/MSRV, Miri and API/package gates.
+- [ ] Obtain independent final-source review and pass unchanged hosted checks.
+- [ ] Deliver through normal hooks; verify merge/source, package publication and
+      any automatic documentation deployment before declaring completion.
+
 Target for this slice: four libraries 0.9.1; unchanged macros 0.9.0.
 
 ## HERMES-EUNOMIA-011-RANGE [patch]

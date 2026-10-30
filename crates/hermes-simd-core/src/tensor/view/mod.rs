@@ -15,7 +15,7 @@ use core::marker::PhantomData;
 
 use super::error::TensorError;
 use super::layout::{ColMajor, Layout, RowMajor};
-use super::strides::{compute_offset, row_major_strides};
+use super::strides::{checked_element_count, compute_offset, row_major_strides, validate_strides};
 
 mod rank_ops;
 mod simd_bridge;
@@ -34,9 +34,11 @@ mod simd_bridge;
 /// - `Ref` — reference type-state (`&'a [T]` or `&'a mut [T]`).
 ///
 /// # Invariants
-/// - `strides[i] * shape[i]` must not overflow `usize`.
-/// - `data.len() >= ∑ (shape[i]-1) * strides[i] + 1` for any valid element access.
-/// - `new` and `with_strides` both verify `product(shape) <= data.len()`.
+/// - The logical element count fits `usize`; any zero axis makes it zero.
+/// - For a nonempty view, `∑ (shape[i]-1) * strides[i] + 1` fits `usize`
+///   and is at most `data.len()`. Empty views have no reachable offsets.
+/// - Explicit strides may repeat storage positions. Mutable access borrows
+///   the view exclusively and never yields aliased element references.
 pub struct TensorView<'a, T: 'a, const N: usize, Layout = RowMajor, Ref = &'a [T]> {
     pub(super) ptr: *mut [T],
     pub(super) shape: [usize; N],
@@ -77,7 +79,8 @@ impl<'b, T, const N: usize> TensorView<'_, T, N, RowMajor, &'b [T]> {
     /// Strides are computed as `strides[i] = ∏_{j=i+1..N} shape[j]` (C-order).
     ///
     /// # Errors
-    /// Returns [`TensorError::ShapeMismatch`] if `∏ shape > data.len()`.
+    /// Returns [`TensorError::ShapeMismatch`] if the element count overflows
+    /// `usize` or exceeds `data.len()`.
     ///
     /// # Examples
     ///
@@ -93,7 +96,7 @@ impl<'b, T, const N: usize> TensorView<'_, T, N, RowMajor, &'b [T]> {
     /// ```
     #[inline]
     pub fn new(data: &'b [T], shape: [usize; N]) -> Result<Self, TensorError> {
-        let elem_count = shape.iter().product::<usize>();
+        let elem_count = checked_element_count(&shape)?;
         if elem_count > data.len() {
             return Err(TensorError::ShapeMismatch);
         }
@@ -115,10 +118,11 @@ impl<'b, T, const N: usize> TensorView<'_, T, N, RowMajor, &'b mut [T]> {
     /// Create a mutable row-major tensor view over `data` with the given `shape`.
     ///
     /// # Errors
-    /// Returns [`TensorError::ShapeMismatch`] if `∏ shape > data.len()`.
+    /// Returns [`TensorError::ShapeMismatch`] if the element count overflows
+    /// `usize` or exceeds `data.len()`.
     #[inline]
     pub fn new_mut(data: &'b mut [T], shape: [usize; N]) -> Result<Self, TensorError> {
-        let elem_count = shape.iter().product::<usize>();
+        let elem_count = checked_element_count(&shape)?;
         if elem_count > data.len() {
             return Err(TensorError::ShapeMismatch);
         }
@@ -139,20 +143,20 @@ impl<'b, T, const N: usize> TensorView<'_, T, N, RowMajor, &'b mut [T]> {
 impl<'b, T, const N: usize, L: Layout> TensorView<'_, T, N, L, &'b [T]> {
     /// Create a tensor view with explicit strides.
     ///
-    /// Allows column-major, blocked, or any custom layout.
+    /// Allows column-major, blocked, or any custom layout, including zero
+    /// strides that repeat storage positions.
     ///
     /// # Errors
-    /// Returns [`TensorError::ShapeMismatch`] if `∏ shape > data.len()`.
+    /// Returns [`TensorError::ShapeMismatch`] if the logical element count or
+    /// reachable storage span overflows `usize`, or any element lies outside
+    /// `data`. Empty shapes have no reachable elements.
     #[inline]
     pub fn with_strides(
         data: &'b [T],
         shape: [usize; N],
         strides: [usize; N],
     ) -> Result<Self, TensorError> {
-        let elem_count = shape.iter().product::<usize>();
-        if elem_count > data.len() {
-            return Err(TensorError::ShapeMismatch);
-        }
+        validate_strides(data.len(), &shape, &strides)?;
         Ok(Self {
             ptr: core::ptr::from_ref(data).cast_mut(),
             shape,
@@ -166,17 +170,17 @@ impl<'a, 'b, T, const N: usize, L: Layout> TensorView<'a, T, N, L, &'b mut [T]> 
     /// Create a mutable tensor view with explicit strides.
     ///
     /// # Errors
-    /// Returns [`TensorError::ShapeMismatch`] if `∏ shape > data.len()`.
+    /// Returns [`TensorError::ShapeMismatch`] if the logical element count or
+    /// reachable storage span overflows `usize`, or any element lies outside
+    /// `data`. Repeated logical positions are permitted; mutable access still
+    /// requires an exclusive borrow of the view.
     #[inline]
     pub fn with_strides_mut(
         data: &'b mut [T],
         shape: [usize; N],
         strides: [usize; N],
     ) -> Result<Self, TensorError> {
-        let elem_count = shape.iter().product::<usize>();
-        if elem_count > data.len() {
-            return Err(TensorError::ShapeMismatch);
-        }
+        validate_strides(data.len(), &shape, &strides)?;
         Ok(Self {
             ptr: core::ptr::from_mut(data),
             shape,
@@ -208,10 +212,11 @@ impl<'b, T> TensorView<'_, T, 2, ColMajor, &'b [T]> {
     /// Fortran strides: `strides[0] = 1`, `strides[1] = shape[0]`.
     ///
     /// # Errors
-    /// Returns [`TensorError::ShapeMismatch`] if `shape[0] * shape[1] > data.len()`.
+    /// Returns [`TensorError::ShapeMismatch`] if the element count overflows
+    /// `usize` or exceeds `data.len()`.
     #[inline]
     pub fn new_col_major(data: &'b [T], shape: [usize; 2]) -> Result<Self, TensorError> {
-        let elem_count = shape[0] * shape[1];
+        let elem_count = checked_element_count(&shape)?;
         if elem_count > data.len() {
             return Err(TensorError::ShapeMismatch);
         }
@@ -249,14 +254,19 @@ impl<'a, T, const N: usize, L, Ref> TensorView<'a, T, N, L, Ref> {
     #[inline]
     #[must_use]
     pub fn num_elements(&self) -> usize {
-        self.shape.iter().product()
+        if self.is_empty() {
+            0
+        } else {
+            // Construction proves the product fits for every nonempty view.
+            self.shape.iter().product()
+        }
     }
 
     /// Returns `true` if the tensor is empty (one of its dimensions is 0).
     #[inline]
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.num_elements() == 0
+        self.shape.contains(&0)
     }
 
     /// Whether this view is contiguous in row-major order.
@@ -312,7 +322,7 @@ impl<'a, T, const N: usize, L, Ref> TensorView<'a, T, N, L, Ref> {
     /// # Errors
     /// Returns [`TensorError::NotContiguous`] when the source is not
     /// contiguous, or [`TensorError::ShapeMismatch`] when the element counts
-    /// of the old and new shapes differ.
+    /// of the old and new shapes differ or the new count overflows `usize`.
     #[inline]
     pub fn reshape<const M: usize>(
         self,
@@ -321,8 +331,8 @@ impl<'a, T, const N: usize, L, Ref> TensorView<'a, T, N, L, Ref> {
         if !self.is_contiguous() {
             return Err(TensorError::NotContiguous);
         }
-        let old_count: usize = self.shape.iter().product();
-        let new_count: usize = new_shape.iter().product();
+        let old_count = self.num_elements();
+        let new_count = checked_element_count(&new_shape)?;
         if old_count != new_count {
             return Err(TensorError::ShapeMismatch);
         }

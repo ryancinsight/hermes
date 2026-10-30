@@ -1,5 +1,20 @@
 # Changelog
 
+## Tensor view storage bounds — 0.9.3
+
+### Fixed
+
+- [patch] Check tensor cardinality and the maximum reachable strided offset
+  without overflow. Empty axes have zero cardinality; rank zero is one scalar.
+- Preserve column strides in immutable and mutable row projections and column
+  iteration. Preserve valid zero-stride layouts and singleton diagonals.
+- Restrict mutable row iteration and rank-one SIMD promotion to the logical
+  extent. Empty row iteration yields the declared row count without a panic;
+  noncontiguous or empty rank-one views do not become SIMD views.
+- Four libraries advance to 0.9.3 and require the repaired core through their
+  direct edges; the macros package remains 0.9.0. External provider requirements,
+  committed sources, features and validation gates are unchanged.
+
 ## Sealed-op marker supertraits — Unreleased
 
 ### Changed
