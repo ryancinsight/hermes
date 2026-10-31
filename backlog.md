@@ -1,5 +1,30 @@
 # Backlog — hermes-simd
 
+<a id="HERMES-TENSOR-STORAGE-20261030"></a>
+## HERMES-TENSOR-STORAGE-20261030 — Validate strided views and projections [patch] — todo
+
+- status: todo; priority: correctness; owner: Codex task
+  `01a17995-4c0b-701d-8625-8650165230c2`.
+- basis: accepted out-of-storage layouts and incorrect public projection values
+  violate the tensor storage contract; repair before optimizing these paths.
+- scope: `crates/hermes-simd-core/src/tensor`, public regression coverage,
+  repaired-core package minimums and release documentation. Target: four
+  libraries 0.9.3; unchanged macros 0.9.0.
+- Contract: cardinality is zero when any axis is zero; otherwise its product
+  fits `usize`. Every nonempty explicit-stride view proves
+  `1 + sum((shape[k] - 1) * stride[k]) <= storage.len()` using checked arithmetic.
+  Rank zero needs one element. Zero strides may repeat positions; mutation
+  exclusively borrows the view and exposes no aliased element references.
+- Projections retain parent strides. Contiguous row iterators and rank-one SIMD
+  promotion expose only logical elements. Empty shapes never calculate an
+  unreachable offset; a singleton diagonal does not add unused strides.
+- Evidence: public API tests on main `8d747f2d` reproduce 15 failures and one
+  passing control. The repaired 18-test target passes, including 1,152 layouts
+  checked against enumerated coordinates and backing-storage readback.
+- Remaining acceptance: exact-revision full native, Miri, API/package and hosted
+  gates; independent review; normal delivery; registry and documentation receipts.
+  Existing hook/provider PRs and the closed rescue source records remain intact.
+
 <a id="HERMES-EUNOMIA-011-RANGE"></a>
 ## HERMES-EUNOMIA-011-RANGE — Admit the approved Eunomia provider bundle [patch] — todo
 

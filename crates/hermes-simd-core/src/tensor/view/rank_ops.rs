@@ -11,6 +11,21 @@ use super::TensorView;
 use crate::tensor::error::TensorError;
 use crate::tensor::layout::{ColMajor, RowMajor};
 
+impl<T, L, Ref> TensorView<'_, T, 2, L, Ref> {
+    /// The parent proves every offset in a nonempty row is in storage.
+    fn row_range(&self, i: usize) -> Result<core::ops::Range<usize>, TensorError> {
+        if i >= self.shape[0] {
+            return Err(TensorError::IndexOutOfBounds);
+        }
+        let columns = self.shape[1];
+        if columns == 0 {
+            return Ok(0..0);
+        }
+        let start = i * self.strides[0];
+        Ok(start..start + (columns - 1) * self.strides[1] + 1)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // 2-D specific methods — read-only
 // ---------------------------------------------------------------------------
@@ -25,15 +40,11 @@ impl<'a, 'b, T, L> TensorView<'a, T, 2, L, &'b [T]> {
         &self,
         i: usize,
     ) -> Result<TensorView<'a, T, 1, RowMajor, &'b [T]>, TensorError> {
-        if i >= self.shape[0] {
-            return Err(TensorError::IndexOutOfBounds);
-        }
-        let row_start = i * self.strides[0];
+        let range = self.row_range(i)?;
         let row_len = self.shape[1];
         // SAFETY: ptr lives for 'b (it was constructed from &'b [T])
         let full_slice: &'b [T] = unsafe { &*self.ptr };
-        let row_data = &full_slice[row_start..row_start + row_len];
-        TensorView::new(row_data, [row_len])
+        TensorView::with_strides(&full_slice[range], [row_len], [self.strides[1]])
     }
 
     /// Iterate over row slices of a contiguous 2-D tensor.
@@ -84,8 +95,9 @@ impl<'a, 'b, T, L> TensorView<'a, T, 2, L, &'b [T]> {
         }
         let nrows = self.shape[0];
         let row_str = self.strides[0];
+        let col_str = self.strides[1];
         let slice = self.as_slice();
-        Ok((0..nrows).map(move |i| slice[j + i * row_str]))
+        Ok((0..nrows).map(move |i| slice[j * col_str + i * row_str]))
     }
 
     /// Iterate over main diagonal elements (min(rows, cols) elements).
@@ -97,9 +109,9 @@ impl<'a, 'b, T, L> TensorView<'a, T, 2, L, &'b [T]> {
         T: Copy,
     {
         let diag_len = self.shape[0].min(self.shape[1]);
-        let diag_str = self.strides[0] + self.strides[1];
+        let [row_str, col_str] = self.strides;
         let slice = self.as_slice();
-        (0..diag_len).map(move |i| slice[i * diag_str])
+        (0..diag_len).map(move |i| slice[i * row_str + i * col_str])
     }
 }
 
@@ -117,14 +129,10 @@ impl<'a, T, L> TensorView<'a, T, 2, L, &mut [T]> {
         &mut self,
         i: usize,
     ) -> Result<TensorView<'a, T, 1, RowMajor, &mut [T]>, TensorError> {
-        if i >= self.shape[0] {
-            return Err(TensorError::IndexOutOfBounds);
-        }
-        let row_start = i * self.strides[0];
+        let range = self.row_range(i)?;
         let row_len = self.shape[1];
         let slice = unsafe { &mut *self.ptr };
-        let row_data = &mut slice[row_start..row_start + row_len];
-        TensorView::new_mut(row_data, [row_len])
+        TensorView::with_strides_mut(&mut slice[range], [row_len], [self.strides[1]])
     }
 
     /// Iterate over mutable row slices of a contiguous 2-D tensor.
@@ -136,9 +144,16 @@ impl<'a, T, L> TensorView<'a, T, 2, L, &mut [T]> {
         if !self.is_contiguous() {
             return Err(TensorError::NotContiguous);
         }
-        let ncols = self.shape[1];
+        let [nrows, ncols] = self.shape;
+        let count = self.num_elements();
         let slice = unsafe { &mut *self.ptr };
-        Ok(slice.chunks_exact_mut(ncols))
+        let mut remaining = &mut slice[..count];
+        Ok((0..nrows).map(move |_| {
+            // Splitting at zero is valid and yields the required empty rows.
+            let (row, tail) = core::mem::take(&mut remaining).split_at_mut(ncols);
+            remaining = tail;
+            row
+        }))
     }
 }
 
@@ -166,9 +181,10 @@ impl<'a, T, L> TensorView<'a, T, 3, L, &'a [T]> {
         }
         let rows = self.shape[1];
         let cols = self.shape[2];
-        let start = b * rows * cols;
+        let size = rows * cols;
+        let start = b * size;
         let full_slice: &[T] = self.as_slice();
-        let slice = &full_slice[start..start + rows * cols];
+        let slice = &full_slice[start..start + size];
         TensorView::<'_, T, 2, RowMajor, &'_ [T]>::new(slice, [rows, cols])
     }
 }
@@ -193,9 +209,10 @@ impl<'a, T, L> TensorView<'a, T, 3, L, &'a mut [T]> {
         }
         let rows = self.shape[1];
         let cols = self.shape[2];
-        let start = b * rows * cols;
+        let size = rows * cols;
+        let start = b * size;
         let slice = unsafe { &mut *self.ptr };
-        let sub_slice = &mut slice[start..start + rows * cols];
+        let sub_slice = &mut slice[start..start + size];
         TensorView::<'_, T, 2, RowMajor, &'_ mut [T]>::new_mut(sub_slice, [rows, cols])
     }
 }

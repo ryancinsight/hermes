@@ -19,8 +19,9 @@ where
 {
     /// Promote this contiguous rank-1 view into a typed [`SimdView`].
     ///
-    /// Zero-copy: shares the same underlying slice. Returns `None` if the slice is empty
-    /// or if the alignment check fails for `Align`.
+    /// Zero-copy: shares exactly the logical elements of the underlying slice.
+    /// Returns `None` for a noncontiguous or empty view, or if the alignment
+    /// check fails for `Align`.
     ///
     /// # Example
     ///
@@ -42,11 +43,14 @@ where
         Arch: SimdArch + SimdKernel<T>,
         Align: Alignment,
     {
+        if self.is_empty() || !self.is_contiguous() {
+            return None;
+        }
         // SAFETY: this impl is bound to `Ref = &'a [T]` (an immutable shared
         // borrow constructed for `'a`), so the `*mut [T]` was originally a
         // `&'a [T]`; reconstructing a `&'a [T]` from it is sound, and
         // `SimdView::new` reborrows it for the same `'a`.
         let slice: &'a [T] = unsafe { &*self.ptr };
-        SimdView::new(slice)
+        SimdView::new(&slice[..self.num_elements()])
     }
 }

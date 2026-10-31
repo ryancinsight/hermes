@@ -1,5 +1,26 @@
 # Gap Audit - hermes-simd
 
+## HERMES-TENSOR-STORAGE-20261030 [patch] — qualification in progress
+
+The public explicit-stride constructors validated logical cardinality but not
+reachable storage. Four backing elements with shape `[2, 2]` and strides `[3, 1]`
+were accepted even though logical index `[1, 1]` addresses offset four. No
+out-of-bounds unchecked read was executed to reproduce this constructor defect.
+A column-major row over `[10, 11, 20, 21, 30, 31]` returned `[11, 20, 21]`
+instead of `[11, 21, 31]`; column iteration and mutable row writes also ignored
+column strides. Empty/oversized shapes, singleton strides, trailing storage and
+rank-one SIMD promotion exposed related projection/cardinality failures.
+
+Checked cardinality and reachable-span validation now establish the shared
+constructor invariant. Row projections preserve the column stride; diagonal
+arithmetic evaluates only reachable offsets; contiguous iterators and SIMD
+promotion honor logical extent. The public regression target records 15 red
+failures plus one passing control before the repair, then 18 passing tests,
+including an independent enumeration of 1,152 small layouts. Strict workspace
+all-target Clippy passes before the final empty-view guard; final qualification
+and independent review remain required. Existing provider, NUMA, codegen and
+rescue ownership records are preserved; this finding does not close those gaps.
+
 ## HERMES-EUNOMIA-011-RANGE [patch] — compatible bridge verification in progress
 
 The default `^0.10` requirement excludes approved Eunomia 0.11. Existing PR

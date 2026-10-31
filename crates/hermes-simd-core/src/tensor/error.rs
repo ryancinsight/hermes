@@ -3,7 +3,8 @@
 /// Error type for tensor construction and indexing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TensorError {
-    /// The element count derived from `shape` does not fit in `data.len()`.
+    /// The logical element count or reachable span overflows, or the layout
+    /// addresses an element outside the backing storage.
     ShapeMismatch,
     /// A row or slice index is out of bounds.
     IndexOutOfBounds,
