@@ -12,7 +12,12 @@ pub trait SparseShape {
 }
 
 /// Generic CSR matrix storage.
-#[derive(Clone)]
+///
+/// `Copy` holds exactly when the storage is borrowed (`CsrData` and friends):
+/// the struct is a fat-pointer bundle plus dimensions, so a per-iteration
+/// `.clone()` in a benchmark loop was already shallow — `Copy` makes the
+/// by-value kernel signature cost-free without touching the API.
+#[derive(Clone, Copy)]
 pub struct CsrMatrix<T, V, I> {
     /// Non-zero values, length `nnz`.
     pub values: V,
@@ -90,7 +95,10 @@ impl<T, V: AsRef<[T]>, I: AsRef<[i32]>> CsrMatrix<T, V, I> {
 pub type CsrData<'a, T> = CsrMatrix<T, &'a [T], &'a [i32]>;
 
 /// Generic Sliced ELLPACK matrix storage.
-#[derive(Clone)]
+///
+/// `Copy` holds exactly when the storage is borrowed (`SellPData`): the struct
+/// is a fat-pointer bundle plus dimensions (see `CsrMatrix`).
+#[derive(Clone, Copy)]
 pub struct SellPMatrix<T, const C: usize, V, I> {
     /// Padded non-zero values.
     pub values: V,
@@ -167,7 +175,10 @@ impl<T, const C: usize, V: AsRef<[T]>, I: AsRef<[i32]>> SellPMatrix<T, C, V, I> 
 pub type SellPData<'a, T, const C: usize> = SellPMatrix<T, C, &'a [T], &'a [i32]>;
 
 /// Generic Blocked COO matrix storage.
-#[derive(Clone)]
+///
+/// `Copy` holds exactly when the storage is borrowed (`BlockedCooData`): the
+/// struct is a fat-pointer bundle plus dimensions (see `CsrMatrix`).
+#[derive(Clone, Copy)]
 pub struct BlockedCooMatrix<T, const BM: usize, const BN: usize, V, I> {
     /// Flattened dense block data.
     pub blocks: V,
@@ -247,7 +258,10 @@ pub type BlockedCooData<'a, T, const BM: usize, const BN: usize> =
     BlockedCooMatrix<T, BM, BN, &'a [T], &'a [i32]>;
 
 /// Generic Dense matrix with a bit-packed structural non-zero mask.
-#[derive(Clone)]
+///
+/// `Copy` holds exactly when the storage is borrowed (`DenseWithMaskData`):
+/// the struct is a fat-pointer bundle plus dimensions (see `CsrMatrix`).
+#[derive(Clone, Copy)]
 pub struct DenseWithMaskMatrix<T, V, M> {
     /// Dense value array, row-major.
     pub values: V,
@@ -357,7 +371,11 @@ pub type DenseWithMaskData<'a, T> = DenseWithMaskMatrix<T, &'a [T], PackedMask<&
 
 /// Sparse storage whose structural invariants have been checked once at
 /// construction.
-#[derive(Clone)]
+///
+/// `Copy` holds exactly when the wrapped storage is `Copy` (all borrowed
+/// views); owned storage keeps move-only semantics, so no deep buffer is ever
+/// duplicated by an implicit copy.
+#[derive(Clone, Copy)]
 pub struct ValidatedData<S> {
     inner: S,
 }

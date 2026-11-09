@@ -103,6 +103,13 @@ fn gather_bound_reference(col_idx: &[i32], x: &[f32]) -> Vec<f32> {
 
 fn bench_spmv_csr_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("spmv_csr_f32");
+    // Same flat, bounded sampling as the gather-bound series below: this group
+    // holds the cache-resident densities, and Criterion's default linear
+    // 1+...+N iteration schedule would otherwise dominate the wall clock.
+    group.sampling_mode(SamplingMode::Flat);
+    group.warm_up_time(Duration::from_millis(100));
+    group.measurement_time(Duration::from_millis(500));
+    group.sample_size(10);
 
     for &(label, density) in DENSITIES {
         let (row_ptr, col_idx, values) = build_csr(NROWS, NCOLS, density);
@@ -118,8 +125,10 @@ fn bench_spmv_csr_f32(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("scalar", label), &label, |bench, _| {
             bench.iter(|| {
                 // Reset output each iteration to get consistent results.
+                // `data` is `Copy` (borrowed CSR view), so this re-passes the
+                // validated handle by value with no per-iteration allocation.
                 y.fill(0.0);
-                spmv_csr::<f32>(black_box(data.clone()), black_box(&x), black_box(&mut y));
+                spmv_csr::<f32>(black_box(data), black_box(&x), black_box(&mut y));
             });
         });
     }
@@ -149,7 +158,7 @@ fn bench_spmv_csr_gather_bound_f32(c: &mut Criterion) {
         ))
         .expect("gather-bound CSR fixture must validate");
 
-        spmv_csr::<f32>(data.clone(), &x, &mut y);
+        spmv_csr::<f32>(data, &x, &mut y);
         assert_eq!(y, expected, "gather-bound CSR fixture reference mismatch");
 
         let structural_nonzeros =
@@ -158,7 +167,7 @@ fn bench_spmv_csr_gather_bound_f32(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(nrows), &nrows, |bench, _| {
             bench.iter(|| {
                 y.fill(0.0);
-                spmv_csr::<f32>(black_box(data.clone()), black_box(&x), black_box(&mut y));
+                spmv_csr::<f32>(black_box(data), black_box(&x), black_box(&mut y));
                 black_box(y.as_slice());
             });
         });

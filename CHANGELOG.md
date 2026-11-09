@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- [minor] `hermes-simd-core` sparse views (`CsrMatrix`, `SellPMatrix`,
+  `BlockedCooMatrix`, `DenseWithMaskMatrix`, `ValidatedData`) gain `Copy`
+  when their storage is borrowed (`CsrData` and friends): the structs are
+  fat-pointer bundles plus dimensions, so a per-iteration `.clone()` was
+  already shallow and `Copy` makes by-value kernel signatures cost-free
+  without an API surface change. Owned storage remains move-only.
+- [patch] Benchmark binaries keep inside the 300 s per-binary cap with
+  flat sampling and bounded warm-up/measurement windows; no workload or
+  sample change.
+
 ## Sealed-op marker supertraits — Unreleased
 
 ### Changed

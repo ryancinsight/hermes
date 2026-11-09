@@ -8,6 +8,17 @@
 //! 0.01 = 1% active). Lower densities stress the scalar tail and mask overhead.
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use hermes_simd::{dot, masked_dot, masked_sum, sum};
+use std::time::Duration;
+
+/// Wall-clock budget shared by this binary's groups: ten benchmark IDs at flat
+/// sampling keep the binary inside the 300-second per-binary cap without
+/// removing a density or changing a timed region.
+fn configure(group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>) {
+    group.sampling_mode(criterion::SamplingMode::Flat);
+    group.warm_up_time(Duration::from_millis(100));
+    group.measurement_time(Duration::from_millis(500));
+    group.sample_size(10);
+}
 
 /// Generate a boolean mask with `density` fraction of `true` values.
 ///
@@ -21,6 +32,7 @@ fn make_mask(len: usize, density: f32) -> Vec<bool> {
 
 fn bench_masked_sum(c: &mut Criterion) {
     let mut group = c.benchmark_group("Masked Sum f32");
+    configure(&mut group);
     let size = 65536usize;
     let data = vec![1.0f32; size];
     group.throughput(Throughput::Elements(size as u64));
@@ -41,6 +53,7 @@ fn bench_masked_sum(c: &mut Criterion) {
 
 fn bench_masked_dot(c: &mut Criterion) {
     let mut group = c.benchmark_group("Masked Dot f32");
+    configure(&mut group);
     let size = 65536usize;
     let a = vec![1.0f32; size];
     let b = vec![2.0f32; size];
@@ -62,5 +75,12 @@ fn bench_masked_dot(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_masked_sum, bench_masked_dot);
+criterion_group! {
+    name = benches;
+    config = Criterion::default()
+        .warm_up_time(Duration::from_millis(100))
+        .measurement_time(Duration::from_millis(500))
+        .sample_size(10);
+    targets = bench_masked_sum, bench_masked_dot
+}
 criterion_main!(benches);

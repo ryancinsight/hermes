@@ -42,6 +42,11 @@ fn benchmark_group<'criterion>(
 ) -> BenchmarkGroup<'criterion, WallTime> {
     let mut group = criterion.benchmark_group(name);
     group.sampling_mode(SamplingMode::Flat);
+    // Sixteen benchmark IDs at flat sampling: 100 ms warm-up plus 500 ms
+    // measurement budgets ~9.6 seconds before analysis, inside the 300-second
+    // per-binary cap without removing a regime or changing a timed region.
+    group.warm_up_time(core::time::Duration::from_millis(100));
+    group.measurement_time(core::time::Duration::from_millis(500));
     // Increase sample count for better statistical significance
     group.sample_size(100);
     group
