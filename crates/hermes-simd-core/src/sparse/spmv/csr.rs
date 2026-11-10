@@ -119,8 +119,10 @@ where
         validate_spmv_sizes(x.len(), y.len(), data.ncols, data.nrows, "CSR");
 
         for r in 0..data.nrows {
-            let start = data.row_ptr[r] as usize;
-            let end = data.row_ptr[r + 1] as usize;
+            let start = usize::try_from(data.row_ptr[r])
+                .expect("invariant: Validated<Csr> row pointers are non-negative");
+            let end = usize::try_from(data.row_ptr[r + 1])
+                .expect("invariant: Validated<Csr> row pointers are non-negative");
             spmv_scaled_csr_row::<T, Arch>(
                 &data.values[start..end],
                 &data.col_indices[start..end],
@@ -238,7 +240,9 @@ fn spmv_scaled_row_tail<T, Arch>(
     while j < row_nnz {
         // SAFETY: validated columns and the entry size assertion prove
         // this index is in bounds.
-        acc += values[j] * unsafe { *x.get_unchecked(columns[j] as usize) };
+        let col = usize::try_from(columns[j])
+            .expect("invariant: Validated<Csr> column indices are non-negative");
+        acc += values[j] * unsafe { *x.get_unchecked(col) };
         j += 1;
     }
     *y_row += alpha * acc;
