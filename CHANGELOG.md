@@ -2,10 +2,16 @@
 
 ## Unreleased
 
-### Changed
+### Added
 
-- [minor] `hermes-simd-core` sparse views (`CsrMatrix`, `SellPMatrix`,
-  `BlockedCooMatrix`, `DenseWithMaskMatrix`, `ValidatedData`) gain `Copy`
+- [minor] Fused scaled-SpMV row kernel `spmv_scaled_csr_row`: `y += alpha·A·x`
+  in one row pass — the 4×-unrolled gather/FMA row body with the scalar
+  multiply folded before the accumulation, plus `unroll_tail_start` resume
+  arithmetic pinned by a partition test. Zero-copy borrowed slices, zero
+  extra buffer, row independence unchanged. Increments toward CG fused
+  updates that pair a SpMV with an `axpy` on the same row.
+- [minor] Sparse views (`CsrMatrix`, `SellPMatrix`, `BlockedCooMatrix`,
+  `DenseWithMaskMatrix`, `ValidatedData`) gain `Copy`
   when their storage is borrowed (`CsrData` and friends): the structs are
   fat-pointer bundles plus dimensions, so a per-iteration `.clone()` was
   already shallow and `Copy` makes by-value kernel signatures cost-free
