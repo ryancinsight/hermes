@@ -116,15 +116,21 @@ fn test_spmv_scaled_csr_matches_scalar_reference_f32() {
             cols.push(*c);
             values.push(*v);
         }
-        row_ptr.push(values.len() as i32);
+        row_ptr.push(i32::try_from(values.len()).expect("test matrix is tiny"));
     }
-    let x: Vec<f32> = (0..ncols).map(|c| (c + 1) as f32).collect();
+    let x: Vec<f32> = (0..ncols).map(|c| f32::from_count(c + 1)).collect();
     let y_init: Vec<f32> = vec![10.0, 20.0, 30.0, 40.0, 50.0];
     let alpha = 2.0f32;
 
     let mut want = y_init.clone();
     for (r, row) in rows.iter().enumerate() {
-        let dot: f32 = row.iter().map(|(c, v)| v * x[*c as usize]).sum();
+        let dot: f32 = row
+            .iter()
+            .map(|(c, v)| {
+                let col = usize::try_from(*c).expect("test column indices are non-negative");
+                v * x[col]
+            })
+            .sum();
         want[r] += alpha * dot;
     }
 
