@@ -1,74 +1,89 @@
-# ADR 025: Adopt the Eunomia 0.10 provider cohort
+# ADR 025: Coordinate Eunomia provider identities
 
 ## Status
 
-Accepted (2026-10-15)
+Accepted
 
-## Contract and decision
+Revision 2026-11-10: extend the provider-cohort decision to the already
+admitted 0.12 line and replace the historical delivery ledger with the
+current contract and evidence requirements.
 
-Hermes reexports Eunomia scalar types and exposes their traits through public
-generic kernels. The provider's CastFrom/CastTo retirement is versioned 0.10.0;
-its nominal type identities require a pre-1.0 minor boundary in Hermes. Advance
-the aligned Rust workspace line and internal package edges from 0.8.2 to 0.9.0.
-Require Eunomia 0.10.0 and the coordinated Mnemosyne-memory 0.10.0 line. Keep
-canonical Git URLs and Cargo-managed precise locks, without revision aliases,
-path patches or compatibility shims. Rust implementations, fixtures, assertions,
-precision choices and native deadlines are unchanged.
+## Context
 
-## Exact-head acceptance
+Hermes reexports Eunomia scalar types. `hermes-simd-core::Scalar` reexports
+`NumericElement`, and public kernels carry those provider traits and types.
+Two provider revisions with matching source names do not establish one
+nominal Rust type identity.
 
-[Reviewed head](https://github.com/ryancinsight/hermes/commit/cf8013a375501b746b41988e2d5beed90639baba)
-and [published merge](https://github.com/ryancinsight/hermes/commit/7a584238c3da61b7d38f09b1da1b277ff20816aa)
-share an [identical tree](https://github.com/ryancinsight/hermes/tree/83a3ba0e519a54fd65d4b4705ccabe99dc09c7e9).
-All twelve executed [final CI jobs](https://github.com/ryancinsight/hermes/actions/runs/38754537267)
-pass, including actual required Miri, SDE, native ARM/macOS/x86 and unchanged
-runtime budgets. All ten branch-required statuses pass; no requested review
-changes or review override exists. The unchanged tracked gate over the complete
-provider-lock range passes with zero conformance regressions and no baseline change.
+The original migration retires CastFrom/CastTo and advances Hermes from
+0.8.2 to 0.9.0 with Eunomia 0.10. The current manifest also admits 0.11 and
+0.12 through `>=0.10.0, <0.13.0`. That widening already lands in
+[the provider-admission commit](https://github.com/ryancinsight/hermes/commit/097e0a294f21bd2925fd3a26a134b4d577c223a2).
+The published 0.9.2 manifest predates the widening and requires `<0.12.0`.
 
-The final [blocking release validation](https://github.com/ryancinsight/hermes/actions/runs/38754801509)
-builds/classifies four ordinary-library published baselines from 0.8.2 to 0.9,
-with 260 rules skipped per library by the automatic major-compatible class.
-The existing caller excludes the unchanged proc-macro API; its Rust remains
-byte-identical and compiler/native plus standard package checks cover it.
-This is no backward-compatibility claim or release-type override; no unbuildable
-baseline fallback supplies the verdict. The core standard package dry-run
-passes, and all five clean exact-head all-feature workspace packages verify.
+## Decision
 
-The final runtime/lock passes all 507 native cases, zero skips, strict
-all-target/all-feature Clippy, minimal builds, warning-denied docs and 27
-doctests (ten existing illustrative ignores). The documentation successor
-changes no Rust/Cargo/workflow/deadline bytes; its full required CI and package
-results are collected at the exact reviewed head. The lock selects published
-Eunomia a231e54d, Mnemosyne b7e0e1e, Themis 63c54410 and Melinoe 681c550e.
-Required Miri establishes its unchanged declared core/intrinsics boundary only;
-held safety work and performance experiments remain untouched.
+Select one immutable provider version and Git revision for each resolved
+consumer graph. Direct scalar dependencies and Hermes's public bounds use
+that same provider identity. Keep the canonical Git URLs and Cargo-managed
+standalone locks. Resolve and test the graph outside the development overlay.
 
-## Immutable registry receipts
+A supported requirement range permits selection of a provider line; it does
+not assert interchangeability of types from different provider lines.
+Consumers that share scalar values or bounds move their direct dependency
+and lock to the selected line together. Value-only callers still undergo
+their actual consumer tests. Public-contract breaks require a compatible
+Hermes version boundary and a migration; widening a requirement alone is
+not compatibility evidence.
 
-The existing [publisher](https://github.com/ryancinsight/hermes/actions/runs/38756242324)
-succeeds after the normal guarded merge. All five archives are present and not
-yanked, independently checksum-matched, and their `.cargo_vcs_info.json` source
-identifies the published merge above.
+Do not restore retired cast traits, introduce revision aliases or forwarding
+adapters, or change precision or test assertions to accommodate a mixed graph.
+The provider-lock increment uses the existing admitted range and preserves
+the kernel source and public signatures from its fetched main basis.
 
-| Crate | Version | Registry SHA-256 |
-| --- | --- | --- |
-| `hermes-simd-core` | 0.9.0 | `22bc61312331fdc74923f331a885297962c03a73292f893a5a268e3d4b38a093` |
-| `hermes-simd-intrinsics` | 0.9.0 | `fd84257a8d36b3dbc4253363f4a34dd925369b948328247e4a61dbc093870fd7` |
-| `hermes-simd-macros` | 0.9.0 | `67fb179583fca545a1d2c52dc8dc51e30ec675c9604905dcc5bc1aa0ac7b830d` |
-| `hermes-simd-types` | 0.9.0 | `fd7218e102a51f8a6b109f41275b37aea01808fb0e2186465bc5cb84e3c4e86f` |
-| `hermes-simd` | 0.9.0 | `03fd29cbc8055ae34b314607b63731b06b956436140c3fba498eca44fab2ac57` |
+## Verification
 
-## Unexpected Pages side effect and remaining boundary
+Compare the ordinary libraries with the fetched Git base, every distinct
+Hermes revision present in committed consumer locks, and published contracts,
+using the pinned toolchain and supported feature/target configurations.
+Native cargo-semver-checks 0.51 updates its synthetic dependency graphs. An old
+Git requirement can therefore be unreconstructable after its provider's
+default branch advances. Retain that failure as unsupported coverage.
 
-The authorized package merge also triggers GitHub's built-in legacy Pages
-[deployment](https://github.com/ryancinsight/hermes/actions/runs/38756241166),
-which is already successful when inspected. The earlier review checked tracked
-workflow path filters but missed repository Pages configured for main at root.
-Only Aequitas documentation deployment had explicit approval. No settings were
-changed, and no additional deployment is triggered to undo or conceal it.
-The user subsequently approves automatic documentation deployment on merge for
-these repository repairs. That prospective approval clears the further-merge
-hold; retain all exact-head checks/reviews and verify each resulting deployment.
-The earlier unanticipated deployment remains recorded as such. This five-Markdown-
-file change adds no package version, Rust source, lock, workflow or native deadline.
+For such a path, inspect the actual exposed identities and migration,
+validate the committed resolved graph, and execute value-semantic consumer
+contracts on the exact selected candidate. A successful compiler invocation
+alone does not establish historical API compatibility.
+
+The proc-macro crate has no target supported by the native API checker.
+Compare its source with the published archive and Git baselines and exercise
+its generated consumer code. Relevant existing contracts include
+`runtime_dispatch_accepts_inline_bounds_and_borrowed_outputs`, the dispatched
+reduction, and the vectorized butterfly against its scalar reference.
+Source equality and consumer tests remain distinct evidence categories.
+
+Required native, documentation, architecture-specific and safety jobs retain
+their configured bounds. Unavailable ISA coverage remains explicit under
+ADR 022. Evidence and exact candidate revisions belong in
+[the consumer PR](https://github.com/ryancinsight/hermes/pull/277).
+
+## Consequences and alternatives
+
+Cohort updates can require consumer lock and dependency changes even when
+provider package versions remain unchanged. Exact resolved identities, not
+matching version strings or checkout state, determine coherence.
+
+A mixed graph with compatibility adapters is rejected because it preserves
+parallel nominal types and hides the dependency boundary. Suppressing an
+unsupported native comparison is rejected because it erases coverage limits.
+
+Existing prospective approval for automatic documentation deployment on
+merge remains in effect. Package publication requires separate release
+authority and the configured release gates.
+
+## Overturning evidence
+
+Removing provider types and traits from the public contract can reduce this
+coupling. A supported native reconstruction can replace a reviewed
+unsupported-path disposition. Any actual consumer regression rejects the
+selected cohort until its cause is corrected.
