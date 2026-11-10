@@ -103,6 +103,13 @@ fn gather_bound_reference(col_idx: &[i32], x: &[f32]) -> Vec<f32> {
 
 fn bench_spmv_csr_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("spmv_csr_f32");
+    // Same flat 10-sample budget as the gather-bound group: SpMV iterations
+    // are sub-millisecond, so Criterion defaults would multiply the sweep
+    // past the per-binary wall-clock bound (ATLAS-BENCH-BUDGET-001).
+    group.sampling_mode(SamplingMode::Flat);
+    group.warm_up_time(Duration::from_millis(100));
+    group.measurement_time(Duration::from_millis(500));
+    group.sample_size(10);
 
     for &(label, density) in DENSITIES {
         let (row_ptr, col_idx, values) = build_csr(NROWS, NCOLS, density);

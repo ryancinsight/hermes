@@ -13,6 +13,7 @@
 //! dispatch or kernel regression.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use std::time::Duration;
 use hermes_simd::{
     elementwise_mul, interleaved_complex_dot, interleaved_complex_dot_runtime,
     interleaved_complex_mul_assign, interleaved_complex_mul_assign_runtime,
@@ -193,11 +194,16 @@ fn bench_real_mul_interleave(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    benches,
-    bench_complex_dot,
-    bench_real_complex_dot,
-    bench_complex_mul_assign,
-    bench_real_mul_interleave
-);
+criterion_group! {
+    name = benches;
+    // Four complex groups over 4 pair sizes: flat 10-sample budget keeps the
+    // sweep inside the per-binary wall-clock bound (ATLAS-BENCH-BUDGET-001)
+    // without removing a regime or changing a timed region.
+    config = Criterion::default()
+        .warm_up_time(Duration::from_millis(100))
+        .measurement_time(Duration::from_millis(500))
+        .sample_size(10);
+    targets = bench_complex_dot, bench_real_complex_dot,
+    bench_complex_mul_assign, bench_real_mul_interleave
+}
 criterion_main!(benches);
