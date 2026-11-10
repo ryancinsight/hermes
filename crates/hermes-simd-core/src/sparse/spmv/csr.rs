@@ -1,6 +1,6 @@
 //! Compressed Sparse Row multiplication.
 
-use super::{build_index_vector, validate_spmv_sizes, SparseSpMv};
+use super::{build_index_vector, validate_spmv_sizes, SparseScaledSpMv, SparseSpMv};
 use crate::arch::SimdArch;
 use crate::kernel::{SimdArith, SimdGather, SimdLoadStore, SimdReduce};
 use crate::scalar::Scalar;
@@ -104,6 +104,32 @@ where
                 j += 1;
             }
             y[r] += acc;
+        }
+    }
+}
+
+impl<T, Arch> SparseScaledSpMv<T> for SparseView<'_, T, Validated<Csr>, Arch>
+where
+    T: Scalar,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdGather<T> + SimdReduce<T>,
+{
+    #[inline]
+    fn spmv_scaled(&self, alpha: T, x: &[T], y: &mut [T]) {
+        let data = self.data.storage();
+        validate_spmv_sizes(x.len(), y.len(), data.ncols, data.nrows, "CSR");
+
+        for r in 0..data.nrows {
+            let start = data.row_ptr[r] as usize;
+            let end = data.row_ptr[r + 1] as usize;
+            spmv_scaled_csr_row::<T, Arch>(
+                &data.values[start..end],
+                &data.col_indices[start..end],
+                alpha,
+                x,
+                // SAFETY: `validate_spmv_sizes` proves `y.len() >= nrows`, so
+                // every row writes its own in-bounds `y[r]` exactly once.
+                unsafe { y.get_unchecked_mut(r) },
+            );
         }
     }
 }

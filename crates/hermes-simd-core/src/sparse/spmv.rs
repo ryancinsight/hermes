@@ -28,6 +28,21 @@ pub trait SparseSpMv<T> {
     fn spmv(&self, x: &[T], y: &mut [T]);
 }
 
+/// Fused scaled sparse matrix-vector multiplication.
+///
+/// Implemented only by formats with a fused `y += alpha * A * x` kernel, so a
+/// single row pass scales the dot product before the single `y[r]` write
+/// instead of replaying the row for a separate `axpy`. Formats without a
+/// fused kernel keep [`SparseSpMv`].
+pub trait SparseScaledSpMv<T> {
+    /// Perform scaled matrix-vector multiplication: `y += alpha * A * x`.
+    ///
+    /// # Panics
+    /// Panics if the dimensions of `x` or `y` are incompatible with the matrix,
+    /// or if a raw storage representation is structurally invalid.
+    fn spmv_scaled(&self, alpha: T, x: &[T], y: &mut [T]);
+}
+
 /// Build an `Arch::IndexVector` from a slice of `i32` column indices.
 ///
 /// # Safety

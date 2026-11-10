@@ -265,6 +265,24 @@ pub fn spmv_csr<T: SimdOps>(data: ValidatedData<CsrData<'_, T>>, x: &[T], y: &mu
     T::spmv_csr(data, x, y);
 }
 
+/// Computes fused scaled sparse `SpMV` using CSR: `y += alpha * A · x`.
+///
+/// One row pass scales the row dot product by `alpha` before the single
+/// `y[r]` write, instead of replaying the row for a separate `axpy`.
+///
+/// # Panics
+/// Panics if `x.len() < ncols` or `y.len() < nrows`. Structural CSR validation
+/// is performed by [`ValidatedData::new`] before this function can be called.
+#[inline(always)]
+pub fn spmv_scaled_csr<T: SimdOps>(
+    data: ValidatedData<CsrData<'_, T>>,
+    alpha: T,
+    x: &[T],
+    y: &mut [T],
+) {
+    T::spmv_scaled_csr(data, alpha, x, y);
+}
+
 /// Computes sparse `SpMV` using const-generic Blocked-COO tiles.
 ///
 /// # Panics
