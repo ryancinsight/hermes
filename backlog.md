@@ -3,7 +3,7 @@
 <a id="HERMES-EUNOMIA-011-RANGE"></a>
 ## HERMES-EUNOMIA-011-RANGE — Admit the approved Eunomia provider bundle [patch] — todo
 
-- priority: correctness; status: todo; owner: Codex; PR #264.
+- priority: correctness; milestone: M-core-kernels; status: todo; owner: Codex; PR #264.
 - Scope: accept `>=0.10.0, <0.12.0` through the existing canonical Git edge,
   retaining current 0.10 support while admitting the approved 0.11 bundle.
   Target: four libraries 0.9.1; unchanged macros 0.9.0. No runtime source, test, feature,
@@ -37,6 +37,7 @@
 ## HERMES-MNEMOSYNE-IDENTITY-2026-09-03 — Align the workspace memory provider with Mnemosyne 0.9 [patch] [arch] — in-progress <a id="hermes-mnemosyne-identity-2026-09-03"></a>
 
 - **Integrator:** Codex on `build/hermes-mnemosyne-09`; **lease:** none.
+- **Milestone:** M-core-kernels.
 - **Outcome:** Advance Hermes' workspace Mnemosyne edge to 0.9.0 so provider
   consumers use one first-party memory source identity.
 - **Acceptance:** The manifest uses git-plus-version without `rev`; the
@@ -67,6 +68,7 @@
   ADR 013, checklist, changelog, and gap audit. The alternative of restoring
   freshness was rejected because it requires a complete shipped-surface model
   absent from the audited generator.
+- **Milestone:** M-backends-isa.
 - **Acceptance:** no executable stale generator remains; no runtime source
   file changes; ADR/index/PM references agree; provider gates pass on the exact
   commit.
@@ -82,7 +84,7 @@
 
 ## HERMES-RESCUE-QUEUE — Complete or close the rescue PR queue [patch] — todo <a id="hermes-rescue-queue"></a>
 
-- Status: todo; priority: correctness; needs: none; scope: `crates/hermes-simd-core`, `crates/hermes-simd-intrinsics`, `crates/hermes-simd`, `crates/hermes-simd-benches`, `gap_audit.md`.
+- Status: todo; priority: correctness; milestone: M-core-kernels; needs: none; scope: `crates/hermes-simd-core`, `crates/hermes-simd-intrinsics`, `crates/hermes-simd`, `crates/hermes-simd-benches`, `gap_audit.md`.
 - **Outcome:** each listed rescue PR is completed onto current main (ported, verified, merged) or closed once its diff resolves empty against main.
 - **Acceptance:** no open `rescue/` PR for hermes remains unaccounted for; each closed PR records an empty resolved diff against main, each completed one its landing PR.
 - **Next step:** port the oldest PR (#220) onto current main and resolve its diff hunk by hunk; both bases predate main by 60+ commits.
