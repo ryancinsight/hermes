@@ -321,21 +321,6 @@ complete SIMD substrate for leto-ops/coeus hot kernels:
 - [x] [minor] Stage C1: `SveArch` public marker + property coverage —
   delivered 2026-06-13 by re-exporting it from `hermes-simd` and adding it to
   the host-independent kernel property suite.
-- [ ] [minor] milestone: M-fused-scaled-spmv; Stage C1: native SVE intrinsic backend for AArch64 server targets.
-  Blocked by the pinned stable Rust toolchain: `SveArch` remains a safe,
-  value-semantic lane-emulated backend, while `SveArch::is_native_hardware_supported`
-  reports hardware capability separately. Revisit when stable scalable SVE
-  vector types are available or an explicitly approved asm/C boundary is added.
-- [ ] [minor] milestone: M-fused-scaled-spmv; Stage C2: expand op/dtype coverage on demand from leto-ops/coeus
-  (gather/scatter variants, additional reductions/scans, complex precisions) so every
-  leto/coeus CPU hot kernel has a hermes path rather than a scalar fallback.
-  Delivered (2026-06-12): abs-sum (`Σ|x|`) and abs-max (`max|x|`) slice
-  reductions via `AbsSum`/`AbsMax` ReductionOp ZSTs + `SimdOps::{abs_sum,
-  abs_max}` dispatch. The reduce loop's unrolled head previously seeded
-  accumulators with raw loads and merged partials with `accumulate` — correct
-  only for transform-free ops; it now seeds through `transform_vector` and
-  merges through `combine_vectors`, fixing the latent defect for every
-  transform-bearing reduction (the documented SquaredSum hook included).
 - [x] [patch] Document the SIMD(hermes) vs MIMD(moirai) vs GPU(hephaestus: wgpu + CUDA)
   boundary in README so consumers compose the three deliberately. Delivered
   2026-06-12: README defines Hermes as the synchronous, slice-oriented SIMD
@@ -376,21 +361,6 @@ marked delivered.
 - [x] [minor] Float-specialized: interleaved complex multiply/dot, norm,
   normalize, absolute reductions, and sqrt/abs/clamp unary strategies are
   present.
-- [ ] [minor] milestone: M-fused-scaled-spmv; Scatter/compress-store family: add only when an Atlas consumer
-  needs indirect writes or compaction output; current delivered scope covers
-  gather and mask/select, not scatter.
-- [ ] [minor] milestone: M-fused-scaled-spmv; Comparison predicate family: add lane-wise compare APIs only when
-  a consumer needs reusable predicate outputs beyond existing min/max/select
-  contracts.
-- [ ] [minor] milestone: M-fused-scaled-spmv; Conversion family: add vectorized widening/narrowing conversion
-  APIs only when a consumer needs conversion as a public SIMD operation;
-  current packed4 unpack is format-specific and owned by packed storage.
-- [ ] [minor] milestone: M-fused-scaled-spmv; Bitwise public facade family: add public bitwise dense APIs only
-  when a consumer requires them; strategy ZSTs exist, but a broad public facade
-  is not admitted without demand.
-- [ ] [minor] milestone: M-fused-scaled-spmv; Crypto/hash family: out of current Hermes scope unless an Atlas
-  consumer requires lane-parallel primitive support; no implementation is
-  claimed.
 
 ## P3 — Architecture & maintenance <a id="p3"></a>
 
@@ -399,10 +369,6 @@ marked delivered.
 - **[arch] Per-type x86 kernel dedup** (delivered 2026-06-21; ADR 005 revised 2026-08-21): the initial build-time-generator decision …
 - **[patch] SVE callable fallback**: removed `unimplemented!()` SVE `SimdKernel` methods and routed `SveArch` f32/f64 through the …
 - **[minor] SVE property coverage**: `hermes-simd` re-exports `SveArch`, and `kernel_property_tests` now exercises its mask …
-- [ ] milestone: M-fused-scaled-spmv; **[minor] Native SVE backend**: hardware intrinsic implementation remains
-      blocked on stable `core::arch::aarch64` SVE vector types; revisit on
-      toolchain updates. The delivered `SveArch` path is emulated and its
-      hardware capability probe is separate from `SimdArch::is_runtime_supported`.
 - **[minor] Arm SME target feasibility study**: evaluate outer-product based tiled matrix multiplication kernels for Apple M4/M5 …
 - **[minor] NUMA module status** (audited 2026-06-11): `numa.rs` IS integrated — `hermes-simd::dispatcher` uses Themis topology …
 - **[patch] Default provider feature policy**: every Hermes package defaults `parallel` and `mnemosyne-memory`; the default …
