@@ -1,9 +1,34 @@
 # Backlog — hermes-simd
 
+## Milestone ladder
+
+Scope and non-goals: [ADR 026](docs/adr/026-release-scope.md). Every open
+item below carries `milestone: M-fused-scaled-spmv`.
+
+<a id="M-fused-scaled-spmv"></a>
+## M-fused-scaled-spmv — Accumulate a scaled sparse product in one pass
+
+- version: 1.0.0; needs: none.
+- outcome: one runtime-dispatched `spmv_scaled_csr` call computes
+  `y += alpha * A * x` for a validated CSR matrix and matches a scalar
+  reference.
+- exit: accumulate a scaled f32 CSR product: `cargo nextest run -p hermes-simd --no-tests=fail -E 'binary_id(=hermes-simd::sparse_tests) & test(=test_spmv_scaled_csr_matches_scalar_reference_f32)'`.
+- exit: accumulate a scaled f64 CSR product: `cargo nextest run -p hermes-simd --no-tests=fail -E 'binary_id(=hermes-simd::sparse_tests) & test(=test_spmv_scaled_csr_matches_scalar_reference_f64)'`.
+- exit: leave `y` unchanged at zero alpha: `cargo nextest run -p hermes-simd --no-tests=fail -E 'binary_id(=hermes-simd::sparse_tests) & test(=test_spmv_scaled_csr_zero_alpha_leaves_y_unchanged)'`.
+- exit: run a scaled SpMV example that asserts its own result: `cargo run -p hermes-simd-examples --example scaled_spmv`.
+- None of the three tests or the example exists at
+  `632269e6f45c0212b67ac6c1f3cbb6814fd207fb`; HERMES-SPMV-SCALED-CSR writes
+  them.
+- standing: no open `correctness` item; the conformance scan's installed-state
+  assertions pass; the SemVer gate, the publish dry run, and the README,
+  example and book builds pass.
+- non-goals: native SVE, AMX or AVX-512 silicon evidence as a release gate,
+  read prefetch, tensor model layers, demand-gated slice facades, crypto/hash.
+
 <a id="HERMES-EUNOMIA-011-RANGE"></a>
 ## HERMES-EUNOMIA-011-RANGE — Admit the approved Eunomia provider bundle [patch] — todo
 
-- priority: correctness; status: todo; owner: Codex; PR #264.
+- priority: correctness; status: todo; milestone: M-fused-scaled-spmv; owner: Codex; PR #264.
 - Scope: accept `>=0.10.0, <0.12.0` through the existing canonical Git edge,
   retaining current 0.10 support while admitting the approved 0.11 bundle.
   Target: four libraries 0.9.1; unchanged macros 0.9.0. No runtime source, test, feature,
@@ -36,7 +61,7 @@
 
 ## HERMES-MNEMOSYNE-IDENTITY-2026-09-03 — Align the workspace memory provider with Mnemosyne 0.9 [patch] [arch] — in-progress <a id="hermes-mnemosyne-identity-2026-09-03"></a>
 
-- **Integrator:** Codex on `build/hermes-mnemosyne-09`; **lease:** none.
+- **Integrator:** Codex on `build/hermes-mnemosyne-09`; **lease:** none; milestone: M-fused-scaled-spmv.
 - **Outcome:** Advance Hermes' workspace Mnemosyne edge to 0.9.0 so provider
   consumers use one first-party memory source identity.
 - **Acceptance:** The manifest uses git-plus-version without `rev`; the
@@ -55,7 +80,7 @@
 
 ## ATLAS-HERMES-CODEGEN-SSOT-2026-08-21 — Resolve SIMD codegen source of truth [arch] [minor] — in-progress (hosted verification pending)
 
-- **Owner / scope:** Atlas integration, clean `origin/main` lane; the former
+- milestone: M-fused-scaled-spmv; **Owner / scope:** Atlas integration, clean `origin/main` lane; the former
   `crates/hermes-simd-intrinsics/src/bin/codegen.rs`, ADR 005, ADR index,
   affected PM records, and stale ADR 013 references. Runtime kernels, f16 and
   NEON implementation work, and Atlas gitlinks are out of scope.
@@ -82,13 +107,26 @@
 
 ## HERMES-RESCUE-QUEUE — Complete or close the rescue PR queue [patch] — todo <a id="hermes-rescue-queue"></a>
 
-- Status: todo; priority: correctness; needs: none; scope: `crates/hermes-simd-core`, `crates/hermes-simd-intrinsics`, `crates/hermes-simd`, `crates/hermes-simd-benches`, `gap_audit.md`.
+- Status: todo; priority: correctness; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core`, `crates/hermes-simd-intrinsics`, `crates/hermes-simd`, `crates/hermes-simd-benches`, `gap_audit.md`.
 - **Outcome:** each listed rescue PR is completed onto current main (ported, verified, merged) or closed once its diff resolves empty against main.
 - **Acceptance:** no open `rescue/` PR for hermes remains unaccounted for; each closed PR records an empty resolved diff against main, each completed one its landing PR.
 - **Next step:** port the oldest PR (#220) onto current main and resolve its diff hunk by hunk; both bases predate main by 60+ commits.
 - **Rescue PRs (draft parking records, not claims):**
   - `ryancinsight/hermes#220` (`rescue/hermes-simd-consolidation-batch`): 9 refactor commits, 25 files (+965/-1691), code only: SIMD wrapper/scalar/AVX2/AVX-512 de-duplication, iter chunk and mask validation helpers, Kogge-Stone bitboard and target consolidation.
   - `ryancinsight/hermes#221` (`rescue/hermes-audit-20260928`): 1 audit commit, 22 files (+1857/-1831), code, tests and `gap_audit.md`: sparse/tiling/tensor view, x86_64 and AMX modules, axpy dispatch, dense/tiling/slice tests, benches.
+
+<a id="HERMES-SPMV-SCALED-CSR"></a>
+## HERMES-SPMV-SCALED-CSR — Fuse y += alpha*A*x into one CSR pass [minor] — todo
+
+- priority: feature; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core/src/sparse`, `crates/hermes-simd/src/dispatch`, `crates/hermes-simd/tests/sparse_tests.rs`, `crates/hermes-simd-examples`.
+- Outcome: public `hermes_simd::spmv_scaled_csr` computes `y += alpha * A * x`
+  for a validated CSR matrix in one runtime-dispatched pass.
+- Acceptance: the four exit checks of `M-fused-scaled-spmv` pass.
+- Prior work: draft PR #276 (`refs/pull/276/head`) holds the kernel and the
+  three tests; it also sets the workspace version to 0.11.0, which the ladder
+  does not plan.
+- Next step: restore `refs/pull/276/head`, drop the version change, add the
+  `scaled_spmv` example, merge main and verify.
 
 ## Legacy HS-4xx record — open items and measured limits
 
@@ -174,7 +212,7 @@ In full: the open measurement items, the limits they rest on, and the rejected r
   Known limit: SDE validates semantics, never performance — any benchmark claim
   still requires real silicon. See HS-429.
 
-- [ ] [minor] **HS-429 — real AVX-512/AMX silicon for performance evidence.**
+- [ ] [minor] milestone: M-fused-scaled-spmv; **HS-429 — real AVX-512/AMX silicon for performance evidence.**
   SDE gives deterministic semantic coverage but cannot support a performance
   claim, so HS-427's "override beats the default" acceptance is unsatisfiable
   under emulation. Acceptance: an AVX-512 job on real silicon whose coverage
@@ -221,7 +259,7 @@ In full: the open measurement items, the limits they rest on, and the rejected r
   result, these may not pay either; they are kept as correctness-equivalent
   canonical lowerings, not as a speed claim. Follow-up HS-430.
 
-- [ ] [patch] **HS-430 — measure the AVX-512 and NEON permute overrides.**
+- [ ] [patch] milestone: M-fused-scaled-spmv; **HS-430 — measure the AVX-512 and NEON permute overrides.**
   HS-427 shipped them on correctness alone. The AVX2 result — a hand-written
   native sequence losing 37% to the generic default — is the reason this cannot
   be assumed. Method: the override-versus-default comparison HS-427 used, which
@@ -273,7 +311,7 @@ hermes is the Atlas **SIMD SSOT** (data-parallel lanes), replacing std::simd / p
 and hand-rolled intrinsics. Scope boundary: hermes owns SIMD only; thread-level **MIMD**
 is moirai's domain, GPU is the `hephaestus` substrate (wgpu + CUDA) via coeus/apollo. Work to make hermes the
 complete SIMD substrate for leto-ops/coeus hot kernels:
-- [ ] [minor] Stage C1: dedicated AVX-512 / AMX CI runners (currently self-skip on
+- [ ] [minor] milestone: M-fused-scaled-spmv; Stage C1: dedicated AVX-512 / AMX CI runners (currently self-skip on
   unsupported hosts), `no_std` feature matrix, committed criterion baselines.
   Partial delivered (2026-06-12): local AVX2 Criterion baseline refreshed with
   packed4 COW unpack and unrolled complex `mul_assign` rows; runner self-check
@@ -283,12 +321,12 @@ complete SIMD substrate for leto-ops/coeus hot kernels:
 - [x] [minor] Stage C1: `SveArch` public marker + property coverage —
   delivered 2026-06-13 by re-exporting it from `hermes-simd` and adding it to
   the host-independent kernel property suite.
-- [ ] [minor] Stage C1: native SVE intrinsic backend for AArch64 server targets.
+- [ ] [minor] milestone: M-fused-scaled-spmv; Stage C1: native SVE intrinsic backend for AArch64 server targets.
   Blocked by the pinned stable Rust toolchain: `SveArch` remains a safe,
   value-semantic lane-emulated backend, while `SveArch::is_native_hardware_supported`
   reports hardware capability separately. Revisit when stable scalable SVE
   vector types are available or an explicitly approved asm/C boundary is added.
-- [ ] [minor] Stage C2: expand op/dtype coverage on demand from leto-ops/coeus
+- [ ] [minor] milestone: M-fused-scaled-spmv; Stage C2: expand op/dtype coverage on demand from leto-ops/coeus
   (gather/scatter variants, additional reductions/scans, complex precisions) so every
   leto/coeus CPU hot kernel has a hermes path rather than a scalar fallback.
   Delivered (2026-06-12): abs-sum (`Σ|x|`) and abs-max (`max|x|`) slice
@@ -338,19 +376,19 @@ marked delivered.
 - [x] [minor] Float-specialized: interleaved complex multiply/dot, norm,
   normalize, absolute reductions, and sqrt/abs/clamp unary strategies are
   present.
-- [ ] [minor] Scatter/compress-store family: add only when an Atlas consumer
+- [ ] [minor] milestone: M-fused-scaled-spmv; Scatter/compress-store family: add only when an Atlas consumer
   needs indirect writes or compaction output; current delivered scope covers
   gather and mask/select, not scatter.
-- [ ] [minor] Comparison predicate family: add lane-wise compare APIs only when
+- [ ] [minor] milestone: M-fused-scaled-spmv; Comparison predicate family: add lane-wise compare APIs only when
   a consumer needs reusable predicate outputs beyond existing min/max/select
   contracts.
-- [ ] [minor] Conversion family: add vectorized widening/narrowing conversion
+- [ ] [minor] milestone: M-fused-scaled-spmv; Conversion family: add vectorized widening/narrowing conversion
   APIs only when a consumer needs conversion as a public SIMD operation;
   current packed4 unpack is format-specific and owned by packed storage.
-- [ ] [minor] Bitwise public facade family: add public bitwise dense APIs only
+- [ ] [minor] milestone: M-fused-scaled-spmv; Bitwise public facade family: add public bitwise dense APIs only
   when a consumer requires them; strategy ZSTs exist, but a broad public facade
   is not admitted without demand.
-- [ ] [minor] Crypto/hash family: out of current Hermes scope unless an Atlas
+- [ ] [minor] milestone: M-fused-scaled-spmv; Crypto/hash family: out of current Hermes scope unless an Atlas
   consumer requires lane-parallel primitive support; no implementation is
   claimed.
 
@@ -361,7 +399,7 @@ marked delivered.
 - **[arch] Per-type x86 kernel dedup** (delivered 2026-06-21; ADR 005 revised 2026-08-21): the initial build-time-generator decision …
 - **[patch] SVE callable fallback**: removed `unimplemented!()` SVE `SimdKernel` methods and routed `SveArch` f32/f64 through the …
 - **[minor] SVE property coverage**: `hermes-simd` re-exports `SveArch`, and `kernel_property_tests` now exercises its mask …
-- [ ] **[minor] Native SVE backend**: hardware intrinsic implementation remains
+- [ ] milestone: M-fused-scaled-spmv; **[minor] Native SVE backend**: hardware intrinsic implementation remains
       blocked on stable `core::arch::aarch64` SVE vector types; revisit on
       toolchain updates. The delivered `SveArch` path is emulated and its
       hardware capability probe is separate from `SimdArch::is_runtime_supported`.
