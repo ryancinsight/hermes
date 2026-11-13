@@ -12,28 +12,14 @@
 //! runtime-dispatch series falling to scalar throughput indicates a broken
 //! dispatch or kernel regression.
 
-use criterion::{
-    black_box, criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, BenchmarkId,
-    Criterion, SamplingMode, Throughput,
-};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use hermes_simd::{
     elementwise_mul, interleaved_complex_dot, interleaved_complex_dot_runtime,
     interleaved_complex_mul_assign, interleaved_complex_mul_assign_runtime,
     real_interleaved_complex_dot_runtime, real_mul_to_interleaved_complex_runtime, Scalar,
 };
-use std::time::Duration;
 
 const PAIR_SIZES: &[usize] = &[256, 1024, 4096, 16384];
-
-/// Shared wall-clock budget for every group in this binary: sixteen benchmark
-/// IDs at flat sampling keep the binary inside the 300-second per-binary cap
-/// without removing a regime or changing a timed region.
-fn configure(group: &mut BenchmarkGroup<'_, WallTime>) {
-    group.sampling_mode(SamplingMode::Flat);
-    group.warm_up_time(Duration::from_millis(100));
-    group.measurement_time(Duration::from_millis(500));
-    group.sample_size(10);
-}
 
 fn make_inputs(pairs: usize) -> (Vec<f64>, Vec<f64>) {
     let a = (0..pairs * 2)
@@ -59,7 +45,6 @@ fn make_real_input(pairs: usize) -> (Vec<f64>, Vec<f64>) {
 
 fn bench_complex_dot(c: &mut Criterion) {
     let mut group = c.benchmark_group("complex_dot");
-    configure(&mut group);
     for &pairs in PAIR_SIZES {
         group.throughput(Throughput::Elements(pairs as u64));
         let (a, b) = make_inputs(pairs);
@@ -79,7 +64,6 @@ fn bench_complex_dot(c: &mut Criterion) {
 
 fn bench_real_complex_dot(c: &mut Criterion) {
     let mut group = c.benchmark_group("real_complex_dot");
-    configure(&mut group);
     for &pairs in PAIR_SIZES {
         group.throughput(Throughput::Elements(pairs as u64));
         let (real, interleaved) = make_real_input(pairs);
@@ -116,7 +100,6 @@ fn bench_real_complex_dot(c: &mut Criterion) {
 
 fn bench_complex_mul_assign(c: &mut Criterion) {
     let mut group = c.benchmark_group("complex_mul_assign");
-    configure(&mut group);
     for &pairs in PAIR_SIZES {
         group.throughput(Throughput::Elements(pairs as u64));
         let (a, b) = make_inputs(pairs);
@@ -162,7 +145,6 @@ fn three_pass_real_mul_interleave(
 
 fn bench_real_mul_interleave(c: &mut Criterion) {
     let mut group = c.benchmark_group("real_mul_interleave_f64");
-    configure(&mut group);
     for &len in &[64_usize, 256, 1_024, 4_096] {
         group.throughput(Throughput::Elements(len as u64));
         let input: Vec<f64> = (0..len)

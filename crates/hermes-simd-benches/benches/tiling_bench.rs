@@ -8,17 +8,9 @@
 //! CPU to exploit out-of-order execution across the FMA latency pipeline.
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use hermes_simd::{dot, tiled_dot, Scalar, SimdView, Unaligned, Unmasked};
-use std::time::Duration;
 
 fn bench_tiled_dot(c: &mut Criterion) {
     let mut group = c.benchmark_group("Tiled Dot f32");
-    // Fifteen benchmark IDs at flat sampling keep this binary inside the
-    // 300-second per-binary cap without removing a tile size or changing a
-    // timed region.
-    group.sampling_mode(criterion::SamplingMode::Flat);
-    group.warm_up_time(Duration::from_millis(100));
-    group.measurement_time(Duration::from_millis(500));
-    group.sample_size(10);
 
     for &size in &[1024usize, 16384, 65536] {
         let a: Vec<f32> = (0..size).map(|i| i as f32 * 0.001).collect();

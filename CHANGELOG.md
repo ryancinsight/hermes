@@ -1,29 +1,5 @@
 # Changelog
 
-## Unreleased
-
-### Added
-
-- [minor] Fused scaled-SpMV `spmv_scaled_csr`: `y += alpha·A·x`
-  in one row pass — the 4×-unrolled gather/FMA row body with the scalar
-  multiply folded before the accumulation, plus `unroll_tail_start` resume
-  arithmetic pinned by a partition test. Public surface is
-  `hermes_simd::spmv_scaled_csr` over `ValidatedData<CsrData>` via
-  `SparseScaledSpMv::spmv_scaled`, covered by exact f32/f64 differential
-  tests (empty, single, tail-only, unrolled-block and multi-block rows) plus
-  a zero-`alpha` no-op test. Zero-copy borrowed slices, zero extra buffer,
-  row independence unchanged. Increments toward CG fused updates that pair
-  a SpMV with an `axpy` on the same row.
-- [minor] Sparse views (`CsrMatrix`, `SellPMatrix`, `BlockedCooMatrix`,
-  `DenseWithMaskMatrix`, `ValidatedData`) gain `Copy`
-  when their storage is borrowed (`CsrData` and friends): the structs are
-  fat-pointer bundles plus dimensions, so a per-iteration `.clone()` was
-  already shallow and `Copy` makes by-value kernel signatures cost-free
-  without an API surface change. Owned storage remains move-only.
-- [patch] Benchmark binaries keep inside the 300 s per-binary cap with
-  flat sampling and bounded warm-up/measurement windows; no workload or
-  sample change.
-
 ## Sealed-op marker supertraits — Unreleased
 
 ### Changed

@@ -6,7 +6,6 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use hermes_simd::{Bf4, Packed4CowExt, PackedBf4Cow, PackedF4Cow, Scalar, SimdCow, Unaligned, F4};
-use std::time::Duration;
 
 const LOGICAL_LENGTHS: [usize; 3] = [1024, 16_384, 262_144];
 
@@ -25,12 +24,6 @@ where
 
 fn bench_packed_unpack(c: &mut Criterion) {
     let mut group = c.benchmark_group("packed4_cow_unpack");
-    // Six benchmark IDs at flat sampling keep this binary inside the 300-second
-    // per-binary cap without removing a length or changing a timed region.
-    group.sampling_mode(criterion::SamplingMode::Flat);
-    group.warm_up_time(Duration::from_millis(100));
-    group.measurement_time(Duration::from_millis(500));
-    group.sample_size(10);
 
     for len in LOGICAL_LENGTHS {
         let bytes = bytes_with(len, |value| Bf4(value & 0x0f).0);
@@ -59,12 +52,5 @@ fn bench_packed_unpack(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group! {
-    name = benches;
-    config = Criterion::default()
-        .warm_up_time(Duration::from_millis(100))
-        .measurement_time(Duration::from_millis(500))
-        .sample_size(10);
-    targets = bench_packed_unpack
-}
+criterion_group!(benches, bench_packed_unpack);
 criterion_main!(benches);

@@ -53,130 +53,6 @@ fn test_spmv_csr_accumulates() {
     assert_eq!(y, [8.0, 8.0]);
 }
 
-/// Row shapes exercising every resume path of the fused scaled kernel: an
-/// empty row (early return), a single-entry row, a tail-only row, a
-/// 4x-unrolled block plus one tail element, and a multi-block row. The
-/// reference is a scalar loop; all values are integers and `alpha` is a power
-/// of two, so the comparison is exact.
-#[test]
-fn test_spmv_scaled_csr_matches_scalar_reference_f32() {
-    let ncols = 20usize;
-    // Row extents into the shared column/value pools below.
-    let rows: &[&[(i32, f32)]] = &[
-        &[],
-        &[(7, 3.0)],
-        &[(0, 1.0), (1, 2.0), (2, 3.0), (3, 4.0), (4, 5.0)],
-        &[
-            (0, 1.0),
-            (1, 1.0),
-            (2, 1.0),
-            (3, 1.0),
-            (4, 1.0),
-            (5, 1.0),
-            (6, 1.0),
-            (7, 1.0),
-            (8, 1.0),
-            (9, 1.0),
-            (10, 1.0),
-            (11, 1.0),
-            (12, 1.0),
-            (13, 1.0),
-            (14, 1.0),
-            (15, 1.0),
-            (16, 2.0),
-        ],
-        &[
-            (0, 1.0),
-            (1, -1.0),
-            (2, 2.0),
-            (3, -2.0),
-            (4, 3.0),
-            (5, -3.0),
-            (6, 4.0),
-            (7, -4.0),
-            (8, 5.0),
-            (9, -5.0),
-            (10, 6.0),
-            (11, -6.0),
-            (12, 7.0),
-            (13, -7.0),
-            (14, 8.0),
-            (15, -8.0),
-            (16, 9.0),
-            (17, -9.0),
-            (18, 10.0),
-            (19, -10.0),
-        ],
-    ];
-    let mut values = Vec::new();
-    let mut cols = Vec::new();
-    let mut row_ptr = vec![0i32];
-    for row in rows {
-        for (c, v) in *row {
-            cols.push(*c);
-            values.push(*v);
-        }
-        row_ptr.push(i32::try_from(values.len()).expect("test matrix is tiny"));
-    }
-    let x: Vec<f32> = (0..ncols).map(|c| f32::from_count(c + 1)).collect();
-    let y_init: Vec<f32> = vec![10.0, 20.0, 30.0, 40.0, 50.0];
-    let alpha = 2.0f32;
-
-    let mut want = y_init.clone();
-    for (r, row) in rows.iter().enumerate() {
-        let dot: f32 = row
-            .iter()
-            .map(|(c, v)| {
-                let col = usize::try_from(*c).expect("test column indices are non-negative");
-                v * x[col]
-            })
-            .sum();
-        want[r] += alpha * dot;
-    }
-
-    let data = CsrData::new(&values[..], &cols[..], &row_ptr[..], rows.len(), ncols);
-    let mut y = y_init.clone();
-    spmv_scaled_csr::<f32>(validated(data), alpha, &x, &mut y);
-    assert_eq!(
-        y, want,
-        "fused scaled CSR SpMV must match the scalar reference"
-    );
-}
-
-#[test]
-fn test_spmv_scaled_csr_matches_scalar_reference_f64() {
-    let values = [1.5f64, -2.0, 3.25, 4.0, -0.5];
-    let cols = [0i32, 1, 2, 3, 4];
-    let row_ptr = [0i32, 0, 1, 5];
-    let x = [2.0f64, 4.0, 8.0, 16.0, 32.0];
-    let y_init = [1.0f64, 2.0, 3.0];
-    let alpha = 0.5f64;
-
-    let mut want = y_init;
-    want[1] += alpha * (values[0] * x[0]);
-    want[2] += alpha * (values[1] * x[1] + values[2] * x[2] + values[3] * x[3] + values[4] * x[4]);
-
-    let data = CsrData::new(&values[..], &cols[..], &row_ptr[..], 3, 5);
-    let mut y = y_init;
-    spmv_scaled_csr::<f64>(validated(data), alpha, &x, &mut y);
-    assert_eq!(
-        y, want,
-        "f64 scaled CSR SpMV must match the scalar reference"
-    );
-}
-
-#[test]
-fn test_spmv_scaled_csr_zero_alpha_leaves_y_unchanged() {
-    let values = [1.0f32, 2.0, 3.0];
-    let col_indices = [0i32, 1, 2];
-    let row_ptr = [0i32, 3];
-    let data = CsrData::new(&values[..], &col_indices[..], &row_ptr[..], 1, 3);
-    let x = [5.0f32, 7.0, 11.0];
-    let mut y = [4.0f32];
-    spmv_scaled_csr::<f32>(validated(data), 0.0, &x, &mut y);
-    assert_eq!(y, [4.0]);
-}
-
 #[test]
 fn test_spmv_dense_masked() {
     let values = [1.0f32, 0.0, 0.0, 1.0]; // 2x2 identity
@@ -568,7 +444,7 @@ fn test_sellp_spmv_dispatch() {
     let x = [10.0f32, 10.0, 10.0, 10.0];
     let mut y = [0.0f32; 4];
 
-    spmv_sellp::<f32, 4>(validated(data), &x, &mut y);
+    spmv_sellp::<f32, 4>(validated(data.clone()), &x, &mut y);
     assert_eq!(y, [10.0, 20.0, 30.0, 40.0]);
 
     let mut y8 = [0.0f32; 4];

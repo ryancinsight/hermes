@@ -156,7 +156,7 @@ fn bench_csr_spmv(c: &mut Criterion) {
             group.bench_with_input(BenchmarkId::new("csr", case.label()), &case, |bench, _| {
                 bench.iter(|| {
                     y.fill(0.0);
-                    spmv_csr::<f32>(data, black_box(&x), black_box(&mut y));
+                    spmv_csr::<f32>(data.clone(), black_box(&x), black_box(&mut y));
                 });
             });
         }
@@ -178,7 +178,7 @@ fn bench_short_row_spmv(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("csr", ncols), &ncols, |bench, _| {
             bench.iter(|| {
                 csr_y.fill(0.0);
-                spmv_csr::<f32>(csr, black_box(&x), black_box(&mut csr_y));
+                spmv_csr::<f32>(csr.clone(), black_box(&x), black_box(&mut csr_y));
                 black_box(csr_y[SHORT_ROWS - 1]);
             });
         });
@@ -196,7 +196,7 @@ fn bench_short_row_spmv(c: &mut Criterion) {
             |bench, _| {
                 bench.iter(|| {
                     dense_y.fill(0.0);
-                    spmv_dense_masked::<f32>(dense, black_box(&x), black_box(&mut dense_y));
+                    spmv_dense_masked::<f32>(dense.clone(), black_box(&x), black_box(&mut dense_y));
                     black_box(dense_y[SHORT_ROWS - 1]);
                 });
             },
@@ -224,7 +224,7 @@ fn bench_sellp_spmv(c: &mut Criterion) {
                 |bench, _| {
                     bench.iter(|| {
                         y4.fill(0.0);
-                        spmv_sellp::<f32, 4>(data4, black_box(&x), black_box(&mut y4));
+                        spmv_sellp::<f32, 4>(data4.clone(), black_box(&x), black_box(&mut y4));
                     });
                 },
             );
@@ -241,7 +241,7 @@ fn bench_sellp_spmv(c: &mut Criterion) {
                 |bench, _| {
                     bench.iter(|| {
                         y8.fill(0.0);
-                        spmv_sellp::<f32, 8>(data8, black_box(&x), black_box(&mut y8));
+                        spmv_sellp::<f32, 8>(data8.clone(), black_box(&x), black_box(&mut y8));
                     });
                 },
             );
@@ -269,7 +269,7 @@ fn bench_bcoo_spmv(c: &mut Criterion) {
                 |bench, _| {
                     bench.iter(|| {
                         y4.fill(0.0);
-                        spmv_bcoo::<f32, 4, 4>(data4, black_box(&x), black_box(&mut y4));
+                        spmv_bcoo::<f32, 4, 4>(data4.clone(), black_box(&x), black_box(&mut y4));
                     });
                 },
             );
@@ -286,7 +286,7 @@ fn bench_bcoo_spmv(c: &mut Criterion) {
                 |bench, _| {
                     bench.iter(|| {
                         y8.fill(0.0);
-                        spmv_bcoo::<f32, 8, 8>(data8, black_box(&x), black_box(&mut y8));
+                        spmv_bcoo::<f32, 8, 8>(data8.clone(), black_box(&x), black_box(&mut y8));
                     });
                 },
             );
@@ -311,7 +311,7 @@ fn bench_dense_masked_spmv(c: &mut Criterion) {
                 |bench, _| {
                     bench.iter(|| {
                         y.fill(0.0);
-                        spmv_dense_masked::<f32>(data, black_box(&x), black_box(&mut y));
+                        spmv_dense_masked::<f32>(data.clone(), black_box(&x), black_box(&mut y));
                     });
                 },
             );
