@@ -17,8 +17,7 @@ item below carries `milestone: M-fused-scaled-spmv`.
 - exit: leave `y` unchanged at zero alpha: `cargo nextest run -p hermes-simd --no-tests=fail -E 'binary_id(=hermes-simd::sparse_tests) & test(=test_spmv_scaled_csr_zero_alpha_leaves_y_unchanged)'`.
 - exit: run a scaled SpMV example that asserts its own result: `cargo run -p hermes-simd-examples --example scaled_spmv`.
 - None of the three tests or the example exists at
-  `632269e6f45c0212b67ac6c1f3cbb6814fd207fb`; HERMES-SPMV-SCALED-CSR writes
-  them.
+  `632269e6f45c0212b67ac6c1f3cbb6814fd207fb`.
 - standing: no open `correctness` item; the conformance scan's installed-state
   assertions pass; the SemVer gate, the publish dry run, and the README,
   example and book builds pass.
@@ -80,19 +79,6 @@ item below carries `milestone: M-fused-scaled-spmv`.
 - **Rescue PRs (draft parking records, not claims):**
   - `ryancinsight/hermes#220` (`rescue/hermes-simd-consolidation-batch`): 9 refactor commits, 25 files (+965/-1691), code only: SIMD wrapper/scalar/AVX2/AVX-512 de-duplication, iter chunk and mask validation helpers, Kogge-Stone bitboard and target consolidation.
   - `ryancinsight/hermes#221` (`rescue/hermes-audit-20260928`): 1 audit commit, 22 files (+1857/-1831), code, tests and `gap_audit.md`: sparse/tiling/tensor view, x86_64 and AMX modules, axpy dispatch, dense/tiling/slice tests, benches.
-
-<a id="HERMES-SPMV-SCALED-CSR"></a>
-## HERMES-SPMV-SCALED-CSR — Fuse y += alpha*A*x into one CSR pass [minor] — todo
-
-- priority: feature; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core/src/sparse`, `crates/hermes-simd/src/dispatch`, `crates/hermes-simd/tests/sparse_tests.rs`, `crates/hermes-simd-examples`.
-- Outcome: public `hermes_simd::spmv_scaled_csr` computes `y += alpha * A * x`
-  for a validated CSR matrix in one runtime-dispatched pass.
-- Acceptance: the four exit checks of `M-fused-scaled-spmv` pass.
-- Prior work: draft PR #276 (`refs/pull/276/head`) holds the kernel and the
-  three tests; it also sets the workspace version to 0.11.0, which the ladder
-  does not plan.
-- Next step: restore `refs/pull/276/head`, drop the version change, add the
-  `scaled_spmv` example, merge main and verify.
 
 ## Legacy HS-4xx record — open items and measured limits
 
