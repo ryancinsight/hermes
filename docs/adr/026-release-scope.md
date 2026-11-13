@@ -84,7 +84,7 @@ minor without a major.
 | Rook, bishop and queen attack functions | delivered | `src/attacks.rs` |
 | `no_std` build with the `std` feature off | delivered | `src/lib.rs` `cfg_attr`; CI `cargo check --workspace --no-default-features` |
 | Slice-level public facades for compress-store, comparison predicates, conversions and bitwise operations | non-goal | admitted only on consumer demand (README) |
-| Crypto and hash primitives | non-goal | outside Hermes' SIMD scope (backlog coverage map) |
+| Crypto and hash primitives | non-goal | admitted only on consumer demand (README; `backlog.md` ladder non-goals) |
 
 ### Unpublished members and documentation
 
