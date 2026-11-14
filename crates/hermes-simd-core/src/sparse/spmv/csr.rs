@@ -1,6 +1,6 @@
 //! Compressed Sparse Row multiplication.
 
-use super::{build_index_vector, validate_spmv_sizes, SparseSpMv};
+use super::{build_index_vector, validate_spmv_sizes, SparseScaledSpMv, SparseSpMv};
 use crate::arch::SimdArch;
 use crate::kernel::{SimdArith, SimdGather, SimdLoadStore, SimdReduce};
 use crate::scalar::Scalar;
@@ -13,6 +13,35 @@ where
 {
     #[inline]
     fn spmv(&self, x: &[T], y: &mut [T]) {
+        self.accumulate_rows(x, y, |dot| dot);
+    }
+}
+
+impl<T, Arch> SparseScaledSpMv<T> for SparseView<'_, T, Validated<Csr>, Arch>
+where
+    T: Scalar,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdGather<T> + SimdReduce<T>,
+{
+    #[inline]
+    fn spmv_scaled(&self, alpha: T, x: &[T], y: &mut [T]) {
+        if alpha == T::ZERO {
+            let data = self.data.storage();
+            validate_spmv_sizes(x.len(), y.len(), data.ncols, data.nrows, "CSR");
+            return;
+        }
+        self.accumulate_rows(x, y, |dot| alpha * dot);
+    }
+}
+
+impl<T, Arch> SparseView<'_, T, Validated<Csr>, Arch>
+where
+    T: Scalar,
+    Arch: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdGather<T> + SimdReduce<T>,
+{
+    /// Adds `contribution(row . x)` to `y[r]` for every non-empty row `r`; the
+    /// closure is monomorphized into the one shared row loop.
+    #[inline]
+    fn accumulate_rows(&self, x: &[T], y: &mut [T], contribution: impl Fn(T) -> T) {
         let data = self.data.storage();
         validate_spmv_sizes(x.len(), y.len(), data.ncols, data.nrows, "CSR");
 
@@ -103,7 +132,7 @@ where
                 acc += vals[j] * unsafe { *x.get_unchecked(cols[j] as usize) };
                 j += 1;
             }
-            y[r] += acc;
+            y[r] += contribution(acc);
         }
     }
 }

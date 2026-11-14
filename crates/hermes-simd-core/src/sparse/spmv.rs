@@ -28,6 +28,40 @@ pub trait SparseSpMv<T> {
     fn spmv(&self, x: &[T], y: &mut [T]);
 }
 
+/// Fused scaled sparse matrix-vector multiplication.
+///
+/// Implemented only by formats with a fused `y += alpha * A * x` kernel, so a
+/// single row pass scales the dot product before the single `y[r]` write
+/// instead of replaying the row for a separate `axpy`. Formats without a
+/// fused kernel keep [`SparseSpMv`].
+pub trait SparseScaledSpMv<T> {
+    /// Perform scaled matrix-vector multiplication: `y += alpha * A * x`.
+    ///
+    /// `alpha == 0` (either sign) returns after the size checks with `y`
+    /// bit-for-bit unchanged like BLAS level 2: `x` and the stored values
+    /// are not read, so a non-finite `x` or an overflowing dot product cannot
+    /// reach `y`. Otherwise IEEE 754 applies to floats: NaN, infinity or
+    /// overflow in a row's dot product, or a NaN `alpha`, propagates into that
+    /// row's `y` entry. Rows without stored entries are skipped, so they leave
+    /// `y` untouched whatever `alpha` is, a NaN or infinite one included.
+    ///
+    /// # Overflow
+    /// For an integer `T` the caller keeps every product, partial sum,
+    /// `alpha * dot` and updated `y` entry inside the range of `T`. Otherwise
+    /// the result is unspecified and memory-safe. For a primitive integer,
+    /// lane arithmetic is backend-defined, while the scalar tail, the scaling
+    /// and the `y` update panic under overflow checks (dev and test profiles)
+    /// and wrap otherwise; row length and backend decide which runs in a lane.
+    /// The `I8`, `I16` and `I32` newtypes wrap in every profile and never
+    /// panic on overflow.
+    ///
+    /// # Panics
+    /// Panics if `x` or `y` is shorter than the column or row count (also for
+    /// a zero `alpha`), if the storage is structurally invalid, or, for a
+    /// primitive integer `T` under overflow checks, on integer overflow.
+    fn spmv_scaled(&self, alpha: T, x: &[T], y: &mut [T]);
+}
+
 /// Build an `Arch::IndexVector` from a slice of `i32` column indices.
 ///
 /// # Safety

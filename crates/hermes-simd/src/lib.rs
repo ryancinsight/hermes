@@ -140,6 +140,7 @@ pub use hermes_simd_core::sparse::{
     SparseCow,
     SparseFormat,
     SparseOps,
+    SparseScaledSpMv,
     SparseSpMv,
     SparseView,
     Validated,
@@ -276,6 +277,7 @@ pub use dispatch::{
     // Sparse operations — generic entry points.
     spmv_csr,
     spmv_dense_masked,
+    spmv_scaled_csr,
     spmv_sellp,
     sum,
     tiled_gemm,
