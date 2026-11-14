@@ -32,6 +32,10 @@ path = "examples/book_isa_dispatch.rs"
 name = "book_reductions"
 path = "examples/book_reductions.rs"
 
+[[example]]
+name = "scaled_spmv"
+path = "examples/scaled_spmv.rs"
+
 [features]
 default = ["mnemosyne-memory"]
 mnemosyne-memory = ["hermes-simd/mnemosyne-memory"]

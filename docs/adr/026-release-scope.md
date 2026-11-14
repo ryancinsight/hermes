@@ -20,7 +20,7 @@ a ladder exit check), **non-goal** (not part of 1.0).
 
 ## Decision
 
-Hermes 1.0 is the delivered surface below plus one in-scope capability: a
+Hermes 1.0 is the delivered surface below, which includes a
 fused, runtime-dispatched scaled CSR product `y += alpha * A * x`. Every other
 open direction is a non-goal for 1.0. A non-goal that is additive (a new
 operation family, a new backend behind an existing marker) can land in a 1.x
@@ -41,7 +41,7 @@ minor without a major.
 | Gather and scatter on views | delivered | `src/view/gather.rs`, `src/view/scatter.rs` |
 | Const-generic tiled dot, GEMM and GEMV | delivered | `src/tiling/` |
 | Sparse formats (CSR, SELL-p, blocked COO, dense-with-mask) and SpMV | delivered | `src/sparse/spmv/` (ADR 019) |
-| Fused scaled CSR SpMV, `y += alpha * A * x` in one pass | in scope | ladder exit checks |
+| Fused scaled CSR SpMV, `y += alpha * A * x` in one pass | delivered | `src/sparse/spmv/csr.rs` |
 | Dense, packed 4-bit and sparse copy-on-write containers | delivered | `src/cow/`, `src/sparse/cow/` |
 | N-D tensor views: layouts, strides, rows, transpose, COW | delivered | `src/tensor/` |
 | Tensor softmax, LayerNorm and attention layers | non-goal | absent from `src/tensor/`; consumer-layer operations |

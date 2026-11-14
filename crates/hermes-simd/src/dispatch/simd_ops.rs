@@ -163,6 +163,19 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
         -> Result<(), SimdError>;
     /// Computes sparse `SpMV` using CSR.
     fn spmv_csr(data: ValidatedData<CsrData<'_, Self>>, x: &[Self], y: &mut [Self]);
+    /// Computes fused scaled sparse `SpMV` using CSR: `y += alpha * A * x`.
+    ///
+    /// The contract is that of [`SparseScaledSpMv`](crate::SparseScaledSpMv).
+    ///
+    /// # Panics
+    /// Panics if `x.len() < ncols` or `y.len() < nrows` (also for a zero
+    /// `alpha`), or on integer overflow.
+    fn spmv_scaled_csr(
+        data: ValidatedData<CsrData<'_, Self>>,
+        alpha: Self,
+        x: &[Self],
+        y: &mut [Self],
+    );
     /// Computes sparse `SpMV` using const-generic Blocked-COO tiles.
     fn spmv_bcoo<const BM: usize, const BN: usize>(
         data: ValidatedData<BlockedCooData<'_, Self, BM, BN>>,
