@@ -71,6 +71,104 @@ item below carries `milestone: M-fused-scaled-spmv`.
   provider lock during unlocked local commands; its derived lock changes were
   discarded. Hosted locked CI remains the delivery gate.
 
+<a id="HERMES-SPMV-SCALED-SCALAR-COVERAGE"></a>
+## HERMES-SPMV-SCALED-SCALAR-COVERAGE — Test scaled CSR SpMV on every `SimdOps` scalar [patch] — todo
+
+- priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd/tests/sparse_tests.rs`.
+- basis: 0341d48d4c843ad62981e6839e5c707059994f37.
+- Outcome: the scaled CSR kernel is tested on all sixteen sealed `SimdOps`
+  scalars (nine today; `Bf16`, `F8`, `Bf8`, `F4`, `Bf4`, `i8` and `I8` ship
+  untested), and dropping any row of `scaled_csr_instantiations!` fails a test.
+- Acceptance: `cargo nextest list -p hermes-simd -E 'binary_id(=hermes-simd::sparse_tests) & test(~scaled_csr)'`
+  names one reference test per scalar, and
+  `test_spmv_scaled_csr_instantiations_cover_every_simd_ops_scalar` fails when
+  any row is removed; neither holds today.
+- Next step: add a power-of-two fixture (values +-1, alpha 2, an empty row, a
+  lane-length row, a tail) whose partial sums stay inside each scalar's exact
+  range; a judge probe passed `A = [[1,1],[],[1]]`, `x = [1,1]`, alpha 2 -> `[4,0,2]` on all seven. Replace the exclusion comment at `sparse_tests.rs:188-194`.
+- Finding: non-gating F2 and F3 of the judge verdict on hermes#291.
+
+<a id="HERMES-SPMV-PANICS-DOC"></a>
+## HERMES-SPMV-PANICS-DOC — Say where the scaled SpMV overflow panics occur [patch] — todo
+
+- priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core/src/sparse/spmv.rs`, `crates/hermes-simd/src/dispatch/ops.rs`, `crates/hermes-simd/src/dispatch/simd_ops.rs`.
+- basis: 0341d48d4c843ad62981e6839e5c707059994f37.
+- Outcome: each `# Panics` overflow clause names the scalar tail, the scaling
+  and the `y` update as the panic sites; a primitive-integer lane-block
+  overflow does not panic, so the unconditional wording is a false contract.
+- Acceptance: `git grep -n -E 'overflow checks, on( integer overflow\.)?$' -- crates`
+  returns no hit (three hits today: `spmv.rs:61`, `ops.rs:277`, `simd_ops.rs:172`).
+- Next step: reword each clause to "in the scalar tail, the scaling or the `y`
+  update" and keep the `# Overflow` cross-reference.
+- Finding: non-gating F10 of the judge verdict on hermes#291.
+
+<a id="HERMES-SPMV-ERROR-BOUND"></a>
+## HERMES-SPMV-ERROR-BOUND — Document the scaled SpMV forward error [patch] — todo
+
+- priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core/src/sparse/spmv.rs`, `crates/hermes-simd/tests/sparse_tests.rs`.
+- basis: 0341d48d4c843ad62981e6839e5c707059994f37.
+- Outcome: the `SparseScaledSpMv` Rustdoc states a forward-error bound for
+  inexact float inputs, derived from the reduction depth (lane blocks plus
+  tail) and the scaling and `y` roundings; the integer-valued fixture checks none.
+- Acceptance: `test_spmv_scaled_csr_forward_error_is_within_documented_bound`
+  runs an inexact-input row set per float scalar against a wider reference
+  and asserts the documented bound; the test does not exist today.
+- Next step: locate and read the dot-product error analysis (Higham,
+  Accuracy and Stability of Numerical Algorithms) before citing it, count the
+  roundings in the kernel, derive the bound per backend reduction width, and
+  place it beside `# Overflow`.
+- Finding: non-gating F12 of the judge verdict on hermes#291.
+
+<a id="HERMES-SPLIT-OVERSIZE-SPARSE-FILES"></a>
+## HERMES-SPLIT-OVERSIZE-SPARSE-FILES — Bring `dispatch/ops.rs` and `sparse_tests.rs` under 500 lines [patch] — todo
+
+- priority: tightening; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd/src/dispatch/ops.rs`, `crates/hermes-simd/tests/sparse_tests.rs`.
+- basis: 0341d48d4c843ad62981e6839e5c707059994f37.
+- Outcome: `dispatch/ops.rs` (586 lines) and `sparse_tests.rs` (1369 lines)
+  each split into concern-named leaf modules of at most 500 lines; no
+  behavior or public path changes.
+- Acceptance: `wc -l` of every resulting file is at most 500 (586 and 1369
+  today); `cargo nextest list -p hermes-simd` names the same tests before and
+  after, and the exit-check filters on `binary_id(=hermes-simd::sparse_tests)`
+  still select one test each.
+- Next step: group `ops.rs` by operation family; make `sparse_tests` one
+  harness (`tests/sparse_tests/main.rs`; confirm the binary id is unchanged)
+  with one module per kernel family; diff the `nextest list` names.
+- Finding: non-gating F14 of the judge verdict on hermes#291.
+
+<a id="HERMES-SPMV-DOC-RESIDUALS"></a>
+## HERMES-SPMV-DOC-RESIDUALS — Correct three scaled SpMV doc residuals [patch] — todo
+
+- priority: verification; milestone: M-fused-scaled-spmv; needs: HERMES-SPMV-SCALED-CSR; scope: `crates/hermes-simd/tests/sparse_tests.rs`, `crates/hermes-simd/src/dispatch/simd_ops.rs`, `docs/adr/026-release-scope.md`.
+- basis: 0341d48d4c843ad62981e6839e5c707059994f37.
+- Outcome: (1) the `FIXTURE_ROW_LENGTHS` comment (`sparse_tests.rs:56-58`)
+  states that the lane decomposition of 17, 85 and 259 holds at 16 lanes
+  only and that every loop is reached for power-of-two lane counts 2..64; (2)
+  the `SimdOps::spmv_scaled_csr` doctest uses an `invariant:` `.expect`
+  message; (3) the ADR 026 revision note cites hermes#291 and hermes#292.
+- Acceptance: `git grep -n -E 'every lane count|a valid CSR matrix' -- crates/hermes-simd/tests/sparse_tests.rs crates/hermes-simd/src/dispatch/simd_ops.rs`
+  returns no hit (two today), and the ADR 026 revision note names both PRs;
+  that note is part of the delivery of the item `needs:` names.
+- Next step: edit the three sites after that item's delivery.
+- Finding: non-gating F8, F13 and P2 of the judge verdicts on hermes#291 and hermes#292.
+
+<a id="HERMES-CHANGELOG-GENERATOR"></a>
+## HERMES-CHANGELOG-GENERATOR — Generate the changelog from conventional commits [patch] — todo
+
+- priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `CHANGELOG.md`, `scripts`, `.github/workflows`, the generator's configuration file.
+- basis: 0341d48d4c843ad62981e6839e5c707059994f37.
+- Outcome: `CHANGELOG.md` is generated from conventional-commit subjects by a
+  committed git-cliff-class configuration, not hand-edited as its
+  "Unreleased" sections are today; the tree holds no generator configuration.
+- Acceptance: a committed regenerate-and-diff check on `CHANGELOG.md` exits 0
+  at the fetched default commit and non-zero when the file is hand-edited;
+  no such check or configuration is tracked today.
+- Next step: select the generator and pin its version in the committed tool
+  manifest (stack ADR 0068 names release-plz as a candidate; the stack has
+  not adopted one), convert the Unreleased sections, then wire the check into
+  the pull-request workflow.
+- Finding: non-gating F9 of the judge verdict on hermes#291.
+
 ## HERMES-RESCUE-QUEUE — Complete or close the rescue PR queue [patch] — todo <a id="hermes-rescue-queue"></a>
 
 - Status: todo; priority: correctness; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core`, `crates/hermes-simd-intrinsics`, `crates/hermes-simd`, `crates/hermes-simd-benches`, `gap_audit.md`.
