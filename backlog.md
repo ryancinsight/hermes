@@ -172,14 +172,14 @@ item below carries `milestone: M-fused-scaled-spmv`.
   path to scope, convert the sections and add the check.
 
 <a id="HERMES-RESCUE-QUEUE"></a>
-## HERMES-RESCUE-QUEUE — Port or account for the closed rescue PR work [patch] — todo
+## HERMES-RESCUE-QUEUE — Port the closed rescue PR work or prove it superseded [patch] — todo
 - priority: correctness; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core`, `crates/hermes-simd-intrinsics`, `crates/hermes-simd`, `crates/hermes-simd-benches`, `gap_audit.md`.
-- basis: ea5b4e6bd3f9630b69f6f47b7e8f174d5b923d64; finding: non-gating N5 of the judge verdict on hermes#294.
-- Outcome: every hunk of `refs/pull/220/head` and `refs/pull/221/head` is ported onto current main (verified, merged) or recorded as dropped with its reason.
-- Acceptance: for each pull head, `git merge-tree --write-tree origin/main <head>` (merge attributes disabled) exits 0 and prints main's tree, or the delivering PR lists each dropped hunk with its reason.
-- Evidence at basis: both PRs are CLOSED, unmerged and unlabelled (`gh pr view`: #220 at 2026-10-13T02:32:19Z, #221 at 2026-10-13T02:30:42Z); their work survives only in the pull refs. Landed-work proof fails for both (`merge-tree` exits 1 with conflicts).
+- basis: 58135279a1000b4cb815a2131ccbf931f213ab9e; finding: non-gating N5 of the judge verdict on hermes#294, F1, F3 and F5 of the judge verdict on hermes#295.
+- Outcome: every hunk of `refs/pull/220/head` and `refs/pull/221/head` is ported onto current main (verified, merged) or superseded: its fix-forward port onto main is empty, citing the main commit that carries its intent. Any other drop needs explicit user instruction.
+- Acceptance: for each pull head the delivering PR accounts for every hunk: a ported hunk appears in its diff against main with a test or build proving it applies, and a superseded hunk cites the main commit and shows the empty port. A hunk with neither fails; the `merge-tree` exit code decides nothing, because ported hunks evolve past the head.
+- Evidence at basis: neither head is merged and the work survives only in the pull refs. Landed-work proof fails for both (`git merge-tree --write-tree origin/main <head>` exits 1 with conflicts).
   - `refs/pull/220/head` (`rescue/hermes-simd-consolidation-batch`): 8 commits, 25 files (+965/-1691); 14 files are byte-identical to main, 11 differ (SIMD wrapper/scalar/NEON/AVX2 de-duplication in `hermes-simd-intrinsics`, `cpu.rs`, `lib.rs`, `kernel/backend.rs`, lockfile).
-  - `refs/pull/221/head` (`rescue/hermes-audit-20260928`): 1 commit, 22 files (+1857/-1831); none is identical to main, and main keeps the `mod.rs` layout and the unsplit `dense_tests.rs` it reorganizes.
+  - `refs/pull/221/head` (`rescue/hermes-audit-20260928`): 1 commit, 22 files (+1857/-1831); none is identical to main. It flattens 9 `mod.rs` modules to `<name>.rs` and splits `dense_tests.rs`; main keeps `mod.rs` for 8 of the 9 and has not split `dense_tests.rs`. The ninth is already flattened: `scalar/mod.rs` became `scalar.rs` in 38e741037b987f57645a28129747c0f7481fc174, and its bodies moved to `scalar/float_kernel.rs` and `scalar/emulated.rs`, so that hunk conflicts on main's layout.
 - Next step: restore each head with `git fetch origin pull/220/head:<branch>`, port #220's 11 differing files hunk by hunk onto main, then #221's 22; the item deletes in the PR that accounts for the last hunk.
 
 ## Legacy HS-4xx record — open items and measured limits
