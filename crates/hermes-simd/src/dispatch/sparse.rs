@@ -5,7 +5,7 @@ use hermes_simd_core::kernel::{SimdArith, SimdGather, SimdLoadStore, SimdMask, S
 use hermes_simd_core::scalar::Scalar;
 use hermes_simd_core::sparse::{
     BlockedCoo, BlockedCooData, Csr, CsrData, DenseWithMask, DenseWithMaskData, SellP, SellPData,
-    SparseSpMv, SparseView, Validated, ValidatedData,
+    SparseScaledSpMv, SparseSpMv, SparseView, Validated, ValidatedData,
 };
 use hermes_simd_macros::runtime_dispatch;
 
@@ -19,6 +19,19 @@ pub(super) fn dispatch_spmv_csr_kernel<T, A>(
     A: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdGather<T> + SimdReduce<T>,
 {
     SparseView::<T, Validated<Csr>, A>::from_validated_csr(data).spmv(x, y);
+}
+
+#[runtime_dispatch(avx512f, avx2, neon, scalar)]
+pub(super) fn dispatch_spmv_scaled_csr_kernel<T, A>(
+    data: ValidatedData<CsrData<'_, T>>,
+    alpha: T,
+    x: &[T],
+    y: &mut [T],
+) where
+    T: Scalar,
+    A: SimdArch + SimdLoadStore<T> + SimdArith<T> + SimdGather<T> + SimdReduce<T>,
+{
+    SparseView::<T, Validated<Csr>, A>::from_validated_csr(data).spmv_scaled(alpha, x, y);
 }
 
 #[runtime_dispatch(avx512f, avx2, neon, scalar)]

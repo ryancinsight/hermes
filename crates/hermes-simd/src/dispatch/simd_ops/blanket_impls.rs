@@ -153,6 +153,15 @@ macro_rules! impl_simd_ops_methods {
             sparse::dispatch_spmv_csr::<Self>(data, x, y)
         }
         #[inline(always)]
+        fn spmv_scaled_csr(
+            data: ValidatedData<CsrData<'_, Self>>,
+            alpha: Self,
+            x: &[Self],
+            y: &mut [Self],
+        ) {
+            sparse::dispatch_spmv_scaled_csr::<Self>(data, alpha, x, y)
+        }
+        #[inline(always)]
         fn spmv_bcoo<const BM: usize, const BN: usize>(
             data: ValidatedData<BlockedCooData<'_, Self, BM, BN>>,
             x: &[Self],

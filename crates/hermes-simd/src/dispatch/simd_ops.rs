@@ -163,6 +163,32 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
         -> Result<(), SimdError>;
     /// Computes sparse `SpMV` using CSR.
     fn spmv_csr(data: ValidatedData<CsrData<'_, Self>>, x: &[Self], y: &mut [Self]);
+    /// Computes fused scaled sparse `SpMV` using CSR: `y += alpha * A * x`.
+    ///
+    /// The contract is that of [`SparseScaledSpMv`](crate::SparseScaledSpMv).
+    ///
+    /// # Panics
+    /// Panics if `x.len() < ncols` or `y.len() < nrows` (also for a zero
+    /// `alpha`), or, for a primitive integer `Self` under overflow checks, on
+    /// integer overflow.
+    ///
+    /// # Examples
+    /// ```
+    /// use hermes_simd::{CsrData, SimdOps, ValidatedData};
+    ///
+    /// let (values, columns, row_ptr) = ([2.0f32, 3.0], [0i32, 1], [0i32, 2]);
+    /// let csr = CsrData::new(&values[..], &columns[..], &row_ptr[..], 1, 2);
+    /// let data = ValidatedData::new(csr).expect("a valid CSR matrix");
+    /// let mut y = [1.0f32];
+    /// f32::spmv_scaled_csr(data, 2.0, &[10.0, 100.0], &mut y);
+    /// assert_eq!(y, [641.0]); // 1 + 2 * (2 * 10 + 3 * 100)
+    /// ```
+    fn spmv_scaled_csr(
+        data: ValidatedData<CsrData<'_, Self>>,
+        alpha: Self,
+        x: &[Self],
+        y: &mut [Self],
+    );
     /// Computes sparse `SpMV` using const-generic Blocked-COO tiles.
     fn spmv_bcoo<const BM: usize, const BN: usize>(
         data: ValidatedData<BlockedCooData<'_, Self, BM, BN>>,
