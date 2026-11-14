@@ -35,7 +35,7 @@ pub use cow::{
     SparseCow,
 };
 pub use ops::SparseOps;
-pub use spmv::SparseSpMv;
+pub use spmv::{SparseScaledSpMv, SparseSpMv};
 pub use types::{
     BlockedCooData, CsrData, DenseWithMaskData, SellPData, SparseShape, ValidatedData,
 };
