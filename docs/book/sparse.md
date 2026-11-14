@@ -83,6 +83,10 @@ convention; callers zero `y` to get `y = A·x`.
 Each format has one entry point, monomorphized by its layout parameters:
 
 - `spmv_csr::<T>(data: ValidatedData<CsrData>, x, y)` — gather-based CSR.
+- `spmv_scaled_csr::<T>(data: ValidatedData<CsrData>, alpha, x, y)` — fused
+  `y += alpha * A * x` in one row pass over the same CSR gather kernel; the
+  scaled sum never replays the row for a separate `axpy`. A runnable check
+  lives in the `scaled_spmv` example.
 - `spmv_sellp::<T, C>(data: ValidatedData<SellPData<C>>, x, y)` — chunked
   SELL-P, const-generic row-chunk width `C`.
 - `spmv_bcoo::<T, BM, BN>(data: ValidatedData<BlockedCooData<BM, BN>>, x, y)`
