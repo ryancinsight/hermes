@@ -115,15 +115,16 @@ item below carries `milestone: M-fused-scaled-spmv`.
 
 <a id="HERMES-SPMV-SCALED-DOCTESTS"></a>
 ## HERMES-SPMV-SCALED-DOCTESTS — Add doctests to the scaled SpMV entry points [patch] — todo
-- priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core/src/sparse/spmv.rs`, `crates/hermes-simd/src/dispatch/ops.rs`.
-- basis: cd0dabd38e1fe02b793782794f8ecdd94a95b9eb; finding: non-gating F11 of the judge verdicts on hermes#291 and hermes#292.
+- priority: verification; milestone: M-fused-scaled-spmv; needs: HERMES-SPMV-DOC-RESIDUALS; scope: `crates/hermes-simd-core/src/sparse/spmv.rs`, `crates/hermes-simd/src/dispatch/ops.rs`.
+- basis: cd0dabd38e1fe02b793782794f8ecdd94a95b9eb; finding: non-gating F11 of the judge verdict on hermes#291.
 - Outcome: `SparseScaledSpMv::spmv_scaled` and the free
   `hermes_simd::spmv_scaled_csr` each carry a runnable doctest that asserts a
   computed `y`; neither has a code example today (`SimdOps::spmv_scaled_csr` does).
 - Acceptance: `cargo test --doc -p hermes-simd-core -p hermes-simd -- spmv_scaled`
   passes and its output names a doctest for each of the two items.
-- Next step: model both examples on the `SimdOps::spmv_scaled_csr` doctest
-  (an `invariant:` `.expect` message, a hand-computed expected `y`).
+- Next step: once HERMES-SPMV-DOC-RESIDUALS gives the `SimdOps::spmv_scaled_csr`
+  doctest an `invariant:` `.expect` message (it reads "a valid CSR matrix" today),
+  model both examples on it, each with a hand-computed expected `y`.
 
 <a id="HERMES-SPMV-DOC-RESIDUALS"></a>
 ## HERMES-SPMV-DOC-RESIDUALS — Correct three scaled SpMV doc residuals [patch] — todo
@@ -162,7 +163,7 @@ item below carries `milestone: M-fused-scaled-spmv`.
   subjects at release time, not hand-edited as its "Unreleased" sections are today.
 - Acceptance: a committed check regenerates the changelog through the latest
   release tag and exits 0 against the committed released sections, non-zero when
-  one is hand-edited (Unreleased is exempt); neither it nor a generator configuration exists today.
+  one is hand-edited; no hand-maintained Unreleased section remains (four today).
 - Blocker: the generator is a stack decision, not a hermes choice; [ADR 0068](../../docs/adr/0068-publish-on-version-change.md)
   keeps release-plz as the candidate if the stack adopts generated changelogs
   and none is adopted. Re-open trigger: the stack adopts a generator.
@@ -170,15 +171,16 @@ item below carries `milestone: M-fused-scaled-spmv`.
   `ci.yml` has one unversioned `tool:` input); then add the generator's configuration
   path to scope, convert the sections and add the check.
 
-## HERMES-RESCUE-QUEUE — Complete or close the rescue PR queue [patch] — todo <a id="hermes-rescue-queue"></a>
-
-- Status: todo; priority: correctness; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core`, `crates/hermes-simd-intrinsics`, `crates/hermes-simd`, `crates/hermes-simd-benches`, `gap_audit.md`.
-- **Outcome:** each listed rescue PR is completed onto current main (ported, verified, merged) or closed once its diff resolves empty against main.
-- **Acceptance:** no open `rescue/` PR for hermes remains unaccounted for; each closed PR records an empty resolved diff against main, each completed one its landing PR.
-- **Next step:** port the oldest PR (#220) onto current main and resolve its diff hunk by hunk; both bases predate main by 60+ commits.
-- **Rescue PRs (draft parking records, not claims):**
-  - `ryancinsight/hermes#220` (`rescue/hermes-simd-consolidation-batch`): 9 refactor commits, 25 files (+965/-1691), code only: SIMD wrapper/scalar/AVX2/AVX-512 de-duplication, iter chunk and mask validation helpers, Kogge-Stone bitboard and target consolidation.
-  - `ryancinsight/hermes#221` (`rescue/hermes-audit-20260928`): 1 audit commit, 22 files (+1857/-1831), code, tests and `gap_audit.md`: sparse/tiling/tensor view, x86_64 and AMX modules, axpy dispatch, dense/tiling/slice tests, benches.
+<a id="HERMES-RESCUE-QUEUE"></a>
+## HERMES-RESCUE-QUEUE — Port or account for the closed rescue PR work [patch] — todo
+- priority: correctness; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core`, `crates/hermes-simd-intrinsics`, `crates/hermes-simd`, `crates/hermes-simd-benches`, `gap_audit.md`.
+- basis: ea5b4e6bd3f9630b69f6f47b7e8f174d5b923d64; finding: non-gating N5 of the judge verdict on hermes#294.
+- Outcome: every hunk of `refs/pull/220/head` and `refs/pull/221/head` is ported onto current main (verified, merged) or recorded as dropped with its reason.
+- Acceptance: for each pull head, `git merge-tree --write-tree origin/main <head>` (merge attributes disabled) exits 0 and prints main's tree, or the delivering PR lists each dropped hunk with its reason.
+- Evidence at basis: both PRs are CLOSED, unmerged and unlabelled (`gh pr view`: #220 at 2026-10-13T02:32:19Z, #221 at 2026-10-13T02:30:42Z); their work survives only in the pull refs. Landed-work proof fails for both (`merge-tree` exits 1 with conflicts).
+  - `refs/pull/220/head` (`rescue/hermes-simd-consolidation-batch`): 8 commits, 25 files (+965/-1691); 14 files are byte-identical to main, 11 differ (SIMD wrapper/scalar/NEON/AVX2 de-duplication in `hermes-simd-intrinsics`, `cpu.rs`, `lib.rs`, `kernel/backend.rs`, lockfile).
+  - `refs/pull/221/head` (`rescue/hermes-audit-20260928`): 1 commit, 22 files (+1857/-1831); none is identical to main, and main keeps the `mod.rs` layout and the unsplit `dense_tests.rs` it reorganizes.
+- Next step: restore each head with `git fetch origin pull/220/head:<branch>`, port #220's 11 differing files hunk by hunk onto main, then #221's 22; the item deletes in the PR that accounts for the last hunk.
 
 ## Legacy HS-4xx record — open items and measured limits
 
