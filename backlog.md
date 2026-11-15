@@ -181,6 +181,19 @@ item below carries `milestone: M-fused-scaled-spmv`.
   - `refs/pull/221/head` (`rescue/hermes-audit-20260928`): 1 commit, 22 files (+1857/-1831); none is identical to main. It flattens 9 `mod.rs` modules to `<name>.rs` and splits `dense_tests.rs`; main keeps `mod.rs` for 8 of the 9 and has not split `dense_tests.rs`. The ninth is already flattened: `scalar/mod.rs` became `scalar.rs` in 38e741037b987f57645a28129747c0f7481fc174, and its bodies moved to `scalar/float_kernel.rs` and `scalar/emulated.rs`, so that hunk conflicts on main's layout.
 - Next step: restore the head with `git fetch origin pull/221/head:<branch>`, then port or prove superseded its 22 files in slices of at most 400 changed lines; the item deletes in the PR that accounts for the last hunk.
 
+<a id="HERMES-NUMA-BINDING-ON-THEMIS-2026-09-29"></a>
+## HERMES-NUMA-BINDING-ON-THEMIS-2026-09-29 — Run the affinity guards on the Themis set binding [minor] — todo
+
+- Outcome: hermes guards and `ProcessorIndex::current` run on themis's set binding (`bind_current_thread_to`, `current_thread_affinity`; themis ADR 0006 rev. 2026-11-13) and hermes declares no affinity FFI of its own.
+- Oracle: `git grep -nE 'ThreadGroupAffinity|sched_(set|get)|GetCurrentProcessorNumber|GetActiveProcessor' -- '*.rs'` is empty (27 hits at basis) and `cargo check -p hermes-simd-core --no-default-features` passes on x86_64-unknown-linux-gnu and x86_64-pc-windows-msvc (compile only; tests still link `std`);
+  `numa::processor` and `numa::binding` tests assert bound and restored affinity by value against `current_thread_affinity()`; `binding_tests::themis_refusal_yields_unbound` feeds group 65 535 to the Windows group-bind seam and gets `Unbound`; ADR 021 (option 2 revised) and ADR 010 name `bind_current_thread_to`.
+- Non-goals: libnuma `numa_bind`, `numa/locality.rs`; moirai's `NoActiveProcessor` arm.
+- priority: tightening; milestone: M-fused-scaled-spmv; needs: themis set binding, landed by themis#133 (merge ef8de1c0, themis 0.11.5).
+- scope: `crates/hermes-simd-core/src/numa/`, `Cargo.toml`, `Cargo.lock`, `docs/adr/010-numa-memory-layout.md`, `docs/adr/021-exact-processor-binding.md`.
+- Next step: lock themis at ef8de1c0 (0.11.5 satisfies the `0.11.1` requirement), then move each guard onto the set binding.
+- Link: moved from the themis board by its filing sweep; themis ADR 0006 cites this ID.
+- basis: 5b24c0e9e662cfb6c92d64d3187e1d3cf1639051.
+
 ## Legacy HS-4xx record — open items and measured limits
 
 In full: the open measurement items, the limits they rest on, and the rejected refactors. The rest of the era is one line each below.
