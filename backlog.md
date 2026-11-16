@@ -70,22 +70,6 @@ item below carries `milestone: M-fused-scaled-spmv`.
   provider lock during unlocked local commands; its derived lock changes were
   discarded. Hosted locked CI remains the delivery gate.
 
-<a id="HERMES-SPMV-SCALED-SCALAR-COVERAGE"></a>
-## HERMES-SPMV-SCALED-SCALAR-COVERAGE — Test scaled CSR SpMV on every `SimdOps` scalar [patch] — todo
-- priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd/tests/sparse_tests.rs`.
-- basis: cd0dabd38e1fe02b793782794f8ecdd94a95b9eb; finding: non-gating F2 and F3 of the judge verdict on hermes#291.
-- Outcome: the scaled CSR kernel is tested on all sixteen sealed `SimdOps`
-  scalars (nine today; `Bf16`, `F8`, `Bf8`, `F4`, `Bf4`, `i8` and `I8` ship
-  untested), and dropping any row of `scaled_csr_instantiations!` fails a test.
-- Acceptance: `cargo nextest list -p hermes-simd -E 'binary_id(=hermes-simd::sparse_tests) & test(~scaled_csr)'`
-  names one reference test per scalar, and
-  `test_spmv_scaled_csr_instantiations_cover_every_simd_ops_scalar` fails when
-  any row is removed; neither holds today.
-- Next step: add a power-of-two fixture (values +-1, alpha 2, an empty row, a
-  lane-length row, a tail) whose partial sums stay inside each scalar's exact
-  range; replace the exclusion comment above the macro (`sparse_tests.rs:188-194`).
-  A judge probe passed `[[1,1],[],[1]]`, alpha 2, on all seven.
-
 <a id="HERMES-SPMV-PANICS-DOC"></a>
 ## HERMES-SPMV-PANICS-DOC — Say where the scaled SpMV overflow panics occur [patch] — todo
 - priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core/src/sparse/spmv.rs`, `crates/hermes-simd/src/dispatch/ops.rs`, `crates/hermes-simd/src/dispatch/simd_ops.rs`.
@@ -141,7 +125,7 @@ item below carries `milestone: M-fused-scaled-spmv`.
 
 <a id="HERMES-SPLIT-OVERSIZE-SPARSE-FILES"></a>
 ## HERMES-SPLIT-OVERSIZE-SPARSE-FILES — Bring `dispatch/ops.rs` and `sparse_tests.rs` under 500 lines [patch] — todo
-- priority: tightening; milestone: M-fused-scaled-spmv; needs: HERMES-SPMV-SCALED-SCALAR-COVERAGE, HERMES-SPMV-PANICS-DOC, HERMES-SPMV-ERROR-BOUND, HERMES-SPMV-SCALED-DOCTESTS, HERMES-SPMV-DOC-RESIDUALS; scope: `crates/hermes-simd/src/dispatch/ops.rs`, `crates/hermes-simd/tests/sparse_tests.rs`.
+- priority: tightening; milestone: M-fused-scaled-spmv; needs: HERMES-SPMV-PANICS-DOC, HERMES-SPMV-ERROR-BOUND, HERMES-SPMV-SCALED-DOCTESTS, HERMES-SPMV-DOC-RESIDUALS; scope: `crates/hermes-simd/src/dispatch/ops.rs`, `crates/hermes-simd/tests/sparse_tests.rs`.
 - basis: cd0dabd38e1fe02b793782794f8ecdd94a95b9eb; finding: non-gating F14 of the judge verdict on hermes#291.
 - Outcome: `dispatch/ops.rs` (586 lines) and `sparse_tests.rs` (1369) each
   split into concern-named leaf modules of at most 500 lines; no behavior or

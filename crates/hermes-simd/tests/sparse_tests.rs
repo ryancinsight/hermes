@@ -53,27 +53,138 @@ fn test_spmv_csr_accumulates() {
     assert_eq!(y, [8.0, 8.0]);
 }
 
+/// Integer description of `y += alpha * A * x`, fixed before a scalar is
+/// chosen so the exact-range bound is computed per scalar limit. Entry `k` of
+/// row `row` is `+1` when `row + k` is even and `-1` otherwise.
+struct ScaledCsrShape {
+    row_lengths: &'static [usize],
+    ncols: usize,
+    /// Column of entry `k` in row `row`, which has `length` entries.
+    column: fn(row: usize, k: usize, length: usize) -> usize,
+    x: fn(column: usize) -> i64,
+    /// Initial `y[row]`, given the exact dot product of the row.
+    y: fn(row: usize, dot: i64) -> i64,
+    alphas: &'static [i64],
+}
+
 /// Row lengths that reach every loop of the kernel on every lane count: empty,
 /// single, sub-lane tail, one 16-lane block plus tail (17), one unrolled block
 /// plus a lane block plus tail (85), four unrolled blocks plus tail (259).
 const FIXTURE_ROW_LENGTHS: [usize; 6] = [0, 1, 5, 17, 85, 259];
-const FIXTURE_NCOLS: usize = 259;
-const FIXTURE_INITIAL_Y: [i32; 6] = [10, -20, 30, -40, 50, -60];
+const FIXTURE_INITIAL_Y: [i64; 6] = [10, -20, 30, -40, 50, -60];
 
-/// Integer-valued CSR matrix with entries `+1`/`-1`, `x[c] = c % 4 + 1` and
-/// integer `alpha`: below the scalar's exact-integer limit every product, sum
-/// and fused multiply-add is exact in any SIMD reduction order, so the
-/// comparison against the scalar reference has a derived tolerance of zero.
-struct ScaledCsrFixture<T> {
-    values: Vec<T>,
+/// Every entry meets `x[c] = c % 4 + 1`, so every product is nonzero. Partial
+/// sums reach several hundred and `y` reaches 60, which only the wide-range
+/// scalars hold exactly.
+const WIDE_SHAPE: ScaledCsrShape = ScaledCsrShape {
+    row_lengths: &FIXTURE_ROW_LENGTHS,
+    ncols: 259,
+    column: |_, k, _| k,
+    x: |column| i64::try_from(column % 4 + 1).expect("invariant: a residue below 4 fits i64"),
+    y: |row, _| FIXTURE_INITIAL_Y[row],
+    alphas: &[2, -3, 1],
+};
+
+/// The fixture lengths three times after the empty row.
+const COMPACT_ROW_LENGTHS: [usize; 16] =
+    [0, 1, 5, 17, 85, 259, 1, 5, 17, 85, 259, 1, 5, 17, 85, 259];
+/// Columns `0..COMPACT_HOT_COLUMNS` hold `x = 1`; every other column holds 0.
+const COMPACT_HOT_COLUMNS: usize = 3;
+
+/// Each non-empty row stores one product of magnitude 1, in a hot column: the
+/// last entry (tail or last lane) in rows 1 to 5, the first (lane 0) in rows 6
+/// to 10, the middle in rows 11 to 15. Every other entry meets `x = 0`, so in
+/// any summation order each partial sum is 0 or that product, `alpha * dot` is
+/// `+-alpha`, and `y = -dot` makes `y + alpha * dot` equal `(alpha - 1) * dot`.
+/// With `alpha` in `{2, -1, 1}` every quantity has magnitude at most 2, the
+/// range that `Bf4` (integers 0 to 3) and `F4` (0, 1, 2, 4, 8) both hold
+/// exactly. The empty row keeps `y = 2` to show that empty rows are skipped.
+const COMPACT_SHAPE: ScaledCsrShape = ScaledCsrShape {
+    row_lengths: &COMPACT_ROW_LENGTHS,
+    ncols: COMPACT_HOT_COLUMNS + 259,
+    column: |row, k, length| {
+        let hot = [length - 1, 0, length / 2][row.saturating_sub(1) / 5];
+        if k == hot {
+            row % COMPACT_HOT_COLUMNS
+        } else {
+            COMPACT_HOT_COLUMNS + k
+        }
+    },
+    x: |column| i64::from(column < COMPACT_HOT_COLUMNS),
+    y: |_, dot| if dot == 0 { 2 } else { -dot },
+    alphas: &[2, -1, 1],
+};
+
+struct ScaledCsrIntegers {
+    values: Vec<i64>,
     columns: Vec<i32>,
     row_ptr: Vec<i32>,
+    x: Vec<i64>,
+    y: Vec<i64>,
+    alphas: &'static [i64],
+    /// Exact `A * x` per row.
+    dots: Vec<i64>,
+    /// Largest magnitude a partial sum of a row's products reaches in any
+    /// summation order: the larger of its positive and negative totals.
+    partial_extents: Vec<i64>,
+}
+
+impl ScaledCsrShape {
+    fn integers(&self) -> ScaledCsrIntegers {
+        let mut integers = ScaledCsrIntegers {
+            values: Vec::new(),
+            columns: Vec::new(),
+            row_ptr: vec![0],
+            x: (0..self.ncols).map(self.x).collect(),
+            y: Vec::new(),
+            alphas: self.alphas,
+            dots: Vec::new(),
+            partial_extents: Vec::new(),
+        };
+        for (row, &length) in self.row_lengths.iter().enumerate() {
+            let (mut positive, mut negative) = (0i64, 0i64);
+            for k in 0..length {
+                let column = (self.column)(row, k, length);
+                let sign: i64 = if (row + k) % 2 == 0 { 1 } else { -1 };
+                let product = sign * integers.x[column];
+                integers.values.push(sign);
+                let column = i32::try_from(column).expect("invariant: fixture column fits i32");
+                integers.columns.push(column);
+                positive += product.max(0);
+                negative += (-product).max(0);
+            }
+            let nnz = i32::try_from(integers.values.len()).expect("invariant: nnz fits i32");
+            integers.row_ptr.push(nnz);
+            integers.dots.push(positive - negative);
+            integers.partial_extents.push(positive.max(negative));
+            integers.y.push((self.y)(row, positive - negative));
+        }
+        integers
+    }
+}
+
+impl ScaledCsrIntegers {
+    /// Whether a scalar that represents every integer of magnitude at most
+    /// `exact_limit` holds every quantity the kernel forms exactly: `y`, each
+    /// partial sum of a row's products, `alpha * dot` and `y + alpha * dot`.
+    fn fits(&self, exact_limit: i64) -> bool {
+        let rows = self.y.iter().zip(&self.dots).zip(&self.partial_extents);
+        self.alphas.iter().all(|&alpha| {
+            rows.clone().all(|((&y, &dot), &extent)| {
+                [extent, y, alpha * dot, y + alpha * dot]
+                    .into_iter()
+                    .all(|quantity| quantity.abs() <= exact_limit)
+            })
+        })
+    }
+}
+
+/// The fixture integers as scalars of `T`, which must hold them exactly.
+struct ScaledCsrFixture<'a, T> {
+    integers: &'a ScaledCsrIntegers,
+    values: Vec<T>,
     x: Vec<T>,
     y_initial: Vec<T>,
-    /// Exact `A * x` per row.
-    row_products: Vec<i64>,
-    /// Exact `|A| * |x|` per row, which bounds every partial sum of that row.
-    row_magnitudes: Vec<i64>,
 }
 
 /// Converts an integer that the scalar `T` represents exactly into `T`.
@@ -89,135 +200,163 @@ fn exact_element<T: SimdScalar>(value: i64) -> T {
     }
 }
 
-impl<T: SimdScalar> ScaledCsrFixture<T> {
-    fn new() -> Self {
-        let x_integers: Vec<i64> = (0..FIXTURE_NCOLS)
-            .map(|c| i64::try_from(c % 4 + 1).expect("invariant: small index fits i64"))
-            .collect();
-        let mut values = Vec::new();
-        let mut columns = Vec::new();
-        let mut row_ptr = vec![0i32];
-        let mut row_products = Vec::new();
-        let mut row_magnitudes = Vec::new();
-        for (row, &length) in FIXTURE_ROW_LENGTHS.iter().enumerate() {
-            let (mut product, mut magnitude) = (0i64, 0i64);
-            for (k, &x_k) in x_integers.iter().enumerate().take(length) {
-                let sign: i64 = if (row + k) % 2 == 0 { 1 } else { -1 };
-                values.push(exact_element::<T>(sign));
-                columns.push(i32::try_from(k).expect("invariant: fixture column fits i32"));
-                product += sign * x_k;
-                magnitude += x_k;
-            }
-            row_ptr.push(i32::try_from(values.len()).expect("invariant: fixture nnz fits i32"));
-            row_products.push(product);
-            row_magnitudes.push(magnitude);
-        }
+impl<'a, T: SimdScalar> ScaledCsrFixture<'a, T> {
+    fn new(integers: &'a ScaledCsrIntegers) -> Self {
+        let elements = |i: &[i64]| i.iter().map(|&i| exact_element::<T>(i)).collect();
         Self {
-            values,
-            columns,
-            row_ptr,
-            x: x_integers.into_iter().map(exact_element::<T>).collect(),
-            y_initial: FIXTURE_INITIAL_Y
-                .iter()
-                .map(|&y| exact_element::<T>(i64::from(y)))
-                .collect(),
-            row_products,
-            row_magnitudes,
+            integers,
+            values: elements(&integers.values),
+            x: elements(&integers.x),
+            y_initial: elements(&integers.y),
         }
     }
 
     fn data(&self) -> ValidatedData<CsrData<'_, T>> {
         validated(CsrData::new(
             &self.values[..],
-            &self.columns[..],
-            &self.row_ptr[..],
-            FIXTURE_ROW_LENGTHS.len(),
-            FIXTURE_NCOLS,
+            &self.integers.columns[..],
+            &self.integers.row_ptr[..],
+            self.integers.dots.len(),
+            self.x.len(),
         ))
     }
-
-    /// Largest magnitude any partial sum of `y + alpha * A * x` can reach.
-    fn max_intermediate_magnitude(&self, alpha: i64) -> i64 {
-        FIXTURE_INITIAL_Y
-            .iter()
-            .zip(&self.row_magnitudes)
-            .map(|(&y, &magnitude)| i64::from(y).abs() + alpha.abs() * magnitude)
-            .max()
-            .expect("invariant: the fixture has rows")
-    }
 }
 
-/// `y += alpha * A * x` equals the scalar reference for every row shape, and
-/// at `alpha = 1` is bit-identical to the unscaled `spmv_csr`.
-fn check_scaled_csr_matches_scalar_reference<T: SimdOps>(exact_limit: i64) {
-    let fixture = ScaledCsrFixture::<T>::new();
-    for alpha in [2i64, -3, 1] {
+/// `y += alpha * A * x` equals the scalar reference for each given shape, and
+/// at `alpha = 1` is bit-identical to the unscaled `spmv_csr`. A shape the
+/// scalar cannot hold exactly fails, so no row can drop a shape unnoticed.
+fn check_scaled_csr_matches_scalar_reference<T: SimdOps>(
+    exact_limit: i64,
+    shapes: &[&ScaledCsrShape],
+) {
+    for shape in shapes {
+        let integers = shape.integers();
         assert!(
-            fixture.max_intermediate_magnitude(alpha) <= exact_limit,
-            "fixture must stay inside the exact-integer range of the scalar"
+            integers.fits(exact_limit),
+            "the fixture must stay inside the exact-integer range of the scalar"
         );
-        let want: Vec<T> = FIXTURE_INITIAL_Y
-            .iter()
-            .zip(&fixture.row_products)
-            .map(|(&y, &product)| exact_element::<T>(i64::from(y) + alpha * product))
-            .collect();
-        let mut y = fixture.y_initial.clone();
-        spmv_scaled_csr::<T>(
-            fixture.data(),
-            exact_element::<T>(alpha),
-            &fixture.x,
-            &mut y,
-        );
-        assert_eq!(y, want, "fused scaled CSR SpMV must match the reference");
+        let fixture = ScaledCsrFixture::<T>::new(&integers);
+        for &alpha in integers.alphas {
+            let want: Vec<T> = integers
+                .y
+                .iter()
+                .zip(&integers.dots)
+                .map(|(&y, &dot)| exact_element::<T>(y + alpha * dot))
+                .collect();
+            let mut y = fixture.y_initial.clone();
+            let alpha = exact_element::<T>(alpha);
+            spmv_scaled_csr::<T>(fixture.data(), alpha, &fixture.x, &mut y);
+            assert_eq!(y, want, "fused scaled CSR SpMV must match the reference");
+        }
+
+        let mut unscaled = fixture.y_initial.clone();
+        spmv_csr::<T>(fixture.data(), &fixture.x, &mut unscaled);
+        let mut fused = fixture.y_initial.clone();
+        spmv_scaled_csr::<T>(fixture.data(), T::ONE, &fixture.x, &mut fused);
+        assert_eq!(fused, unscaled, "alpha = 1 must reproduce spmv_csr");
     }
-
-    let mut unscaled = fixture.y_initial.clone();
-    spmv_csr::<T>(fixture.data(), &fixture.x, &mut unscaled);
-    let mut fused = fixture.y_initial.clone();
-    spmv_scaled_csr::<T>(fixture.data(), T::ONE, &fixture.x, &mut fused);
-    assert_eq!(fused, unscaled, "alpha = 1 must reproduce spmv_csr");
 }
 
-fn check_scaled_csr_zero_alpha_leaves_y_unchanged<T: SimdOps>() {
-    let fixture = ScaledCsrFixture::<T>::new();
-    let mut y = fixture.y_initial.clone();
-    spmv_scaled_csr::<T>(fixture.data(), T::ZERO, &fixture.x, &mut y);
-    assert_eq!(y, fixture.y_initial);
+fn check_scaled_csr_zero_alpha_leaves_y_unchanged<T: SimdOps>(shapes: &[&ScaledCsrShape]) {
+    for shape in shapes {
+        let integers = shape.integers();
+        let fixture = ScaledCsrFixture::<T>::new(&integers);
+        let mut y = fixture.y_initial.clone();
+        spmv_scaled_csr::<T>(fixture.data(), T::ZERO, &fixture.x, &mut y);
+        assert_eq!(y, fixture.y_initial);
+    }
 }
 
-/// Instantiates the generic scaled-CSR checks for each `SimdOps` scalar that
-/// represents the fixture integers exactly, native and newtype alike. The
-/// limit is the largest integer below which the scalar represents every
-/// integer (`2^p` for a `p`-bit significand, the type maximum for integers).
-/// Scalars whose exact range is below the fixture bound asserted by
-/// `max_intermediate_magnitude` (`Bf16`, `F8`, `Bf8`, `F4`, `Bf4`, `i8` and
-/// `I8`) are not instantiated.
+/// Instantiates the generic scaled-CSR checks once per sealed `SimdOps`
+/// scalar, native and newtype alike. Scalars in `wide_and_compact` run both
+/// fixtures; those in `compact_only` hold exactly only the compact one. The
+/// limit is the largest `L` such that the scalar represents every integer of
+/// magnitude at most `L`: `2^p` for a `p`-bit significand, the type maximum
+/// for integers. `Bf16` is E8M7 (`p = 8`); `F8` is E4M3 (`p = 4`); `Bf8` is
+/// E5M2 (`p = 3`); `Bf4` is E2M1 with the top exponent reserved, holding 0,
+/// 0.5, 1, 1.5, 2 and 3 (`L = 3`); `F4` is E3M0, holding signed powers of
+/// two, so 3 is absent (`L = 2`). The scalar names feed
+/// `test_spmv_scaled_csr_instantiations_cover_every_simd_ops_scalar`.
 macro_rules! scaled_csr_instantiations {
-    ($($reference_test:ident, $t:ty, $limit:expr;)+) => {
+    (
+        wide_and_compact { $($wide_test:ident, $wide_t:ty, $wide_limit:expr;)+ }
+        compact_only { $($compact_test:ident, $compact_t:ty, $compact_limit:expr;)+ }
+    ) => {
         $(
             #[test]
-            fn $reference_test() {
-                check_scaled_csr_matches_scalar_reference::<$t>($limit);
+            fn $wide_test() {
+                let shapes = [&WIDE_SHAPE, &COMPACT_SHAPE];
+                check_scaled_csr_matches_scalar_reference::<$wide_t>($wide_limit, &shapes);
+            }
+        )+
+        $(
+            #[test]
+            fn $compact_test() {
+                let shapes = [&COMPACT_SHAPE];
+                check_scaled_csr_matches_scalar_reference::<$compact_t>($compact_limit, &shapes);
             }
         )+
 
         #[test]
         fn test_spmv_scaled_csr_zero_alpha_leaves_y_unchanged() {
-            $(check_scaled_csr_zero_alpha_leaves_y_unchanged::<$t>();)+
+            $(check_scaled_csr_zero_alpha_leaves_y_unchanged::<$wide_t>(
+                &[&WIDE_SHAPE, &COMPACT_SHAPE],
+            );)+
+            $(check_scaled_csr_zero_alpha_leaves_y_unchanged::<$compact_t>(&[&COMPACT_SHAPE]);)+
         }
+
+        const SCALED_CSR_INSTANTIATED_SCALARS: &[&str] =
+            &[$(stringify!($wide_t),)+ $(stringify!($compact_t),)+];
     };
 }
 
 scaled_csr_instantiations! {
-    test_spmv_scaled_csr_matches_scalar_reference_f32, f32, 1 << 24;
-    test_spmv_scaled_csr_matches_scalar_reference_f64, f64, 1 << 53;
-    test_spmv_scaled_csr_matches_scalar_reference_i32, i32, i64::from(i32::MAX);
-    test_spmv_scaled_csr_matches_scalar_reference_f16, F16, 1 << 11;
-    test_spmv_scaled_csr_matches_scalar_reference_i16, i16, i64::from(i16::MAX);
-    test_spmv_scaled_csr_matches_scalar_reference_f32_newtype, F32, 1 << 24;
-    test_spmv_scaled_csr_matches_scalar_reference_f64_newtype, F64, 1 << 53;
-    test_spmv_scaled_csr_matches_scalar_reference_i16_newtype, I16, i64::from(i16::MAX);
-    test_spmv_scaled_csr_matches_scalar_reference_i32_newtype, I32, i64::from(i32::MAX);
+    wide_and_compact {
+        test_spmv_scaled_csr_matches_scalar_reference_f32, f32, 1 << 24;
+        test_spmv_scaled_csr_matches_scalar_reference_f64, f64, 1 << 53;
+        test_spmv_scaled_csr_matches_scalar_reference_i32, i32, i64::from(i32::MAX);
+        test_spmv_scaled_csr_matches_scalar_reference_f16, F16, 1 << 11;
+        test_spmv_scaled_csr_matches_scalar_reference_i16, i16, i64::from(i16::MAX);
+        test_spmv_scaled_csr_matches_scalar_reference_f32_newtype, F32, 1 << 24;
+        test_spmv_scaled_csr_matches_scalar_reference_f64_newtype, F64, 1 << 53;
+        test_spmv_scaled_csr_matches_scalar_reference_i16_newtype, I16, i64::from(i16::MAX);
+        test_spmv_scaled_csr_matches_scalar_reference_i32_newtype, I32, i64::from(i32::MAX);
+    }
+    compact_only {
+        test_spmv_scaled_csr_matches_scalar_reference_bf16, Bf16, 1 << 8;
+        test_spmv_scaled_csr_matches_scalar_reference_f8, F8, 1 << 4;
+        test_spmv_scaled_csr_matches_scalar_reference_bf8, Bf8, 1 << 3;
+        test_spmv_scaled_csr_matches_scalar_reference_f4, F4, 1 << 1;
+        test_spmv_scaled_csr_matches_scalar_reference_bf4, Bf4, 3;
+        test_spmv_scaled_csr_matches_scalar_reference_i8, i8, i64::from(i8::MAX);
+        test_spmv_scaled_csr_matches_scalar_reference_i8_newtype, I8, i64::from(i8::MAX);
+    }
+}
+
+/// The scalars `SimdOps` admits. Rust cannot enumerate a sealed trait's
+/// implementors, so this reads the `private::Sealed` impls, the supertrait
+/// that seals `SimdOps`, from its dispatch source.
+fn sealed_simd_ops_scalars() -> Vec<&'static str> {
+    include_str!("../src/dispatch/simd_ops.rs")
+        .lines()
+        .filter_map(|line| {
+            line.strip_prefix("impl private::Sealed for ")?
+                .strip_suffix(" {}")
+        })
+        .map(|path| path.rsplit_once("::").map_or(path, |(_, name)| name))
+        .collect()
+}
+
+#[test]
+fn test_spmv_scaled_csr_instantiations_cover_every_simd_ops_scalar() {
+    let mut sealed = sealed_simd_ops_scalars();
+    let mut instantiated = SCALED_CSR_INSTANTIATED_SCALARS.to_vec();
+    sealed.sort_unstable();
+    instantiated.sort_unstable();
+    assert_eq!(
+        instantiated, sealed,
+        "scaled_csr_instantiations! rows must be exactly the sealed SimdOps scalars"
+    );
 }
 
 fn spmv_scaled_unit_row<T: SimdOps>(alpha: T, x: &[T], y: &mut [T]) {
@@ -257,15 +396,22 @@ fn test_spmv_scaled_csr_non_finite_alpha_skips_empty_rows() {
 #[test]
 #[should_panic(expected = "x too short for CSR ncols (got 258, expected >= 259)")]
 fn test_spmv_scaled_csr_rejects_short_x() {
-    let fixture = ScaledCsrFixture::<f32>::new();
+    let integers = WIDE_SHAPE.integers();
+    let fixture = ScaledCsrFixture::<f32>::new(&integers);
     let mut y = fixture.y_initial.clone();
-    spmv_scaled_csr::<f32>(fixture.data(), 2.0, &fixture.x[..FIXTURE_NCOLS - 1], &mut y);
+    spmv_scaled_csr::<f32>(
+        fixture.data(),
+        2.0,
+        &fixture.x[..fixture.x.len() - 1],
+        &mut y,
+    );
 }
 
 #[test]
 #[should_panic(expected = "y too short for CSR nrows (got 5, expected >= 6)")]
 fn test_spmv_scaled_csr_rejects_short_y() {
-    let fixture = ScaledCsrFixture::<f32>::new();
+    let integers = WIDE_SHAPE.integers();
+    let fixture = ScaledCsrFixture::<f32>::new(&integers);
     let mut y = fixture.y_initial[..5].to_vec();
     spmv_scaled_csr::<f32>(fixture.data(), 2.0, &fixture.x, &mut y);
 }
