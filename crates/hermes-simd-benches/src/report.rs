@@ -3,7 +3,15 @@ use crate::host::HostCapabilities;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-#[derive(PartialEq)]
+/// A benchmark parameter parsed from its Criterion value string.
+///
+/// The order is total: variants rank `Numeric` < `String` < `None`; `String`
+/// payloads compare lexicographically; `Numeric` payloads compare by the
+/// IEEE 754 `totalOrder` predicate ([`f64::total_cmp`]), so `-0.0` sorts
+/// before `0.0`, a NaN with a clear sign bit sorts after every non-NaN
+/// number, and a NaN with a set sign bit sorts before every non-NaN number.
+/// Equality is `cmp == Equal`, so `==`, `PartialOrd` and `Ord` agree and
+/// `==` is reflexive for NaN.
 enum ParamValue {
     Numeric(f64),
     String(String),
@@ -11,22 +19,7 @@ enum ParamValue {
 }
 
 impl ParamValue {
-    /// Total order over the three variants: `Numeric` sorts before `String`
-    /// before `None` (the declaration order), and same-variant values compare
-    /// by payload. `f64::partial_cmp` returns `None` for a NaN operand, so that
-    /// pair is ordered `Equal` — the resolution the previous `Ord::cmp`
-    /// (`partial_cmp(..).unwrap_or(Equal)`) already applied.
-    fn total_cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match (self, other) {
-            (Self::Numeric(a), Self::Numeric(b)) => {
-                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
-            }
-            (Self::String(a), Self::String(b)) => a.cmp(b),
-            _ => self.rank().cmp(&other.rank()),
-        }
-    }
-
-    fn rank(&self) -> u8 {
+    const fn rank(&self) -> u8 {
         match self {
             Self::Numeric(_) => 0,
             Self::String(_) => 1,
@@ -35,15 +28,16 @@ impl ParamValue {
     }
 }
 
-// `Ord` and `PartialOrd` are both written by hand from the single `total_cmp`
-// order. Deriving `PartialOrd` beside a hand-written `Ord` is the
-// `derive_ord_xor_partial_ord` defect (the two can disagree), which is what the
-// removed crate-level allow in `main.rs` used to silence.
-impl Eq for ParamValue {}
-
 impl Ord for ParamValue {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.total_cmp(other)
+        match (self, other) {
+            (Self::Numeric(a), Self::Numeric(b)) => a.total_cmp(b),
+            (Self::String(a), Self::String(b)) => a.cmp(b),
+            (Self::None, Self::None) => std::cmp::Ordering::Equal,
+            (Self::Numeric(_) | Self::String(_) | Self::None, _) => {
+                self.rank().cmp(&other.rank())
+            }
+        }
     }
 }
 
@@ -52,6 +46,14 @@ impl PartialOrd for ParamValue {
         Some(self.cmp(other))
     }
 }
+
+impl PartialEq for ParamValue {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == std::cmp::Ordering::Equal
+    }
+}
+
+impl Eq for ParamValue {}
 
 fn parse_param(value_str: Option<&str>) -> ParamValue {
     let Some(s) = value_str else {
@@ -321,8 +323,14 @@ fn is_baseline_candidate(function_id: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{format_throughput, parse_param, ParamValue};
+    use super::{format_throughput, parse_param, render_group, ParamValue};
+    use crate::criterion_results::BenchResult;
     use std::cmp::Ordering;
+
+    /// Quiet NaN with a clear sign bit (IEEE 754 binary64 `0x7ff8_0000_0000_0000`).
+    const POSITIVE_NAN: f64 = f64::from_bits(0x7ff8_0000_0000_0000);
+    /// The same NaN with the sign bit set.
+    const NEGATIVE_NAN: f64 = f64::from_bits(0xfff8_0000_0000_0000);
 
     #[test]
     fn parses_density_and_sparsity_parameters_as_numbers() {
@@ -354,15 +362,116 @@ mod tests {
         assert_eq!(ParamValue::None.cmp(&ParamValue::None), Ordering::Equal);
     }
 
+    fn order_samples() -> Vec<ParamValue> {
+        let mut samples: Vec<ParamValue> = [
+            POSITIVE_NAN,
+            NEGATIVE_NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            0.0,
+            -0.0,
+            1.0,
+            2.0,
+            -2.0,
+        ]
+        .into_iter()
+        .map(ParamValue::Numeric)
+        .collect();
+        samples.extend(["", "a", "b"].map(|s| ParamValue::String(s.to_string())));
+        samples.push(ParamValue::None);
+        samples
+    }
+
     #[test]
-    fn param_value_orders_nan_payload_equal_and_partial_cmp_agrees() {
-        let nan = ParamValue::Numeric(f64::NAN);
-        let one = ParamValue::Numeric(1.0);
-        assert_eq!(nan.cmp(&one), Ordering::Equal);
-        assert_eq!(one.partial_cmp(&nan), Some(Ordering::Equal));
+    fn param_value_variant_rank_orders_numeric_string_none() {
+        let samples = order_samples();
+        for a in &samples {
+            for b in &samples {
+                let cross_variant = std::mem::discriminant(a) != std::mem::discriminant(b);
+                if cross_variant {
+                    assert_eq!(a.cmp(b), a.rank().cmp(&b.rank()));
+                }
+            }
+        }
         assert_eq!(
-            one.partial_cmp(&ParamValue::None),
-            Some(one.cmp(&ParamValue::None))
+            (
+                ParamValue::Numeric(POSITIVE_NAN).rank(),
+                ParamValue::String(String::new()).rank(),
+                ParamValue::None.rank()
+            ),
+            (0, 1, 2)
         );
+    }
+
+    #[test]
+    fn param_value_numeric_payload_follows_ieee_total_order() {
+        let ascending = [
+            NEGATIVE_NAN,
+            f64::NEG_INFINITY,
+            -2.0,
+            -0.0,
+            0.0,
+            1.0,
+            f64::INFINITY,
+            POSITIVE_NAN,
+        ];
+        for (i, a) in ascending.iter().enumerate() {
+            for (j, b) in ascending.iter().enumerate() {
+                assert_eq!(
+                    ParamValue::Numeric(*a).cmp(&ParamValue::Numeric(*b)),
+                    i.cmp(&j),
+                    "payload bits {:#x} against {:#x}",
+                    a.to_bits(),
+                    b.to_bits()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn param_value_order_laws_hold_with_nan_and_signed_zero() {
+        let samples = order_samples();
+        for a in &samples {
+            assert!(a.eq(a), "reflexive equality");
+            for b in &samples {
+                assert_eq!(a.cmp(b), b.cmp(a).reverse(), "antisymmetry");
+                assert_eq!(a == b, a.cmp(b) == Ordering::Equal, "eq iff cmp Equal");
+                assert_eq!(a.partial_cmp(b), Some(a.cmp(b)), "partial_cmp is Some(cmp)");
+                for c in &samples {
+                    if a.cmp(b) != Ordering::Greater && b.cmp(c) != Ordering::Greater {
+                        assert_ne!(a.cmp(c), Ordering::Greater, "transitivity");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn param_value_nan_is_distinct_from_numbers_and_equal_to_itself() {
+        let nan = ParamValue::Numeric(POSITIVE_NAN);
+        assert_eq!(nan.cmp(&ParamValue::Numeric(1.0)), Ordering::Greater);
+        assert_eq!(ParamValue::Numeric(1.0).cmp(&nan), Ordering::Less);
+        assert!(nan == ParamValue::Numeric(POSITIVE_NAN));
+        assert!(ParamValue::Numeric(-0.0) != ParamValue::Numeric(0.0));
+    }
+
+    #[test]
+    fn render_group_sorts_rows_with_a_nan_parameter_last() {
+        let row = |value: &str| BenchResult {
+            group_id: "g".to_string(),
+            function_id: "f".to_string(),
+            value_str: Some(value.to_string()),
+            time_ns: 1.0,
+            throughput_kind: None,
+            throughput_val: None,
+        };
+        let mut items = ["4", "NaN", "1", "3", "2"].map(row);
+        let mut markdown = String::new();
+        render_group(&mut markdown, "g", &mut items);
+        let order: Vec<&str> = items
+            .iter()
+            .map(|item| item.value_str.as_deref().expect("invariant: every row has a value"))
+            .collect();
+        assert_eq!(order, ["1", "2", "3", "4", "NaN"]);
     }
 }
