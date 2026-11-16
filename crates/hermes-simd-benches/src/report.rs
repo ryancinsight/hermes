@@ -34,9 +34,7 @@ impl Ord for ParamValue {
             (Self::Numeric(a), Self::Numeric(b)) => a.total_cmp(b),
             (Self::String(a), Self::String(b)) => a.cmp(b),
             (Self::None, Self::None) => std::cmp::Ordering::Equal,
-            (Self::Numeric(_) | Self::String(_) | Self::None, _) => {
-                self.rank().cmp(&other.rank())
-            }
+            (Self::Numeric(_) | Self::String(_) | Self::None, _) => self.rank().cmp(&other.rank()),
         }
     }
 }
@@ -470,7 +468,11 @@ mod tests {
         render_group(&mut markdown, "g", &mut items);
         let order: Vec<&str> = items
             .iter()
-            .map(|item| item.value_str.as_deref().expect("invariant: every row has a value"))
+            .map(|item| {
+                item.value_str
+                    .as_deref()
+                    .expect("invariant: every row has a value")
+            })
             .collect();
         assert_eq!(order, ["1", "2", "3", "4", "NaN"]);
     }
