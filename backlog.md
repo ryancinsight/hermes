@@ -197,6 +197,42 @@ item below carries `milestone: M-fused-scaled-spmv`.
 - Link: moved from the themis board by its filing sweep; themis ADR 0006 cites this ID.
 - basis: 5b24c0e9e662cfb6c92d64d3187e1d3cf1639051.
 
+<a id="HERMES-AVX512-UNPACK-X86-32"></a>
+## HERMES-AVX512-UNPACK-X86-32 — Build the AVX-512 unpack dispatch on 32-bit x86 or exclude that target [patch] — todo
+- priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-intrinsics/src/x86_64.rs`, `crates/hermes-simd-intrinsics/src/x86_64/avx512_tiling.rs`.
+- basis: 4cd0bdbf245b4264fe823e71ae53920c9c9cfe37; finding: non-gating F1 of the judge verdict on hermes#300.
+- Outcome: `hermes-simd-intrinsics` compiles on every target its `cfg` gates admit, or its gates admit only `x86_64`.
+- Acceptance: `cargo check -p hermes-simd-intrinsics --target i686-pc-windows-msvc` exits 0, or the `any(target_arch = "x86", target_arch = "x86_64")` gates at `x86_64.rs:3`, `:8` (the `_mm_sfence` call) and `:85` narrow to `x86_64` and the README states 32-bit x86 is unsupported.
+- Evidence at basis: the `avx512_unpack_dispatch!` macro names `eunomia::unsafe_intrinsics::avx512::*` in an `unsafe` call outside any arch gate (`avx512_tiling.rs:390-391`); eunomia exports `unsafe_intrinsics` only under `any(target_arch = "x86_64", target_arch = "aarch64")` (`eunomia` `lib.rs:51-52`); `x86_64.rs:8` calls `core::arch::x86_64::_mm_sfence` under the x86 gate. Base already failed there, so it is not a regression of hermes#300. The i686 build itself was not run.
+- Next step: run the `cargo check` above; if it fails for more than these sites, narrow the gates and record the supported target set.
+
+<a id="HERMES-AVX512-UNPACK-PROBE-COVERAGE"></a>
+## HERMES-AVX512-UNPACK-PROBE-COVERAGE — Probe every feature the AVX-512 unpackers need and cover the Bf4 wrapper [patch] — todo
+- priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-intrinsics/src/x86_64/avx512_tiling.rs`, `crates/hermes-simd/tests/types_tests.rs`.
+- basis: 4cd0bdbf245b4264fe823e71ae53920c9c9cfe37; finding: non-gating F2 and F7 of the judge verdict on hermes#300.
+- Outcome: the runtime probe names the features its callee's `#[target_feature]` requires, and every `avx512_tiling::unpack_*` entry point has a caller or test.
+- Acceptance: the `bf8`, `bf4` and packed-`bf4` probes check `avx512f`, `avx512bw` and `avx512vl` (callee `target_feature` is `avx512f,avx512bw,avx512vl`), or a comment proves bw implies f at runtime; `avx512_tiling::unpack_bf4_to_bf16` is exercised by a value test alongside the existing calls at `types_tests.rs:1413`, `:1454`, `:1590`, or deleted with its re-export check.
+- Evidence at basis: probes read `avx512bw` and `avx512vl` only (`avx512_tiling.rs:405`, `:421`, `:437`); the implication holds statically (judge: `rustc --print cfg -C target-feature=+avx512bw` lists `avx512f`). `git grep -n 'avx512_tiling::unpack_bf4_to_bf16'` finds no caller; `types_tests.rs:1105` calls `eunomia::unpack_bf4_to_bf16`, not the wrapper.
+- Next step: add the f probe term and a Bf4 value test against the scalar unpacker.
+
+<a id="HERMES-CLIPPY-NO-DEFAULT-FEATURES"></a>
+## HERMES-CLIPPY-NO-DEFAULT-FEATURES — Make `hermes-simd-intrinsics` clippy-clean without default features [patch] — todo
+- priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-intrinsics/src/x86_64/amx/session.rs`, the no-std test modules of `crates/hermes-simd-intrinsics`.
+- basis: 4cd0bdbf245b4264fe823e71ae53920c9c9cfe37; finding: non-gating F6 of the judge verdict on hermes#300, and its residual note.
+- Outcome: the `--no-default-features` lint floor holds for the library and its test targets.
+- Acceptance: `cargo clippy -p hermes-simd-intrinsics --no-default-features --all-targets -- -D warnings` exits 0; no `#[allow]` is added.
+- Evidence at basis: `session.rs:63` and `:156` end a `#[cfg(not(feature = "std"))]` block with `return Err(AmxSessionError::UnsupportedTarget);` (read), the reported `needless_return` sites. The judge reports the same command exiting 101 with 80 further errors from no-std test modules using `std`/`vec!` (for example `avx512_tiling.rs:470` in `int8_tests`); that count was not reproduced here.
+- Next step: drop the two `return`s, then gate or port the std-using test modules, and rerun the command.
+
+<a id="HERMES-BENCH-REPORT-TEST-ORACLES"></a>
+## HERMES-BENCH-REPORT-TEST-ORACLES — Make the `ParamValue` ordering tests independent of the implementation and of NaN sign [patch] — todo
+- priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-benches/src/report.rs`.
+- basis: 4cd0bdbf245b4264fe823e71ae53920c9c9cfe37; finding: non-gating N2 and N5 of the second judge verdict on hermes#300.
+- Outcome: no `ParamValue` ordering test restates the implementation's expression or depends on an arbitrary NaN sign.
+- Acceptance: `param_value_variant_rank_orders_numeric_string_none` asserts a literal expected order (Numeric < String < None) instead of `a.cmp(b) == a.rank().cmp(&b.rank())` (`report.rs:384-401`); `render_group_sorts_rows_with_a_nan_parameter_last` builds its NaN from `f64::from_bits` or places the NaN row from `"NaN".parse::<f64>()` and `is_sign_negative()`, so it holds for either sign.
+- Evidence at basis: the NaN test expects `["1","2","3","4","NaN"]` (`report.rs:466-477`); `"NaN"` parses to `f64::NAN`, whose sign is "arbitrary" (rust-src 1.97.0 `core/src/num/f64.rs:501-504`), and `ParamValue` orders a sign-set NaN first (`report.rs:11-12`). The tuple `(0, 1, 2)` at `:394-400` already pins the ranks, so N2 is redundancy, not a missing check. No failing platform is known.
+- Next step: rewrite both tests; run the four ordering mutants the judge listed against them.
+
 ## Legacy HS-4xx record — open items and measured limits
 
 In full: the open measurement items, the limits they rest on, and the rejected refactors. The rest of the era is one line each below.

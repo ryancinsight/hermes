@@ -484,3 +484,9 @@ Evidence tier: value-semantic differential and boundary tests.
 - The local `[patch]` graph warns that `mnemosyne-heap` is unused; this is not introduced by the Highway audit, but remains a supply-chain hygiene item.
 - [minor, deferred] NUMA alloc-generation is a single global counter bumped on every dealloc/realloc. On a multi-NUMA + AMX host under heavy alloc churn this is a true-sharing serialization point and over-broad (a free on any node invalidates every node's thread-local cache). Sharding the generation per NUMA node would remove both, but requires threading the node through the allocator bump API; deferred as it only affects multi-node AMX hosts and needs careful node attribution. The ordering/TOCTOU correctness fix landed this sprint.
 - `.config/nextest.toml` added this sprint (30s slow / 60s terminate), making the mandated test-time budget enforced rather than implicit. The suite currently runs in ~2.4s, well under the threshold.
+
+<a id="HERMES-GAP-TARGET-FORK-2026-11-16"></a>
+## HERMES-GAP-TARGET-FORK-2026-11-16 — A repo-local cargo target exists in the hermes tree
+- risk: `D:/atlas/repos/hermes/target` is a second build cache next to the shared target; the pre-push hook reports host row `hermes/target_forks` 0 -> 1 (hermes#299, hermes#300). It is derived and machine-local; the writer is unidentified, presumably a cargo run without the shared `CARGO_TARGET_DIR`.
+- evidence: the path holds `CACHEDIR.TAG` (mtime 2026-11-09) with `debug`, `doc` and `tmp`, read 2026-11-16 at origin/main `4cd0bdb`; the 1.7 GB size is the judge's figure on hermes#299, not re-measured.
+- re-open trigger: the writer is found and the tree deleted, then a hook run reports `target_forks` 0 for hermes.
