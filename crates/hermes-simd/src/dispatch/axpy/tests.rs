@@ -1,4 +1,5 @@
 use super::super::{axpy, axpy_mul, axpy_pair, axpy_rows, axpy_rows_batch};
+use eunomia::{F32, F64};
 use hermes_simd_core::view::SimdError;
 
 #[test]
@@ -6,8 +7,8 @@ fn axpy_matches_scalar_reference_across_tail_sizes() {
     // Sizes straddle every lane width incl. partial tails.
     for &len in &[0usize, 1, 3, 7, 8, 9, 15, 16, 17, 63, 64, 65, 1027] {
         let alpha = 1.75f64;
-        let x: Vec<f64> = (0..len).map(|i| i as f64 * 0.5 - 3.0).collect();
-        let mut out: Vec<f64> = (0..len).map(|i| 100.0 - i as f64).collect();
+        let x: Vec<f64> = (0..len).map(|i| F64::from_count(i).0 * 0.5 - 3.0).collect();
+        let mut out: Vec<f64> = (0..len).map(|i| 100.0 - F64::from_count(i).0).collect();
         let expected: Vec<f64> = out.iter().zip(&x).map(|(o, xv)| o + alpha * xv).collect();
 
         axpy(alpha, &x, &mut out).unwrap();
@@ -19,8 +20,10 @@ fn axpy_matches_scalar_reference_across_tail_sizes() {
 fn axpy_tail_preserves_fused_operation_order() {
     let len = 9usize;
     let alpha = 1.0_f32 / 3.0;
-    let x: Vec<f32> = (0..len).map(|i| i as f32 + 0.125).collect();
-    let mut out: Vec<f32> = (0..len).map(|i| i as f32 * 0.75 + 0.2).collect();
+    let x: Vec<f32> = (0..len).map(|i| F32::from_count(i).0 + 0.125).collect();
+    let mut out: Vec<f32> = (0..len)
+        .map(|i| F32::from_count(i).0 * 0.75 + 0.2)
+        .collect();
     let expected: Vec<f32> = out
         .iter()
         .zip(&x)
@@ -35,9 +38,11 @@ fn axpy_tail_preserves_fused_operation_order() {
 fn axpy_mul_matches_scalar_fma_reference_across_tail_sizes() {
     for &len in &[0usize, 1, 3, 7, 8, 9, 15, 16, 17, 63, 64, 65, 1027] {
         let alpha = 1.75f64;
-        let a: Vec<f64> = (0..len).map(|i| i as f64 * 0.5 - 3.0).collect();
-        let b: Vec<f64> = (0..len).map(|i| i as f64 * 0.25 + 1.0).collect();
-        let mut out: Vec<f64> = (0..len).map(|i| 100.0 - i as f64).collect();
+        let a: Vec<f64> = (0..len).map(|i| F64::from_count(i).0 * 0.5 - 3.0).collect();
+        let b: Vec<f64> = (0..len)
+            .map(|i| F64::from_count(i).0 * 0.25 + 1.0)
+            .collect();
+        let mut out: Vec<f64> = (0..len).map(|i| 100.0 - F64::from_count(i).0).collect();
         let expected: Vec<f64> = out
             .iter()
             .zip(&a)
@@ -67,9 +72,11 @@ fn axpy_mul_rejects_length_mismatch() {
 fn axpy_mul_tail_preserves_fused_operation_order() {
     let len = 9usize;
     let alpha = 1.0_f32 / 3.0;
-    let a: Vec<f32> = (0..len).map(|i| i as f32 + 0.125).collect();
-    let b: Vec<f32> = (0..len).map(|i| 0.75 - i as f32 * 0.0625).collect();
-    let mut out: Vec<f32> = (0..len).map(|i| i as f32 * 0.5 + 0.2).collect();
+    let a: Vec<f32> = (0..len).map(|i| F32::from_count(i).0 + 0.125).collect();
+    let b: Vec<f32> = (0..len)
+        .map(|i| 0.75 - F32::from_count(i).0 * 0.0625)
+        .collect();
+    let mut out: Vec<f32> = (0..len).map(|i| F32::from_count(i).0 * 0.5 + 0.2).collect();
     let expected: Vec<f32> = out
         .iter()
         .zip(&a)
@@ -177,7 +184,7 @@ fn axpy_pair_rejects_length_mismatch() {
 #[test]
 fn axpy_single_precision_matches_reference() {
     let alpha = -0.5f32;
-    let x: Vec<f32> = (0..133).map(|i| i as f32).collect();
+    let x: Vec<f32> = (0..133).map(|i| F32::from_count(i).0).collect();
     let mut out = vec![1.0f32; 133];
     let expected: Vec<f32> = x.iter().map(|xv| 1.0 + alpha * xv).collect();
     axpy(alpha, &x, &mut out).unwrap();
@@ -205,9 +212,15 @@ fn axpy_rows_matches_repeated_axpy_with_padding() {
     let rows = 5usize;
     let cols = 17usize;
     let row_stride = 23usize;
-    let alphas: Vec<f64> = (0..rows).map(|row| row as f64 * 0.25 - 0.5).collect();
-    let x: Vec<f64> = (0..cols).map(|col| col as f64 * 1.5 - 2.0).collect();
-    let mut out: Vec<f64> = (0..rows * row_stride).map(|i| i as f64 * 0.125).collect();
+    let alphas: Vec<f64> = (0..rows)
+        .map(|row| F64::from_count(row).0 * 0.25 - 0.5)
+        .collect();
+    let x: Vec<f64> = (0..cols)
+        .map(|col| F64::from_count(col).0 * 1.5 - 2.0)
+        .collect();
+    let mut out: Vec<f64> = (0..rows * row_stride)
+        .map(|i| F64::from_count(i).0 * 0.125)
+        .collect();
     let mut expected = out.clone();
 
     for row in 0..rows {
@@ -225,9 +238,9 @@ fn axpy_rows_tail_preserves_fused_operation_order() {
     let cols = 9usize;
     let row_stride = 11usize;
     let alphas = [1.0_f32 / 3.0, -0.25];
-    let x: Vec<f32> = (0..cols).map(|i| i as f32 + 0.125).collect();
+    let x: Vec<f32> = (0..cols).map(|i| F32::from_count(i).0 + 0.125).collect();
     let mut out: Vec<f32> = (0..rows * row_stride)
-        .map(|i| i as f32 * 0.5 + 0.2)
+        .map(|i| F32::from_count(i).0 * 0.5 + 0.2)
         .collect();
     let mut expected = out.clone();
     for row in 0..rows {
@@ -246,10 +259,14 @@ fn axpy_rows_masked_tails_cover_multiple_widths_and_f64() {
     for &cols in &[1usize, 2, 3, 5, 9, 17, 65] {
         let rows = 3usize;
         let row_stride = cols + 3;
-        let alphas: Vec<f64> = (0..rows).map(|row| row as f64 * 0.125 - 0.25).collect();
-        let x: Vec<f64> = (0..cols).map(|col| col as f64 * 0.375 + 0.0625).collect();
+        let alphas: Vec<f64> = (0..rows)
+            .map(|row| F64::from_count(row).0 * 0.125 - 0.25)
+            .collect();
+        let x: Vec<f64> = (0..cols)
+            .map(|col| F64::from_count(col).0 * 0.375 + 0.0625)
+            .collect();
         let mut out: Vec<f64> = (0..rows * row_stride)
-            .map(|index| index as f64 * 0.25 - 0.5)
+            .map(|index| F64::from_count(index).0 * 0.25 - 0.5)
             .collect();
         let mut expected = out.clone();
         for row in 0..rows {
@@ -291,12 +308,14 @@ fn axpy_rows_batch_matches_repeated_axpy_rows_with_padding() {
     let cols = 19usize;
     let row_stride = 23usize;
     let alphas: Vec<f64> = (0..rows * depth)
-        .map(|idx| idx as f64 * 0.125 - 0.75)
+        .map(|idx| F64::from_count(idx).0 * 0.125 - 0.75)
         .collect();
     let x_panel: Vec<f64> = (0..depth * cols)
-        .map(|idx| idx as f64 * 0.25 - 1.5)
+        .map(|idx| F64::from_count(idx).0 * 0.25 - 1.5)
         .collect();
-    let mut out: Vec<f64> = (0..rows * row_stride).map(|i| i as f64 * 0.03125).collect();
+    let mut out: Vec<f64> = (0..rows * row_stride)
+        .map(|i| F64::from_count(i).0 * 0.03125)
+        .collect();
     let mut expected = out.clone();
 
     for shared in 0..depth {
@@ -325,10 +344,10 @@ fn axpy_rows_batch_tail_preserves_fused_operation_order() {
     let row_stride = 11usize;
     let alphas = [1.0_f32 / 3.0, -0.25, 0.2, -1.0 / 7.0];
     let x_panel: Vec<f32> = (0..depth * cols)
-        .map(|i| i as f32 * 0.125 + 0.0625)
+        .map(|i| F32::from_count(i).0 * 0.125 + 0.0625)
         .collect();
     let mut out: Vec<f32> = (0..rows * row_stride)
-        .map(|i| i as f32 * 0.5 + 0.2)
+        .map(|i| F32::from_count(i).0 * 0.5 + 0.2)
         .collect();
     let mut expected = out.clone();
     for row in 0..rows {
@@ -352,13 +371,13 @@ fn axpy_rows_batch_masked_tails_cover_multiple_widths_and_depths() {
         let rows = 3usize;
         let row_stride = cols + 2;
         let alphas: Vec<f64> = (0..rows * depth)
-            .map(|index| index as f64 * 0.125 - 0.375)
+            .map(|index| F64::from_count(index).0 * 0.125 - 0.375)
             .collect();
         let x_panel: Vec<f64> = (0..depth * cols)
-            .map(|index| index as f64 * 0.25 + 0.0625)
+            .map(|index| F64::from_count(index).0 * 0.25 + 0.0625)
             .collect();
         let mut out: Vec<f64> = (0..rows * row_stride)
-            .map(|index| index as f64 * 0.125 - 0.25)
+            .map(|index| F64::from_count(index).0 * 0.125 - 0.25)
             .collect();
         let mut expected = out.clone();
         for row in 0..rows {
