@@ -6,10 +6,10 @@ Accepted
 *Accepted 2026-08-17, retroactively: the decision below shipped (HS-438,
 delivered 2026-08-16) while this record still read `Proposed`. Verified on
 `main` at acceptance: all five raw wrappers are const-generic —
-`tilezero<const TILE: u8>` (`amx/mod.rs:131`), `tileloadd<const TILE: u8>`
+`tilezero<const TILE: u8>` (`amx.rs:131`), `tileloadd<const TILE: u8>`
 (`:158`), `tilestored<const TILE: u8>` (`:188`),
 `tdpbf16ps<const DST, SRC1, SRC2>` (`:218`), and
-`tdpbssd<const DST, SRC1, SRC2>` (`:247`) — and `amx/mod.rs` now contains zero
+`tdpbssd<const DST, SRC1, SRC2>` (`:247`) — and `amx.rs` now contains zero
 `unreachable!()`, which was the defect this decision existed to remove: an
 unlisted-but-valid tile triple used to panic instead of executing. The decision
 text is unchanged.*
@@ -17,7 +17,7 @@ text is unchanged.*
 ## Context
 
 The `raw` AMX wrappers in
-`crates/hermes-simd-intrinsics/src/x86_64/amx/mod.rs` dispatch the tile index
+`crates/hermes-simd-intrinsics/src/x86_64/amx.rs` dispatch the tile index
 at runtime. `tilezero`, `tileloadd`, and `tilestored` match an 8-arm `tile`
 value; `tdpbf16ps` and `tdpbssd` match an 11-entry `(dst, src1, src2)`
 whitelist with an `unreachable!()` tail. The whitelist is a latent defect:
@@ -72,7 +72,7 @@ branch vanishes from the tile loop.
   compiled; the valid-but-unlisted panic class is gone (those triples now
   execute, and any triple that the assembler rejects fails the build instead
   of panicking).
-- The runtime `match`/`unreachable!()` disappears from `amx/mod.rs`.
+- The runtime `match`/`unreachable!()` disappears from `amx.rs`.
 - The AMX-silicon before/after measurement in HS-438's acceptance rides on
   the HS-429 hardware validation increment, where a criterion baseline is
   possible; it is a recorded watchpoint, not a software blocker.
