@@ -3,17 +3,53 @@ use crate::host::HostCapabilities;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-#[derive(PartialEq, PartialOrd)]
+#[derive(PartialEq)]
 enum ParamValue {
     Numeric(f64),
     String(String),
     None,
 }
 
+impl ParamValue {
+    /// Total order over the three variants: `Numeric` sorts before `String`
+    /// before `None` (the declaration order), and same-variant values compare
+    /// by payload. `f64::partial_cmp` returns `None` for a NaN operand, so that
+    /// pair is ordered `Equal` — the resolution the previous `Ord::cmp`
+    /// (`partial_cmp(..).unwrap_or(Equal)`) already applied.
+    fn total_cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (Self::Numeric(a), Self::Numeric(b)) => {
+                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+            }
+            (Self::String(a), Self::String(b)) => a.cmp(b),
+            _ => self.rank().cmp(&other.rank()),
+        }
+    }
+
+    fn rank(&self) -> u8 {
+        match self {
+            Self::Numeric(_) => 0,
+            Self::String(_) => 1,
+            Self::None => 2,
+        }
+    }
+}
+
+// `Ord` and `PartialOrd` are both written by hand from the single `total_cmp`
+// order. Deriving `PartialOrd` beside a hand-written `Ord` is the
+// `derive_ord_xor_partial_ord` defect (the two can disagree), which is what the
+// removed crate-level allow in `main.rs` used to silence.
 impl Eq for ParamValue {}
+
 impl Ord for ParamValue {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+        self.total_cmp(other)
+    }
+}
+
+impl PartialOrd for ParamValue {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -286,6 +322,7 @@ fn is_baseline_candidate(function_id: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{format_throughput, parse_param, ParamValue};
+    use std::cmp::Ordering;
 
     #[test]
     fn parses_density_and_sparsity_parameters_as_numbers() {
@@ -302,5 +339,30 @@ mod tests {
     #[test]
     fn formats_byte_throughput() {
         assert_eq!(format_throughput("Bytes", 1_000, 1_000.0), "1.000 GB/s");
+    }
+
+    #[test]
+    fn param_value_orders_by_variant_then_payload() {
+        let numeric = ParamValue::Numeric;
+        let text = |s: &str| ParamValue::String(s.to_string());
+        assert_eq!(numeric(1.0).cmp(&numeric(2.0)), Ordering::Less);
+        assert_eq!(numeric(2.0).cmp(&numeric(2.0)), Ordering::Equal);
+        assert_eq!(text("a").cmp(&text("b")), Ordering::Less);
+        assert_eq!(numeric(1.0e9).cmp(&text("")), Ordering::Less);
+        assert_eq!(text("z").cmp(&ParamValue::None), Ordering::Less);
+        assert_eq!(ParamValue::None.cmp(&numeric(0.0)), Ordering::Greater);
+        assert_eq!(ParamValue::None.cmp(&ParamValue::None), Ordering::Equal);
+    }
+
+    #[test]
+    fn param_value_orders_nan_payload_equal_and_partial_cmp_agrees() {
+        let nan = ParamValue::Numeric(f64::NAN);
+        let one = ParamValue::Numeric(1.0);
+        assert_eq!(nan.cmp(&one), Ordering::Equal);
+        assert_eq!(one.partial_cmp(&nan), Some(Ordering::Equal));
+        assert_eq!(
+            one.partial_cmp(&ParamValue::None),
+            Some(one.cmp(&ParamValue::None))
+        );
     }
 }
