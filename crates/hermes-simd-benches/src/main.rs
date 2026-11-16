@@ -1,5 +1,3 @@
-#![allow(clippy::derive_ord_xor_partial_ord)]
-
 mod cli;
 mod criterion_results;
 mod host;
