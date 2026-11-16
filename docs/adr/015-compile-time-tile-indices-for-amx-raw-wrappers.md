@@ -101,6 +101,6 @@ branch vanishes from the tile loop.
 ## References
 
 - HS-438 backlog item (backlog.md).
-- `crates/hermes-simd-intrinsics/src/x86_64/amx/{mod,bf16,int8}.rs`.
+- `crates/hermes-simd-intrinsics/src/x86_64/amx.rs` and `crates/hermes-simd-intrinsics/src/x86_64/amx/{bf16,int8}.rs`.
 - ADR 003 (stable inline assembly for AMX/VNNI).
 - ADR 014 (pre-1.0 minor-release **Breaking** convention).
