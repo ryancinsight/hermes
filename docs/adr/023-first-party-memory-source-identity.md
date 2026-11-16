@@ -57,9 +57,11 @@ resolves all eight Mnemosyne packages to upstream commit
 `c409d996eb0db78077ff91f6034f0c3070a7e2a7`. The earlier review-revision
 narrative and its removal trigger are obsolete.
 
-2026-11-16: The workspace requirement is Mnemosyne 0.10.0 (hermes#260).
-The standalone lock resolves all eight Mnemosyne packages to upstream
-commit `946af714edf8e90d2b48bdcaa2215270f8207436` (hermes#271), where
-`mnemosyne-memory` is 0.10.1. The decision is unchanged: git plus
-version, no `rev`, one source identity. The 0.9.0 and
-`c409d996` statements above are as of 2026-10-04.
+2026-11-16: The workspace requirement is Mnemosyne 0.10.0 (hermes#260),
+because ADR 025 adopts the Eunomia 0.10 provider cohort, which requires
+the coordinated Mnemosyne-memory 0.10 line. The standalone lock resolves
+all eight Mnemosyne packages to upstream commit
+`946af714edf8e90d2b48bdcaa2215270f8207436` (hermes#271, a provider
+cohort advance), where `mnemosyne-memory` is 0.10.1. The decision is
+unchanged: git plus version, no `rev`, one source identity. The 0.9.0
+and `c409d996` statements above are as of hermes#242 (2026-10-14).
