@@ -24,52 +24,6 @@ item below carries `milestone: M-fused-scaled-spmv`.
 - non-goals: native SVE, AMX or AVX-512 silicon evidence as a release gate,
   read prefetch, tensor model layers, demand-gated slice facades, crypto/hash.
 
-## HERMES-MNEMOSYNE-IDENTITY-2026-09-03 — Align the workspace memory provider with Mnemosyne 0.9 [patch] [arch] — in-progress <a id="hermes-mnemosyne-identity-2026-09-03"></a>
-
-- **Integrator:** Codex on `build/hermes-mnemosyne-09`; **lease:** none; milestone: M-fused-scaled-spmv.
-- **Outcome:** Advance Hermes' workspace Mnemosyne edge to 0.9.0 so provider
-  consumers use one first-party memory source identity.
-- **Acceptance:** The manifest uses git-plus-version without `rev`; the
-  standalone lock resolves all eight Mnemosyne packages to one upstream
-  commit; workspace check, Clippy, nextest, doctests, rustdoc, and diff checks
-  pass; no conversion or compatibility layer is added.
-- **ADR:** [`023`](docs/adr/023-first-party-memory-source-identity.md).
-- **Evidence, 2026-10-04.** Mnemosyne 0.9.0 is selected by git-plus-version
-  without `rev`; the standalone lock resolves all eight Mnemosyne packages to
-  `c409d996eb0db78077ff91f6034f0c3070a7e2a7`. The PR records the locked
-  workspace check, warning-denied Clippy, Nextest, doctests, rustdoc, and diff
-  checks. Windows Miri cannot execute the six NUMA cases that call Windows
-  affinity APIs; hosted Linux Miri remains the applicable platform gate.
-- **Dependency:** Mnemosyne 0.9.0 git-plus-version requirement; **Last-update:**
-  2026-10-04.
-
-## ATLAS-HERMES-CODEGEN-SSOT-2026-08-21 — Resolve SIMD codegen source of truth [arch] [minor] — in-progress (hosted verification pending)
-
-- milestone: M-fused-scaled-spmv; **Owner / scope:** Atlas integration, clean `origin/main` lane; the former
-  `crates/hermes-simd-intrinsics/src/bin/codegen.rs`, ADR 005, ADR index,
-  affected PM records, and stale ADR 013 references. Runtime kernels, f16 and
-  NEON implementation work, and Atlas gitlinks are out of scope.
-- **Finding:** a pinned direct `rustc +1.97.0` run rewrote all four x86 f32/f64
-  files and dropped 28 shipped methods; the 1424-line generator also modeled
-  neither x86 f16 nor AArch64 NEON and had no invocation or freshness gate.
-- **Resolution:** delete the incomplete generator; retain the checked-in ISA
-  files as canonical; revise ADR 005 in place and synchronize the index,
-  ADR 013, checklist, changelog, and gap audit. The alternative of restoring
-  freshness was rejected because it requires a complete shipped-surface model
-  absent from the audited generator.
-- **Acceptance:** no executable stale generator remains; no runtime source
-  file changes; ADR/index/PM references agree; provider gates pass on the exact
-  commit.
-- **Evidence:** source comparison before and after the direct pinned run,
-  four-file destructive diff (415 deletions before restoration), and the
-  method-set comparison are recorded in ADR 005 and `gap_audit.md`.
-- **Local verification:** `cargo +1.97.0 fmt --all -- --check`, workspace
-  Clippy with `-D warnings`, Nextest (465/465), doctests (18 executed, all
-  passing; documented ignores remain), warning-denied workspace Rustdoc, and
-  workspace example builds pass. The Atlas development overlay rewrites the
-  provider lock during unlocked local commands; its derived lock changes were
-  discarded. Hosted locked CI remains the delivery gate.
-
 <a id="HERMES-SPMV-SCALED-SCALAR-COVERAGE"></a>
 ## HERMES-SPMV-SCALED-SCALAR-COVERAGE — Test scaled CSR SpMV on every `SimdOps` scalar [patch] — todo
 - priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd/tests/sparse_tests.rs`.
@@ -181,9 +135,10 @@ item below carries `milestone: M-fused-scaled-spmv`.
   - `refs/pull/221/head` (`rescue/hermes-audit-20260928`): 1 commit, 22 files (+1857/-1831); none is identical to main. It flattens 9 `mod.rs` modules to `<name>.rs` and splits `dense_tests.rs`; main keeps `mod.rs` for 8 of the 9 and has not split `dense_tests.rs`. The ninth is already flattened: `scalar/mod.rs` became `scalar.rs` in 38e741037b987f57645a28129747c0f7481fc174, and its bodies moved to `scalar/float_kernel.rs` and `scalar/emulated.rs`, so that hunk conflicts on main's layout.
   - Accounted by hermes#299: eight of the nine R100 renames (`sparse`, `sparse/cow`, `tensor/view`, `tiling`, `bitboard/kogge_stone`, `x86_64`, `x86_64/amx`, `tile_matmul`), with identical `cargo nextest list` names before and after. Superseded: `scalar/mod.rs`, whose effect `crates/hermes-simd-intrinsics/src/scalar.rs` is the module root at main since 38e741037b987f57645a28129747c0f7481fc174 (R100 `scalar/mod.rs` -> `scalar.rs`).
   - Accounted by hermes#300: `hermes-simd-benches/src/{main,report}.rs` (ported: `ParamValue` is a total order by variant rank then `f64::total_cmp`, with `PartialEq`, `PartialOrd` and `Ord` written from one `cmp`, the crate-level `derive_ord_xor_partial_ord` allow is gone, tests `param_value_*` and `render_group_sorts_rows_with_a_nan_parameter_last`), `x86_64/avx512_tiling.rs` hunk 2 (ported: one `avx512_unpack_dispatch!` for the four unpackers, whose no-std probe now checks every feature of the std probe), `gap_audit.md` (ported: `58c31a9`/`df32296` are unreachable from main, `7943dc6`/`a2ca807` are their landed commits). Superseded: `avx512_tiling.rs` hunk 1, whose effect is the deleted duplicate `SAFETY:` line at 44874cb, `avx512_tiling.rs:271-273`; only comment wrapping differs.
-  - Accounted by hermes#302: `dispatch/axpy.rs` with `axpy/tests.rs` (ported onto main's text: the `tests` module body of main 89ec519, including `axpy_pair` which the rescue base lacks, moved dedented into `#[cfg(test)] mod tests;` with two lines re-wrapped by rustfmt and every `as` cast replaced by `eunomia::F32::from_count` or `F64::from_count`, the eunomia count conversion, so the cast gate sees no bare `as` on a moved line; module path `dispatch::axpy::tests` and every test name unchanged).
+  - Accounted by hermes#302: `dispatch/axpy.rs` with `axpy/tests.rs` (ported onto main's text: the `tests` module body of main 89ec519, including `axpy_pair` which the rescue base lacks, moved dedented into `#[cfg(test)] mod tests;` with two statements reflowed by rustfmt (four lines to three, at `crates/hermes-simd/src/dispatch/axpy/tests.rs:358` and `:388-389`) and every `as` cast replaced by `eunomia::F32::from_count` or `F64::from_count`, the eunomia count conversion, so the cast gate sees no bare `as` on a moved line; module path `dispatch::axpy::tests` and every test name unchanged).
   - Open: 7 files, `tests/dense_tests.rs` with `dense_arithmetic.rs` and `dense_dispatch.rs`, `tests/tiling_tests.rs` with `tiling_ops.rs`, `tests/vector_slice_tests.rs` with `slice_memory_ops.rs`. By `git diff --numstat 513c3ea742c09a6a213231a63376c6da9c33ffc0 origin/main` at c26922c, main has edited `tests/tiling_tests.rs` (2 added, 5 deleted) since the rescue base, so that split is a fix-forward port onto main's text. `tests/dense_tests.rs` and `tests/vector_slice_tests.rs` are unchanged on main since that base.
-- Next step: restore the head with `git fetch origin pull/221/head:<branch>`, then port or prove superseded the open files in slices of at most 400 changed lines; the item deletes in the PR that accounts for the last hunk.
+  - Cast conversion for the open splits: the cast gate counts every line moved into a new file as added and rejects a bare `as` on it, so each split converts its count-valued `as f32`/`as f64` casts to `eunomia::F32::from_count`/`F64::from_count`, as hermes#302 did for `axpy/tests.rs`. At 6cd3cade7549643eeeb1d9d08bdf105231d6b542, `grep -cE '\bas [uif](8|16|32|64|size)\b'` counts 8 lines in `crates/hermes-simd/tests/dense_tests.rs`, 18 in `tiling_tests.rs` and 5 in `vector_slice_tests.rs`; the matches include `as_ptr() as usize` (`vector_slice_tests.rs:68`, `:82`), `as u8 as i8` (`tiling_tests.rs:447`, `:450`) and `j as i8` (`vector_slice_tests.rs:526`), which are not count-to-float conversions, so `from_count` does not cover them.
+- Next step: restore the head with `git fetch origin pull/221/head:<branch>`, then port or prove superseded the open files in slices of at most 400 changed lines; each slice applies the cast conversion above; the item deletes in the PR that accounts for the last hunk.
 
 <a id="HERMES-NUMA-BINDING-ON-THEMIS-2026-09-29"></a>
 ## HERMES-NUMA-BINDING-ON-THEMIS-2026-09-29 — Run the affinity guards on the Themis set binding [minor] — todo

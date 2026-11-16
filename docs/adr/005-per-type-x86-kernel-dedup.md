@@ -70,6 +70,6 @@ precision.
 
 ## References
 
-- `ATLAS-HERMES-CODEGEN-SSOT-2026-08-21` in `backlog.md`.
+- hermes#59, which deleted the generator.
 - `crates/hermes-simd-intrinsics/src/x86_64/`.
 - `crates/hermes-simd-intrinsics/src/aarch64/`.
