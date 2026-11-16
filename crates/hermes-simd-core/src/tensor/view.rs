@@ -5,7 +5,7 @@
 //! monomorphization, leaving no runtime overhead vs. a hand-written 2-D or 3-D struct.
 //!
 //! This module is split by concern:
-//! - `mod.rs` (here): the core struct, marker impls, constructors, and the
+//! - `view.rs` (here): the core struct, marker impls, constructors, and the
 //!   rank-agnostic shape/stride/element accessors.
 //! - `rank_ops` (private): rank-2 and rank-3 specialized views (rows, columns,
 //!   diagonal, `matrix_at`, transpose).
