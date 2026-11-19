@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.10.0 — Unreleased
+
+### Breaking
+
+- [major] The four library crates now use published Eunomia 0.12.1 for
+  scalar types, kernel bounds, and re-exports. Consumers must advance
+  Hermes and Eunomia together to share the same Rust type identity.
+  The procedural macro crate remains on 0.9.0.
+- Align the internal hermes-simd-core, hermes-simd-intrinsics, and
+  hermes-simd-types requirements at 0.10.0. See [ADR 027](docs/adr/027-eunomia-012-provider.md).
+
 ## Chrono advisory — Unreleased
 
 ### Changed

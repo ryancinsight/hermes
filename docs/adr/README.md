@@ -35,3 +35,4 @@
 | [024](024-const-generic-pair-permutes.md) | Const-Generic Pair Decimation and Interleave | Accepted |
 | [025](025-eunomia-010-cohort.md) | Adopt the Eunomia 0.10 provider cohort | Accepted |
 | [026](026-release-scope.md) | Hermes 1.0 Release Scope | Accepted |
+| [027](027-eunomia-012-provider.md) | Hermes adopts the published Eunomia 0.12 provider | Accepted |

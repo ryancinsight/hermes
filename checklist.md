@@ -1,25 +1,16 @@
 # Checklist — active sprint
 
-Target version: **0.9.0**. Active increment: **HERMES-EUNOMIA-010-COHORT [major]**.
+Target version: **0.10.0**. Active increment: **HERMES-EUNOMIA-012 [major]**.
 
-## HERMES-EUNOMIA-010-COHORT [major] — published 2026-10-15
+## HERMES-EUNOMIA-012 [major]
 
-- [x] Align the 0.9.0 workspace/internal versions and current public provider identity.
-- [x] Lock published Eunomia and Mnemosyne sources without aliases or path patches.
-- [x] Pass 507 all-feature native cases, zero skips, strict all-target/all-feature
-      Clippy, minimal builds, warning-denied docs and 27 doctests (ten existing ignores).
-- [x] Verify all five clean exact-head standard all-feature packages.
-- [x] Pass all twelve executed final-head CI jobs, including actual Miri, SDE,
-      native ARM/macOS/x86 and unchanged runtime budgets; all ten required statuses pass.
-- [x] Pass the final blocking four-library API release classification and core
-      dry-run. The existing caller excludes unchanged proc-macro API; compiler,
-      native tests and standard packaging cover it. No compatibility claim is made.
-- [x] Merge #260 normally with an identical reviewed tree; verify all five
-      not-yanked registry archive checksums and published VCS sources (ADR 025).
-- [x] Obtain explicit prospective automatic documentation deployment approval;
-      legacy Pages deploys on every main push.
-- [ ] Merge this receipt-only closure after final-head gates/reviews pass and
-      verify the resulting Pages build/deployment.
+- [x] Record the provider boundary in [ADR 027](docs/adr/027-eunomia-012-provider.md).
+- [x] Advance the four library manifests and all internal library edges together.
+- [ ] Pass exact-head package, SemVer, and required native and Miri checks.
+- [ ] Verify the four registry archives and a fresh typed consumer.
+
+The 0.9.0 release verification and publication receipts remain in
+[ADR 025](docs/adr/025-eunomia-010-cohort.md).
 
 ## HERMES-MACOS-NATIVE-20261013 [patch]
 
