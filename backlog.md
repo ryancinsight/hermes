@@ -24,6 +24,12 @@ item below carries `milestone: M-fused-scaled-spmv`.
 - non-goals: native SVE, AMX or AVX-512 silicon evidence as a release gate,
   read prefetch, tensor model layers, demand-gated slice facades, crypto/hash.
 
+<a id="HERMES-EUNOMIA-012"></a>
+## HERMES-EUNOMIA-012 — Align the published scalar provider [major] — todo
+- priority: correctness; milestone: M-fused-scaled-spmv; needs: none.
+- outcome: all four 0.10.0 libraries share published Eunomia 0.12.1 with Aequitas 0.4.0.
+- acceptance: [ADR 027](docs/adr/027-eunomia-012-provider.md) and the 0.10.0 checklist.
+
 <a id="HERMES-SPMV-PANICS-DOC"></a>
 ## HERMES-SPMV-PANICS-DOC — Say where the scaled SpMV overflow panics occur [patch] — todo
 - priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core/src/sparse/spmv.rs`, `crates/hermes-simd/src/dispatch/ops.rs`, `crates/hermes-simd/src/dispatch/simd_ops.rs`.
