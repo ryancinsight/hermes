@@ -307,7 +307,8 @@ dependencies = [
 [[package]]
 name = "eunomia"
 version = "0.12.0"
-source = "git+https://github.com/ryancinsight/eunomia#136c20e69d921abd8e5cd9c7b672b2cc4747f0b5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed06ed5a98e33ab7e70cd371717d70a87b13a3fef566bfe6e947f62df0775352"
 dependencies = [
  "bytemuck",
  "eunomia-derive",
@@ -318,7 +319,8 @@ dependencies = [
 [[package]]
 name = "eunomia-derive"
 version = "0.12.0"
-source = "git+https://github.com/ryancinsight/eunomia#136c20e69d921abd8e5cd9c7b672b2cc4747f0b5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5806836edadeaadb15655c7c831debf6750af746808a6c50f7969dc8c3ddd990"
 dependencies = [
  "proc-macro2",
  "quote",
