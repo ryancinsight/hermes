@@ -1,5 +1,17 @@
 # Changelog
 
+## Chrono advisory — Unreleased
+
+### Changed
+
+- [patch] `hermes-simd-benches`: `RUSTSEC-2026-0543` marks `chrono`
+  unmaintained, and every version is affected, so the benchmark runner's
+  `chrono` edge leaves the graph. The baseline's generation timestamp is
+  rendered from `time::OffsetDateTime::now_utc()`'s calendar fields, so it
+  reads as UTC and needs no fallible formatter. `time` 0.3 enters the
+  workspace graph for the unpublished bench crate; the published libraries
+  keep their contracts.
+
 ## Sealed-op marker supertraits — Unreleased
 
 ### Changed
