@@ -14,6 +14,21 @@ use host::{get_cpu_info, HostCapabilities};
 use regression::{check_regressions, write_baseline};
 use report::render_markdown;
 
+/// Render a UTC timestamp for the benchmark baseline, without a fallible
+/// formatter: the calendar fields of an `OffsetDateTime` cannot fail to
+/// format, and UTC keeps the baseline unambiguous across hosts.
+fn format_utc_timestamp(now: time::OffsetDateTime) -> String {
+    format!(
+        "{:04}-{:02}-{:02} {:02}:{:02}:{:02} UTC",
+        now.year(),
+        u8::from(now.month()),
+        now.day(),
+        now.hour(),
+        now.minute(),
+        now.second(),
+    )
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = BenchRunnerArgs::parse(env::args().skip(1))?;
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
@@ -65,9 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cpu = get_cpu_info();
     let capabilities = HostCapabilities::detect();
-    let generated_at = chrono::Local::now()
-        .format("%Y-%m-%d %H:%M:%S %Z")
-        .to_string();
+    let generated_at = format_utc_timestamp(time::OffsetDateTime::now_utc());
 
     if args.write_baseline {
         write_baseline(
@@ -102,4 +115,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::format_utc_timestamp;
+
+    #[test]
+    fn timestamp_renders_utc_calendar_fields() {
+        let instant = time::OffsetDateTime::from_unix_timestamp(1_700_000_000)
+            .expect("invariant: the epoch instant is representable");
+        assert_eq!(format_utc_timestamp(instant), "2023-11-14 22:13:20 UTC");
+    }
 }
