@@ -1,5 +1,14 @@
 # Checklist — active sprint
 
+## Stable release checklist
+
+Basis `d95d1cbf894e`, representative manifest `hermes-simd 0.10.0`. Target 1.0.0. [Backlog item](backlog.md#hermes-stable-qualification).
+
+- [ ] [patch] Run the precise f32 and f64 scaled SpMV tests named in the ladder. Compare y + alpha*A*x with a scalar reference, including zero alpha and empty rows, for each advertised dispatch path.
+- [ ] [patch] Derive the forward-error bound and document the validated index and overflow behavior in HERMES-SPMV-ERROR-BOUND and HERMES-SPMV-PANICS-DOC. Benchmark supported ISA paths against the scalar kernel.
+- [ ] [major] Execute the scaled_spmv example from the released facade and verify real Leto adoption. Track the Atlas CPU-LANE hardware obligations separately from the local milestone exits.
+- [ ] [patch] Run the [release scope](docs/adr/026-release-scope.md) exits and attach reviewed, exact-revision evidence for this member’s [Atlas qualification criteria](https://github.com/ryancinsight/atlas/blob/17b0124a7548ad81e817284afc5cb115c1d1bc78/docs/parity/repositories.json).
+
 Target version: **0.10.0**. Active increment: **HERMES-EUNOMIA-012 [major]**.
 
 ## HERMES-EUNOMIA-012 [major]
