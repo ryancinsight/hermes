@@ -1,5 +1,11 @@
 # Backlog — hermes-simd
 
+<a id="hermes-stable-qualification"></a>
+## HERMES-STABLE-QUALIFICATION — hermes stable-release qualification [patch] — todo
+- priority: verification; milestone: M-fused-scaled-spmv; basis: `d95d1cbf894e`.
+- Outcome: Qualify runtime-dispatched scaled CSR accumulation. Follow the [release scope](docs/adr/026-release-scope.md) and `M-fused-scaled-spmv`.
+- Acceptance and sequence: [stable-release checklist](checklist.md#stable-release-checklist).
+
 ## Milestone ladder
 
 Scope and non-goals: [ADR 026](docs/adr/026-release-scope.md). Every open
