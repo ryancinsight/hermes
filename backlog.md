@@ -2,8 +2,8 @@
 
 <a id="hermes-stable-qualification"></a>
 ## HERMES-STABLE-QUALIFICATION — hermes stable-release qualification [patch] — todo
-- priority: verification; milestone: M-fused-scaled-spmv; basis: `d95d1cbf894e`.
-- Outcome: Qualify runtime-dispatched scaled CSR accumulation. Follow the [release scope](docs/adr/026-release-scope.md) and `M-fused-scaled-spmv`.
+- priority: verification; milestone: M-fused-scaled-spmv; basis: `3e382ba2524a`.
+- Outcome: Qualify runtime-dispatched scaled CSR accumulation. Follow the [release scope](docs/adr/026-release-scope.md) and `M-fused-scaled-spmv`. Planning targets for `hermes-simd` are 0.10.1 if a dispatch repair is needed, then 1.0.0-beta.1 and the 1.0.0 freeze. Verification alone can advance the current version.
 - Acceptance and sequence: [stable-release checklist](checklist.md#stable-release-checklist).
 
 ## Milestone ladder
