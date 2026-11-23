@@ -1,5 +1,11 @@
 # Gap Audit - hermes-simd
 
+## Incremental release baseline
+
+Reviewed [hermes-simd 0.10.0](crates/hermes-simd/Cargo.toml) at [3e382ba2524a](https://github.com/ryancinsight/hermes/tree/3e382ba2524a0060f361de3fdb84b0eb46eb826c). The exact version appears in the [registry](https://crates.io/crates/hermes-simd/0.10.0).
+
+The next [patch] checkpoint uses [scaled spmv](crates/hermes-simd-examples/examples/scaled_spmv.rs). [Target version and acceptance criteria](checklist.md#stable-release-checklist).
+
 ## HERMES-EUNOMIA-010-COHORT [major] — published and registry-verified
 
 All five Hermes 0.9.0 packages are published from the normally guarded #260

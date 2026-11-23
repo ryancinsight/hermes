@@ -2,12 +2,14 @@
 
 ## Stable release checklist
 
-Basis `d95d1cbf894e`, representative manifest `hermes-simd 0.10.0`. Target 1.0.0. [Backlog item](backlog.md#hermes-stable-qualification).
+Basis `3e382ba2524a`, representative manifest `hermes-simd 0.10.0`. Target 1.0.0. [Backlog item](backlog.md#hermes-stable-qualification).
 
 - [ ] [patch] Run the precise f32 and f64 scaled SpMV tests named in the ladder. Compare y + alpha*A*x with a scalar reference, including zero alpha and empty rows, for each advertised dispatch path.
 - [ ] [patch] Derive the forward-error bound and document the validated index and overflow behavior in HERMES-SPMV-ERROR-BOUND and HERMES-SPMV-PANICS-DOC. Benchmark supported ISA paths against the scalar kernel.
 - [ ] [major] Execute the scaled_spmv example from the released facade and verify real Leto adoption. Track the Atlas CPU-LANE hardware obligations separately from the local milestone exits.
-- [ ] [patch] Run the [release scope](docs/adr/026-release-scope.md) exits and attach reviewed, exact-revision evidence for this member’s [Atlas qualification criteria](https://github.com/ryancinsight/atlas/blob/17b0124a7548ad81e817284afc5cb115c1d1bc78/docs/parity/repositories.json).
+- [ ] [patch] **0.10.1 if a dispatch repair is needed.** For scaled CSR accumulation, exercise an empty row between populated rows, zero scale and a nonzero initial destination. Compare every result with the scalar expression for each advertised dispatch path. [Source and baseline](gap_audit.md#incremental-release-baseline).
+- [ ] [major] **1.0.0-beta.1 scope.** Freeze the delivered operation set under ADR 026. Run the example with packaged libraries and check the tails of vector-width batches. Keep hardware claims within the ADR’s supported evidence scope.
+- [ ] [major] **1.0.0-beta.1 → 1.0.0-rc.1 → 1.0.0.** Freeze the supported surface at beta. The external SIMD consumer agrees with scalar CSR on both precisions and the four existing milestone exits pass. Repeat the applicable exits on the exact RC before stable promotion. Run the [release scope](docs/adr/026-release-scope.md) exits and attach reviewed, exact-revision evidence for this member’s [Atlas qualification criteria](https://github.com/ryancinsight/atlas/blob/17b0124a7548ad81e817284afc5cb115c1d1bc78/docs/parity/repositories.json).
 
 Target version: **0.10.0**. Active increment: **HERMES-EUNOMIA-012 [major]**.
 
