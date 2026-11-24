@@ -30,12 +30,6 @@ item below carries `milestone: M-fused-scaled-spmv`.
 - non-goals: native SVE, AMX or AVX-512 silicon evidence as a release gate,
   read prefetch, tensor model layers, demand-gated slice facades, crypto/hash.
 
-<a id="HERMES-EUNOMIA-012"></a>
-## HERMES-EUNOMIA-012 — Align the published scalar provider [major] — todo
-- priority: correctness; milestone: M-fused-scaled-spmv; needs: none.
-- outcome: all four 0.10.0 libraries share published Eunomia 0.12.1 with Aequitas 0.4.0.
-- acceptance: [ADR 027](docs/adr/027-eunomia-012-provider.md) and the 0.10.0 checklist.
-
 <a id="HERMES-SPMV-PANICS-DOC"></a>
 ## HERMES-SPMV-PANICS-DOC — Say where the scaled SpMV overflow panics occur [patch] — todo
 - priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core/src/sparse/spmv.rs`, `crates/hermes-simd/src/dispatch/ops.rs`, `crates/hermes-simd/src/dispatch/simd_ops.rs`.
@@ -188,12 +182,12 @@ item below carries `milestone: M-fused-scaled-spmv`.
 <a id="HERMES-CHECKLIST-FOLD"></a>
 ## HERMES-CHECKLIST-FOLD — Fold `checklist.md` into the board and delete it [patch] — todo
 - priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `checklist.md`, `backlog.md`, `gap_audit.md`, `README.md`.
-- basis: 6cd3cade7549643eeeb1d9d08bdf105231d6b542; finding: F4 of the judge verdict on hermes#303.
+- basis: a67f028425adf4cd6b0d98e373fe75ab6aafbaa5; finding: F4 of the judge verdict on hermes#303.
 - Outcome: no checklist file remains; each fact `checklist.md` holds lives in its one home, a board item, a `gap_audit.md` risk or the commit history.
-- Acceptance: `git ls-files checklist.md` is empty; `board_checklist_files` of `board_schema_counts` in `python scripts/atlas-conformance.py` reads 0 for hermes (1 at basis); `git grep -n 'checklist\.md' -- . ':!CHANGELOG.md' ':!.githooks'` is empty. Each of the 31 open `- [ ]` boxes at basis is accounted: it becomes or joins a board item or a `gap_audit.md` risk, cited by ID; or it is closed with the evidence that settles it; or it is deleted as superseded with the commit that supersedes it. Closed boxes and delivery narrative delete, because commits and PRs hold them.
-- Evidence at basis: 754 lines, 53 `##` headings, 31 open boxes (12 in lines 1-301, 10 in lines 302-581, 9 in lines 582-754). `README.md:401` links the file. `.githooks/pre-push:1447-1458` only exempts `checklist.md` from its ownership walk; the hook is stack-owned and not edited here.
-- Slices: three PRs, each deleting a heading-aligned range of `checklist.md` and adding at most 90 board or risk lines, so each stays under 400 changed lines (301 + 90 at most): lines 1-301; lines 302-581; lines 582-754 with the file deletion and the `README.md:401` edit.
-- Next step: classify the 12 open boxes of lines 1-301 against the board and `gap_audit.md`, file the survivors, delete the range.
+- Acceptance: `git ls-files checklist.md` is empty; `board_checklist_files` of `board_schema_counts` in `python scripts/atlas-conformance.py` reads 0 for hermes (1 at basis); `git grep -n 'checklist\.md' -- . ':!CHANGELOG.md' ':!.githooks'` is empty. Each of the 36 open `- [ ]` boxes at basis outside the 12 lines before `## HERMES-MACOS-NATIVE-20261013` is accounted: it becomes or joins a board item or a `gap_audit.md` risk, cited by ID; or it is closed with the evidence that settles it; or it is deleted as superseded with the commit that supersedes it. Closed boxes and delivery narrative delete, because commits and PRs hold them.
+- Evidence at basis: outside the 12 lines (2 open boxes) before `## HERMES-MACOS-NATIVE-20261013`, 744 lines (numbered as without those 12), 53 `##` headings, 36 open boxes: 17 from `## Stable release checklist` through `## HS-ARGEXTREMA-ONE-PASS-2026-08-27` (lines 3-247, 245 lines), 1 from `## HS-EXACT-LANE-DISPATCH-2026-08-27` through `## ATLAS-ORPHAN-MODULES-096-HERMES` (lines 248-457, 210 lines), 18 from `## HS-429` through `## HS-401` (lines 458-744, 287 lines). Lines 1-2 are the file title and a blank line. `README.md:401` links the file. `.githooks/pre-push:1577` only exempts `checklist.md` from its ownership walk; the hook is stack-owned and not edited here.
+- Slices: three PRs, one per heading range above, each deleting its range and adding at most 90 board or risk lines, so each stays under 400 changed lines; the last also deletes the file, title lines included, and edits `README.md:401`.
+- Next step: classify the 17 open boxes of the first range against the board and `gap_audit.md`, file the survivors, delete the range.
 
 ## Legacy HS-4xx record — open items and measured limits
 
