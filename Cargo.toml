@@ -134,6 +134,7 @@ too_many_arguments = "allow"           # 9 (9 prod)
 manual_is_multiple_of = "allow"        # 24 (24 prod)
 
 [workspace.dependencies]
+horae-civil-time = { version = "0.1.0", git = "https://github.com/ryancinsight/horae" }
 # Canonical source identities; Cargo.lock selects reviewed cohort revisions.
 mnemosyne = { package = "mnemosyne-memory", git = "https://github.com/ryancinsight/Mnemosyne.git", version = "0.10.0", default-features = false }
 themis = { package = "themis-topology", git = "https://github.com/ryancinsight/themis", version = "0.11.1", default-features = false }
