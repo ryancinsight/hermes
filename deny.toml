@@ -42,6 +42,7 @@ allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 # the exact commit consumed by every reproducible build.
 allow-git = [
     "https://github.com/ryancinsight/eunomia",
+    "https://github.com/ryancinsight/horae",
     "https://github.com/ryancinsight/melinoe.git",
     "https://github.com/ryancinsight/Mnemosyne.git",
     "https://github.com/ryancinsight/themis",
