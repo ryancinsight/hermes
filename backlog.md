@@ -30,20 +30,6 @@ item below carries `milestone: M-fused-scaled-spmv`.
 - non-goals: native SVE, AMX or AVX-512 silicon evidence as a release gate,
   read prefetch, tensor model layers, demand-gated slice facades, crypto/hash.
 
-<a id="HERMES-RELEASE-GATE-0100"></a>
-## HERMES-RELEASE-GATE-0100 — Compare the 0.10.0 libraries with 0.9.2 for SemVer [patch] — todo
-- priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd`, `crates/hermes-simd-core`, `crates/hermes-simd-intrinsics`, `crates/hermes-simd-types`.
-- basis: a67f028425adf4cd6b0d98e373fe75ab6aafbaa5; source: [ADR 027](docs/adr/027-eunomia-012-provider.md) verification clause.
-- Outcome: the 0.9.2 to 0.10.0 public-surface change has a recorded SemVer verdict. The native and Miri
-  half of the box is met: hosted CI run 44631113187 at a65c6c2 (the published source) and run 45268964602 at a67f028 passed
-  `fmt + clippy + test + doc (x86_64)` and `miri (core + intrinsics boundary)`. Both runs skipped the two SemVer
-  jobs, which run only on pull requests and releases.
-- Acceptance: `cargo semver-checks --package hermes-simd-core --package hermes-simd-intrinsics --package hermes-simd-types --package hermes-simd --baseline-version 0.9.2`
-  on Rust 1.97.0 (the `semver` job of `.github/workflows/ci.yml`) at a65c6c2 or current main exits 0, the release type
-  inferred from 0.9.2 to 0.10.0, with the output recorded in the delivering PR body.
-- Next step: run the command in an overlay-free export through the committed stack command; a reported break
-  the 0.10.0 version does not cover is a `correctness` item.
-
 <a id="HERMES-SPMV-PANICS-DOC"></a>
 ## HERMES-SPMV-PANICS-DOC — Say where the scaled SpMV overflow panics occur [patch] — todo
 - priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core/src/sparse/spmv.rs`, `crates/hermes-simd/src/dispatch/ops.rs`, `crates/hermes-simd/src/dispatch/simd_ops.rs`.
@@ -196,12 +182,12 @@ item below carries `milestone: M-fused-scaled-spmv`.
 <a id="HERMES-CHECKLIST-FOLD"></a>
 ## HERMES-CHECKLIST-FOLD — Fold `checklist.md` into the board and delete it [patch] — todo
 - priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `checklist.md`, `backlog.md`, `gap_audit.md`, `README.md`.
-- basis: 6cd3cade7549643eeeb1d9d08bdf105231d6b542; finding: F4 of the judge verdict on hermes#303.
+- basis: a67f028425adf4cd6b0d98e373fe75ab6aafbaa5; finding: F4 of the judge verdict on hermes#303.
 - Outcome: no checklist file remains; each fact `checklist.md` holds lives in its one home, a board item, a `gap_audit.md` risk or the commit history.
-- Acceptance: `git ls-files checklist.md` is empty; `board_checklist_files` of `board_schema_counts` in `python scripts/atlas-conformance.py` reads 0 for hermes (1 at basis); `git grep -n 'checklist\.md' -- . ':!CHANGELOG.md' ':!.githooks'` is empty. Each of the 31 open `- [ ]` boxes at basis is accounted: it becomes or joins a board item or a `gap_audit.md` risk, cited by ID; or it is closed with the evidence that settles it; or it is deleted as superseded with the commit that supersedes it. Closed boxes and delivery narrative delete, because commits and PRs hold them.
-- Evidence at basis: 754 lines, 53 `##` headings, 31 open boxes (12 in lines 1-301, 10 in lines 302-581, 9 in lines 582-754). `README.md:401` links the file. `.githooks/pre-push:1447-1458` only exempts `checklist.md` from its ownership walk; the hook is stack-owned and not edited here.
-- Slices: three PRs, each deleting a heading-aligned range of `checklist.md` and adding at most 90 board or risk lines, so each stays under 400 changed lines (301 + 90 at most): lines 1-301; lines 302-581; lines 582-754 with the file deletion and the `README.md:401` edit.
-- Next step: classify the 12 open boxes of lines 1-301 against the board and `gap_audit.md`, file the survivors, delete the range.
+- Acceptance: `git ls-files checklist.md` is empty; `board_checklist_files` of `board_schema_counts` in `python scripts/atlas-conformance.py` reads 0 for hermes (1 at basis); `git grep -n 'checklist\.md' -- . ':!CHANGELOG.md' ':!.githooks'` is empty. Each of the 36 open `- [ ]` boxes at basis outside the 12 lines before `## HERMES-MACOS-NATIVE-20261013` is accounted: it becomes or joins a board item or a `gap_audit.md` risk, cited by ID; or it is closed with the evidence that settles it; or it is deleted as superseded with the commit that supersedes it. Closed boxes and delivery narrative delete, because commits and PRs hold them.
+- Evidence at basis: outside the 12 lines (2 open boxes) before `## HERMES-MACOS-NATIVE-20261013`, 744 lines, 53 `##` headings, 36 open boxes: 17 from `## Stable release checklist` through `## HS-ARGEXTREMA-ONE-PASS-2026-08-27` (247 lines), 1 from `## HS-EXACT-LANE-DISPATCH-2026-08-27` through `## ATLAS-ORPHAN-MODULES-096-HERMES` (210 lines), 18 from `## HS-429` through `## HS-401` (287 lines). `README.md:401` links the file. `.githooks/pre-push:1577` only exempts `checklist.md` from its ownership walk; the hook is stack-owned and not edited here.
+- Slices: three PRs, one per heading range above, each deleting its range and adding at most 90 board or risk lines, so each stays under 400 changed lines; the last also deletes the file and edits `README.md:401`.
+- Next step: classify the 17 open boxes of the first range against the board and `gap_audit.md`, file the survivors, delete the range.
 
 ## Legacy HS-4xx record — open items and measured limits
 
