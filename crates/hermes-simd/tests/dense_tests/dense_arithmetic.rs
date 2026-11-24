@@ -1,3 +1,4 @@
+use eunomia::{F32, F64};
 use hermes_simd::*;
 
 #[test]
@@ -26,10 +27,10 @@ fn test_dot_f32() {
 #[test]
 fn test_dot_f32_non_dyadic_tail_matches_within_tolerance() {
     let a: Vec<f32> = (0..13)
-        .map(|i| ((i * 19 + 7) as f32) / 23.0 - 2.0)
+        .map(|i| F32::from_count(i * 19 + 7).0 / 23.0 - 2.0)
         .collect();
     let b: Vec<f32> = (0..13)
-        .map(|i| ((i * 11 + 5) as f32) / 17.0 - 1.5)
+        .map(|i| F32::from_count(i * 11 + 5).0 / 17.0 - 1.5)
         .collect();
 
     let actual = dot::<f32>(&a, &b).unwrap();
@@ -139,8 +140,8 @@ fn test_elementwise_add_streaming_matches_scalar() {
     // 2_100_003 f32 = 8.4 MiB > the 8 MiB NT threshold; not a lane multiple so
     // the tail path is exercised too.
     let n = 2_100_003usize;
-    let a: Vec<f32> = (0..n).map(|i| (i % 101) as f32 * 0.5).collect();
-    let b: Vec<f32> = (0..n).map(|i| (i % 103) as f32 * 0.25).collect();
+    let a: Vec<f32> = (0..n).map(|i| F32::from_count(i % 101).0 * 0.5).collect();
+    let b: Vec<f32> = (0..n).map(|i| F32::from_count(i % 103).0 * 0.25).collect();
     let mut out_buf = vec![0.0f32; n + 8];
     let out = &mut out_buf[1..=n]; // 4-byte-offset start → nonzero peel head
     elementwise_add::<f32>(&a, &b, out).unwrap();
@@ -160,10 +161,10 @@ fn test_elementwise_add_streaming_matches_scalar() {
 #[test]
 fn test_elementwise_binary_matches_scalar_reference() {
     for &n in &[1usize, 3, 7, 8, 15, 16, 17, 64, 257, 1024] {
-        let a32: Vec<f32> = (0..n).map(|i| i as f32 * 0.5 - 3.0).collect();
-        let b32: Vec<f32> = (0..n).map(|i| (i % 7) as f32 + 1.0).collect();
-        let a64: Vec<f64> = (0..n).map(|i| i as f64 * 0.5 - 3.0).collect();
-        let b64: Vec<f64> = (0..n).map(|i| (i % 7) as f64 + 1.0).collect();
+        let a32: Vec<f32> = (0..n).map(|i| F32::from_count(i).0 * 0.5 - 3.0).collect();
+        let b32: Vec<f32> = (0..n).map(|i| F32::from_count(i % 7).0 + 1.0).collect();
+        let a64: Vec<f64> = (0..n).map(|i| F64::from_count(i).0 * 0.5 - 3.0).collect();
+        let b64: Vec<f64> = (0..n).map(|i| F64::from_count(i % 7).0 + 1.0).collect();
 
         let mut o32 = vec![0.0f32; n];
         let mut o64 = vec![0.0f64; n];
