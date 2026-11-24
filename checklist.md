@@ -11,18 +11,6 @@ Basis `3e382ba2524a`, representative manifest `hermes-simd 0.10.0`. Target 1.0.0
 - [ ] [major] **1.0.0-beta.1 scope.** Freeze the delivered operation set under ADR 026. Run the example with packaged libraries and check the tails of vector-width batches. Keep hardware claims within the ADR’s supported evidence scope.
 - [ ] [major] **1.0.0-beta.1 → 1.0.0-rc.1 → 1.0.0.** Freeze the supported surface at beta. The external SIMD consumer agrees with scalar CSR on both precisions and the four existing milestone exits pass. Repeat the applicable exits on the exact RC before stable promotion. Run the [release scope](docs/adr/026-release-scope.md) exits and attach reviewed, exact-revision evidence for this member’s [Atlas qualification criteria](https://github.com/ryancinsight/atlas/blob/17b0124a7548ad81e817284afc5cb115c1d1bc78/docs/parity/repositories.json).
 
-Target version: **0.10.0**. Active increment: **HERMES-EUNOMIA-012 [major]**.
-
-## HERMES-EUNOMIA-012 [major]
-
-- [x] Record the provider boundary in [ADR 027](docs/adr/027-eunomia-012-provider.md).
-- [x] Advance the four library manifests and all internal library edges together.
-- [ ] Pass exact-head package, SemVer, and required native and Miri checks.
-- [ ] Verify the four registry archives and a fresh typed consumer.
-
-The 0.9.0 release verification and publication receipts remain in
-[ADR 025](docs/adr/025-eunomia-010-cohort.md).
-
 ## HERMES-MACOS-NATIVE-20261013 [patch]
 
 - [x] Refresh the task branch from current upstream before native validation.

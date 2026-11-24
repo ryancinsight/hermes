@@ -30,11 +30,19 @@ item below carries `milestone: M-fused-scaled-spmv`.
 - non-goals: native SVE, AMX or AVX-512 silicon evidence as a release gate,
   read prefetch, tensor model layers, demand-gated slice facades, crypto/hash.
 
-<a id="HERMES-EUNOMIA-012"></a>
-## HERMES-EUNOMIA-012 — Align the published scalar provider [major] — todo
-- priority: correctness; milestone: M-fused-scaled-spmv; needs: none.
-- outcome: all four 0.10.0 libraries share published Eunomia 0.12.1 with Aequitas 0.4.0.
-- acceptance: [ADR 027](docs/adr/027-eunomia-012-provider.md) and the 0.10.0 checklist.
+<a id="HERMES-RELEASE-GATE-0100"></a>
+## HERMES-RELEASE-GATE-0100 — Compare the 0.10.0 libraries with 0.9.2 for SemVer [patch] — todo
+- priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd`, `crates/hermes-simd-core`, `crates/hermes-simd-intrinsics`, `crates/hermes-simd-types`.
+- basis: a67f028425adf4cd6b0d98e373fe75ab6aafbaa5; source: [ADR 027](docs/adr/027-eunomia-012-provider.md) verification clause.
+- Outcome: the 0.9.2 to 0.10.0 public-surface change has a recorded SemVer verdict. The native and Miri
+  half of the box is met: hosted CI run 44631113187 at a65c6c2 (the published source) and run 45268964602 at a67f028 passed
+  `fmt + clippy + test + doc (x86_64)` and `miri (core + intrinsics boundary)`. Both runs skipped the two SemVer
+  jobs, which run only on pull requests and releases.
+- Acceptance: `cargo semver-checks --package hermes-simd-core --package hermes-simd-intrinsics --package hermes-simd-types --package hermes-simd --baseline-version 0.9.2`
+  on Rust 1.97.0 (the `semver` job of `.github/workflows/ci.yml`) at a65c6c2 or current main exits 0, the release type
+  inferred from 0.9.2 to 0.10.0, with the output recorded in the delivering PR body.
+- Next step: run the command in an overlay-free export through the committed stack command; a reported break
+  the 0.10.0 version does not cover is a `correctness` item.
 
 <a id="HERMES-SPMV-PANICS-DOC"></a>
 ## HERMES-SPMV-PANICS-DOC — Say where the scaled SpMV overflow panics occur [patch] — todo
