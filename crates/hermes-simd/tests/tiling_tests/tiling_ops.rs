@@ -1,9 +1,10 @@
+use eunomia::{Bf16, F32};
 use hermes_simd::*;
 
 #[test]
 fn test_tiled_dot_matches_dot() {
-    let a: Vec<f32> = (0..64).map(|i| i as f32).collect();
-    let b: Vec<f32> = (0..64).map(|i| (64 - i) as f32).collect();
+    let a: Vec<f32> = (0..64).map(|i| F32::from_count(i).0).collect();
+    let b: Vec<f32> = (0..64).map(|i| F32::from_count(64 - i).0).collect();
 
     let view_a = SimdView::<f32, Scalar, Unaligned, Unmasked, &[f32]>::new(&a).unwrap();
     let view_b = SimdView::<f32, Scalar, Unaligned, Unmasked, &[f32]>::new(&b).unwrap();
@@ -28,10 +29,10 @@ fn test_tiled_dot_matches_dot() {
 #[test]
 fn test_dot_non_dyadic_tail_forced_sve_backend() {
     let a: Vec<f32> = (0..13)
-        .map(|i| ((i * 19 + 7) as f32) / 23.0 - 2.0)
+        .map(|i| F32::from_count(i * 19 + 7).0 / 23.0 - 2.0)
         .collect();
     let b: Vec<f32> = (0..13)
-        .map(|i| ((i * 11 + 5) as f32) / 17.0 - 1.5)
+        .map(|i| F32::from_count(i * 11 + 5).0 / 17.0 - 1.5)
         .collect();
     let lhs = SimdView::<f32, SveArch, Unaligned, Unmasked, &[f32]>::new(&a).unwrap();
     let rhs = SimdView::<f32, SveArch, Unaligned, Unmasked, &[f32]>::new(&b).unwrap();
@@ -73,10 +74,12 @@ fn test_gemv_f32_column_tail_differential() {
     let nrows = 11usize;
     let ncols = 21usize;
     let a: Vec<f32> = (0..nrows * ncols)
-        .map(|i| ((i % 9) as f32 - 4.0) * 0.25)
+        .map(|i| (F32::from_count(i % 9).0 - 4.0) * 0.25)
         .collect();
-    let x: Vec<f32> = (0..ncols).map(|i| ((i % 5) as f32 - 2.0) * 0.5).collect();
-    let y_init: Vec<f32> = (0..nrows).map(|i| (i % 3) as f32 - 1.0).collect();
+    let x: Vec<f32> = (0..ncols)
+        .map(|i| (F32::from_count(i % 5).0 - 2.0) * 0.5)
+        .collect();
+    let y_init: Vec<f32> = (0..nrows).map(|i| F32::from_count(i % 3).0 - 1.0).collect();
 
     let mut y = y_init.clone();
     gemv::<f32>(&a, &x, &mut y, nrows, ncols).unwrap();
@@ -135,7 +138,6 @@ fn test_native_bf16_capability_probe_matches_std_detector() {
 
 #[test]
 fn test_tile_matrix_multiply_bf16() {
-    use eunomia::{Bf16, F32};
     let mut c = vec![F32(0.0); 16 * 16];
     let a = vec![Bf16::from_f32(1.0); 16 * 32];
     let b = vec![Bf16::from_f32(2.0); 32 * 16];
@@ -152,19 +154,19 @@ fn test_tile_matrix_multiply_bf16() {
 #[cfg(target_arch = "x86_64")]
 #[test]
 fn test_native_bf16_tile_matches_scalar_when_available() {
-    use eunomia::{Bf16, F32};
-
     if !has_avx512_bf16() {
         return;
     }
 
-    let c_initial: Vec<f32> = (0..16 * 16).map(|i| (i % 7) as f32 - 3.0).collect();
+    let c_initial: Vec<f32> = (0..16 * 16)
+        .map(|i| F32::from_count(i % 7).0 - 3.0)
+        .collect();
     let mut actual: Vec<F32> = c_initial.iter().copied().map(F32).collect();
     let a: Vec<Bf16> = (0..16 * 32)
-        .map(|i| Bf16::from_f32(((i * 13 + 5) % 29) as f32 / 8.0 - 1.5))
+        .map(|i| Bf16::from_f32(F32::from_count((i * 13 + 5) % 29).0 / 8.0 - 1.5))
         .collect();
     let b: Vec<Bf16> = (0..32 * 16)
-        .map(|i| Bf16::from_f32(((i * 17 + 3) % 31) as f32 / 7.0 - 2.0))
+        .map(|i| Bf16::from_f32(F32::from_count((i * 17 + 3) % 31).0 / 7.0 - 2.0))
         .collect();
 
     unsafe {
@@ -214,7 +216,6 @@ fn test_tile_matrix_multiply_int8() {
 
 #[test]
 fn test_gemm_bf16_high_level() {
-    use eunomia::{Bf16, F32};
     let m = 35;
     let n = 20;
     let k = 36;
@@ -260,10 +261,16 @@ fn test_tiled_gemm_column_tail_differential() {
     let m = 7usize;
     let n = 45usize;
     let k = 13usize;
-    let a: Vec<f32> = (0..m * k).map(|i| ((i % 9) as f32 - 4.0) * 0.5).collect();
-    let b: Vec<f32> = (0..k * n).map(|i| ((i % 7) as f32 - 3.0) * 0.5).collect();
+    let a: Vec<f32> = (0..m * k)
+        .map(|i| (F32::from_count(i % 9).0 - 4.0) * 0.5)
+        .collect();
+    let b: Vec<f32> = (0..k * n)
+        .map(|i| (F32::from_count(i % 7).0 - 3.0) * 0.5)
+        .collect();
     // Nonzero C exercises the accumulate contract on both tile and tail paths.
-    let c_init: Vec<f32> = (0..m * n).map(|i| (i % 11) as f32 - 5.0).collect();
+    let c_init: Vec<f32> = (0..m * n)
+        .map(|i| F32::from_count(i % 11).0 - 5.0)
+        .collect();
 
     let mut c = c_init.clone();
     tiled_gemm(&a, &b, &mut c, m, n, k).unwrap();
@@ -295,14 +302,27 @@ fn test_gemm_int8_signed_differential() {
     let n = 29;
     let k = 130;
     let a: Vec<i8> = (0..m * k)
-        .map(|i| ((i * 89 + 3) % 256) as u8 as i8)
+        .map(|i| {
+            u8::try_from((i * 89 + 3) % 256)
+                .expect("invariant: a remainder modulo 256 fits u8")
+                .cast_signed()
+        })
         .collect();
     let b: Vec<i8> = (0..k * n)
-        .map(|i| ((i * 41 + 128) % 256) as u8 as i8)
+        .map(|i| {
+            u8::try_from((i * 41 + 128) % 256)
+                .expect("invariant: a remainder modulo 256 fits u8")
+                .cast_signed()
+        })
         .collect();
     // Nonzero C exercises the accumulate contract end-to-end.
     let c_init: Vec<i32> = (0..m * n)
-        .map(|i| (i as i32).wrapping_mul(7919) - 40000)
+        .map(|i| {
+            i32::try_from(i)
+                .expect("invariant: m * n = 1073 elements index within i32")
+                .wrapping_mul(7919)
+                - 40000
+        })
         .collect();
 
     let mut c = c_init.clone();
@@ -329,7 +349,6 @@ fn test_gemm_int8_signed_differential() {
 
 #[test]
 fn test_gemm_bf16_size_16() {
-    use eunomia::{Bf16, F32};
     let m = 16;
     let n = 16;
     let k = 16;
@@ -344,8 +363,8 @@ fn test_gemm_bf16_size_16() {
 
 #[test]
 fn test_tiling_strategy_trait_direct() {
-    let a: Vec<f32> = (0..64).map(|i| i as f32).collect();
-    let b: Vec<f32> = (0..64).map(|i| (64 - i) as f32).collect();
+    let a: Vec<f32> = (0..64).map(|i| F32::from_count(i).0).collect();
+    let b: Vec<f32> = (0..64).map(|i| F32::from_count(64 - i).0).collect();
 
     let view_a = SimdView::<f32, Scalar, Unaligned, Unmasked, &[f32]>::new(&a).unwrap();
     let view_b = SimdView::<f32, Scalar, Unaligned, Unmasked, &[f32]>::new(&b).unwrap();
