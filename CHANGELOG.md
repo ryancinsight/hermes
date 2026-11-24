@@ -13,6 +13,9 @@
 
 ## Chrono advisory — Unreleased
 
+- [patch] Use Horae for the benchmark's UTC timestamp and reuse its display
+  formatter for existing Markdown and JSON reports.
+
 ### Changed
 
 - [patch] `hermes-simd-benches`: `RUSTSEC-2026-0543` marks `chrono`
