@@ -1,4 +1,3 @@
-use eunomia::F32;
 use hermes_simd::{Scalar, SimdError, Vector};
 
 #[test]
@@ -333,6 +332,7 @@ fn safe_avx512_vector_constructors_reject_unsupported_target() {
 #[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), feature = "std"))]
 #[test]
 fn test_masked_load_store_slice_avx512() {
+    use eunomia::F32;
     use hermes_simd::{target::TargetId, Avx512, BitMask, Mask, Vector};
 
     if !TargetId::Avx512.is_supported() {
