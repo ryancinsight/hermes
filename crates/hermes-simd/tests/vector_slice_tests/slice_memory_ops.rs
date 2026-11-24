@@ -1,3 +1,4 @@
+use eunomia::F32;
 use hermes_simd::{Scalar, SimdError, Vector};
 
 #[test]
@@ -60,7 +61,9 @@ fn safe_aligned_load_and_store_reject_unaligned_slices() {
     let unaligned_input = (0..=4)
         .map(|offset| &input[offset..offset + 4])
         .find(|slice| {
-            !(slice.as_ptr() as usize)
+            !slice
+                .as_ptr()
+                .addr()
                 .is_multiple_of(<Scalar as hermes_simd::SimdStorage<f32>>::LANE_COUNT * 4)
         })
         .expect("at least one f32 subslice offset is unaligned to the scalar vector width");
@@ -74,7 +77,9 @@ fn safe_aligned_load_and_store_reject_unaligned_slices() {
     let mut output = [0.0f32; 8];
     let unaligned_offset = (0..=4)
         .find(|&offset| {
-            !(output[offset..].as_ptr() as usize)
+            !output[offset..]
+                .as_ptr()
+                .addr()
                 .is_multiple_of(<Scalar as hermes_simd::SimdStorage<f32>>::LANE_COUNT * 4)
         })
         .expect("at least one f32 mutable subslice offset is unaligned to the scalar vector width");
@@ -337,7 +342,7 @@ fn test_masked_load_store_slice_avx512() {
     // Avx512 has lane count 16 for f32.
     let mut data = [0.0f32; 16];
     for (i, d) in data.iter_mut().enumerate() {
-        *d = (i + 1) as f32;
+        *d = F32::from_count(i + 1).0;
     }
     let mut mask_arr = [false; 16];
     for (i, m) in mask_arr.iter_mut().enumerate() {
@@ -356,7 +361,7 @@ fn test_masked_load_store_slice_avx512() {
         vec.masked_store_to_slice(&mut out, mask).unwrap();
         for (i, &o) in out.iter().enumerate() {
             if i % 2 == 0 {
-                assert_eq!(o, (i + 1) as f32);
+                assert_eq!(o, F32::from_count(i + 1).0);
             } else {
                 assert_eq!(o, 99.0);
             }
