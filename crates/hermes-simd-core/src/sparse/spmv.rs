@@ -58,7 +58,9 @@ pub trait SparseScaledSpMv<T> {
     /// # Panics
     /// Panics if `x` or `y` is shorter than the column or row count (also for
     /// a zero `alpha`), if the storage is structurally invalid, or, for a
-    /// primitive integer `T` under overflow checks, on integer overflow.
+    /// primitive integer `T` under overflow checks, on integer overflow in the
+    /// scalar tail, the scaling or the `y` update; lane arithmetic is
+    /// backend-defined (see `# Overflow`).
     fn spmv_scaled(&self, alpha: T, x: &[T], y: &mut [T]);
 }
 

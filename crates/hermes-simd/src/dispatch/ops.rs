@@ -274,7 +274,10 @@ pub fn spmv_csr<T: SimdOps>(data: ValidatedData<CsrData<'_, T>>, x: &[T], y: &mu
 ///
 /// # Panics
 /// Panics if `x.len() < ncols` or `y.len() < nrows` (also for a zero `alpha`),
-/// or, for a primitive integer `T` under overflow checks, on integer overflow.
+/// or, for a primitive integer `T` under overflow checks, on integer overflow
+/// in the scalar tail, the scaling or the `y` update; lane arithmetic is
+/// backend-defined (see `# Overflow` of
+/// [`SparseScaledSpMv`](crate::SparseScaledSpMv)).
 #[inline(always)]
 pub fn spmv_scaled_csr<T: SimdOps>(
     data: ValidatedData<CsrData<'_, T>>,

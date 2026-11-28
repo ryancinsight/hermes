@@ -169,8 +169,10 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     ///
     /// # Panics
     /// Panics if `x.len() < ncols` or `y.len() < nrows` (also for a zero
-    /// `alpha`), or, for a primitive integer `Self` under overflow checks, on
-    /// integer overflow.
+    /// `alpha`), or, for a primitive integer `Self`, on integer overflow in
+    /// the scalar tail, the scaling or the `y` update under overflow checks;
+    /// lane arithmetic is backend-defined (see `# Overflow` of
+    /// [`SparseScaledSpMv`](crate::SparseScaledSpMv)).
     ///
     /// # Examples
     /// ```

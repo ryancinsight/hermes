@@ -30,18 +30,6 @@ item below carries `milestone: M-fused-scaled-spmv`.
 - non-goals: native SVE, AMX or AVX-512 silicon evidence as a release gate,
   read prefetch, tensor model layers, demand-gated slice facades, crypto/hash.
 
-<a id="HERMES-SPMV-PANICS-DOC"></a>
-## HERMES-SPMV-PANICS-DOC — Say where the scaled SpMV overflow panics occur [patch] — todo
-- priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core/src/sparse/spmv.rs`, `crates/hermes-simd/src/dispatch/ops.rs`, `crates/hermes-simd/src/dispatch/simd_ops.rs`.
-- basis: cd0dabd38e1fe02b793782794f8ecdd94a95b9eb; finding: non-gating F10 of the judge verdict on hermes#291.
-- Outcome: each `# Panics` overflow clause names the scalar tail, the scaling
-  and the `y` update as the panic sites; a primitive-integer lane-block
-  overflow does not panic, so the unconditional wording is a false contract.
-- Acceptance: `git grep -n -E 'overflow checks, on( integer overflow\.)?$' -- crates`
-  returns no hit (three hits today: `spmv.rs:61`, `ops.rs:277`, `simd_ops.rs:172`).
-- Next step: reword each clause to "in the scalar tail, the scaling or the `y`
-  update" and keep the `# Overflow` cross-reference.
-
 <a id="HERMES-SPMV-ERROR-BOUND"></a>
 ## HERMES-SPMV-ERROR-BOUND — Document the scaled SpMV forward error [patch] — todo
 - priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core/src/sparse/spmv.rs`, `crates/hermes-simd/tests/sparse_tests.rs`.
@@ -85,7 +73,7 @@ item below carries `milestone: M-fused-scaled-spmv`.
 
 <a id="HERMES-SPLIT-OVERSIZE-SPARSE-FILES"></a>
 ## HERMES-SPLIT-OVERSIZE-SPARSE-FILES — Bring `dispatch/ops.rs` and `sparse_tests.rs` under 500 lines [patch] — todo
-- priority: tightening; milestone: M-fused-scaled-spmv; needs: HERMES-SPMV-PANICS-DOC, HERMES-SPMV-ERROR-BOUND, HERMES-SPMV-SCALED-DOCTESTS, HERMES-SPMV-DOC-RESIDUALS; scope: `crates/hermes-simd/src/dispatch/ops.rs`, `crates/hermes-simd/tests/sparse_tests.rs`.
+- priority: tightening; milestone: M-fused-scaled-spmv; needs: HERMES-SPMV-ERROR-BOUND, HERMES-SPMV-SCALED-DOCTESTS, HERMES-SPMV-DOC-RESIDUALS; scope: `crates/hermes-simd/src/dispatch/ops.rs`, `crates/hermes-simd/tests/sparse_tests.rs`.
 - basis: cd0dabd38e1fe02b793782794f8ecdd94a95b9eb; finding: non-gating F14 of the judge verdict on hermes#291.
 - Outcome: `dispatch/ops.rs` (586 lines) and `sparse_tests.rs` (1369) each
   split into concern-named leaf modules of at most 500 lines; no behavior or
