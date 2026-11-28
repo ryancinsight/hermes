@@ -520,9 +520,9 @@ fn overflow_rows(max: i64, lanes: usize) -> Vec<OverflowRow> {
     let mut values = vec![0; 2 * pass];
     (values[0], values[pass], values[1]) = (half, half, 5);
     rows.push(OverflowRow::new(Portable, values, Wraps));
-    let root = (1..)
+    let root = (1..=max)
         .find(|r: &i64| r * r > max)
-        .expect("invariant: the search is unbounded");
+        .expect("invariant: the root of max lies below max for max >= 2");
     for backend in [Dispatched, Portable] {
         for (r, outcome) in [(root, Panics(OVERFLOW_MULTIPLY)), (root - 1, Exact)] {
             rows.push(OverflowRow {
