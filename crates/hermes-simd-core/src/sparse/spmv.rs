@@ -22,6 +22,10 @@ use crate::scalar::Scalar;
 pub trait SparseSpMv<T> {
     /// Perform matrix-vector multiplication: `y += A * x`.
     ///
+    /// # Overflow
+    /// Integer overflow is per format. For CSR the sites are those of
+    /// [`SparseScaledSpMv::spmv_scaled`] except the scaling.
+    ///
     /// # Panics
     /// Panics if the dimensions of `x` or `y` are incompatible with the matrix,
     /// or if a raw storage representation is structurally invalid.
@@ -48,19 +52,24 @@ pub trait SparseScaledSpMv<T> {
     /// # Overflow
     /// For an integer `T` the caller keeps every product, partial sum,
     /// `alpha * dot` and updated `y` entry inside the range of `T`. Otherwise
-    /// the result is unspecified and memory-safe. For a primitive integer,
-    /// lane arithmetic is backend-defined, while the scalar tail, the scaling
-    /// and the `y` update panic under overflow checks (dev and test profiles)
-    /// and wrap otherwise; row length and backend decide which runs in a lane.
-    /// The `I8`, `I16` and `I32` newtypes wrap in every profile and never
-    /// panic on overflow.
+    /// the result is unspecified and memory-safe. For the primitive `i8`,
+    /// `i16` and `i32`, every dispatched backend shares one emulated kernel
+    /// with these sites. The lane multiply-add wraps in every profile, also
+    /// where it adds a product to a lane accumulator. The vector `+` that
+    /// combines the four lane accumulators, the left-to-right horizontal
+    /// reduction of the lanes, the scalar tail, the scaling and the `y` update
+    /// panic under overflow checks (dev and test profiles) and wrap otherwise;
+    /// row length and lane count decide which site an overflow reaches. The
+    /// `I8`, `I16` and `I32` newtypes wrap at every site in every profile and
+    /// never panic on overflow.
     ///
     /// # Panics
     /// Panics if `x` or `y` is shorter than the column or row count (also for
     /// a zero `alpha`), if the storage is structurally invalid, or, for a
-    /// primitive integer `T` under overflow checks, on integer overflow in the
-    /// scalar tail, the scaling or the `y` update; lane arithmetic is
-    /// backend-defined (see `# Overflow`).
+    /// primitive integer `T`, on integer overflow under overflow checks in the
+    /// accumulator combine, the horizontal reduction, the scalar tail, the
+    /// scaling or the `y` update. The lane multiply-add wraps (see
+    /// `# Overflow`).
     fn spmv_scaled(&self, alpha: T, x: &[T], y: &mut [T]);
 }
 

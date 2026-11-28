@@ -258,8 +258,10 @@ pub fn masked_add<T: SimdOps>(
 /// Computes sparse `SpMV` using CSR: `y += A · x`.
 ///
 /// # Panics
-/// Panics if `x.len() < ncols` or `y.len() < nrows`. Structural CSR validation
-/// is performed by [`ValidatedData::new`] before this function can be called.
+/// Panics if `x.len() < ncols` or `y.len() < nrows`, or, for a primitive
+/// integer `T`, on integer overflow under overflow checks in the sites of
+/// [`spmv_scaled_csr`] other than the scaling. Structural CSR validation is
+/// performed by [`ValidatedData::new`] before this function can be called.
 #[inline(always)]
 pub fn spmv_csr<T: SimdOps>(data: ValidatedData<CsrData<'_, T>>, x: &[T], y: &mut [T]) {
     T::spmv_csr(data, x, y);
@@ -274,10 +276,10 @@ pub fn spmv_csr<T: SimdOps>(data: ValidatedData<CsrData<'_, T>>, x: &[T], y: &mu
 ///
 /// # Panics
 /// Panics if `x.len() < ncols` or `y.len() < nrows` (also for a zero `alpha`),
-/// or, for a primitive integer `T` under overflow checks, on integer overflow
-/// in the scalar tail, the scaling or the `y` update; lane arithmetic is
-/// backend-defined (see `# Overflow` of
-/// [`SparseScaledSpMv`](crate::SparseScaledSpMv)).
+/// or, for a primitive integer `T`, on integer overflow under overflow checks
+/// in the accumulator combine, the horizontal reduction, the scalar tail, the
+/// scaling or the `y` update. The lane multiply-add wraps (see `# Overflow` of
+/// [`SparseScaledSpMv::spmv_scaled`](crate::SparseScaledSpMv::spmv_scaled)).
 #[inline(always)]
 pub fn spmv_scaled_csr<T: SimdOps>(
     data: ValidatedData<CsrData<'_, T>>,
