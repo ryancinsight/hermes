@@ -162,6 +162,9 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     fn masked_add(a: &[Self], b: &[Self], mask: &[bool], out: &mut [Self])
         -> Result<(), SimdError>;
     /// Computes sparse `SpMV` using CSR.
+    ///
+    /// The integer overflow sites are those of [`SimdOps::spmv_scaled_csr`]
+    /// except the scaling.
     fn spmv_csr(data: ValidatedData<CsrData<'_, Self>>, x: &[Self], y: &mut [Self]);
     /// Computes fused scaled sparse `SpMV` using CSR: `y += alpha * A * x`.
     ///
@@ -169,8 +172,11 @@ pub trait SimdOps: ScalarTrait + private::Sealed {
     ///
     /// # Panics
     /// Panics if `x.len() < ncols` or `y.len() < nrows` (also for a zero
-    /// `alpha`), or, for a primitive integer `Self` under overflow checks, on
-    /// integer overflow.
+    /// `alpha`), or, for a primitive integer `Self`, on integer overflow under
+    /// overflow checks in the accumulator combine, the horizontal reduction,
+    /// the scalar tail, the scaling or the `y` update. The lane multiply-add
+    /// wraps (see `# Overflow` of
+    /// [`SparseScaledSpMv::spmv_scaled`](crate::SparseScaledSpMv::spmv_scaled)).
     ///
     /// # Examples
     /// ```

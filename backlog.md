@@ -30,18 +30,6 @@ item below carries `milestone: M-fused-scaled-spmv`.
 - non-goals: native SVE, AMX or AVX-512 silicon evidence as a release gate,
   read prefetch, tensor model layers, demand-gated slice facades, crypto/hash.
 
-<a id="HERMES-SPMV-PANICS-DOC"></a>
-## HERMES-SPMV-PANICS-DOC — Say where the scaled SpMV overflow panics occur [patch] — todo
-- priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core/src/sparse/spmv.rs`, `crates/hermes-simd/src/dispatch/ops.rs`, `crates/hermes-simd/src/dispatch/simd_ops.rs`.
-- basis: cd0dabd38e1fe02b793782794f8ecdd94a95b9eb; finding: non-gating F10 of the judge verdict on hermes#291.
-- Outcome: each `# Panics` overflow clause names the scalar tail, the scaling
-  and the `y` update as the panic sites; a primitive-integer lane-block
-  overflow does not panic, so the unconditional wording is a false contract.
-- Acceptance: `git grep -n -E 'overflow checks, on( integer overflow\.)?$' -- crates`
-  returns no hit (three hits today: `spmv.rs:61`, `ops.rs:277`, `simd_ops.rs:172`).
-- Next step: reword each clause to "in the scalar tail, the scaling or the `y`
-  update" and keep the `# Overflow` cross-reference.
-
 <a id="HERMES-SPMV-ERROR-BOUND"></a>
 ## HERMES-SPMV-ERROR-BOUND — Document the scaled SpMV forward error [patch] — todo
 - priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core/src/sparse/spmv.rs`, `crates/hermes-simd/tests/sparse_tests.rs`.
@@ -85,12 +73,12 @@ item below carries `milestone: M-fused-scaled-spmv`.
 
 <a id="HERMES-SPLIT-OVERSIZE-SPARSE-FILES"></a>
 ## HERMES-SPLIT-OVERSIZE-SPARSE-FILES — Bring `dispatch/ops.rs` and `sparse_tests.rs` under 500 lines [patch] — todo
-- priority: tightening; milestone: M-fused-scaled-spmv; needs: HERMES-SPMV-PANICS-DOC, HERMES-SPMV-ERROR-BOUND, HERMES-SPMV-SCALED-DOCTESTS, HERMES-SPMV-DOC-RESIDUALS; scope: `crates/hermes-simd/src/dispatch/ops.rs`, `crates/hermes-simd/tests/sparse_tests.rs`.
+- priority: tightening; milestone: M-fused-scaled-spmv; needs: HERMES-SPMV-ERROR-BOUND, HERMES-SPMV-SCALED-DOCTESTS, HERMES-SPMV-DOC-RESIDUALS; scope: `crates/hermes-simd/src/dispatch/ops.rs`, `crates/hermes-simd/tests/sparse_tests.rs`.
 - basis: cd0dabd38e1fe02b793782794f8ecdd94a95b9eb; finding: non-gating F14 of the judge verdict on hermes#291.
-- Outcome: `dispatch/ops.rs` (586 lines) and `sparse_tests.rs` (1369) each
+- Outcome: `dispatch/ops.rs` (591 lines) and `sparse_tests.rs` (1757) each
   split into concern-named leaf modules of at most 500 lines; no behavior or
   public path changes.
-- Acceptance: `wc -l` of every resulting file is at most 500 (586 and 1369
+- Acceptance: `wc -l` of every resulting file is at most 500 (591 and 1757
   today), and the leaf names (last `::` segment) of
   `cargo nextest list -p hermes-simd -E 'binary_id(=hermes-simd::sparse_tests)'`
   are the same set before and after, with every `test_spmv_scaled_csr_*` test
@@ -98,6 +86,14 @@ item below carries `milestone: M-fused-scaled-spmv`.
 - Next step: group `ops.rs` by operation family; make `sparse_tests` one
   harness (`tests/sparse_tests/main.rs`, binary id unchanged) with one module
   per kernel family, the scaled family at the root. It follows its needs.
+
+<a id="HERMES-SPMV-OTHER-FORMAT-OVERFLOW"></a>
+## HERMES-SPMV-OTHER-FORMAT-OVERFLOW — Document and test the integer overflow sites of the non-CSR SpMV formats [patch] — todo
+- priority: verification; milestone: M-fused-scaled-spmv; needs: none; scope: `crates/hermes-simd-core/src/sparse/spmv.rs`, `crates/hermes-simd-core/src/sparse/spmv/sellp.rs`, `crates/hermes-simd-core/src/sparse/spmv/blocked_coo.rs`, `crates/hermes-simd-core/src/sparse/spmv/dense_with_mask.rs`, `crates/hermes-simd/tests/sparse_tests.rs`.
+- basis: ecb3e23eb63b989024c71c18e1cf85bd5eb0ace6; finding: F4 of the judge verdict on hermes#321.
+- Outcome: the `SparseSpMv::spmv` of SELL-p, blocked COO and dense-with-mask storage states which primitive-integer sites panic under overflow checks and which wrap, as the CSR kernel does after hermes#321; the CSR rows are checked by `test_spmv_csr_primitive_integer_overflow_sites_match_the_documented_contract`.
+- Acceptance: one value-asserting test per format runs an `Exact` control and an overflowing witness per site and asserts the exact result, the wrapped result or the panic message; each format's Rustdoc says what the tests show. The `# Overflow` of `SparseSpMv::spmv` names the formats it covers.
+- Next step: read each kernel's accumulation and reduction calls, derive the witness rows as the CSR test does, then write the docs from the run.
 
 <a id="HERMES-CHANGELOG-GENERATOR"></a>
 ## HERMES-CHANGELOG-GENERATOR — Generate the changelog from conventional commits [patch] — blocked

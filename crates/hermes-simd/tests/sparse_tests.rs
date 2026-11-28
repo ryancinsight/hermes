@@ -422,6 +422,248 @@ fn test_spmv_scaled_csr_rejects_short_x_before_zero_alpha_return() {
     spmv_scaled_unit_row(0.0f32, &[1.0], &mut [0.0; 2]);
 }
 
+/// Where a one-row CSR witness for the integer overflow sites runs.
+#[derive(Clone, Copy, Debug)]
+enum OverflowBackend {
+    /// The kernel the host dispatches to; its lane count is not known here.
+    Dispatched,
+    /// The portable `Scalar` architecture, whose lane count fixes the lane
+    /// that holds each entry.
+    Portable,
+}
+
+/// The CSR entry point a witness runs through.
+#[derive(Clone, Copy, Debug)]
+enum OverflowEntry {
+    Scaled,
+    Unscaled,
+}
+
+/// What a primitive integer does at a witness. The `I8`, `I16` and `I32`
+/// newtypes always give the wrapped result.
+#[derive(Clone, Copy, Debug)]
+enum PrimitiveOutcome {
+    Exact,
+    Wraps,
+    Panics(&'static str),
+}
+
+const OVERFLOW_ADD: &str = "attempt to add with overflow";
+const OVERFLOW_MULTIPLY: &str = "attempt to multiply with overflow";
+
+/// One row `y0 + alpha * (values . x)` over the exact integers.
+#[derive(Debug)]
+struct OverflowRow {
+    backend: OverflowBackend,
+    values: Vec<i64>,
+    x: Vec<i64>,
+    alpha: i64,
+    y0: i64,
+    outcome: PrimitiveOutcome,
+}
+
+impl OverflowRow {
+    fn new(backend: OverflowBackend, values: Vec<i64>, outcome: PrimitiveOutcome) -> Self {
+        Self {
+            backend,
+            x: vec![1; values.len()],
+            values,
+            alpha: 1,
+            y0: 0,
+            outcome,
+        }
+    }
+}
+
+/// Witness rows for a primitive integer with largest value `max`. Each
+/// `Panics` row has an `Exact` control one step inside the bound. `lanes` is
+/// the `Scalar` lane count, so `4 * lanes` entries are one unrolled pass in
+/// which lane `l` of accumulator `a` holds entry `a * lanes + l`.
+fn overflow_rows(max: i64, lanes: usize) -> Vec<OverflowRow> {
+    use OverflowBackend::{Dispatched, Portable};
+    use PrimitiveOutcome::{Exact, Panics, Wraps};
+    let pass = 4 * lanes;
+    let pass_i64 = i64::try_from(pass).expect("invariant: a pass is a few dozen entries");
+    let mut rows = Vec::new();
+    // `pass` equal entries: every accumulator lane and every lane sum fits,
+    // the sum of all lanes is `max + 1` or more (horizontal reduction).
+    let reduction = max / pass_i64 + 1;
+    for (v, outcome) in [(reduction, Panics(OVERFLOW_ADD)), (reduction - 1, Exact)] {
+        rows.push(OverflowRow::new(Portable, vec![v; pass], outcome));
+    }
+    // Lane 0 holds `+v`, lane 1 `-v` in each of the four accumulators: the
+    // lane-0 combine is `4 * v`, the reduction never leaves `[-max - 1, max]`.
+    let combine = max / 4 + 1;
+    for (v, outcome) in [(combine, Panics(OVERFLOW_ADD)), (combine - 1, Exact)] {
+        let mut values = vec![0; pass];
+        for accumulator in 0..4 {
+            values[accumulator * lanes] = v;
+            values[accumulator * lanes + 1] = -v;
+        }
+        values[2] = 3;
+        let row = OverflowRow::new(Portable, values, outcome);
+        rows.push(OverflowRow {
+            alpha: 2,
+            y0: 5,
+            ..row
+        });
+    }
+    // Whatever the lane count, 64 equal entries sum to `max + 1` or more and
+    // no lane portion does.
+    let spread = max / 64 + 1;
+    for (v, outcome) in [(spread, Panics(OVERFLOW_ADD)), (spread - 1, Exact)] {
+        rows.push(OverflowRow::new(Dispatched, vec![v; 64], outcome));
+    }
+    // Two entries of lane 0 of accumulator 0 sum to `max + 1`: the lane
+    // multiply-add wraps that accumulation, and the reduction then fits.
+    let half = max / 2 + 1;
+    let mut values = vec![0; 2 * pass];
+    (values[0], values[pass], values[1]) = (half, half, 5);
+    rows.push(OverflowRow::new(Portable, values, Wraps));
+    let root = (1..=max)
+        .find(|r: &i64| r * r > max)
+        .expect("invariant: the root of max lies below max for max >= 2");
+    for backend in [Dispatched, Portable] {
+        for (r, outcome) in [(root, Panics(OVERFLOW_MULTIPLY)), (root - 1, Exact)] {
+            rows.push(OverflowRow {
+                x: vec![r],
+                ..OverflowRow::new(backend, vec![r], outcome)
+            });
+        }
+        for (alpha, outcome) in [(max / 2 + 1, Panics(OVERFLOW_MULTIPLY)), (max / 2, Exact)] {
+            let row = OverflowRow::new(backend, vec![1], outcome);
+            rows.push(OverflowRow {
+                alpha,
+                x: vec![2],
+                ..row
+            });
+        }
+        for (y0, outcome) in [(max, Panics(OVERFLOW_ADD)), (max - 1, Exact)] {
+            rows.push(OverflowRow {
+                y0,
+                ..OverflowRow::new(backend, vec![1], outcome)
+            });
+        }
+        // `root * root` exceeds `max` inside a lane multiply-add of a lane block.
+        let mut values = vec![0; 64];
+        values[0] = root;
+        rows.push(OverflowRow {
+            x: values.clone(),
+            ..OverflowRow::new(backend, values, Wraps)
+        });
+    }
+    rows
+}
+
+/// Runs one witness row through `entry`, returning the updated `y[0]`.
+fn run_overflow_row<T>(row: &OverflowRow, entry: OverflowEntry) -> T
+where
+    T: SimdOps + SimdScalar,
+    Scalar: SimdKernel<T>,
+{
+    let values: Vec<T> = row.values.iter().map(|&v| exact_element(v)).collect();
+    let x: Vec<T> = row.x.iter().map(|&v| exact_element(v)).collect();
+    let columns: Vec<i32> = (0..values.len())
+        .map(|c| i32::try_from(c).expect("invariant: witness rows are short"))
+        .collect();
+    let row_ptr = [
+        0,
+        i32::try_from(values.len()).expect("invariant: witness rows are short"),
+    ];
+    let data = validated(CsrData::new(
+        &values[..],
+        &columns[..],
+        &row_ptr[..],
+        1,
+        x.len(),
+    ));
+    let (alpha, mut y) = (exact_element::<T>(row.alpha), [exact_element::<T>(row.y0)]);
+    match (row.backend, entry) {
+        (OverflowBackend::Dispatched, OverflowEntry::Scaled) => {
+            spmv_scaled_csr::<T>(data, alpha, &x, &mut y);
+        }
+        (OverflowBackend::Dispatched, OverflowEntry::Unscaled) => spmv_csr::<T>(data, &x, &mut y),
+        (OverflowBackend::Portable, OverflowEntry::Scaled) => {
+            SparseView::<T, Validated<Csr>, Scalar>::from_validated_csr(data)
+                .spmv_scaled(alpha, &x, &mut y);
+        }
+        (OverflowBackend::Portable, OverflowEntry::Unscaled) => {
+            SparseView::<T, Validated<Csr>, Scalar>::from_validated_csr(data).spmv(&x, &mut y);
+        }
+    }
+    y[0]
+}
+
+/// The integer `value` of `T`, including the most negative one that
+/// `exact_element` cannot build from its magnitude.
+fn integer_element<T: SimdScalar>(value: i64, max: i64) -> T {
+    if value == -max - 1 {
+        exact_element::<T>(-max) - T::ONE
+    } else {
+        exact_element(value)
+    }
+}
+
+/// Whether integer `+` and `*` trap on overflow in this profile.
+fn overflow_checks_enabled() -> bool {
+    std::panic::catch_unwind(|| std::hint::black_box(i32::MAX) + std::hint::black_box(1)).is_err()
+}
+
+/// Every witness row of a primitive (`primitive`) or newtype integer `T`
+/// with largest value `max` gives the documented outcome: the exact result
+/// inside the range, the wrapped result at the lane multiply-add and for a
+/// newtype, and the panic message of the overflowing site otherwise.
+fn check_integer_overflow_rows<T>(max: i64, primitive: bool)
+where
+    T: SimdOps + SimdScalar,
+    Scalar: SimdKernel<T> + SimdStorage<T>,
+{
+    let traps = overflow_checks_enabled();
+    for row in overflow_rows(max, <Scalar as SimdStorage<T>>::LANE_COUNT) {
+        let dot: i64 = row.values.iter().zip(&row.x).map(|(v, x)| v * x).sum();
+        let exact = row.y0 + row.alpha * dot;
+        let wrapped = (exact + max + 1).rem_euclid(2 * (max + 1)) - max - 1;
+        let entries: &[OverflowEntry] = if row.alpha == 1 {
+            &[OverflowEntry::Scaled, OverflowEntry::Unscaled]
+        } else {
+            &[OverflowEntry::Scaled]
+        };
+        for &entry in entries {
+            let run = || run_overflow_row::<T>(&row, entry);
+            match row.outcome {
+                PrimitiveOutcome::Exact => {
+                    assert_eq!(run(), integer_element::<T>(exact, max), "{entry:?} {row:?}");
+                }
+                PrimitiveOutcome::Panics(message) if primitive && traps => {
+                    let payload = std::panic::catch_unwind(std::panic::AssertUnwindSafe(run))
+                        .expect_err("an overflowing integer site must panic under overflow checks");
+                    let observed = payload.downcast_ref::<&str>().copied();
+                    assert_eq!(observed, Some(message), "{entry:?} {row:?}");
+                }
+                _ => assert_eq!(
+                    run(),
+                    integer_element::<T>(wrapped, max),
+                    "{entry:?} {row:?}"
+                ),
+            }
+        }
+    }
+}
+
+#[test]
+fn test_spmv_csr_primitive_integer_overflow_sites_match_the_documented_contract() {
+    check_integer_overflow_rows::<i8>(i64::from(i8::MAX), true);
+    check_integer_overflow_rows::<i16>(i64::from(i16::MAX), true);
+    check_integer_overflow_rows::<i32>(i64::from(i32::MAX), true);
+}
+
+#[test]
+fn test_spmv_csr_integer_newtypes_wrap_at_every_overflow_site() {
+    check_integer_overflow_rows::<I8>(i64::from(i8::MAX), false);
+    check_integer_overflow_rows::<I16>(i64::from(i16::MAX), false);
+    check_integer_overflow_rows::<I32>(i64::from(i32::MAX), false);
+}
+
 #[test]
 fn test_spmv_dense_masked() {
     let values = [1.0f32, 0.0, 0.0, 1.0]; // 2x2 identity
